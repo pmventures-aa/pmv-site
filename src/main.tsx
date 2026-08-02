@@ -3,6 +3,11 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import Home from './pages/Home'
+import ServicesOverview from './pages/public/ServicesOverview'
+import ServiceDetail from './pages/public/ServiceDetail'
+import About from './pages/public/About'
+import ServiceArea from './pages/public/ServiceArea'
+import Contact from './pages/public/Contact'
 import PortalApp from './pages/portal/PortalApp'
 import AdminApp from './pages/admin/AdminApp'
 import { AuthProvider } from './lib/auth'
@@ -33,6 +38,11 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
+      <Route path="/services" element={<ServicesOverview />} />
+      <Route path="/services/:slug" element={<ServiceDetail />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/service-area" element={<ServiceArea />} />
+      <Route path="/contact" element={<Contact />} />
       <Route path="/portal/*" element={<PortalApp />} />
       <Route path="/admin/*" element={<AdminApp />} />
       <Route path="*" element={<Navigate to="/" replace />} />

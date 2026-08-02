@@ -24,6 +24,7 @@ export const portalNav: NavItem[] = [
 export const adminNav: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', to: '', icon: '⌂' },
   { key: 'clients', label: 'Clients', to: 'clients', icon: '☺' },
+  { key: 'inquiries', label: 'Inquiries', to: 'inquiries', icon: '✉' },
   { key: 'users', label: 'Users', to: 'users', icon: '⚙' },
   { key: 'assignments', label: 'Assignments', to: 'assignments', icon: '⇄' },
   { key: 'settings', label: 'Settings', to: 'settings', icon: '⚙' },
