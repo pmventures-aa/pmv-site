@@ -4,6 +4,7 @@ import { Shell } from '../../components/layout/Shell'
 import { adminNav } from '../../components/layout/nav'
 import { useAuth } from '../../lib/auth'
 import Login from '../auth/Login'
+import SetPassword from '../auth/SetPassword'
 import AdminDashboard from './AdminDashboard'
 import ClientsList from './ClientsList'
 import ClientDetail from './ClientDetail'
@@ -22,6 +23,7 @@ export default function AdminApp() {
   return (
     <Routes>
       <Route path="login" element={<Login surface="staff" />} />
+      <Route path="set-password" element={<SetPassword surface="staff" />} />
 
       <Route element={<ProtectedRoute allow={['staff', 'admin']} />}>
         <Route element={<AdminShell />}>
