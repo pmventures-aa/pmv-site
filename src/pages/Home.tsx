@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { Card, StatusBadge, Logo, Crest } from '../components/ui'
 
 const services = [
@@ -23,7 +22,7 @@ export default function Home() {
             <a href="#contact" className="hover:text-gold">Contact</a>
           </nav>
           <div className="flex items-center gap-3">
-            <Link to="/portal" className="btn-outline hidden sm:inline-flex">Client Portal</Link>
+            <a href="https://client.pinnaclemanagementventures.com/login" className="btn-outline hidden sm:inline-flex">Client Portal</a>
             <a href="#contact" className="btn-gold">Get Started</a>
           </div>
         </div>
@@ -43,7 +42,7 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <a href="#contact" className="btn-gold">Book a consultation</a>
-            <Link to="/portal" className="btn-outline">Enter client portal</Link>
+            <a href="https://client.pinnaclemanagementventures.com/login" className="btn-outline">Enter client portal</a>
           </div>
         </div>
       </section>
@@ -91,7 +90,7 @@ export default function Home() {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <a href="mailto:support@pinnaclemanagementventures.com" className="btn-gold">Email us</a>
-            <Link to="/portal" className="btn-outline">Client login</Link>
+            <a href="https://client.pinnaclemanagementventures.com/login" className="btn-outline">Client login</a>
           </div>
         </Card>
       </section>

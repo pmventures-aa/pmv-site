@@ -1,1 +1,0 @@
-{"root":["./src/main.tsx","./src/components/ui.tsx","./src/pages/AdminPlaceholder.tsx","./src/pages/Home.tsx","./src/pages/PortalPlaceholder.tsx","./functions/_lib/access.ts","./functions/_lib/crypto.ts","./functions/_lib/session.ts","./functions/_lib/types.ts","./functions/api/[[route]].ts"],"version":"5.9.3"}
