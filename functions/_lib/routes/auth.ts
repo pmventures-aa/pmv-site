@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv, SessionUser } from '../types'
 import { uuid, hashPassword, verifyPassword } from '../crypto'
-import { createSession, sessionCookie, clearCookie, destroySession } from '../session'
+import { createSession, sessionCookie, clearCookie, destroySession, createActivationToken, consumeActivationToken } from '../session'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -91,26 +91,59 @@ authRoutes.post('/signup', async (c) => {
 })
 
 // ---------- first-admin bootstrap (only works while there are zero users) ----------
+// No password is accepted here — the account is created with no usable
+// password_hash, and a one-time, single-use activation token is returned
+// instead. The caller must hit POST /auth/set-password with that token to
+// choose the actual password. This avoids ever having a system-generated
+// or hardcoded password exist anywhere (in code, logs, or responses).
 authRoutes.post('/bootstrap', async (c) => {
-  const { email, password, full_name } = await c.req.json<{ email: string; password: string; full_name?: string }>()
-    .catch(() => ({ email: '', password: '', full_name: '' }))
+  const { email, full_name } = await c.req.json<{ email: string; full_name?: string }>()
+    .catch(() => ({ email: '', full_name: '' }))
   const e = norm(email)
-  if (!e || !password) return c.json({ error: 'email and password required' }, 400)
-  if (password.length < MIN_PASSWORD) return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
+  if (!e) return c.json({ error: 'email required' }, 400)
 
   const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>()
   if ((count?.n ?? 0) > 0) return c.json({ error: 'bootstrap disabled: an account already exists' }, 403)
 
   const id = uuid()
-  const hash = await hashPassword(password)
   await c.env.DB.prepare(
     `INSERT INTO users (id, email, password_hash, role, full_name, two_factor_enabled, status)
-     VALUES (?, ?, ?, 'admin', ?, 0, 'active')`,
-  ).bind(id, e, hash, full_name ?? null).run()
+     VALUES (?, ?, NULL, 'admin', ?, 0, 'active')`,
+  ).bind(id, e, full_name ?? null).run()
 
-  const su: SessionUser = { id, email: e, role: 'admin', full_name: full_name ?? null }
-  const token = await createSession(c.env, su)
-  c.header('Set-Cookie', sessionCookie(token))
+  const setupToken = await createActivationToken(c.env, id)
+  return c.json({ ok: true, user: { id, email: e, role: 'admin', full_name: full_name ?? null }, setup_token: setupToken }, 201)
+})
+
+// ---------- set-password (consumes a one-time activation token) ----------
+// Used both for the bootstrap admin's first password and, going forward,
+// for any account created without a password (e.g. admin-created staff
+// invited via a setup link instead of a temporary password).
+authRoutes.post('/set-password', async (c) => {
+  const { token, password } = await c.req.json<{ token: string; password: string }>()
+    .catch(() => ({ token: '', password: '' }))
+  if (!token || !password) return c.json({ error: 'token and password required' }, 400)
+  if (password.length < MIN_PASSWORD) return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
+
+  const userId = await consumeActivationToken(c.env, token)
+  if (!userId) return c.json({ error: 'this setup link is invalid or has expired — ask an admin for a new one' }, 400)
+
+  const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first<any>()
+  if (!user || user.status !== 'active') return c.json({ error: 'account not found or inactive' }, 400)
+
+  const hash = await hashPassword(password)
+  await c.env.DB.prepare("UPDATE users SET password_hash = ?, last_login_at = datetime('now') WHERE id = ?").bind(hash, userId).run()
+
+  const su: SessionUser = {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    full_name: user.full_name,
+    first_name: user.first_name ?? null,
+    last_name: user.last_name ?? null,
+  }
+  const sessToken = await createSession(c.env, su)
+  c.header('Set-Cookie', sessionCookie(sessToken))
   return c.json({ ok: true, user: su })
 })
 
@@ -131,7 +164,7 @@ authRoutes.post('/login', async (c) => {
     ok = await verifyPassword(password, user.password_hash)
   } else {
     // dummy verify to equalize timing and reduce user enumeration
-    await verifyPassword(password, 'pbkdf2$120000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')
+    await verifyPassword(password, 'pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')
   }
 
   if (!user || user.status !== 'active' || !ok) {

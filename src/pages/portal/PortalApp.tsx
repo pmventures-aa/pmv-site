@@ -5,6 +5,7 @@ import { Shell } from '../../components/layout/Shell'
 import { portalNav } from '../../components/layout/nav'
 import Login from '../auth/Login'
 import Signup from '../auth/Signup'
+import SetPassword from '../auth/SetPassword'
 import OnboardingWizard from './OnboardingWizard'
 import Dashboard from './Dashboard'
 import Services from './Services'
@@ -20,6 +21,7 @@ export default function PortalApp() {
     <Routes>
       <Route path="login" element={<Login surface="client" />} />
       <Route path="signup" element={<Signup />} />
+      <Route path="set-password" element={<SetPassword surface="client" />} />
 
       <Route element={<ProtectedRoute allow={['client']} />}>
         <Route path="onboarding" element={<OnboardingWizard />} />
