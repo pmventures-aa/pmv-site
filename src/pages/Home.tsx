@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Card, StatusBadge, Logo } from '../components/ui'
+import { Card, StatusBadge, Logo, Crest } from '../components/ui'
 
 const services = [
   { t: 'Business Formation', d: 'Entity setup, EIN, registered agent, and ongoing compliance calendars.', tag: 'Formation' },
@@ -32,6 +32,7 @@ export default function Home() {
       {/* Hero */}
       <section className="container-pmv pt-20 pb-16 text-center">
         <div className="mx-auto max-w-3xl">
+          <div className="mb-6 flex justify-center"><Crest size={104} /></div>
           <div className="mb-5 flex justify-center"><StatusBadge tone="gold">Trusted business management partner</StatusBadge></div>
           <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-6xl">
             Building stronger businesses and creating <span className="text-gold">lasting value</span>.

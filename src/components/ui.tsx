@@ -21,14 +21,30 @@ export function StatusBadge({ children, tone = 'slate' }: { children: React.Reac
   )
 }
 
-export function Logo({ className = '' }: { className?: string }) {
+export function Logo({ className = '', showText = true }: { className?: string; showText?: boolean }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <div className="grid h-9 w-9 place-items-center rounded-lg bg-gold text-navy-950 font-extrabold">P</div>
-      <div className="leading-tight">
-        <div className="text-sm font-bold tracking-tight text-white">PINNACLE</div>
-        <div className="text-[10px] font-medium uppercase tracking-[0.25em] text-gold">Management Ventures</div>
+      <div className="grid h-11 w-11 place-items-center overflow-hidden rounded-full bg-white shadow-glass ring-1 ring-white/20">
+        <img src="/logo-crest.png" alt="Pinnacle Management Ventures crest" className="h-9 w-9 object-contain" />
       </div>
+      {showText && (
+        <div className="leading-tight">
+          <div className="text-sm font-bold tracking-tight text-white">PINNACLE</div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.25em] text-gold">Management Ventures</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Large centered crest for hero / login screens
+export function Crest({ size = 96, className = '' }: { size?: number; className?: string }) {
+  return (
+    <div
+      className={`grid place-items-center overflow-hidden rounded-full bg-white shadow-glass ring-1 ring-white/20 ${className}`}
+      style={{ width: size, height: size }}
+    >
+      <img src="/logo-crest.png" alt="Pinnacle Management Ventures crest" style={{ width: size * 0.82, height: size * 0.82 }} className="object-contain" />
     </div>
   )
 }

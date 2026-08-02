@@ -19,7 +19,7 @@ export default function PortalPlaceholder() {
         <p className="eyebrow">Coming next</p>
         <h1 className="mt-2 text-3xl font-bold text-white">Secure client portal</h1>
         <p className="mt-3 max-w-2xl text-slate-300">
-          This route is wired and ready. Phase 2 adds authentication (password + 2FA), a database with
+          This route is wired and ready. Phase 2 adds secure password authentication, a database with
           row-level security, and each module below. Nothing here is live yet.
         </p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

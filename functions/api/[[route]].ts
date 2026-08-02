@@ -1,71 +1,91 @@
 import { Hono } from 'hono'
 import { handle } from 'hono/cloudflare-pages'
 import type { Env, SessionUser } from '../_lib/types'
-import { uuid, randomCode, hashSecret, constantTimeEqual } from '../_lib/crypto'
-import {
-  createSession, sessionCookie, clearCookie, getUser, destroySession,
-} from '../_lib/session'
+import { uuid, hashPassword, verifyPassword } from '../_lib/crypto'
+import { createSession, sessionCookie, clearCookie, getUser, destroySession } from '../_lib/session'
 import { visibleClientIds } from '../_lib/access'
 
 type Vars = { user: SessionUser }
 const app = new Hono<{ Bindings: Env; Variables: Vars }>().basePath('/api')
 
+const MIN_PASSWORD = 10
+const MAX_FAILS = 5           // failed attempts before lockout
+const LOCKOUT_SECONDS = 15 * 60
+
+// ---------- helpers ----------
+const norm = (e: string) => (e || '').trim().toLowerCase()
+
+async function throttleKey(env: Env, email: string) {
+  return `fail:${email}`
+}
+async function isLockedOut(env: Env, email: string): Promise<boolean> {
+  const raw = await env.SESSIONS.get(await throttleKey(env, email))
+  return raw ? parseInt(raw, 10) >= MAX_FAILS : false
+}
+async function recordFailure(env: Env, email: string) {
+  const k = await throttleKey(env, email)
+  const cur = parseInt((await env.SESSIONS.get(k)) || '0', 10) + 1
+  await env.SESSIONS.put(k, String(cur), { expirationTtl: LOCKOUT_SECONDS })
+}
+async function clearFailures(env: Env, email: string) {
+  await env.SESSIONS.delete(await throttleKey(env, email))
+}
+
 // ---------- health ----------
 app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
 
-// ---------- auth: step 1 — request an OTP ----------
-app.post('/auth/request-otp', async (c) => {
-  const { email, password } = await c.req.json<{ email: string; password?: string }>().catch(() => ({ email: '', password: undefined as string | undefined }))
-  if (!email) return c.json({ error: 'email required' }, 400)
+// ---------- first-admin bootstrap (only works while there are zero users) ----------
+app.post('/auth/bootstrap', async (c) => {
+  const { email, password, full_name } = await c.req.json<{ email: string; password: string; full_name?: string }>()
+    .catch(() => ({ email: '', password: '', full_name: '' }))
+  const e = norm(email)
+  if (!e || !password) return c.json({ error: 'email and password required' }, 400)
+  if (password.length < MIN_PASSWORD) return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
 
-  const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?')
-    .bind(email.toLowerCase()).first<any>()
-  // Always return ok to avoid leaking which emails exist.
-  if (!user || user.status !== 'active') return c.json({ ok: true })
+  const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>()
+  if ((count?.n ?? 0) > 0) return c.json({ error: 'bootstrap disabled: an account already exists' }, 403)
 
-  // Optional password gate before OTP.
-  if (user.password_hash && password !== undefined) {
-    const ph = await hashSecret(password, user.id)
-    if (!(await constantTimeEqual(ph, user.password_hash))) return c.json({ error: 'invalid credentials' }, 401)
-  }
-
-  const code = randomCode(6)
-  const codeHash = await hashSecret(code, user.id)
-  const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  const id = uuid()
+  const hash = await hashPassword(password)
   await c.env.DB.prepare(
-    'INSERT INTO otp_codes (id, user_id, purpose, code_hash, expires_at) VALUES (?, ?, ?, ?, ?)',
-  ).bind(uuid(), user.id, 'login', codeHash, expires).run()
+    `INSERT INTO users (id, email, password_hash, role, full_name, two_factor_enabled, status)
+     VALUES (?, ?, ?, 'admin', ?, 0, 'active')`,
+  ).bind(id, e, hash, full_name ?? null).run()
 
-  // TODO(phase-2): send `code` via email (and SMS if phone_verified) instead of returning it.
-  const debug = c.env.SESSION_SECRET === 'dev' ? { dev_code: code } : {}
-  return c.json({ ok: true, ...debug })
+  const su: SessionUser = { id, email: e, role: 'admin', full_name: full_name ?? null }
+  const token = await createSession(c.env, su)
+  c.header('Set-Cookie', sessionCookie(token))
+  return c.json({ ok: true, user: su })
 })
 
-// ---------- auth: step 2 — verify OTP, issue session ----------
-app.post('/auth/verify-otp', async (c) => {
-  const { email, code } = await c.req.json<{ email: string; code: string }>().catch(() => ({ email: '', code: '' }))
-  if (!email || !code) return c.json({ error: 'email and code required' }, 400)
+// ---------- login (password) with throttling ----------
+app.post('/auth/login', async (c) => {
+  const { email, password } = await c.req.json<{ email: string; password: string }>()
+    .catch(() => ({ email: '', password: '' }))
+  const e = norm(email)
+  if (!e || !password) return c.json({ error: 'email and password required' }, 400)
 
-  const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?')
-    .bind(email.toLowerCase()).first<any>()
-  if (!user) return c.json({ error: 'invalid code' }, 401)
-
-  const row = await c.env.DB.prepare(
-    `SELECT * FROM otp_codes WHERE user_id = ? AND purpose = 'login' AND consumed = 0
-     ORDER BY created_at DESC LIMIT 1`,
-  ).bind(user.id).first<any>()
-  if (!row) return c.json({ error: 'invalid code' }, 401)
-  if (row.attempts >= 5) return c.json({ error: 'too many attempts' }, 429)
-  if (new Date(row.expires_at).getTime() < Date.now()) return c.json({ error: 'code expired' }, 401)
-
-  const ok = await constantTimeEqual(await hashSecret(code, user.id), row.code_hash)
-  if (!ok) {
-    await c.env.DB.prepare('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?').bind(row.id).run()
-    return c.json({ error: 'invalid code' }, 401)
+  if (await isLockedOut(c.env, e)) {
+    return c.json({ error: 'too many attempts — try again in 15 minutes' }, 429)
   }
-  await c.env.DB.prepare('UPDATE otp_codes SET consumed = 1 WHERE id = ?').bind(row.id).run()
-  await c.env.DB.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").bind(user.id).run()
 
+  const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(e).first<any>()
+  // Constant-ish: still run a verify to reduce user-enumeration timing differences.
+  let ok = false
+  if (user && user.status === 'active' && user.password_hash) {
+    ok = await verifyPassword(password, user.password_hash)
+  } else {
+    // dummy verify to equalize timing and reduce user enumeration
+    await verifyPassword(password, 'pbkdf2$120000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')
+  }
+
+  if (!user || user.status !== 'active' || !ok) {
+    await recordFailure(c.env, e)
+    return c.json({ error: 'invalid email or password' }, 401)
+  }
+
+  await clearFailures(c.env, e)
+  await c.env.DB.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").bind(user.id).run()
   const su: SessionUser = { id: user.id, email: user.email, role: user.role, full_name: user.full_name }
   const token = await createSession(c.env, su)
   c.header('Set-Cookie', sessionCookie(token))
@@ -78,22 +98,50 @@ app.post('/auth/logout', async (c) => {
   return c.json({ ok: true })
 })
 
-// ---------- auth guard for everything under /api/me and /api/portal ----------
-app.use('/me', async (c, next) => requireUser(c, next))
-app.use('/portal/*', async (c, next) => requireUser(c, next))
-
+// ---------- auth guards ----------
 async function requireUser(c: any, next: any) {
   const user = await getUser(c.env, c.req.raw)
   if (!user) return c.json({ error: 'unauthorized' }, 401)
   c.set('user', user)
   await next()
 }
+async function requireAdmin(c: any, next: any) {
+  const user = await getUser(c.env, c.req.raw)
+  if (!user) return c.json({ error: 'unauthorized' }, 401)
+  if (user.role !== 'admin') return c.json({ error: 'forbidden' }, 403)
+  c.set('user', user)
+  await next()
+}
+
+app.use('/me', requireUser)
+app.use('/portal/*', requireUser)
+app.use('/admin/*', requireAdmin)
 
 app.get('/me', (c) => c.json({ user: c.get('user') }))
 
-// ---------- sample authenticated, access-scoped route ----------
-// Returns the caller's visible matters. Clients see their own; staff see
-// assigned clients'; admins see all — enforced by visibleClientIds().
+// ---------- admin: create a user (client or staff) ----------
+app.post('/admin/users', async (c) => {
+  const { email, password, role, full_name } = await c.req.json<{
+    email: string; password: string; role?: string; full_name?: string
+  }>().catch(() => ({ email: '', password: '', role: 'client', full_name: '' }))
+  const e = norm(email)
+  const r = ['client', 'staff', 'admin'].includes(role ?? '') ? (role as string) : 'client'
+  if (!e || !password) return c.json({ error: 'email and password required' }, 400)
+  if (password.length < MIN_PASSWORD) return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
+
+  const exists = await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(e).first()
+  if (exists) return c.json({ error: 'a user with that email already exists' }, 409)
+
+  const id = uuid()
+  const hash = await hashPassword(password)
+  await c.env.DB.prepare(
+    `INSERT INTO users (id, email, password_hash, role, full_name, two_factor_enabled, status)
+     VALUES (?, ?, ?, ?, ?, 0, 'active')`,
+  ).bind(id, e, hash, r, full_name ?? null).run()
+  return c.json({ ok: true, user: { id, email: e, role: r, full_name: full_name ?? null } })
+})
+
+// ---------- sample access-scoped route ----------
 app.get('/portal/matters', async (c) => {
   const user = c.get('user')
   const ids = await visibleClientIds(c.env, user)
