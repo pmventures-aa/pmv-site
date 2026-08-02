@@ -1,0 +1,343 @@
+import { Hono } from 'hono'
+import type { AppEnv } from '../types'
+import { requireUser } from '../mid'
+import { uuid } from '../crypto'
+import { resolveClientId, loadScopedRow, scopeFilter, ScopeError } from '../scope'
+
+export const portalRoutes = new Hono<AppEnv>()
+portalRoutes.use('*', requireUser)
+
+portalRoutes.onError((err, c) => {
+  if (err instanceof ScopeError) return c.json({ error: err.message }, err.status as any)
+  console.error(err)
+  return c.json({ error: 'internal error' }, 500)
+})
+
+async function listScoped(c: any, table: string, extra = '') {
+  const user = c.get('user')
+  const { where, params } = await scopeFilter(c.env, user)
+  const res = await c.env.DB.prepare(
+    `SELECT * FROM ${table} WHERE ${where} ${extra} ORDER BY created_at DESC LIMIT 200`,
+  ).bind(...params).all()
+  return res.results ?? []
+}
+
+// ---------------- Dashboard ----------------
+portalRoutes.get('/dashboard', async (c) => {
+  const user = c.get('user')
+  const { where, params } = await scopeFilter(c.env, user)
+  const p2 = () => [...params]
+
+  const [matters, tasks, docs, invoices, tickets, calls, appts, msgs] = await Promise.all([
+    c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${where} AND status != 'closed'`).bind(...p2()).first<{ n: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${where} AND status != 'done'`).bind(...p2()).first<{ n: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) n FROM document_requests WHERE ${where} AND status = 'requested'`).bind(...p2()).first<{ n: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) n FROM invoices WHERE ${where} AND status = 'open'`).bind(...p2()).first<{ n: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) n FROM support_tickets WHERE ${where} AND status = 'open'`).bind(...p2()).first<{ n: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) n FROM planned_calls WHERE ${where} AND status = 'requested'`).bind(...p2()).first<{ n: number }>(),
+    c.env.DB.prepare(`SELECT * FROM appointments WHERE ${where} AND starts_at >= datetime('now') ORDER BY starts_at ASC LIMIT 5`).bind(...p2()).all(),
+    c.env.DB.prepare(`SELECT * FROM secure_messages WHERE ${where} ORDER BY created_at DESC LIMIT 5`).bind(...p2()).all(),
+  ])
+
+  return c.json({
+    stats: {
+      open_matters: matters?.n ?? 0,
+      open_tasks: tasks?.n ?? 0,
+      pending_documents: docs?.n ?? 0,
+      open_invoices: invoices?.n ?? 0,
+      open_tickets: tickets?.n ?? 0,
+      pending_calls: calls?.n ?? 0,
+    },
+    upcoming_appointments: appts.results ?? [],
+    recent_messages: msgs.results ?? [],
+  })
+})
+
+// ---------------- Planned Calls ----------------
+portalRoutes.get('/calls', async (c) => c.json({ calls: await listScoped(c, 'planned_calls') }))
+
+portalRoutes.post('/calls', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ topic: string; preferred_times?: string[]; client_user_id?: string }>().catch(() => null)
+  if (!body?.topic) return c.json({ error: 'topic is required' }, 400)
+  const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO planned_calls (id, client_user_id, topic, preferred_times, status) VALUES (?, ?, ?, ?, 'requested')`,
+  ).bind(id, clientId, body.topic.trim().slice(0, 300), JSON.stringify(body.preferred_times ?? [])).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+portalRoutes.patch('/calls/:id', async (c) => {
+  const user = c.get('user')
+  const row = await loadScopedRow<any>(c.env, user, 'planned_calls', c.req.param('id'))
+  const body = await c.req.json<{ status?: string; scheduled_at?: string; notes?: string }>().catch(() => ({} as { status?: string; scheduled_at?: string; notes?: string }))
+  if (user.role === 'client') {
+    if (body.status && body.status !== 'cancelled') return c.json({ error: 'clients may only cancel a call' }, 403)
+    if (body.status === 'cancelled') {
+      await c.env.DB.prepare("UPDATE planned_calls SET status = 'cancelled' WHERE id = ?").bind(row.id).run()
+    }
+    return c.json({ ok: true })
+  }
+  const status = ['requested', 'scheduled', 'completed', 'cancelled'].includes(body.status ?? '') ? body.status : undefined
+  await c.env.DB.prepare(
+    `UPDATE planned_calls SET status = COALESCE(?, status), scheduled_at = COALESCE(?, scheduled_at),
+     notes = COALESCE(?, notes), staff_user_id = COALESCE(?, staff_user_id) WHERE id = ?`,
+  ).bind(status ?? null, body.scheduled_at ?? null, body.notes ?? null, user.id, row.id).run()
+  return c.json({ ok: true })
+})
+
+// ---------------- Matters ----------------
+portalRoutes.get('/matters', async (c) => c.json({ matters: await listScoped(c, 'matters') }))
+
+portalRoutes.post('/matters', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ title: string; type?: string; due_date?: string; client_user_id?: string }>().catch(() => null)
+  if (!body?.title) return c.json({ error: 'title is required' }, 400)
+  const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO matters (id, client_user_id, title, type, due_date, status) VALUES (?, ?, ?, ?, ?, 'open')`,
+  ).bind(id, clientId, body.title.trim().slice(0, 300), body.type ?? null, body.due_date ?? null).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+portalRoutes.patch('/matters/:id', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
+  const row = await loadScopedRow<any>(c.env, user, 'matters', c.req.param('id'))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const status = ['open', 'in_progress', 'blocked', 'closed'].includes(body.status ?? '') ? body.status : undefined
+  if (status) await c.env.DB.prepare('UPDATE matters SET status = ? WHERE id = ?').bind(status, row.id).run()
+  return c.json({ ok: true })
+})
+
+// ---------------- Tasks ----------------
+portalRoutes.get('/tasks', async (c) => c.json({ tasks: await listScoped(c, 'client_tasks') }))
+
+portalRoutes.post('/tasks', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ title: string; due_date?: string; matter_id?: string; client_user_id?: string }>().catch(() => null)
+  if (!body?.title) return c.json({ error: 'title is required' }, 400)
+  const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO client_tasks (id, client_user_id, matter_id, title, due_date, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
+  ).bind(id, clientId, body.matter_id ?? null, body.title.trim().slice(0, 300), body.due_date ?? null).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+portalRoutes.patch('/tasks/:id', async (c) => {
+  const user = c.get('user')
+  const row = await loadScopedRow<any>(c.env, user, 'client_tasks', c.req.param('id'))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const status = ['pending', 'in_progress', 'done'].includes(body.status ?? '') ? body.status : undefined
+  if (status) await c.env.DB.prepare('UPDATE client_tasks SET status = ? WHERE id = ?').bind(status, row.id).run()
+  return c.json({ ok: true })
+})
+
+// ---------------- Documents ----------------
+// Metadata only for now — actual file storage requires an R2 bucket binding (not yet provisioned).
+portalRoutes.get('/documents', async (c) => c.json({ documents: await listScoped(c, 'client_documents') }))
+
+portalRoutes.post('/documents', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ category?: string; tax_year?: number; file_name?: string; client_user_id?: string }>().catch(() => null)
+  const clientId = await resolveClientId(c.env, user, body?.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO client_documents (id, client_user_id, category, tax_year, file_name, review_status) VALUES (?, ?, ?, ?, ?, 'pending')`,
+  ).bind(id, clientId, body?.category ?? null, body?.tax_year ?? null, body?.file_name ?? null).run()
+  return c.json({ ok: true, id, note: 'File upload storage (R2) is not yet configured — this records a document request placeholder.' }, 201)
+})
+
+portalRoutes.get('/document-requests', async (c) => c.json({ requests: await listScoped(c, 'document_requests') }))
+
+// ---------------- Messages ----------------
+portalRoutes.get('/messages', async (c) => c.json({ messages: await listScoped(c, 'secure_messages') }))
+
+portalRoutes.post('/messages', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ body: string; client_user_id?: string }>().catch(() => null)
+  if (!body?.body?.trim()) return c.json({ error: 'message body is required' }, 400)
+  const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO secure_messages (id, client_user_id, sender_user_id, body) VALUES (?, ?, ?, ?)`,
+  ).bind(id, clientId, user.id, body.body.trim().slice(0, 4000)).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+// ---------------- Calendar (appointments) ----------------
+portalRoutes.get('/calendar', async (c) => c.json({ appointments: await listScoped(c, 'appointments', 'ORDER BY starts_at ASC') }))
+
+portalRoutes.post('/calendar', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ title: string; starts_at: string; client_user_id?: string }>().catch(() => null)
+  if (!body?.title || !body?.starts_at) return c.json({ error: 'title and starts_at are required' }, 400)
+  const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO appointments (id, client_user_id, title, starts_at, status) VALUES (?, ?, ?, ?, 'proposed')`,
+  ).bind(id, clientId, body.title.trim().slice(0, 300), body.starts_at).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+portalRoutes.patch('/calendar/:id', async (c) => {
+  const user = c.get('user')
+  const row = await loadScopedRow<any>(c.env, user, 'appointments', c.req.param('id'))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const allowed = user.role === 'client' ? ['cancelled'] : ['proposed', 'confirmed', 'completed', 'cancelled']
+  if (body.status && allowed.includes(body.status)) {
+    await c.env.DB.prepare('UPDATE appointments SET status = ? WHERE id = ?').bind(body.status, row.id).run()
+  }
+  return c.json({ ok: true })
+})
+
+// ---------------- Billing (invoices — read only for clients) ----------------
+portalRoutes.get('/billing', async (c) => c.json({ invoices: await listScoped(c, 'invoices') }))
+
+portalRoutes.post('/billing', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
+  const body = await c.req.json<{ amount_cents: number; due_date?: string; client_user_id: string }>().catch(() => null)
+  if (!body?.amount_cents || !body.client_user_id) return c.json({ error: 'amount_cents and client_user_id are required' }, 400)
+  const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO invoices (id, client_user_id, amount_cents, due_date, status) VALUES (?, ?, ?, ?, 'open')`,
+  ).bind(id, clientId, body.amount_cents, body.due_date ?? null).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+portalRoutes.patch('/billing/:id', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
+  const row = await loadScopedRow<any>(c.env, user, 'invoices', c.req.param('id'))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const status = ['open', 'paid', 'void'].includes(body.status ?? '') ? body.status : undefined
+  if (status) await c.env.DB.prepare('UPDATE invoices SET status = ? WHERE id = ?').bind(status, row.id).run()
+  return c.json({ ok: true })
+})
+
+// ---------------- Funding ----------------
+portalRoutes.get('/funding', async (c) => c.json({ applications: await listScoped(c, 'funding_applications') }))
+
+portalRoutes.post('/funding', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ amount_requested_cents?: number; use_of_funds?: string; client_user_id?: string }>().catch(() => null)
+  const clientId = await resolveClientId(c.env, user, body?.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO funding_applications (id, client_user_id, amount_requested_cents, use_of_funds, status) VALUES (?, ?, ?, ?, 'draft')`,
+  ).bind(id, clientId, body?.amount_requested_cents ?? null, body?.use_of_funds ?? null).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+portalRoutes.patch('/funding/:id', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
+  const row = await loadScopedRow<any>(c.env, user, 'funding_applications', c.req.param('id'))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const status = ['draft', 'submitted', 'under_review', 'approved', 'declined'].includes(body.status ?? '') ? body.status : undefined
+  if (status) await c.env.DB.prepare('UPDATE funding_applications SET status = ? WHERE id = ?').bind(status, row.id).run()
+  return c.json({ ok: true })
+})
+
+// ---------------- Property ----------------
+portalRoutes.get('/property', async (c) => c.json({ properties: await listScoped(c, 'properties') }))
+
+portalRoutes.post('/property', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ address: string; property_type?: string; notes?: string; client_user_id?: string }>().catch(() => null)
+  if (!body?.address) return c.json({ error: 'address is required' }, 400)
+  const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO properties (id, client_user_id, address, property_type, notes, status) VALUES (?, ?, ?, ?, ?, 'active')`,
+  ).bind(id, clientId, body.address.trim().slice(0, 300), body.property_type ?? null, body.notes ?? null).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+portalRoutes.patch('/property/:id', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
+  const row = await loadScopedRow<any>(c.env, user, 'properties', c.req.param('id'))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const status = ['active', 'under_contract', 'sold', 'inactive'].includes(body.status ?? '') ? body.status : undefined
+  if (status) await c.env.DB.prepare('UPDATE properties SET status = ? WHERE id = ?').bind(status, row.id).run()
+  return c.json({ ok: true })
+})
+
+// ---------------- Tax ----------------
+portalRoutes.get('/tax', async (c) => c.json({ filings: await listScoped(c, 'tax_filings') }))
+
+portalRoutes.post('/tax', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ tax_year: number; filing_type?: string; due_date?: string; client_user_id?: string }>().catch(() => null)
+  if (!body?.tax_year) return c.json({ error: 'tax_year is required' }, 400)
+  const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO tax_filings (id, client_user_id, tax_year, filing_type, due_date, status) VALUES (?, ?, ?, ?, ?, 'not_started')`,
+  ).bind(id, clientId, body.tax_year, body.filing_type ?? null, body.due_date ?? null).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+portalRoutes.patch('/tax/:id', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
+  const row = await loadScopedRow<any>(c.env, user, 'tax_filings', c.req.param('id'))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const status = ['not_started', 'in_progress', 'filed', 'extended'].includes(body.status ?? '') ? body.status : undefined
+  if (status) await c.env.DB.prepare('UPDATE tax_filings SET status = ? WHERE id = ?').bind(status, row.id).run()
+  return c.json({ ok: true })
+})
+
+// ---------------- Support ----------------
+portalRoutes.get('/support', async (c) => c.json({ tickets: await listScoped(c, 'support_tickets') }))
+
+portalRoutes.post('/support', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ subject: string; category?: string; priority?: string; client_user_id?: string }>().catch(() => null)
+  if (!body?.subject) return c.json({ error: 'subject is required' }, 400)
+  const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const priority = ['low', 'normal', 'high', 'urgent'].includes(body.priority ?? '') ? body.priority! : 'normal'
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO support_tickets (id, client_user_id, subject, category, priority, status) VALUES (?, ?, ?, ?, ?, 'open')`,
+  ).bind(id, clientId, body.subject.trim().slice(0, 300), body.category ?? null, priority).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+portalRoutes.patch('/support/:id', async (c) => {
+  const user = c.get('user')
+  const row = await loadScopedRow<any>(c.env, user, 'support_tickets', c.req.param('id'))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const allowed = user.role === 'client' ? ['closed'] : ['open', 'in_progress', 'closed']
+  if (body.status && allowed.includes(body.status)) {
+    await c.env.DB.prepare('UPDATE support_tickets SET status = ? WHERE id = ?').bind(body.status, row.id).run()
+  }
+  return c.json({ ok: true })
+})
+
+portalRoutes.get('/support/:id/messages', async (c) => {
+  const user = c.get('user')
+  await loadScopedRow<any>(c.env, user, 'support_tickets', c.req.param('id'))
+  const res = await c.env.DB.prepare(
+    'SELECT * FROM secure_messages WHERE ticket_id = ? ORDER BY created_at ASC',
+  ).bind(c.req.param('id')).all()
+  return c.json({ messages: res.results ?? [] })
+})
+
+portalRoutes.post('/support/:id/messages', async (c) => {
+  const user = c.get('user')
+  const ticket = await loadScopedRow<any>(c.env, user, 'support_tickets', c.req.param('id'))
+  const body = await c.req.json<{ body: string }>().catch(() => ({ body: '' }))
+  if (!body.body?.trim()) return c.json({ error: 'message body is required' }, 400)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO secure_messages (id, client_user_id, sender_user_id, body, ticket_id) VALUES (?, ?, ?, ?, ?)`,
+  ).bind(id, ticket.client_user_id, user.id, body.body.trim().slice(0, 4000), ticket.id).run()
+  return c.json({ ok: true, id }, 201)
+})
