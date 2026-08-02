@@ -17,6 +17,7 @@ export default function Signup() {
     password: '',
     confirm: '',
   })
+  const [tosAccepted, setTosAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -35,6 +36,14 @@ export default function Signup() {
       setError('Passwords do not match.')
       return
     }
+    if (!form.phone.trim()) {
+      setError('A phone number is required.')
+      return
+    }
+    if (!tosAccepted) {
+      setError('You must accept the Terms of Service to create an account.')
+      return
+    }
     setBusy(true)
     try {
       await signup({
@@ -42,8 +51,9 @@ export default function Signup() {
         password: form.password,
         first_name: form.first_name,
         last_name: form.last_name,
-        phone: form.phone || undefined,
+        phone: form.phone,
         business_name: form.business_name || undefined,
+        tos_accepted: true,
       })
       navigate('../onboarding', { relative: 'path', replace: true })
     } catch (err) {
@@ -88,8 +98,8 @@ export default function Signup() {
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Phone (optional)">
-            <input className={inputCls} type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+          <Field label="Phone">
+            <input className={inputCls} type="tel" required value={form.phone} onChange={(e) => set('phone', e.target.value)} />
           </Field>
           <Field label="Business name (optional)">
             <input className={inputCls} value={form.business_name} onChange={(e) => set('business_name', e.target.value)} />
@@ -116,12 +126,25 @@ export default function Signup() {
             onChange={(e) => set('confirm', e.target.value)}
           />
         </Field>
+        <label className="flex items-start gap-2.5 text-xs text-slate-400">
+          <input
+            type="checkbox"
+            required
+            checked={tosAccepted}
+            onChange={(e) => setTosAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-white/[0.04] accent-gold"
+          />
+          <span>
+            I agree to the{' '}
+            <a href="https://pinnaclemanagementventures.com/terms" target="_blank" rel="noreferrer" className="font-medium text-gold hover:underline">
+              Terms of Service
+            </a>{' '}
+            and to be contacted by Pinnacle Management Ventures about my services.
+          </span>
+        </label>
         <button type="submit" disabled={busy} className="btn-gold w-full disabled:opacity-60">
           {busy ? 'Creating account…' : 'Create account'}
         </button>
-        <p className="text-center text-xs text-slate-500">
-          By creating an account you agree to be contacted by Pinnacle Management Ventures about your services.
-        </p>
       </form>
     </AuthLayout>
   )

@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
-import { uuid, hashPassword } from '../crypto'
+import { uuid } from '../crypto'
 import { scopeFilter, canAccessClient, ScopeError } from '../scope'
 import { visibleClientIds } from '../access'
-import { MIN_PASSWORD } from './auth'
+import { createActivationToken } from '../session'
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -122,33 +122,60 @@ adminRoutes.get('/users', requireAdmin, async (c) => {
   return c.json({ users: res.results ?? [] })
 })
 
+// Creates a user account AND, for clients, a real client_profile with
+// business details — not just a bare login shell. No password is
+// accepted here either: like bootstrap, this returns a one-time
+// activation link (via setup_token) for the new account holder to set
+// their own password, consistent with the "never invent/hardcode a
+// password" rule applied to the admin account.
 adminRoutes.post('/users', requireAdmin, async (c) => {
-  const { email, password, role, full_name, first_name, last_name } = await c.req.json<{
-    email: string; password: string; role?: string; full_name?: string; first_name?: string; last_name?: string
-  }>().catch(() => ({ email: '', password: '', role: 'client', full_name: '', first_name: '', last_name: '' }))
-  const e = (email || '').trim().toLowerCase()
-  const r = ['client', 'staff', 'admin'].includes(role ?? '') ? (role as string) : 'client'
-  if (!e || !password) return c.json({ error: 'email and password required' }, 400)
-  if (password.length < MIN_PASSWORD) return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
+  const body = await c.req.json<{
+    email: string
+    role?: string
+    full_name?: string
+    first_name?: string
+    last_name?: string
+    phone?: string
+    business_name?: string
+    entity_type?: string
+    ein?: string
+    state?: string
+    services_enrolled?: string[]
+  }>().catch(() => ({ email: '' }) as any)
+  const e = (body.email || '').trim().toLowerCase()
+  const r = ['client', 'staff', 'admin'].includes(body.role ?? '') ? (body.role as string) : 'client'
+  if (!e) return c.json({ error: 'email required' }, 400)
 
   const exists = await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(e).first()
   if (exists) return c.json({ error: 'a user with that email already exists' }, 409)
 
   const id = uuid()
-  const hash = await hashPassword(password)
-  const fn = full_name || [first_name, last_name].filter(Boolean).join(' ') || null
+  const fn = body.full_name || [body.first_name, body.last_name].filter(Boolean).join(' ') || null
+  const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) || null : null
   await c.env.DB.prepare(
-    `INSERT INTO users (id, email, password_hash, role, full_name, first_name, last_name, two_factor_enabled, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'active')`,
-  ).bind(id, e, hash, r, fn, first_name ?? null, last_name ?? null).run()
+    `INSERT INTO users (id, email, password_hash, role, full_name, first_name, last_name, phone, two_factor_enabled, status)
+     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 0, 'active')`,
+  ).bind(id, e, r, fn, body.first_name ?? null, body.last_name ?? null, phone).run()
 
   if (r === 'client') {
-    await c.env.DB.prepare('INSERT INTO client_profiles (id, user_id, onboarding_completed) VALUES (?, ?, 0)').bind(uuid(), id).run()
+    await c.env.DB.prepare(
+      `INSERT INTO client_profiles (id, user_id, business_name, entity_type, ein, state, services_enrolled, onboarding_completed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+    ).bind(
+      uuid(),
+      id,
+      body.business_name ?? null,
+      body.entity_type ?? null,
+      body.ein ?? null,
+      body.state ?? null,
+      Array.isArray(body.services_enrolled) ? JSON.stringify(body.services_enrolled) : null,
+    ).run()
   } else if (r === 'staff') {
     await c.env.DB.prepare("INSERT INTO team_members (id, user_id, staff_role) VALUES (?, ?, 'pinnacle_admin')").bind(uuid(), id).run()
   }
 
-  return c.json({ ok: true, user: { id, email: e, role: r, full_name: fn } }, 201)
+  const setupToken = await createActivationToken(c.env, id)
+  return c.json({ ok: true, user: { id, email: e, role: r, full_name: fn }, setup_token: setupToken }, 201)
 })
 
 adminRoutes.patch('/users/:id', requireAdmin, async (c) => {

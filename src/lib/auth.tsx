@@ -23,6 +23,7 @@ interface AuthState {
     last_name: string
     phone?: string
     business_name?: string
+    tos_accepted?: boolean
   }) => Promise<SessionUser>
   logout: () => Promise<void>
   refresh: () => Promise<void>

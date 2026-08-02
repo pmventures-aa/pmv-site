@@ -47,19 +47,24 @@ authRoutes.post('/signup', async (c) => {
     last_name: string
     phone?: string
     business_name?: string
+    tos_accepted?: boolean
   }>().catch(() => null)
   if (!body) return c.json({ error: 'invalid request body' }, 400)
 
   const e = norm(body.email)
   const firstName = cleanName(body.first_name)
   const lastName = cleanName(body.last_name)
-  const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) : null
+  const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) : ''
   const businessName = typeof body.business_name === 'string' ? body.business_name.trim().slice(0, 200) : null
 
   if (!e || !e.includes('@')) return c.json({ error: 'a valid email is required' }, 400)
   if (!firstName || !lastName) return c.json({ error: 'first and last name are required' }, 400)
+  if (!phone) return c.json({ error: 'a phone number is required' }, 400)
   if (!body.password || body.password.length < MIN_PASSWORD) {
     return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
+  }
+  if (body.tos_accepted !== true) {
+    return c.json({ error: 'you must accept the Terms of Service to create an account' }, 400)
   }
 
   const ip = c.req.header('CF-Connecting-IP') || 'unknown'
@@ -76,8 +81,8 @@ authRoutes.post('/signup', async (c) => {
 
   await c.env.DB.batch([
     c.env.DB.prepare(
-      `INSERT INTO users (id, email, password_hash, role, full_name, first_name, last_name, phone, two_factor_enabled, status)
-       VALUES (?, ?, ?, 'client', ?, ?, ?, ?, 0, 'active')`,
+      `INSERT INTO users (id, email, password_hash, role, full_name, first_name, last_name, phone, two_factor_enabled, status, tos_accepted_at)
+       VALUES (?, ?, ?, 'client', ?, ?, ?, ?, 0, 'active', datetime('now'))`,
     ).bind(id, e, hash, fullName, firstName, lastName, phone),
     c.env.DB.prepare(
       `INSERT INTO client_profiles (id, user_id, business_name, onboarding_completed) VALUES (?, ?, ?, 0)`,
