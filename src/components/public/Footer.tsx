@@ -24,6 +24,7 @@ export function Footer() {
               <li><Link to="/about" className="hover:text-gold">About</Link></li>
               <li><Link to="/service-area" className="hover:text-gold">Service Area</Link></li>
               <li><Link to="/contact" className="hover:text-gold">Contact</Link></li>
+              <li><Link to="/terms" className="hover:text-gold">Terms of Service</Link></li>
             </ul>
           </div>
 
@@ -44,13 +45,13 @@ export function Footer() {
             <p className="eyebrow mb-3">Contact</p>
             <ul className="space-y-2 text-sm text-slate-400">
               <li>
-                <a href="mailto:info@pinnaclemanagementventures.com" className="hover:text-gold">
-                  info@pinnaclemanagementventures.com
+                <a href="mailto:support@pinnaclemanagementventures.com" className="hover:text-gold">
+                  support@pinnaclemanagementventures.com
                 </a>
               </li>
               <li>
-                <a href="tel:+19545550192" className="hover:text-gold">
-                  (954) 555-0192
+                <a href="tel:+15613887879" className="hover:text-gold">
+                  (561) 388-7879
                 </a>
               </li>
               <li>

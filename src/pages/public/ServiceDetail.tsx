@@ -27,7 +27,7 @@ export default function ServiceDetail() {
         <p className="mt-4 max-w-2xl text-lg text-slate-300">{service.heroDescription}</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link to="/contact" className="btn-gold">Request this service</Link>
-          <a href="tel:+19545550192" className="btn-outline">Call (954) 555-0192</a>
+          <a href="tel:+15613887879" className="btn-outline">Call (561) 388-7879</a>
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-2">

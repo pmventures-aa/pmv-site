@@ -8,6 +8,7 @@ import ServiceDetail from './pages/public/ServiceDetail'
 import About from './pages/public/About'
 import ServiceArea from './pages/public/ServiceArea'
 import Contact from './pages/public/Contact'
+import Terms from './pages/public/Terms'
 import PortalApp from './pages/portal/PortalApp'
 import AdminApp from './pages/admin/AdminApp'
 import { AuthProvider } from './lib/auth'
@@ -43,6 +44,7 @@ function App() {
       <Route path="/about" element={<About />} />
       <Route path="/service-area" element={<ServiceArea />} />
       <Route path="/contact" element={<Contact />} />
+      <Route path="/terms" element={<Terms />} />
       <Route path="/portal/*" element={<PortalApp />} />
       <Route path="/admin/*" element={<AdminApp />} />
       <Route path="*" element={<Navigate to="/" replace />} />

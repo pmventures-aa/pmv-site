@@ -94,13 +94,13 @@ export default function Contact() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gold">Direct contact</h2>
             <ul className="mt-4 space-y-3 text-sm text-slate-300">
               <li>
-                <a href="mailto:info@pinnaclemanagementventures.com" className="hover:text-gold">
-                  info@pinnaclemanagementventures.com
+                <a href="mailto:support@pinnaclemanagementventures.com" className="hover:text-gold">
+                  support@pinnaclemanagementventures.com
                 </a>
               </li>
               <li>
-                <a href="tel:+19545550192" className="hover:text-gold">
-                  (954) 555-0192
+                <a href="tel:+15613887879" className="hover:text-gold">
+                  (561) 388-7879
                 </a>
               </li>
               <li className="text-slate-400">Nationwide · South Florida (on-site)</li>
