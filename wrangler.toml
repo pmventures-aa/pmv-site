@@ -1,0 +1,17 @@
+name = "pmv-site"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+# --- Bindings (IDs provisioned in Cloudflare on 2026-08-02) ---
+[[d1_databases]]
+binding = "DB"
+database_name = "pmv"
+database_id = "bb86b0a6-4756-41bf-bdb5-d8bb7fe4d502"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "d88bb30fe5544ba5aac0f5e74ce58234"
+
+# SESSION_SECRET is set as an encrypted secret (dashboard or `wrangler pages secret put SESSION_SECRET`)
