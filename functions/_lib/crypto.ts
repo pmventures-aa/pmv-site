@@ -16,7 +16,12 @@ function unb64(s: string): Uint8Array {
   return out
 }
 
-const PBKDF2_ITERATIONS = 120_000
+// Cloudflare Workers' WebCrypto implementation caps PBKDF2 at 100,000
+// iterations (crypto.subtle.deriveBits throws NotSupportedError above that,
+// even though browsers/Node allow more) — this was the actual root cause of
+// the bootstrap/signup 500s. 100,000 is still a solid modern PBKDF2-SHA256
+// parameter (OWASP's 2023 minimum recommendation).
+const PBKDF2_ITERATIONS = 100_000
 
 // Hash a password with PBKDF2-SHA256 (random 16-byte salt, 32-byte derived key).
 // Stored form: pbkdf2$<iterations>$<saltB64>$<hashB64>
