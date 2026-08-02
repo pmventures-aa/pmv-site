@@ -95,6 +95,25 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   })
 })
 
+// ---------------- staff + admin: contact inquiries ----------------
+adminRoutes.get('/inquiries', requireStaff, async (c) => {
+  const res = await c.env.DB.prepare(
+    `SELECT ci.*, s.name AS service_name FROM contact_inquiries ci
+     LEFT JOIN services s ON s.key = ci.service_key
+     ORDER BY ci.created_at DESC LIMIT 200`,
+  ).all()
+  return c.json({ inquiries: res.results ?? [] })
+})
+
+adminRoutes.patch('/inquiries/:id', requireStaff, async (c) => {
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const status = ['new', 'contacted', 'closed'].includes(body.status ?? '') ? body.status : undefined
+  if (status) {
+    await c.env.DB.prepare('UPDATE contact_inquiries SET status = ? WHERE id = ?').bind(status, c.req.param('id')).run()
+  }
+  return c.json({ ok: true })
+})
+
 // ---------------- admin-only: users ----------------
 adminRoutes.get('/users', requireAdmin, async (c) => {
   const res = await c.env.DB.prepare(

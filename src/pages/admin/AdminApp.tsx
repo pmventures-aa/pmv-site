@@ -10,10 +10,11 @@ import ClientDetail from './ClientDetail'
 import UsersAdmin from './UsersAdmin'
 import AssignmentsAdmin from './AssignmentsAdmin'
 import SettingsAdmin from './SettingsAdmin'
+import InquiriesAdmin from './InquiriesAdmin'
 
 function AdminShell() {
   const { user } = useAuth()
-  const nav = user?.role === 'admin' ? adminNav : adminNav.filter((n) => ['dashboard', 'clients'].includes(n.key))
+  const nav = user?.role === 'admin' ? adminNav : adminNav.filter((n) => ['dashboard', 'clients', 'inquiries'].includes(n.key))
   return <Shell nav={nav} badge="Staff Console" />
 }
 
@@ -27,6 +28,7 @@ export default function AdminApp() {
           <Route index element={<AdminDashboard />} />
           <Route path="clients" element={<ClientsList />} />
           <Route path="clients/:id" element={<ClientDetail />} />
+          <Route path="inquiries" element={<InquiriesAdmin />} />
           <Route path="users" element={<UsersAdmin />} />
           <Route path="assignments" element={<AssignmentsAdmin />} />
           <Route path="settings" element={<SettingsAdmin />} />

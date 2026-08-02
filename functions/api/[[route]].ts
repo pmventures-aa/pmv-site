@@ -7,10 +7,12 @@ import { authRoutes } from '../_lib/routes/auth'
 import { selfRoutes } from '../_lib/routes/self'
 import { portalRoutes } from '../_lib/routes/portal'
 import { adminRoutes } from '../_lib/routes/admin'
+import { publicRoutes } from '../_lib/routes/public'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
 app.route('/auth', authRoutes)
+app.route('/', publicRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
