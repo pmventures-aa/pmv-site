@@ -27,15 +27,14 @@ app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date(
 
 app.notFound((c) => c.json({ error: 'not found' }, 404))
 
-// global error handler — surfaces the real exception as JSON instead of
-// Cloudflare's opaque plain-text 500 page. TEMPORARY: includes err.stack
-// for diagnosis; tighten before long-term retention if stack traces are
-// considered sensitive.
+// Global error handler — surfaces unhandled exceptions as JSON (with the
+// real message) instead of Cloudflare's opaque plain-text 500 page. Logs
+// the full error (incl. stack) server-side via console.error, but does not
+// return the stack trace in the response body to callers.
 app.onError((err, c) => {
   console.error('unhandled API error', err)
   const message = err instanceof Error ? err.message : String(err)
-  const stack = err instanceof Error ? err.stack : undefined
-  return c.json({ error: message, stack }, 500)
+  return c.json({ error: message }, 500)
 })
 
 export const onRequest = handle(app)
