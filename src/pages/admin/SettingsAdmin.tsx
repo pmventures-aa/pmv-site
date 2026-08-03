@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag, EmptyState, NoAccess, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { useAuth } from '../../lib/auth'
 
@@ -51,14 +51,20 @@ function GeneralTab() {
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [forbidden, setForbidden] = useState(false)
 
   useEffect(() => {
-    api.get<{ settings: { key: string; value: string }[] }>('/admin/settings').then((r) => {
-      const map: Record<string, string> = {}
-      for (const row of r.settings) map[row.key] = row.value
-      setSettings(map)
-      setLoading(false)
-    })
+    api
+      .get<{ settings: { key: string; value: string }[] }>('/admin/settings')
+      .then((r) => {
+        const map: Record<string, string> = {}
+        for (const row of r.settings) map[row.key] = row.value
+        setSettings(map)
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 403) setForbidden(true)
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   async function save(e: React.FormEvent) {
@@ -75,6 +81,7 @@ function GeneralTab() {
   }
 
   if (loading) return <p className="text-sm text-slate-400">Loading…</p>
+  if (forbidden) return <NoAccess label="General settings" />
 
   return (
     <Panel>
@@ -132,12 +139,15 @@ function CatalogTab() {
   const [showNew, setShowNew] = useState(false)
   const [form, setForm] = useState({ key: '', name: '', description: '', category: '', sort_order: '0' })
   const [busy, setBusy] = useState(false)
+  const [forbidden, setForbidden] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await api.get<{ services: ServiceRow[] }>('/admin/services')
       setServices(res.services)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
     } finally {
       setLoading(false)
     }
@@ -172,6 +182,8 @@ function CatalogTab() {
       toast.error('Could not update service.')
     }
   }
+
+  if (forbidden) return <NoAccess label="the Service Catalog" />
 
   return (
     <div>
@@ -432,6 +444,7 @@ function StaffTab() {
   const isAdmin = me?.role === 'admin'
   const [users, setUsers] = useState<StaffUser[]>([])
   const [loading, setLoading] = useState(true)
+  const [forbidden, setForbidden] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -439,7 +452,8 @@ function StaffTab() {
       const res = await api.get<{ users: StaffUser[] }>('/admin/users')
       setUsers(res.users.filter((u) => u.role === 'staff' || u.role === 'admin'))
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Could not load staff.')
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+      else toast.error(err instanceof ApiError ? err.message : 'Could not load staff.')
     } finally {
       setLoading(false)
     }
@@ -465,6 +479,7 @@ function StaffTab() {
   }
 
   if (loading) return <p className="text-sm text-slate-400">Loading…</p>
+  if (forbidden) return <NoAccess label="Staff &amp; Permissions" />
 
   return (
     <div>

@@ -1,3 +1,4 @@
+# --- Project ---
 name = "pmv-site"
 compatibility_date = "2026-08-01"
 compatibility_flags = ["nodejs_compat"]
@@ -14,11 +15,16 @@ migrations_dir = "migrations"
 binding = "SESSIONS"
 id = "d88bb30fe5544ba5aac0f5e74ce58234"
 
-# SESSION_SECRET, PAYMENT_ENCRYPTION_KEY, and RESEND_API_KEY are set as encrypted
-# secrets (dashboard, or `wrangler pages secret put <NAME>`) — not here.
-
-# Non-secret: which "from" address email notifications send as. Only used if
-# RESEND_API_KEY is set; must be a domain verified in Resend. Uncomment and
-# update once a sending domain is verified — until then sending no-ops.
+# --- Vars (non-secret, safe to commit) ---
+# RESEND_FROM_EMAIL: which "from" address email notifications send as. Only
+# used if RESEND_API_KEY is set (a secret, below); must be a domain verified
+# in Resend. Uncomment and update once a sending domain is verified — until
+# then email sending no-ops.
 # [vars]
 # RESEND_FROM_EMAIL = "Pinnacle Management Ventures <notifications@pinnaclemanagementventures.com>"
+
+# --- Secrets (NOT set here — see DEPLOY.md "Environment variables" table) ---
+# Required: SESSION_SECRET, PAYMENT_ENCRYPTION_KEY
+# Optional: RESEND_API_KEY
+# Local dev: copy .dev.vars.example to .dev.vars and fill in test values.
+# Deployed: `wrangler pages secret put <NAME>`, or the Cloudflare dashboard.

@@ -1,0 +1,17 @@
+# Local dev secrets for `wrangler pages dev`. Copy this file to `.dev.vars`
+# (gitignored — never commit real values) and fill in test values; wrangler
+# reads it automatically.
+#
+# See DEPLOY.md's "Environment variables" table for what each one does and
+# how to set it for a real deployment.
+
+# Required — any value works locally, but use a real random secret in prod.
+SESSION_SECRET=local-dev-testing-secret-not-real
+
+# Required — encrypts ACH banking info at rest. The banking-info step of a
+# service application 500s without this set.
+PAYMENT_ENCRYPTION_KEY=local-dev-payment-key-not-real-either
+
+# Optional — email delivery via Resend. Leave unset to develop with email
+# sending as a safe no-op (logged, not thrown).
+# RESEND_API_KEY=

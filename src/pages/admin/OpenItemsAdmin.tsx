@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, EmptyState } from '../../components/admin/ui'
 
@@ -14,8 +14,11 @@ const TYPE_CONFIG: Record<ItemType, { title: string; titleKey: string; extra: (r
 }
 
 export default function OpenItemsAdmin() {
+  // /admin/open-items/:type is the current URL shape; ?type= (the old shape)
+  // is kept as a fallback so any existing bookmarks/links still resolve.
+  const { type: pathType } = useParams<{ type: string }>()
   const [params] = useSearchParams()
-  const type = (params.get('type') as ItemType) || 'tickets'
+  const type = (pathType as ItemType) || (params.get('type') as ItemType) || 'tickets'
   const cfg = TYPE_CONFIG[type] ?? TYPE_CONFIG.tickets
 
   const [items, setItems] = useState<any[]>([])
