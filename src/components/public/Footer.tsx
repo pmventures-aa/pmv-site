@@ -59,6 +59,11 @@ export function Footer() {
                   Client Login
                 </a>
               </li>
+              <li>
+                <a href="https://hq.pinnaclemanagementventures.com/login" className="hover:text-gold">
+                  Agent / Employee Login
+                </a>
+              </li>
             </ul>
           </div>
         </div>

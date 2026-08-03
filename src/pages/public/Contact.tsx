@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
-import { Card } from '../../components/ui'
+import { btnPrimary, PageIntro, panelCls } from '../../components/public/ui'
 import { services } from '../../data/services'
 import { api, ApiError } from '../../lib/api'
 import { inputCls } from '../auth/AuthLayout'
@@ -29,19 +29,17 @@ export default function Contact() {
   }
 
   return (
-    <div className="min-h-screen bg-navy-radial">
+    <div className="min-h-screen bg-navy-950">
       <Header />
       <section className="container-pmv py-16">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="eyebrow">Get in touch</p>
-          <h1 className="mt-2 text-4xl font-bold text-white">Request Service</h1>
-          <p className="mt-5 text-lg text-slate-300">
-            Tell us what you need and we&rsquo;ll follow up to map the right service and next steps.
-          </p>
-        </div>
+        <PageIntro
+          kicker="Get in touch"
+          title="Request Service"
+          subtitle="Tell us what you need and we’ll follow up to map the right service and next steps."
+        />
 
-        <div className="mx-auto mt-10 grid max-w-4xl gap-8 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+        <div className="mt-12 grid gap-8 lg:grid-cols-3">
+          <div className={`${panelCls} lg:col-span-2`}>
             {status === 'sent' ? (
               <div className="py-8 text-center">
                 <p className="text-xl font-semibold text-white">Thanks — we got it.</p>
@@ -83,14 +81,14 @@ export default function Contact() {
                   <textarea className={`${inputCls} min-h-[120px]`} required value={form.message} onChange={(e) => set('message', e.target.value)} />
                 </label>
                 {error && <p className="text-sm text-rose-300">{error}</p>}
-                <button type="submit" disabled={status === 'busy'} className="btn-gold disabled:opacity-60">
+                <button type="submit" disabled={status === 'busy'} className={`${btnPrimary} disabled:opacity-60`}>
                   {status === 'busy' ? 'Sending…' : 'Send request'}
                 </button>
               </form>
             )}
-          </Card>
+          </div>
 
-          <Card>
+          <div className={panelCls}>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gold">Direct contact</h2>
             <ul className="mt-4 space-y-3 text-sm text-slate-300">
               <li>
@@ -110,7 +108,7 @@ export default function Contact() {
                 Already a client? Sign in →
               </a>
             </div>
-          </Card>
+          </div>
         </div>
       </section>
       <Footer />

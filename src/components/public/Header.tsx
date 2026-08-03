@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
 import { Logo } from '../ui'
+import { btnOutline, btnPrimary } from './ui'
 
 const navItems = [
   { to: '/services', label: 'Services' },
@@ -27,10 +28,10 @@ export function Header() {
           ))}
         </nav>
         <div className="hidden items-center gap-3 sm:flex">
-          <a href="https://client.pinnaclemanagementventures.com/login" className="btn-outline">
+          <a href="https://client.pinnaclemanagementventures.com/login" className={btnOutline}>
             Client Login
           </a>
-          <Link to="/contact" className="btn-gold">
+          <Link to="/contact" className={btnPrimary}>
             Request Service
           </Link>
         </div>
@@ -50,10 +51,10 @@ export function Header() {
                 {item.label}
               </NavLink>
             ))}
-            <a href="https://client.pinnaclemanagementventures.com/login" className="btn-outline mt-2 justify-center">
+            <a href="https://client.pinnaclemanagementventures.com/login" className={`${btnOutline} mt-2`}>
               Client Login
             </a>
-            <Link to="/contact" className="btn-gold justify-center" onClick={() => setOpen(false)}>
+            <Link to="/contact" className={btnPrimary} onClick={() => setOpen(false)}>
               Request Service
             </Link>
           </nav>
