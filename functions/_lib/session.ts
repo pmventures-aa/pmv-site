@@ -37,7 +37,14 @@ export async function destroySession(env: Env, request: Request): Promise<void> 
 // admin-invited user with no initial password) set its own password via a
 // link, instead of the system generating/emailing a password. Single-use:
 // consumeActivationToken deletes the KV entry on first successful read.
-const ACTIVATION_TTL_SECONDS = 60 * 60 * 48 // 48h
+//
+// The raw token is returned directly in the API response body (to the
+// authenticated admin/bootstrap caller, not the invitee) rather than emailed,
+// so it can end up in HTTP logs/monitoring the way a password normally
+// wouldn't. It's kept short-lived (24h, down from 48h) to limit that window,
+// and is deleted on first use — but avoid any logging/analytics tooling that
+// persists response bodies for POST /auth/bootstrap or POST /admin/users.
+const ACTIVATION_TTL_SECONDS = 60 * 60 * 24 // 24h
 
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
