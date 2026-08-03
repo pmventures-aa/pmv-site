@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import type { NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
+import { Avatar } from '../kit/Avatar'
 import { btnOutline } from './ui'
 
 // Self-contained staff-console shell (sidebar + topbar). Deliberately not the
@@ -36,8 +37,13 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
         ))}
       </nav>
       <div className="mt-6 rounded-md border border-white/10 bg-white/[0.02] p-3">
-        <p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p>
-        <p className="truncate text-xs text-slate-500">{user?.email}</p>
+        <div className="flex items-center gap-3">
+          {user && <Avatar userId={user.id} name={user.full_name} size={36} editable uploadPath="/me/avatar" />}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p>
+            <p className="truncate text-xs text-slate-500">{user?.email}</p>
+          </div>
+        </div>
         <button onClick={() => logout()} className={`${btnOutline} mt-3 w-full !py-1.5 text-xs`}>
           Sign out
         </button>

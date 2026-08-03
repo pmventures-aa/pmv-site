@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { Card, PageHeader, EmptyState } from '../../components/ui'
+import { Avatar } from '../../components/kit/Avatar'
 
 interface TeamMember {
   id: string
@@ -48,8 +49,13 @@ export default function MyTeam() {
         <div className="grid gap-4 sm:grid-cols-2">
           {team.map((m) => (
             <Card key={m.id}>
-              <p className="text-base font-semibold text-white">{m.full_name || m.email}</p>
-              <p className="mt-1 text-sm text-gold">{m.title || (m.staff_role ? ROLE_LABELS[m.staff_role] ?? m.staff_role : 'Team member')}</p>
+              <div className="flex items-center gap-3">
+                <Avatar userId={m.id} name={m.full_name} size={44} />
+                <div>
+                  <p className="text-base font-semibold text-white">{m.full_name || m.email}</p>
+                  <p className="text-sm text-gold">{m.title || (m.staff_role ? ROLE_LABELS[m.staff_role] ?? m.staff_role : 'Team member')}</p>
+                </div>
+              </div>
               <div className="mt-3 space-y-1 text-sm text-slate-400">
                 <a href={`mailto:${m.email}`} className="block hover:text-gold">
                   {m.email}

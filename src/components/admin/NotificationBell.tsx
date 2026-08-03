@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
+import { playNotificationSound, soundKindFor } from '../../lib/sound'
 
-const POLL_MS = 45_000
+// "Auto refresh every minute or so for new things" — 30s keeps the badge and
+// activity feed feeling live without hammering the API.
+const POLL_MS = 30_000
 
 export function NotificationBell() {
   const p = useAppPath()
@@ -13,9 +16,35 @@ export function NotificationBell() {
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
+  const soundEnabledRef = useRef(true)
+  const prevCountRef = useRef(0)
 
-  const loadCount = useCallback(() => {
-    api.get<{ count: number }>('/admin/activity/unread-count').then((r) => setCount(r.count)).catch(() => {})
+  useEffect(() => {
+    api
+      .get<{ sound_enabled: boolean }>('/admin/notification-prefs')
+      .then((r) => {
+        soundEnabledRef.current = r.sound_enabled
+      })
+      .catch(() => {})
+  }, [])
+
+  const loadCount = useCallback(async () => {
+    try {
+      const r = await api.get<{ count: number }>('/admin/activity/unread-count')
+      if (r.count > prevCountRef.current && soundEnabledRef.current) {
+        // Something new landed — peek at the latest event to pick a tone.
+        try {
+          const latest = await api.get<{ events: ActivityEvent[] }>('/admin/activity')
+          playNotificationSound(latest.events[0] ? soundKindFor(latest.events[0].kind) : 'default')
+        } catch {
+          playNotificationSound('default')
+        }
+      }
+      prevCountRef.current = r.count
+      setCount(r.count)
+    } catch {
+      // transient network error — next poll will retry
+    }
   }, [])
 
   useEffect(() => {
@@ -41,6 +70,7 @@ export function NotificationBell() {
         const r = await api.get<{ events: ActivityEvent[] }>('/admin/activity')
         setEvents(r.events.slice(0, 8))
         await api.post('/admin/activity/mark-seen')
+        prevCountRef.current = 0
         setCount(0)
       } finally {
         setLoading(false)

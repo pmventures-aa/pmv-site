@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '../../lib/api'
-import { PageIntro, Panel, EmptyState } from '../../components/admin/ui'
+import { api, ApiError } from '../../lib/api'
+import { PageIntro, Panel, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { toast } from '../../components/kit/toast'
+import { services } from '../../data/services'
 
 interface Inquiry {
   id: string
@@ -13,9 +15,15 @@ interface Inquiry {
   created_at: string
 }
 
+const emptyForm = { name: '', email: '', phone: '', service_key: '', message: '' }
+
 export default function InquiriesAdmin() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState(emptyForm)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -36,9 +44,82 @@ export default function InquiriesAdmin() {
     await load()
   }
 
+  async function onCreate(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setBusy(true)
+    try {
+      await api.post('/admin/inquiries', form)
+      toast.success('Lead added.')
+      setForm(emptyForm)
+      setShowForm(false)
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not add lead.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div>
-      <PageIntro kicker="Website" title="Request Service Inquiries" subtitle="Submissions from the public contact form." />
+      <PageIntro
+        kicker="Website + manual entry"
+        title="Request Service Inquiries"
+        subtitle="Submissions from the public contact form, plus any leads you enter directly."
+        action={
+          <button className={btnPrimary} onClick={() => setShowForm((s) => !s)}>
+            {showForm ? 'Cancel' : '+ New lead'}
+          </button>
+        }
+      />
+
+      {showForm && (
+        <Panel className="mb-6">
+          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Name</span>
+              <input className={inputCls} required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Email</span>
+              <input className={inputCls} type="email" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Phone</span>
+              <input className={inputCls} type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Interested in</span>
+              <select className={inputCls} value={form.service_key} onChange={(e) => setForm((f) => ({ ...f, service_key: e.target.value }))}>
+                <option value="">Not sure yet</option>
+                {services.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="sm:col-span-2">
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Notes</span>
+              <textarea
+                className={inputCls}
+                rows={3}
+                placeholder="How you met them, what they need, anything relevant…"
+                value={form.message}
+                onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+              />
+            </label>
+            <div className="flex items-center gap-3 sm:col-span-2">
+              <button type="submit" disabled={busy} className={btnOutline}>
+                {busy ? 'Adding…' : 'Add lead'}
+              </button>
+              {error && <span className="text-sm text-rose-300">{error}</span>}
+            </div>
+          </form>
+        </Panel>
+      )}
+
       {loading ? (
         <p className="text-sm text-slate-400">Loading…</p>
       ) : inquiries.length === 0 ? (
@@ -55,7 +136,7 @@ export default function InquiriesAdmin() {
                 </p>
                 {i.phone && <p className="text-xs text-slate-500">{i.phone}</p>}
                 {i.service_name && <p className="mt-1 text-xs text-gold">{i.service_name}</p>}
-                <p className="mt-2 max-w-xl text-sm text-slate-300">{i.message}</p>
+                {i.message && <p className="mt-2 max-w-xl text-sm text-slate-300">{i.message}</p>}
                 <p className="mt-2 text-xs text-slate-500">{new Date(i.created_at.replace(' ', 'T') + 'Z').toLocaleString()}</p>
               </div>
               <select

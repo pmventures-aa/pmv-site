@@ -5,6 +5,7 @@
 - **API:** Hono on **Pages Functions** (`functions/api/*`) → served at `/api/*`
 - **Database:** Cloudflare **D1** (SQLite), schema in `migrations/`
 - **Sessions:** Cloudflare **KV**
+- **Profile pictures:** Cloudflare **R2**
 
 ## Environment variables
 
@@ -25,9 +26,10 @@
 1. `npx wrangler login`
 2. Create the database: `npx wrangler d1 create pmv` → paste the returned `database_id` into `wrangler.toml`
 3. Create the KV namespace: `npx wrangler kv namespace create SESSIONS` → paste the `id` into `wrangler.toml`
-4. Set the required secrets (see table above): `npx wrangler pages secret put SESSION_SECRET` and `npx wrangler pages secret put PAYMENT_ENCRYPTION_KEY`
-5. Optional — email delivery: `npx wrangler pages secret put RESEND_API_KEY`, then set `RESEND_FROM_EMAIL` (uncomment the `[vars]` block in `wrangler.toml`), a **Notification email** in HQ → Settings → General (`firm_notify_email`, the fallback recipient for firm-wide events like a new inquiry with no assignee yet), and have individual staff opt in from HQ → Settings → Notifications (email is off per staff member by default even once the key is set).
-6. Apply the schema: `npm run db:migrate` (local dev: `npm run db:migrate:local`)
+4. Create the R2 bucket for profile pictures: `npx wrangler r2 bucket create pmv-uploads` — needs no ID to paste anywhere, `wrangler.toml` already references it by name (`pmv-uploads`). Until this bucket exists, avatar uploads 500 in any deployed environment; local dev works regardless (wrangler simulates R2 locally, same as D1).
+5. Set the required secrets (see table above): `npx wrangler pages secret put SESSION_SECRET` and `npx wrangler pages secret put PAYMENT_ENCRYPTION_KEY`
+6. Optional — email delivery: `npx wrangler pages secret put RESEND_API_KEY`, then set `RESEND_FROM_EMAIL` (uncomment the `[vars]` block in `wrangler.toml`), a **Notification email** in HQ → Settings → General (`firm_notify_email`, the fallback recipient for firm-wide events like a new inquiry with no assignee yet), and have individual staff opt in from HQ → Settings → Notifications (email is off per staff member by default even once the key is set).
+7. Apply the schema: `npm run db:migrate` (local dev: `npm run db:migrate:local`)
 
 ## Deploy
 - **Git (recommended):** push to GitHub, then in the Cloudflare dashboard
@@ -43,10 +45,10 @@
 | Root directory | `/` |
 | Node version | 20 or later (set `NODE_VERSION=20` env var if needed) |
 
-Bindings (Pages project → Settings → Functions): add the **D1** binding `DB` → `pmv`
-and the **KV** binding `SESSIONS`. `wrangler.toml` already declares both for CLI
-deploys; the dashboard needs them set on the project too, alongside the secrets
-from the table above.
+Bindings (Pages project → Settings → Functions): add the **D1** binding `DB` → `pmv`,
+the **KV** binding `SESSIONS`, and the **R2** binding `UPLOADS` → `pmv-uploads`.
+`wrangler.toml` already declares all three for CLI deploys; the dashboard needs
+them set on the project too, alongside the secrets from the table above.
 
 ## Verify
 - `GET /api/health` → `{ ok: true }`

@@ -19,18 +19,23 @@ export function PageIntro({
   title,
   subtitle,
   action,
+  leading,
 }: {
   kicker: string
   title: string
   subtitle?: string
   action?: ReactNode
+  leading?: ReactNode
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <p className="eyebrow">{kicker}</p>
-        <h1 className="mt-2 font-display text-3xl font-medium text-white">{title}</h1>
-        {subtitle && <p className="mt-1 max-w-2xl text-sm text-slate-400">{subtitle}</p>}
+      <div className="flex items-start gap-4">
+        {leading}
+        <div>
+          <p className="eyebrow">{kicker}</p>
+          <h1 className="mt-2 font-display text-3xl font-medium text-white">{title}</h1>
+          {subtitle && <p className="mt-1 max-w-2xl text-sm text-slate-400">{subtitle}</p>}
+        </div>
       </div>
       {action}
     </div>

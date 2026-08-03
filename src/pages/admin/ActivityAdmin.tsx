@@ -1,22 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, EmptyState } from '../../components/admin/ui'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
 
+const POLL_MS = 60_000
+
 export default function ActivityAdmin() {
   const p = useAppPath()
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    api
-      .get<{ events: ActivityEvent[] }>('/admin/activity')
-      .then((r) => setEvents(r.events))
-      .finally(() => setLoading(false))
-    api.post('/admin/activity/mark-seen').catch(() => {})
+  const load = useCallback(async () => {
+    try {
+      const r = await api.get<{ events: ActivityEvent[] }>('/admin/activity')
+      setEvents(r.events)
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    load()
+    api.post('/admin/activity/mark-seen').catch(() => {})
+    const t = setInterval(load, POLL_MS)
+    return () => clearInterval(t)
+  }, [load])
 
   return (
     <div>

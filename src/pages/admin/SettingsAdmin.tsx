@@ -488,6 +488,37 @@ function StaffTab() {
           Role and capability grants are admin-only. You can view the team below, but saving is disabled.
         </p>
       )}
+
+      {isAdmin && users.length > 0 && (
+        <Panel className="mb-5 overflow-x-auto !p-0">
+          <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">All grants at a glance</h3>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-2 font-medium">Name</th>
+                <th className="px-5 py-2 font-medium">Role</th>
+                <th className="px-5 py-2 font-medium">Banking</th>
+                <th className="px-5 py-2 font-medium">Users</th>
+                <th className="px-5 py-2 font-medium">Settings</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id} className="border-t border-white/5">
+                  <td className="px-5 py-2 text-slate-200">{u.full_name || u.email}</td>
+                  <td className="px-5 py-2">
+                    <Tag tone={u.role === 'admin' ? 'gold' : 'slate'}>{u.role}</Tag>
+                  </td>
+                  <td className="px-5 py-2">{u.role === 'admin' || u.can_reveal_payment_info ? '✓' : '—'}</td>
+                  <td className="px-5 py-2">{u.role === 'admin' || u.can_manage_users ? '✓' : '—'}</td>
+                  <td className="px-5 py-2">{u.role === 'admin' || u.can_manage_settings ? '✓' : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      )}
+
       <div className="space-y-3">
         {users.map((u) => (
           <Panel key={u.id}>
@@ -563,16 +594,20 @@ function NotificationsTab() {
   const [kinds, setKinds] = useState<string[]>([])
   const [muted, setMuted] = useState<Set<string>>(new Set())
   const [emailEnabled, setEmailEnabled] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    api.get<{ kinds: string[]; muted_kinds: string[]; email_enabled: boolean }>('/admin/notification-prefs').then((r) => {
-      setKinds(r.kinds)
-      setMuted(new Set(r.muted_kinds))
-      setEmailEnabled(r.email_enabled)
-      setLoading(false)
-    })
+    api
+      .get<{ kinds: string[]; muted_kinds: string[]; email_enabled: boolean; sound_enabled: boolean }>('/admin/notification-prefs')
+      .then((r) => {
+        setKinds(r.kinds)
+        setMuted(new Set(r.muted_kinds))
+        setEmailEnabled(r.email_enabled)
+        setSoundEnabled(r.sound_enabled)
+        setLoading(false)
+      })
   }, [])
 
   function toggle(kind: string) {
@@ -587,7 +622,7 @@ function NotificationsTab() {
   async function save() {
     setBusy(true)
     try {
-      await api.patch('/admin/notification-prefs', { muted_kinds: Array.from(muted), email_enabled: emailEnabled })
+      await api.patch('/admin/notification-prefs', { muted_kinds: Array.from(muted), email_enabled: emailEnabled, sound_enabled: soundEnabled })
       toast.success('Notification preferences saved.')
     } catch {
       toast.error('Could not save preferences.')
@@ -604,6 +639,10 @@ function NotificationsTab() {
         Choose which events show up in your activity feed and bell. Muted events are still logged for audit
         purposes — they just won't notify you.
       </p>
+      <label className="mb-3 flex items-center gap-2 text-sm text-slate-200">
+        <input type="checkbox" checked={soundEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} />
+        Play a sound when a new notification arrives (checked every ~30 seconds while HQ is open)
+      </label>
       <label className="mb-4 flex items-center gap-2 text-sm text-slate-200">
         <input type="checkbox" checked={emailEnabled} onChange={(e) => setEmailEnabled(e.target.checked)} />
         Also email me for events I haven't muted (requires email delivery to be configured firm-wide)

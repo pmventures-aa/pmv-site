@@ -15,6 +15,15 @@ migrations_dir = "migrations"
 binding = "SESSIONS"
 id = "d88bb30fe5544ba5aac0f5e74ce58234"
 
+# Profile picture storage. Local dev works out of the box (wrangler
+# simulates R2 locally, same as D1) — but the real bucket must exist before
+# this works in a deployed environment: `npx wrangler r2 bucket create
+# pmv-uploads` (needs Cloudflare API credentials this environment doesn't
+# have), then add the binding on the Pages project dashboard too.
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "pmv-uploads"
+
 # --- Vars (non-secret, safe to commit) ---
 # RESEND_FROM_EMAIL: which "from" address email notifications send as. Only
 # used if RESEND_API_KEY is set (a secret, below); must be a domain verified

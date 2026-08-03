@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
+import { Avatar } from '../kit/Avatar'
 import type { NavItem } from './nav'
 
 export function Shell({
@@ -35,8 +36,13 @@ export function Shell({
         ))}
       </nav>
       <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-        <p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p>
-        <p className="truncate text-xs text-slate-500">{user?.email}</p>
+        <div className="flex items-center gap-3">
+          {user && <Avatar userId={user.id} name={user.full_name} size={36} editable uploadPath="/me/avatar" />}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p>
+            <p className="truncate text-xs text-slate-500">{user?.email}</p>
+          </div>
+        </div>
         <button onClick={() => logout()} className="btn-outline mt-3 w-full !py-1.5 text-xs">
           Sign out
         </button>

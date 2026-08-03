@@ -115,7 +115,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   const ok = await canAccessClient(c.env, user, id)
   if (!ok) return c.json({ error: 'forbidden' }, 403)
 
-  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods] = await Promise.all([
+  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT cs.*, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE client_user_id = ?').bind(id).all(),
@@ -140,6 +140,14 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
       `SELECT id, service_key, method_type, account_holder_name, bank_name, account_type, account_last4, created_at
        FROM client_payment_methods WHERE client_user_id = ? ORDER BY created_at DESC`,
     ).bind(id).all(),
+    // General profile notes only (matter_id IS NULL) — matter-specific notes
+    // load on demand via GET /admin/matters/:matterId/notes when a matter's
+    // thread is expanded, so this bundle doesn't grow with every case note.
+    c.env.DB.prepare(
+      `SELECT n.*, a.full_name AS author_name, a.email AS author_email
+       FROM internal_notes n LEFT JOIN users a ON a.id = n.author_user_id
+       WHERE n.client_user_id = ? AND n.matter_id IS NULL ORDER BY n.created_at DESC`,
+    ).bind(id).all(),
   ])
 
   if (!account) return c.json({ error: 'not found' }, 404)
@@ -160,7 +168,53 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
     appointments: appts.results ?? [],
     application_answers: answers.results ?? [],
     payment_methods: paymentMethods.results ?? [],
+    notes: notes.results ?? [],
   })
+})
+
+// ---------------- internal notes (staff-only, never exposed to clients) ----------------
+// General profile note when matter_id is omitted; a case/project note tied
+// to a specific matter when it's supplied. Two-way in the sense that any
+// staff member with access to this client can add to the same thread — it's
+// a running internal conversation, not a single owner's private scratchpad.
+adminRoutes.post('/clients/:id/notes', requireStaff, async (c) => {
+  const user = c.get('user')
+  const clientId = c.req.param('id') ?? ''
+  const ok = await canAccessClient(c.env, user, clientId)
+  if (!ok) return c.json({ error: 'forbidden' }, 403)
+
+  const body = await c.req.json<{ body?: string; matter_id?: string }>().catch(() => ({}) as { body?: string; matter_id?: string })
+  const noteBody = (body.body || '').trim().slice(0, 4000)
+  if (!noteBody) return c.json({ error: 'note body is required' }, 400)
+
+  let matterId: string | null = null
+  if (body.matter_id) {
+    const matter = await c.env.DB.prepare('SELECT id FROM matters WHERE id = ? AND client_user_id = ?').bind(body.matter_id, clientId).first()
+    if (!matter) return c.json({ error: 'matter not found for this client' }, 404)
+    matterId = body.matter_id
+  }
+
+  const id = uuid()
+  await c.env.DB.prepare(
+    'INSERT INTO internal_notes (id, client_user_id, matter_id, author_user_id, body) VALUES (?, ?, ?, ?, ?)',
+  ).bind(id, clientId, matterId, user.id, noteBody).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+adminRoutes.get('/matters/:matterId/notes', requireStaff, async (c) => {
+  const user = c.get('user')
+  const matterId = c.req.param('matterId')
+  const matter = await c.env.DB.prepare('SELECT client_user_id FROM matters WHERE id = ?').bind(matterId).first<{ client_user_id: string }>()
+  if (!matter) return c.json({ error: 'not found' }, 404)
+  const ok = await canAccessClient(c.env, user, matter.client_user_id)
+  if (!ok) return c.json({ error: 'forbidden' }, 403)
+
+  const res = await c.env.DB.prepare(
+    `SELECT n.*, a.full_name AS author_name, a.email AS author_email
+     FROM internal_notes n LEFT JOIN users a ON a.id = n.author_user_id
+     WHERE n.matter_id = ? ORDER BY n.created_at DESC`,
+  ).bind(matterId).all()
+  return c.json({ notes: res.results ?? [] })
 })
 
 // Reveal a payment method's full (decrypted) routing/account numbers.
@@ -209,6 +263,43 @@ adminRoutes.get('/inquiries', requireStaff, async (c) => {
 })
 
 const INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'converted', 'lost']
+
+// Staff-entered lead — same shape as a public /contact submission, but for a
+// prospect staff met offline (a call, a referral, a networking event) who
+// never filled out the website form themselves. Flows through the same
+// pipeline/status lifecycle and "Convert to client" action as any other
+// inquiry — this just adds a second way to get one into the system.
+adminRoutes.post('/inquiries', requireStaff, async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ name?: string; email?: string; phone?: string; service_key?: string; message?: string }>()
+    .catch(() => ({}) as { name?: string; email?: string; phone?: string; service_key?: string; message?: string })
+  const name = (body.name || '').trim().slice(0, 200)
+  const email = (body.email || '').trim().toLowerCase().slice(0, 200)
+  const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) || null : null
+  const message = (body.message || '').trim().slice(0, 4000)
+  if (!name) return c.json({ error: 'name is required' }, 400)
+  if (!email || !email.includes('@')) return c.json({ error: 'a valid email is required' }, 400)
+
+  let serviceKey: string | null = null
+  if (body.service_key) {
+    const svc = await c.env.DB.prepare('SELECT key FROM services WHERE key = ? AND active = 1').bind(body.service_key).first()
+    if (svc) serviceKey = body.service_key
+  }
+
+  const id = uuid()
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO contact_inquiries (id, name, email, phone, service_key, message, status) VALUES (?, ?, ?, ?, ?, ?, 'new')`,
+    ).bind(id, name, email, phone, serviceKey, message),
+    activityInsert(c.env, {
+      actorUserId: user.id,
+      clientUserId: null,
+      kind: 'inquiry_submitted',
+      detail: { name, email, service_key: serviceKey, staff_entered: true },
+    }),
+  ])
+  return c.json({ ok: true, id }, 201)
+})
 
 adminRoutes.patch('/inquiries/:id', requireStaff, async (c) => {
   const user = c.get('user')
@@ -660,22 +751,24 @@ const NOTIFICATION_KINDS = [
 
 adminRoutes.get('/notification-prefs', requireStaff, async (c) => {
   const user = c.get('user')
-  const row = await c.env.DB.prepare('SELECT muted_kinds, email_enabled FROM notification_prefs WHERE user_id = ?').bind(user.id).first<{ muted_kinds: string; email_enabled: number }>()
+  const row = await c.env.DB.prepare('SELECT muted_kinds, email_enabled, sound_enabled FROM notification_prefs WHERE user_id = ?').bind(user.id).first<{ muted_kinds: string; email_enabled: number; sound_enabled: number }>()
   return c.json({
     kinds: NOTIFICATION_KINDS,
     muted_kinds: row ? JSON.parse(row.muted_kinds) : [],
     email_enabled: row ? !!row.email_enabled : false,
+    sound_enabled: row ? !!row.sound_enabled : true,
   })
 })
 
 adminRoutes.patch('/notification-prefs', requireStaff, async (c) => {
   const user = c.get('user')
-  const body = await c.req.json<{ muted_kinds?: string[]; email_enabled?: boolean }>().catch(() => ({}) as { muted_kinds?: string[]; email_enabled?: boolean })
+  const body = await c.req.json<{ muted_kinds?: string[]; email_enabled?: boolean; sound_enabled?: boolean }>()
+    .catch(() => ({}) as { muted_kinds?: string[]; email_enabled?: boolean; sound_enabled?: boolean })
   const muted = Array.isArray(body.muted_kinds) ? body.muted_kinds.filter((k: string) => NOTIFICATION_KINDS.includes(k)) : []
   await c.env.DB.prepare(
-    `INSERT INTO notification_prefs (user_id, muted_kinds, email_enabled, updated_at) VALUES (?, ?, ?, datetime('now'))
-     ON CONFLICT(user_id) DO UPDATE SET muted_kinds = excluded.muted_kinds, email_enabled = excluded.email_enabled, updated_at = excluded.updated_at`,
-  ).bind(user.id, JSON.stringify(muted), body.email_enabled ? 1 : 0).run()
+    `INSERT INTO notification_prefs (user_id, muted_kinds, email_enabled, sound_enabled, updated_at) VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET muted_kinds = excluded.muted_kinds, email_enabled = excluded.email_enabled, sound_enabled = excluded.sound_enabled, updated_at = excluded.updated_at`,
+  ).bind(user.id, JSON.stringify(muted), body.email_enabled ? 1 : 0, body.sound_enabled === false ? 0 : 1).run()
   return c.json({ ok: true })
 })
 

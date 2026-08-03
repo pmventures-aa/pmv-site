@@ -39,13 +39,18 @@ function StatLink({ label, value, to }: { label: string; value: number | string;
   )
 }
 
+const POLL_MS = 60_000
+
 export default function AdminDashboard() {
   const { user } = useAuth()
   const p = useAppPath()
   const [data, setData] = useState<DashboardResponse | null>(null)
 
   useEffect(() => {
-    api.get<DashboardResponse>('/admin/dashboard').then(setData).catch(() => setData(null))
+    const load = () => api.get<DashboardResponse>('/admin/dashboard').then(setData).catch(() => {})
+    load()
+    const t = setInterval(load, POLL_MS)
+    return () => clearInterval(t)
   }, [])
 
   const stats = data?.stats

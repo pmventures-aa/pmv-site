@@ -1,6 +1,7 @@
 export interface Env {
   DB: D1Database
   SESSIONS: KVNamespace
+  UPLOADS: R2Bucket
   SESSION_SECRET: string
   // Encrypts ACH routing/account numbers at rest (see functions/_lib/crypto.ts
   // encryptSensitive/decryptSensitive). Separate from SESSION_SECRET on purpose.
