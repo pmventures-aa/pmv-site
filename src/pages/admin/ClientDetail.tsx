@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
+import { toast } from '../../components/kit/toast'
+import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
@@ -92,6 +94,7 @@ function CreateForm({
     try {
       const body = config.toBody ? config.toBody(values) : values
       await api.post(`/portal/${config.postPath}`, { ...body, client_user_id: clientId })
+      toast.success('Created.')
       onCreated()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create item.')
@@ -303,21 +306,64 @@ function ServiceApplications({
   )
 }
 
-function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; methods: Bundle['payment_methods']; onRevealed: () => void }) {
-  const [revealed, setRevealed] = useState<Record<string, { routing_number: string; account_number: string }>>({})
-  const [busyId, setBusyId] = useState<string | null>(null)
+function RevealPaymentMethodDialog({
+  clientId,
+  method,
+  onRevealed,
+}: {
+  clientId: string
+  method: Bundle['payment_methods'][number]
+  onRevealed: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<{ routing_number: string; account_number: string } | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  async function reveal(pmId: string) {
-    setBusyId(pmId)
-    try {
-      const res = await api.post<{ routing_number: string; account_number: string }>(`/admin/clients/${clientId}/payment-methods/${pmId}/reveal`)
-      setRevealed((r) => ({ ...r, [pmId]: res }))
-      onRevealed()
-    } finally {
-      setBusyId(null)
+  async function handleOpenChange(next: boolean) {
+    setOpen(next)
+    if (next && !data) {
+      setBusy(true)
+      try {
+        const res = await api.post<{ routing_number: string; account_number: string }>(
+          `/admin/clients/${clientId}/payment-methods/${method.id}/reveal`,
+        )
+        setData(res)
+        onRevealed()
+      } catch {
+        toast.error('Could not reveal payment details.')
+        setOpen(false)
+      } finally {
+        setBusy(false)
+      }
     }
   }
 
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <button className="text-xs font-medium text-gold hover:underline">Reveal (admin only)</button>
+      </DialogTrigger>
+      <DialogContent title="Banking details" description={`${method.account_holder_name} — this view is logged for audit`}>
+        {busy ? (
+          <p className="text-sm text-slate-400">Decrypting…</p>
+        ) : data ? (
+          <dl className="space-y-3 text-sm">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Routing number</dt>
+              <dd className="mt-0.5 font-mono text-base text-white">{data.routing_number}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Account number</dt>
+              <dd className="mt-0.5 font-mono text-base text-white">{data.account_number}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; methods: Bundle['payment_methods']; onRevealed: () => void }) {
   if (methods.length === 0) return null
   return (
     <Panel className="mb-5 !p-0">
@@ -331,21 +377,8 @@ function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; m
                 {m.bank_name ?? 'Bank on file'} · {m.account_type ?? 'account'} ending {m.account_last4}
                 {m.service_key ? ` · ${m.service_key.replace(/_/g, ' ')}` : ''}
               </p>
-              {revealed[m.id] && (
-                <p className="mt-1 text-xs text-emerald-300">
-                  Routing {revealed[m.id].routing_number} · Account {revealed[m.id].account_number}
-                </p>
-              )}
             </div>
-            {!revealed[m.id] && (
-              <button
-                onClick={() => reveal(m.id)}
-                disabled={busyId === m.id}
-                className="text-xs font-medium text-gold hover:underline disabled:opacity-60"
-              >
-                {busyId === m.id ? 'Revealing…' : 'Reveal (admin only)'}
-              </button>
-            )}
+            <RevealPaymentMethodDialog clientId={clientId} method={m} onRevealed={onRevealed} />
           </div>
         ))}
       </div>
@@ -360,7 +393,6 @@ export default function ClientDetail() {
 
   const load = useCallback(async () => {
     if (!id) return
-    setLoading(true)
     try {
       const res = await api.get<Bundle>(`/admin/clients/${id}`)
       setData(res)

@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api'
 import { Card, PageHeader } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { inputCls } from '../auth/AuthLayout'
+import { toast } from '../../components/kit/toast'
 
 export default function Security() {
   const { user } = useAuth()
@@ -11,12 +12,10 @@ export default function Security() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setSaved(false)
     if (newPassword !== confirmPassword) {
       setError('New passwords do not match.')
       return
@@ -31,7 +30,7 @@ export default function Security() {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-      setSaved(true)
+      toast.success('Password updated.')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not update password.')
     } finally {
@@ -92,7 +91,6 @@ export default function Security() {
               />
             </label>
             {error && <p className="text-sm text-rose-300">{error}</p>}
-            {saved && <p className="text-sm text-emerald-300">Password updated.</p>}
             <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">
               {busy ? 'Updating…' : 'Update password'}
             </button>

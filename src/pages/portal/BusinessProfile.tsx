@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import { Card, PageHeader } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
+import { toast } from '../../components/kit/toast'
 
 interface Profile {
   business_name: string | null
@@ -15,7 +16,6 @@ export default function BusinessProfile() {
   const [form, setForm] = useState<Profile>({ business_name: '', entity_type: '', ein: '', state: '' })
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     api
@@ -30,10 +30,11 @@ export default function BusinessProfile() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
-    setSaved(false)
     try {
       await api.patch('/portal/profile', form)
-      setSaved(true)
+      toast.success('Business profile saved.')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not save your profile.')
     } finally {
       setBusy(false)
     }
@@ -76,7 +77,6 @@ export default function BusinessProfile() {
               <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">
                 {busy ? 'Saving…' : 'Save changes'}
               </button>
-              {saved && <span className="text-sm text-emerald-300">Saved.</span>}
             </div>
           </form>
         )}
