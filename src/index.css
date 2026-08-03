@@ -25,3 +25,14 @@ body {
   .container-pmv { @apply mx-auto w-full max-w-6xl px-6; }
   .eyebrow { @apply text-xs font-semibold uppercase tracking-[0.2em] text-gold; }
 }
+
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee-scroll 28s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee { animation: none; }
+}
