@@ -15,19 +15,11 @@ migrations_dir = "migrations"
 binding = "SESSIONS"
 id = "d88bb30fe5544ba5aac0f5e74ce58234"
 
-# Profile picture storage. Commented out until the bucket actually exists —
-# Cloudflare Pages resolves every binding at deploy time, so a reference to
-# a bucket that hasn't been created yet fails the *deploy* step outright
-# (not just the avatar feature). Uncomment once you've run:
-#   npx wrangler r2 bucket create pmv-uploads
-# (needs real Cloudflare API credentials this environment doesn't have),
-# then also add the binding on the Pages project dashboard (Settings ->
-# Functions -> R2 bucket bindings). Local dev works fine either way —
-# wrangler simulates R2 locally, same as D1 — uncomment locally to test
-# uploads, but re-comment before pushing until the real bucket exists.
-# [[r2_buckets]]
-# binding = "UPLOADS"
-# bucket_name = "pmv-uploads"
+# Document + profile-picture storage. The pmv-uploads bucket was created
+# 2026-08-03 (Cloudflare account R2 subscription activated same day).
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "pmv-uploads"
 
 # --- Vars (non-secret, safe to commit) ---
 # RESEND_FROM_EMAIL: which "from" address email notifications send as. Only
