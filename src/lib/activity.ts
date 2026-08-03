@@ -31,6 +31,8 @@ export function describeActivity(e: ActivityEvent): string {
   switch (e.kind) {
     case 'inquiry_submitted':
       return `New inquiry from ${d.name || d.email || 'a website visitor'}${d.service_key ? ` about ${fmtStatus(d.service_key)}` : ''}`
+    case 'inquiry_status_changed':
+      return `${actor} moved ${d.name || d.email || 'an inquiry'} to ${fmtStatus(d.to)}`
     case 'client_signed_up':
       return `${client} signed up${d.business_name ? ` (${d.business_name})` : ''}`
     case 'user_created':
@@ -81,6 +83,8 @@ export function describeActivity(e: ActivityEvent): string {
       return `${actor} set ${client}’s ${fmtStatus(d.service_key)} application to ${fmtStatus(d.to)}`
     case 'payment_info_revealed':
       return `${actor} viewed banking details for ${client} (account ending ${d.account_last4 ?? '····'})`
+    case 'staff_profile_updated':
+      return `${actor} updated ${d.name || 'a staff member'}’s role to ${fmtStatus(d.staff_role)}`
     default:
       return fmtStatus(e.kind)
   }

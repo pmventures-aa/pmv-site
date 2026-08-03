@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
+import { notifyStaff } from '../email'
 
 const CONTACT_MAX_PER_HOUR = 10
 
@@ -53,6 +54,17 @@ publicRoutes.post('/contact', async (c) => {
     ).bind(inquiryId, name, email, phone, resolvedServiceKey, message),
     activityInsert(c.env, { kind: 'inquiry_submitted', detail: { name, email, service_key: resolvedServiceKey } }),
   ])
+
+  // No specific staff own an unassigned inquiry yet — always falls back to
+  // the firm-wide notify address. Best-effort: never blocks the response.
+  c.executionCtx.waitUntil(
+    notifyStaff(c.env, {
+      staffUserIds: [],
+      kind: 'inquiry_submitted',
+      subject: `New inquiry: ${name}`,
+      html: `<p><strong>${name}</strong> (${email}${phone ? `, ${phone}` : ''}) submitted a new inquiry${resolvedServiceKey ? ` about ${resolvedServiceKey}` : ''}:</p><p>${message}</p>`,
+    }),
+  )
 
   return c.json({ ok: true }, 201)
 })

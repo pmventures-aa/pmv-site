@@ -28,6 +28,7 @@ export const portalHiddenRoutes = ['calls', 'funding', 'property', 'tax'] as con
 
 export const adminNav: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', to: '', icon: '⌂' },
+  { key: 'pipelines', label: 'Pipelines', to: 'pipelines', icon: '▤' },
   { key: 'clients', label: 'Clients', to: 'clients', icon: '☺' },
   { key: 'inquiries', label: 'Inquiries', to: 'inquiries', icon: '✉' },
   { key: 'activity', label: 'Activity', to: 'activity', icon: '🔔' },

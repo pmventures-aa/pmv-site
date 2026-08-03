@@ -63,7 +63,7 @@ export default function InquiriesAdmin() {
                 value={i.status}
                 onChange={(e) => setStatus(i.id, e.target.value)}
               >
-                {['new', 'contacted', 'closed'].map((s) => (
+                {['new', 'contacted', 'qualified', 'converted', 'lost'].map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { services } from '../../data/services'
@@ -28,11 +29,29 @@ const emptyForm = {
   services_enrolled: [] as string[],
 }
 
+// Pre-fills the "new user" form from URL query params — used by the
+// Pipelines page's "Convert to client" link on a qualified inquiry, so
+// staff don't retype what the lead already gave us.
+function prefillFromParams(params: URLSearchParams): typeof emptyForm | null {
+  if (!params.has('email') && !params.has('first_name') && !params.has('last_name')) return null
+  const [first, ...rest] = (params.get('name') ?? '').split(' ')
+  return {
+    ...emptyForm,
+    email: params.get('email') ?? '',
+    first_name: params.get('first_name') ?? first ?? '',
+    last_name: params.get('last_name') ?? rest.join(' '),
+    phone: params.get('phone') ?? '',
+    role: params.get('role') ?? 'client',
+  }
+}
+
 export default function UsersAdmin() {
+  const [searchParams] = useSearchParams()
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState(emptyForm)
+  const prefill = useMemo(() => prefillFromParams(searchParams), [searchParams])
+  const [showForm, setShowForm] = useState(() => prefill !== null)
+  const [form, setForm] = useState(prefill ?? emptyForm)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [setupLink, setSetupLink] = useState<{ email: string; url: string } | null>(null)

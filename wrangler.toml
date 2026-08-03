@@ -14,5 +14,11 @@ migrations_dir = "migrations"
 binding = "SESSIONS"
 id = "d88bb30fe5544ba5aac0f5e74ce58234"
 
-# SESSION_SECRET and PAYMENT_ENCRYPTION_KEY are set as encrypted secrets
-# (dashboard, or `wrangler pages secret put SESSION_SECRET` / `PAYMENT_ENCRYPTION_KEY`)
+# SESSION_SECRET, PAYMENT_ENCRYPTION_KEY, and RESEND_API_KEY are set as encrypted
+# secrets (dashboard, or `wrangler pages secret put <NAME>`) — not here.
+
+# Non-secret: which "from" address email notifications send as. Only used if
+# RESEND_API_KEY is set; must be a domain verified in Resend. Uncomment and
+# update once a sending domain is verified — until then sending no-ops.
+# [vars]
+# RESEND_FROM_EMAIL = "Pinnacle Management Ventures <notifications@pinnaclemanagementventures.com>"
