@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
 import { services } from '../../data/services'
+
+const ROLE_OPTIONS = ['all', 'client', 'staff', 'admin']
+const STATUS_OPTIONS = ['all', 'active', 'suspended']
 
 interface UserRow {
   id: string
@@ -34,6 +37,9 @@ export default function UsersAdmin() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [setupLink, setSetupLink] = useState<{ email: string; url: string } | null>(null)
+  const [q, setQ] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -96,6 +102,16 @@ export default function UsersAdmin() {
     await api.patch(`/admin/users/${u.id}`, { status })
     await load()
   }
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    return users.filter((u) => {
+      if (roleFilter !== 'all' && u.role !== roleFilter) return false
+      if (statusFilter !== 'all' && u.status !== statusFilter) return false
+      if (!needle) return true
+      return (u.full_name ?? '').toLowerCase().includes(needle) || u.email.toLowerCase().includes(needle)
+    })
+  }, [users, q, roleFilter, statusFilter])
 
   return (
     <div>
@@ -217,12 +233,35 @@ export default function UsersAdmin() {
         </Card>
       )}
 
+      <div className="mb-4 flex flex-wrap gap-3">
+        <input
+          className={`${inputCls} max-w-xs`}
+          placeholder="Search name or email…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <select className={`${inputCls} max-w-[160px]`} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+          {ROLE_OPTIONS.map((r) => (
+            <option key={r} value={r}>
+              {r === 'all' ? 'All roles' : r}
+            </option>
+          ))}
+        </select>
+        <select className={`${inputCls} max-w-[160px]`} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s === 'all' ? 'All statuses' : s}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <Card className="overflow-x-auto !p-0">
         {loading ? (
           <div className="p-6 text-sm text-slate-400">Loading…</div>
-        ) : users.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="p-6">
-            <EmptyState label="No users yet." />
+            <EmptyState label={users.length === 0 ? 'No users yet.' : 'No users match your search.'} />
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -235,7 +274,7 @@ export default function UsersAdmin() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {filtered.map((u) => (
                 <tr key={u.id} className="border-b border-white/5 last:border-0">
                   <td className="px-5 py-3">
                     <p className="font-medium text-white">{u.full_name || u.email}</p>

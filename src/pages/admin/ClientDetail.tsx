@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
+import { inputCls } from '../auth/AuthLayout'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
@@ -41,6 +42,92 @@ const patchPath: Record<string, string> = {
   invoices: 'billing',
 }
 
+// ---------- generic "+ Add" form, config-driven per module ----------
+type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'datetime-local'
+interface FieldDef {
+  key: string
+  label: string
+  type?: FieldType
+  required?: boolean
+  placeholder?: string
+}
+interface CreateConfig {
+  postPath: string
+  fields: FieldDef[]
+  // transforms the raw form values into the request body (e.g. dollars -> cents)
+  toBody?: (values: Record<string, string>) => Record<string, unknown>
+}
+
+function CreateForm({
+  config,
+  clientId,
+  onCreated,
+  onCancel,
+}: {
+  config: CreateConfig
+  clientId: string
+  onCreated: () => void
+  onCancel: () => void
+}) {
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const body = config.toBody ? config.toBody(values) : values
+      await api.post(`/portal/${config.postPath}`, { ...body, client_user_id: clientId })
+      onCreated()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not create item.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="border-t border-white/10 bg-white/[0.02] p-5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {config.fields.map((f) => (
+          <label key={f.key} className={f.type === 'textarea' ? 'sm:col-span-2' : ''}>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">{f.label}</span>
+            {f.type === 'textarea' ? (
+              <textarea
+                className={inputCls}
+                required={f.required}
+                placeholder={f.placeholder}
+                value={values[f.key] ?? ''}
+                onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+              />
+            ) : (
+              <input
+                className={inputCls}
+                type={f.type ?? 'text'}
+                required={f.required}
+                placeholder={f.placeholder}
+                value={values[f.key] ?? ''}
+                onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+              />
+            )}
+          </label>
+        ))}
+      </div>
+      <div className="mt-4 flex items-center gap-3">
+        <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">
+          {busy ? 'Creating…' : 'Create'}
+        </button>
+        <button type="button" onClick={onCancel} className="text-sm text-slate-400 hover:text-white">
+          Cancel
+        </button>
+        {error && <span className="text-sm text-rose-300">{error}</span>}
+      </div>
+    </form>
+  )
+}
+
 function Section({
   title,
   rows,
@@ -49,6 +136,9 @@ function Section({
   statusOptionsKey,
   onStatusChange,
   emptyLabel,
+  createConfig,
+  clientId,
+  onCreated,
 }: {
   title: string
   rows: any[]
@@ -57,10 +147,35 @@ function Section({
   statusOptionsKey?: string
   onStatusChange?: (id: string, status: string) => void
   emptyLabel: string
+  createConfig?: CreateConfig
+  clientId: string
+  onCreated: () => void
 }) {
+  const [adding, setAdding] = useState(false)
+
   return (
     <Card className="!p-0">
-      <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">{title}</h3>
+      <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
+        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        {createConfig && (
+          <button onClick={() => setAdding((a) => !a)} className="text-xs font-medium text-gold hover:underline">
+            {adding ? 'Cancel' : '+ Add'}
+          </button>
+        )}
+      </div>
+
+      {adding && createConfig && (
+        <CreateForm
+          config={createConfig}
+          clientId={clientId}
+          onCreated={() => {
+            setAdding(false)
+            onCreated()
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+
       {rows.length === 0 ? (
         <div className="p-5">
           <EmptyState label={emptyLabel} />
@@ -140,6 +255,8 @@ export default function ClientDetail() {
     return <p className="text-sm text-slate-400">Loading…</p>
   }
 
+  const clientId = data.account.id
+
   return (
     <div>
       <Link to=".." relative="path" className="mb-4 inline-block text-sm text-slate-400 hover:text-gold">
@@ -169,6 +286,16 @@ export default function ClientDetail() {
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('matters', itemId, status)}
           emptyLabel="No matters."
+          clientId={clientId}
+          onCreated={load}
+          createConfig={{
+            postPath: 'matters',
+            fields: [
+              { key: 'title', label: 'Title', required: true },
+              { key: 'type', label: 'Type', placeholder: 'tax_resolution, document_prep…' },
+              { key: 'due_date', label: 'Due date', type: 'date' },
+            ],
+          }}
         />
         <Section
           title="Tasks"
@@ -178,6 +305,15 @@ export default function ClientDetail() {
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('tasks', itemId, status)}
           emptyLabel="No tasks."
+          clientId={clientId}
+          onCreated={load}
+          createConfig={{
+            postPath: 'tasks',
+            fields: [
+              { key: 'title', label: 'Title', required: true },
+              { key: 'due_date', label: 'Due date', type: 'date' },
+            ],
+          }}
         />
         <Section
           title="Tickets"
@@ -187,6 +323,15 @@ export default function ClientDetail() {
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('tickets', itemId, status)}
           emptyLabel="No support tickets."
+          clientId={clientId}
+          onCreated={load}
+          createConfig={{
+            postPath: 'support',
+            fields: [
+              { key: 'subject', label: 'Subject', required: true },
+              { key: 'category', label: 'Category' },
+            ],
+          }}
         />
         <Section
           title="Calls"
@@ -196,6 +341,12 @@ export default function ClientDetail() {
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('calls', itemId, status)}
           emptyLabel="No planned calls."
+          clientId={clientId}
+          onCreated={load}
+          createConfig={{
+            postPath: 'calls',
+            fields: [{ key: 'topic', label: 'Topic', required: true }],
+          }}
         />
         <Section
           title="Funding"
@@ -207,6 +358,19 @@ export default function ClientDetail() {
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('funding', itemId, status)}
           emptyLabel="No funding applications."
+          clientId={clientId}
+          onCreated={load}
+          createConfig={{
+            postPath: 'funding',
+            fields: [
+              { key: 'amount_requested_dollars', label: 'Amount requested ($)', type: 'number' },
+              { key: 'use_of_funds', label: 'Use of funds', type: 'textarea' },
+            ],
+            toBody: (v) => ({
+              amount_requested_cents: v.amount_requested_dollars ? Math.round(parseFloat(v.amount_requested_dollars) * 100) : undefined,
+              use_of_funds: v.use_of_funds || undefined,
+            }),
+          }}
         />
         <Section
           title="Properties"
@@ -216,6 +380,15 @@ export default function ClientDetail() {
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('properties', itemId, status)}
           emptyLabel="No properties."
+          clientId={clientId}
+          onCreated={load}
+          createConfig={{
+            postPath: 'property',
+            fields: [
+              { key: 'address', label: 'Address', required: true },
+              { key: 'property_type', label: 'Property type' },
+            ],
+          }}
         />
         <Section
           title="Tax filings"
@@ -225,6 +398,17 @@ export default function ClientDetail() {
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('tax_filings', itemId, status)}
           emptyLabel="No tax filings."
+          clientId={clientId}
+          onCreated={load}
+          createConfig={{
+            postPath: 'tax',
+            fields: [
+              { key: 'tax_year', label: 'Tax year', type: 'number', required: true, placeholder: '2025' },
+              { key: 'filing_type', label: 'Filing type' },
+              { key: 'due_date', label: 'Due date', type: 'date' },
+            ],
+            toBody: (v) => ({ tax_year: parseInt(v.tax_year, 10), filing_type: v.filing_type || undefined, due_date: v.due_date || undefined }),
+          }}
         />
         <Section
           title="Invoices"
@@ -234,18 +418,40 @@ export default function ClientDetail() {
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('invoices', itemId, status)}
           emptyLabel="No invoices."
+          clientId={clientId}
+          onCreated={load}
+          createConfig={{
+            postPath: 'billing',
+            fields: [
+              { key: 'amount_dollars', label: 'Amount ($)', type: 'number', required: true },
+              { key: 'due_date', label: 'Due date', type: 'date' },
+            ],
+            toBody: (v) => ({ amount_cents: Math.round(parseFloat(v.amount_dollars || '0') * 100), due_date: v.due_date || undefined }),
+          }}
         />
         <Section
           title="Documents"
           rows={data.documents}
           columns={[{ key: 'file_name', label: 'File' }, { key: 'review_status', label: 'Review' }]}
           emptyLabel="No documents."
+          clientId={clientId}
+          onCreated={load}
         />
         <Section
           title="Appointments"
           rows={data.appointments}
           columns={[{ key: 'title', label: 'Title' }, { key: 'starts_at', label: 'When', render: (r) => new Date(r.starts_at).toLocaleString() }]}
           emptyLabel="No appointments."
+          clientId={clientId}
+          onCreated={load}
+          createConfig={{
+            postPath: 'calendar',
+            fields: [
+              { key: 'title', label: 'Title', required: true },
+              { key: 'starts_at', label: 'Starts at', type: 'datetime-local', required: true },
+            ],
+            toBody: (v) => ({ title: v.title, starts_at: v.starts_at ? new Date(v.starts_at).toISOString() : undefined }),
+          }}
         />
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
+import { activityInsert } from '../activity'
 
 const CONTACT_MAX_PER_HOUR = 10
 
@@ -39,19 +40,19 @@ publicRoutes.post('/contact', async (c) => {
     return c.json({ error: 'too many requests — try again later or email us directly' }, 429)
   }
 
+  let resolvedServiceKey = serviceKey
   if (serviceKey) {
     const svc = await c.env.DB.prepare('SELECT key FROM services WHERE key = ? AND active = 1').bind(serviceKey).first()
-    if (!svc) {
-      await c.env.DB.prepare(
-        `INSERT INTO contact_inquiries (id, name, email, phone, service_key, message) VALUES (?, ?, ?, ?, NULL, ?)`,
-      ).bind(uuid(), name, email, phone, message).run()
-      return c.json({ ok: true }, 201)
-    }
+    if (!svc) resolvedServiceKey = null
   }
 
-  await c.env.DB.prepare(
-    `INSERT INTO contact_inquiries (id, name, email, phone, service_key, message) VALUES (?, ?, ?, ?, ?, ?)`,
-  ).bind(uuid(), name, email, phone, serviceKey, message).run()
+  const inquiryId = uuid()
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO contact_inquiries (id, name, email, phone, service_key, message) VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(inquiryId, name, email, phone, resolvedServiceKey, message),
+    activityInsert(c.env, { kind: 'inquiry_submitted', detail: { name, email, service_key: resolvedServiceKey } }),
+  ])
 
   return c.json({ ok: true }, 201)
 })

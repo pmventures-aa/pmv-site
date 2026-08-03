@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
@@ -7,9 +7,11 @@ import type { NavItem } from './nav'
 export function Shell({
   nav,
   badge,
+  topRight,
 }: {
   nav: NavItem[]
   badge: string
+  topRight?: ReactNode
 }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -54,6 +56,7 @@ export function Shell({
         <Logo />
         <div className="flex items-center gap-3">
           <span className="hidden text-xs text-slate-400 sm:inline">{badge}</span>
+          {topRight}
           <button
             onClick={() => setMobileOpen(true)}
             className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white"
@@ -82,7 +85,8 @@ export function Shell({
       )}
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <div className="hidden items-center justify-end border-b border-white/5 bg-navy-950/40 px-8 py-3 lg:flex">
+        <div className="hidden items-center justify-end gap-4 border-b border-white/5 bg-navy-950/40 px-8 py-3 lg:flex">
+          {topRight}
           <span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span>
         </div>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv, SessionUser } from '../types'
 import { uuid, hashPassword, verifyPassword } from '../crypto'
 import { createSession, sessionCookie, clearCookie, destroySession, createActivationToken, consumeActivationToken } from '../session'
+import { activityInsert } from '../activity'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -91,6 +92,7 @@ authRoutes.post('/signup', async (c) => {
     c.env.DB.prepare(
       `INSERT INTO client_profiles (id, user_id, business_name, onboarding_completed) VALUES (?, ?, ?, 0)`,
     ).bind(uuid(), id, businessName),
+    activityInsert(c.env, { clientUserId: id, kind: 'client_signed_up', detail: { email: e, business_name: businessName } }),
   ])
 
   const su: SessionUser = { id, email: e, role: 'client', full_name: fullName, first_name: firstName, last_name: lastName }

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { Shell } from '../../components/layout/Shell'
 import { adminNav } from '../../components/layout/nav'
+import { NotificationBell } from '../../components/admin/NotificationBell'
 import { useAuth } from '../../lib/auth'
 import Login from '../auth/Login'
 import SetPassword from '../auth/SetPassword'
@@ -12,11 +13,15 @@ import UsersAdmin from './UsersAdmin'
 import AssignmentsAdmin from './AssignmentsAdmin'
 import SettingsAdmin from './SettingsAdmin'
 import InquiriesAdmin from './InquiriesAdmin'
+import ActivityAdmin from './ActivityAdmin'
+import OpenItemsAdmin from './OpenItemsAdmin'
+
+const STAFF_VISIBLE = ['dashboard', 'clients', 'inquiries', 'activity']
 
 function AdminShell() {
   const { user } = useAuth()
-  const nav = user?.role === 'admin' ? adminNav : adminNav.filter((n) => ['dashboard', 'clients', 'inquiries'].includes(n.key))
-  return <Shell nav={nav} badge="Staff Console" />
+  const nav = user?.role === 'admin' ? adminNav : adminNav.filter((n) => STAFF_VISIBLE.includes(n.key))
+  return <Shell nav={nav} badge="Staff Console" topRight={<NotificationBell />} />
 }
 
 export default function AdminApp() {
@@ -31,6 +36,8 @@ export default function AdminApp() {
           <Route path="clients" element={<ClientsList />} />
           <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="inquiries" element={<InquiriesAdmin />} />
+          <Route path="activity" element={<ActivityAdmin />} />
+          <Route path="open-items" element={<OpenItemsAdmin />} />
           <Route path="users" element={<UsersAdmin />} />
           <Route path="assignments" element={<AssignmentsAdmin />} />
           <Route path="settings" element={<SettingsAdmin />} />
