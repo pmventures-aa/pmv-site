@@ -417,3 +417,22 @@ portalRoutes.post('/support/:id/messages', async (c) => {
   ).bind(id, ticket.client_user_id, user.id, body.body.trim().slice(0, 4000), ticket.id).run()
   return c.json({ ok: true, id }, 201)
 })
+
+// ---------------- Service applications (staff/admin lifecycle) ----------------
+// Clients submit via POST /services/:key/apply (self.ts); staff progress the
+// resulting client_services row through this endpoint. Clients themselves
+// cannot change status here — the application, once submitted, is staff-owned.
+portalRoutes.patch('/services/:id', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
+  const row = await loadScopedRow<any>(c.env, user, 'client_services', c.req.param('id'))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const status = ['requested', 'submitted', 'active', 'completed', 'declined'].includes(body.status ?? '') ? body.status : undefined
+  if (status) {
+    await c.env.DB.prepare('UPDATE client_services SET status = ? WHERE id = ?').bind(status, row.id).run()
+    if (status !== row.status) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'service_status_changed', detail: { service_key: row.service_key, from: row.status, to: status } })
+    }
+  }
+  return c.json({ ok: true })
+})

@@ -9,10 +9,15 @@ import SetPassword from '../auth/SetPassword'
 import OnboardingWizard from './OnboardingWizard'
 import Dashboard from './Dashboard'
 import Services from './Services'
+import ServiceApplication from './ServiceApplication'
 import Documents from './Documents'
 import Messages from './Messages'
 import Support from './Support'
 import Billing from './Billing'
+import BusinessProfile from './BusinessProfile'
+import MyTeam from './MyTeam'
+import Notifications from './Notifications'
+import Security from './Security'
 import { ModulePage } from './ModulePage'
 import { callsConfig, mattersConfig, tasksConfig, calendarConfig, fundingConfig, propertyConfig, taxConfig } from './moduleConfigs'
 
@@ -31,6 +36,7 @@ export default function PortalApp() {
             <Route index element={<Dashboard />} />
             <Route path="calls" element={<ModulePage config={callsConfig} />} />
             <Route path="services" element={<Services />} />
+            <Route path="services/:key/apply" element={<ServiceApplication />} />
             <Route path="matters" element={<ModulePage config={mattersConfig} />} />
             <Route path="tasks" element={<ModulePage config={tasksConfig} />} />
             <Route path="documents" element={<Documents />} />
@@ -41,6 +47,10 @@ export default function PortalApp() {
             <Route path="property" element={<ModulePage config={propertyConfig} />} />
             <Route path="tax" element={<ModulePage config={taxConfig} />} />
             <Route path="support" element={<Support />} />
+            <Route path="profile" element={<BusinessProfile />} />
+            <Route path="team" element={<MyTeam />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="security" element={<Security />} />
           </Route>
         </Route>
       </Route>

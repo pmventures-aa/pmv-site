@@ -6,7 +6,7 @@ import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary } from '../../c
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
   profile: { business_name: string | null; entity_type: string | null; state: string | null } | null
-  services: { service_key: string; name: string; status: string }[]
+  services: { id: string; service_key: string; name: string; status: string }[]
   matters: any[]
   tasks: any[]
   documents: any[]
@@ -17,7 +17,20 @@ interface Bundle {
   tickets: any[]
   calls: any[]
   appointments: any[]
+  application_answers: { service_key: string; question_key: string; value: string; label: string | null; step_label: string | null }[]
+  payment_methods: {
+    id: string
+    service_key: string | null
+    method_type: string
+    account_holder_name: string
+    bank_name: string | null
+    account_type: string | null
+    account_last4: string
+    created_at: string
+  }[]
 }
+
+const SERVICE_STATUS_OPTIONS = ['requested', 'submitted', 'active', 'completed', 'declined']
 
 const statusOptions: Record<string, string[]> = {
   matters: ['open', 'in_progress', 'blocked', 'closed'],
@@ -225,6 +238,121 @@ function Section({
   )
 }
 
+function ServiceApplications({
+  services,
+  answers,
+  onStatusChange,
+}: {
+  services: Bundle['services']
+  answers: Bundle['application_answers']
+  onStatusChange: (csId: string, status: string) => void
+}) {
+  if (services.length === 0) return null
+  return (
+    <Panel className="mb-5 !p-0">
+      <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">Service Applications</h3>
+      <div className="divide-y divide-white/5">
+        {services.map((s) => {
+          const svcAnswers = answers.filter((a) => a.service_key === s.service_key)
+          const bySteps = new Map<string, typeof svcAnswers>()
+          for (const a of svcAnswers) {
+            const step = a.step_label ?? 'Details'
+            if (!bySteps.has(step)) bySteps.set(step, [])
+            bySteps.get(step)!.push(a)
+          }
+          return (
+            <div key={s.id} className="px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-white">{s.name}</p>
+                <select
+                  className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
+                  value={s.status}
+                  onChange={(e) => onStatusChange(s.id, e.target.value)}
+                >
+                  {SERVICE_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {svcAnswers.length === 0 ? (
+                <p className="mt-2 text-xs text-slate-500">No application details submitted yet.</p>
+              ) : (
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  {Array.from(bySteps.entries()).map(([step, items]) => (
+                    <div key={step}>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gold/80">{step}</p>
+                      <dl className="mt-2 space-y-1.5">
+                        {items.map((a) => (
+                          <div key={a.question_key} className="text-xs">
+                            <dt className="text-slate-500">{a.label ?? a.question_key}</dt>
+                            <dd className="text-slate-200">{a.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </Panel>
+  )
+}
+
+function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; methods: Bundle['payment_methods']; onRevealed: () => void }) {
+  const [revealed, setRevealed] = useState<Record<string, { routing_number: string; account_number: string }>>({})
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  async function reveal(pmId: string) {
+    setBusyId(pmId)
+    try {
+      const res = await api.post<{ routing_number: string; account_number: string }>(`/admin/clients/${clientId}/payment-methods/${pmId}/reveal`)
+      setRevealed((r) => ({ ...r, [pmId]: res }))
+      onRevealed()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  if (methods.length === 0) return null
+  return (
+    <Panel className="mb-5 !p-0">
+      <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">Payment Methods (ACH)</h3>
+      <div className="divide-y divide-white/5">
+        {methods.map((m) => (
+          <div key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
+            <div>
+              <p className="text-white">{m.account_holder_name}</p>
+              <p className="text-xs text-slate-400">
+                {m.bank_name ?? 'Bank on file'} · {m.account_type ?? 'account'} ending {m.account_last4}
+                {m.service_key ? ` · ${m.service_key.replace(/_/g, ' ')}` : ''}
+              </p>
+              {revealed[m.id] && (
+                <p className="mt-1 text-xs text-emerald-300">
+                  Routing {revealed[m.id].routing_number} · Account {revealed[m.id].account_number}
+                </p>
+              )}
+            </div>
+            {!revealed[m.id] && (
+              <button
+                onClick={() => reveal(m.id)}
+                disabled={busyId === m.id}
+                className="text-xs font-medium text-gold hover:underline disabled:opacity-60"
+              >
+                {busyId === m.id ? 'Revealing…' : 'Reveal (admin only)'}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </Panel>
+  )
+}
+
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
@@ -247,6 +375,11 @@ export default function ClientDetail() {
 
   async function setStatus(module: string, itemId: string, status: string) {
     await api.patch(`/portal/${patchPath[module]}/${itemId}`, { status })
+    await load()
+  }
+
+  async function setServiceStatus(csId: string, status: string) {
+    await api.patch(`/portal/services/${csId}`, { status })
     await load()
   }
 
@@ -275,6 +408,9 @@ export default function ClientDetail() {
           </div>
         }
       />
+
+      <ServiceApplications services={data.services} answers={data.application_answers} onStatusChange={setServiceStatus} />
+      <PaymentMethods clientId={clientId} methods={data.payment_methods} onRevealed={load} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Section

@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
-import { uuid } from '../crypto'
+import { uuid, decryptSensitive } from '../crypto'
 import { scopeFilter, canAccessClient, ScopeError } from '../scope'
 import { visibleClientIds } from '../access'
 import { createActivationToken } from '../session'
@@ -76,7 +76,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   const ok = await canAccessClient(c.env, user, id)
   if (!ok) return c.json({ error: 'forbidden' }, 403)
 
-  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts] = await Promise.all([
+  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT cs.*, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE client_user_id = ?').bind(id).all(),
@@ -90,6 +90,17 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
     c.env.DB.prepare('SELECT * FROM support_tickets WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all(),
     c.env.DB.prepare('SELECT * FROM planned_calls WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all(),
     c.env.DB.prepare('SELECT * FROM appointments WHERE client_user_id = ? ORDER BY starts_at DESC').bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT r.service_key, r.question_key, r.value, q.label, q.step_label
+       FROM client_onboarding_responses r
+       LEFT JOIN onboarding_questions q ON q.service_key = r.service_key AND q.question_key = r.question_key
+       WHERE r.client_user_id = ? ORDER BY r.service_key, q.step_order, q.sort_order`,
+    ).bind(id).all(),
+    // Masked — encrypted columns are never selected here. See the /reveal route for full values.
+    c.env.DB.prepare(
+      `SELECT id, service_key, method_type, account_holder_name, bank_name, account_type, account_last4, created_at
+       FROM client_payment_methods WHERE client_user_id = ? ORDER BY created_at DESC`,
+    ).bind(id).all(),
   ])
 
   if (!account) return c.json({ error: 'not found' }, 404)
@@ -108,7 +119,35 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
     tickets: tickets.results ?? [],
     calls: calls.results ?? [],
     appointments: appts.results ?? [],
+    application_answers: answers.results ?? [],
+    payment_methods: paymentMethods.results ?? [],
   })
+})
+
+// Reveal a payment method's full (decrypted) routing/account numbers. Admin-only
+// (not requireStaff) given the sensitivity, and every reveal is itself logged.
+adminRoutes.post('/clients/:id/payment-methods/:pmId/reveal', requireAdmin, async (c) => {
+  const user = c.get('user')
+  const clientId = c.req.param('id')
+  const pmId = c.req.param('pmId')
+  const row = await c.env.DB.prepare(
+    'SELECT * FROM client_payment_methods WHERE id = ? AND client_user_id = ?',
+  ).bind(pmId, clientId).first<any>()
+  if (!row) return c.json({ error: 'not found' }, 404)
+
+  const [routing_number, account_number] = await Promise.all([
+    decryptSensitive(row.routing_number_enc, c.env.PAYMENT_ENCRYPTION_KEY),
+    decryptSensitive(row.account_number_enc, c.env.PAYMENT_ENCRYPTION_KEY),
+  ])
+
+  await logActivity(c.env, {
+    actorUserId: user.id,
+    clientUserId: clientId,
+    kind: 'payment_info_revealed',
+    detail: { account_holder_name: row.account_holder_name, account_last4: row.account_last4 },
+  })
+
+  return c.json({ routing_number, account_number })
 })
 
 // ---------------- staff + admin: contact inquiries ----------------

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 
@@ -14,10 +15,24 @@ interface Enrolled {
   status: string
 }
 
+const STATUS_TONE: Record<string, 'gold' | 'green' | 'blue' | 'slate' | 'red'> = {
+  requested: 'gold',
+  submitted: 'blue',
+  active: 'green',
+  completed: 'green',
+  declined: 'red',
+}
+
+// Enrolled services that have their own dedicated workspace elsewhere in the portal.
+const SERVICE_MODULE_LINKS: Record<string, { to: string; label: string }> = {
+  funding: { to: '/portal/funding', label: 'View your funding applications →' },
+  property_management: { to: '/portal/property', label: 'View your properties →' },
+}
+
 export default function Services() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [enrolled, setEnrolled] = useState<Enrolled[]>([])
-  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     const [cat, mine] = await Promise.all([
@@ -29,45 +44,46 @@ export default function Services() {
   }, [])
 
   useEffect(() => {
-    load()
+    load().finally(() => setLoading(false))
   }, [load])
 
   const enrolledKeys = new Set(enrolled.map((e) => e.service_key))
 
-  async function enroll(key: string) {
-    setBusyKey(key)
-    try {
-      await api.post('/portal/services', { service_key: key })
-      await load()
-    } finally {
-      setBusyKey(null)
-    }
-  }
-
   return (
     <div>
-      <PageHeader eyebrow="Your services" title="Services" subtitle="Manage what Pinnacle is helping you with." />
+      <PageHeader eyebrow="Your services" title="My Services" subtitle="Manage what Pinnacle is helping you with." />
 
       <Card className="mb-6">
         <h2 className="mb-4 text-lg font-semibold text-white">Enrolled</h2>
-        {enrolled.length === 0 ? (
-          <EmptyState label="No services enrolled yet — add one below." />
+        {loading ? (
+          <p className="text-sm text-slate-400">Loading…</p>
+        ) : enrolled.length === 0 ? (
+          <EmptyState label="No services enrolled yet — start a journey below." />
         ) : (
           <ul className="space-y-3">
-            {enrolled.map((e) => (
-              <li key={e.service_key} className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3">
-                <span className="text-sm font-medium text-white">{e.name}</span>
-                <StatusBadge tone={e.status === 'active' ? 'green' : e.status === 'completed' ? 'blue' : 'gold'}>
-                  {e.status.replace(/_/g, ' ')}
-                </StatusBadge>
-              </li>
-            ))}
+            {enrolled.map((e) => {
+              const link = SERVICE_MODULE_LINKS[e.service_key]
+              return (
+                <li key={e.service_key} className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3">
+                  <div>
+                    <span className="block text-sm font-medium text-white">{e.name}</span>
+                    {link && (
+                      <Link to={link.to} className="mt-1 inline-block text-xs text-gold hover:underline">
+                        {link.label}
+                      </Link>
+                    )}
+                  </div>
+                  <StatusBadge tone={STATUS_TONE[e.status] ?? 'slate'}>{e.status.replace(/_/g, ' ')}</StatusBadge>
+                </li>
+              )
+            })}
           </ul>
         )}
       </Card>
 
       <Card>
-        <h2 className="mb-4 text-lg font-semibold text-white">Add a service</h2>
+        <h2 className="mb-1 text-lg font-semibold text-white">Start a new journey</h2>
+        <p className="mb-4 text-sm text-slate-400">A few quick questions so we can route your request to the right specialist.</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {catalog
             .filter((c) => !enrolledKeys.has(c.key))
@@ -77,13 +93,9 @@ export default function Services() {
                   <p className="text-sm font-medium text-white">{c.name}</p>
                   <p className="mt-1 text-xs text-slate-400">{c.description}</p>
                 </div>
-                <button
-                  disabled={busyKey === c.key}
-                  onClick={() => enroll(c.key)}
-                  className="btn-outline shrink-0 !px-4 !py-1.5 text-xs disabled:opacity-60"
-                >
-                  {busyKey === c.key ? 'Adding…' : 'Add'}
-                </button>
+                <Link to={`/portal/services/${c.key}/apply`} className="btn-outline shrink-0 !px-4 !py-1.5 text-xs">
+                  Start
+                </Link>
               </div>
             ))}
           {catalog.length > 0 && catalog.every((c) => enrolledKeys.has(c.key)) && (

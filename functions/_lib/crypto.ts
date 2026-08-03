@@ -82,3 +82,35 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   for (let i = 0; i < a.length; i++) out |= a[i] ^ b[i]
   return out === 0
 }
+
+// ---------- AES-256-GCM for sensitive-but-not-card financial fields (e.g. ACH
+// routing/account numbers). Never used for card PAN/CVV — those are never
+// collected or stored by this app; see functions/_lib/routes/self.ts. Keyed
+// by PAYMENT_ENCRYPTION_KEY, a secret separate from SESSION_SECRET so a leak
+// of one doesn't automatically compromise the other. Stored form:
+// `<ivB64>.<ciphertextB64>`.
+async function sha256(s: string): Promise<Uint8Array> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s) as unknown as BufferSource)
+  return new Uint8Array(digest)
+}
+
+async function aesKey(secret: string): Promise<CryptoKey> {
+  const keyBytes = await sha256(secret)
+  return crypto.subtle.importKey('raw', keyBytes as unknown as BufferSource, 'AES-GCM', false, ['encrypt', 'decrypt'])
+}
+
+export async function encryptSensitive(plaintext: string, secret: string): Promise<string> {
+  const key = await aesKey(secret)
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as unknown as BufferSource }, key, new TextEncoder().encode(plaintext) as unknown as BufferSource)
+  return `${b64(iv)}.${b64(new Uint8Array(ciphertext))}`
+}
+
+export async function decryptSensitive(stored: string, secret: string): Promise<string> {
+  const [ivB64, ctB64] = stored.split('.')
+  const key = await aesKey(secret)
+  const iv = unb64(ivB64)
+  const ct = unb64(ctB64)
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as unknown as BufferSource }, key, ct as unknown as BufferSource)
+  return new TextDecoder().decode(plaintext)
+}
