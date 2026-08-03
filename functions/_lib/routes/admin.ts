@@ -36,6 +36,24 @@ function requireCapability(cap: Capability) {
   }
 }
 
+// The staff console's own nav decides what to show a signed-in staff member
+// based on this — without it, a capability grant is invisible until someone
+// knows the exact URL to type. Admins get every capability implicitly.
+adminRoutes.get('/my-capabilities', requireStaff, async (c) => {
+  const user = c.get('user')
+  if (user.role === 'admin') {
+    return c.json({ can_reveal_payment_info: true, can_manage_users: true, can_manage_settings: true })
+  }
+  const row = await c.env.DB.prepare(
+    'SELECT can_reveal_payment_info, can_manage_users, can_manage_settings FROM team_members WHERE user_id = ?',
+  ).bind(user.id).first<{ can_reveal_payment_info: number; can_manage_users: number; can_manage_settings: number }>()
+  return c.json({
+    can_reveal_payment_info: !!row?.can_reveal_payment_info,
+    can_manage_users: !!row?.can_manage_users,
+    can_manage_settings: !!row?.can_manage_settings,
+  })
+})
+
 // ---------------- staff + admin: cross-client views ----------------
 adminRoutes.get('/dashboard', requireStaff, async (c) => {
   const user = c.get('user')
@@ -388,8 +406,12 @@ adminRoutes.patch('/users/:id', requireAdmin, async (c) => {
   return c.json({ ok: true })
 })
 
-// ---------------- admin-only: staff assignments ----------------
-adminRoutes.get('/assignments', requireAdmin, async (c) => {
+// ---------------- staff assignments: admin, or staff granted can_manage_users ----------------
+// Controlling which staff can see which clients is a user-management action
+// in the same spirit as onboarding accounts, so it shares that capability
+// rather than needing its own — kept consistent with the "Assignments" nav
+// item, which is shown under the same condition (see AdminApp.tsx).
+adminRoutes.get('/assignments', requireStaff, requireCapability('can_manage_users'), async (c) => {
   const res = await c.env.DB.prepare(
     `SELECT sa.*, su.email AS staff_email, su.full_name AS staff_name, cu.email AS client_email, cu.full_name AS client_name
      FROM staff_assignments sa
@@ -400,7 +422,7 @@ adminRoutes.get('/assignments', requireAdmin, async (c) => {
   return c.json({ assignments: res.results ?? [] })
 })
 
-adminRoutes.post('/assignments', requireAdmin, async (c) => {
+adminRoutes.post('/assignments', requireStaff, requireCapability('can_manage_users'), async (c) => {
   const { staff_user_id, client_user_id } = await c.req.json<{ staff_user_id: string; client_user_id: string }>()
     .catch(() => ({ staff_user_id: '', client_user_id: '' }))
   if (!staff_user_id || !client_user_id) return c.json({ error: 'staff_user_id and client_user_id are required' }, 400)
@@ -412,7 +434,7 @@ adminRoutes.post('/assignments', requireAdmin, async (c) => {
   return c.json({ ok: true, id }, 201)
 })
 
-adminRoutes.delete('/assignments/:id', requireAdmin, async (c) => {
+adminRoutes.delete('/assignments/:id', requireStaff, requireCapability('can_manage_users'), async (c) => {
   await c.env.DB.prepare('DELETE FROM staff_assignments WHERE id = ?').bind(c.req.param('id')).run()
   return c.json({ ok: true })
 })

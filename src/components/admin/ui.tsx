@@ -45,6 +45,20 @@ export function EmptyState({ label }: { label: string }) {
   return <div className="rounded-md border border-dashed border-white/10 py-10 text-center text-sm text-slate-500">{label}</div>
 }
 
+// Shown instead of a blank/broken page when a staff member hits a
+// capability-gated route (Users, Assignments, Settings) without the grant —
+// e.g. an old bookmark, or before an admin has granted them access.
+export function NoAccess({ label = 'this section' }: { label?: string }) {
+  return (
+    <Panel className="max-w-lg">
+      <p className="text-sm font-medium text-white">You don't have access to {label}.</p>
+      <p className="mt-2 text-sm text-slate-400">
+        Ask an admin to grant you access from Settings → Staff &amp; Permissions.
+      </p>
+    </Panel>
+  )
+}
+
 export type Tone = 'gold' | 'green' | 'blue' | 'slate' | 'red'
 const toneMap: Record<Tone, string> = {
   gold: 'bg-gold/10 text-gold border-gold/25',

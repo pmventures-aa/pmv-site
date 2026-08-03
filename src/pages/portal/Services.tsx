@@ -26,7 +26,7 @@ const STATUS_TONE: Record<string, 'gold' | 'green' | 'blue' | 'slate' | 'red'> =
 // Enrolled services that have their own dedicated workspace elsewhere in the portal.
 const SERVICE_MODULE_LINKS: Record<string, { to: string; label: string }> = {
   funding: { to: '/portal/funding', label: 'View your funding applications →' },
-  property_management: { to: '/portal/property', label: 'View your properties →' },
+  property_management: { to: '/portal/property-management', label: 'View your properties →' },
 }
 
 export default function Services() {

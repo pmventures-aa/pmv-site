@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag, EmptyState, NoAccess, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { services } from '../../data/services'
 
 const ROLE_OPTIONS = ['all', 'client', 'staff', 'admin']
@@ -49,6 +49,7 @@ export default function UsersAdmin() {
   const [searchParams] = useSearchParams()
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [forbidden, setForbidden] = useState(false)
   const prefill = useMemo(() => prefillFromParams(searchParams), [searchParams])
   const [showForm, setShowForm] = useState(() => prefill !== null)
   const [form, setForm] = useState(prefill ?? emptyForm)
@@ -64,6 +65,8 @@ export default function UsersAdmin() {
     try {
       const res = await api.get<{ users: UserRow[] }>('/admin/users')
       setUsers(res.users)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
     } finally {
       setLoading(false)
     }
@@ -130,6 +133,15 @@ export default function UsersAdmin() {
       return (u.full_name ?? '').toLowerCase().includes(needle) || u.email.toLowerCase().includes(needle)
     })
   }, [users, q, roleFilter, statusFilter])
+
+  if (forbidden) {
+    return (
+      <div>
+        <PageIntro kicker="Access" title="Users" />
+        <NoAccess label="Users" />
+      </div>
+    )
+  }
 
   return (
     <div>

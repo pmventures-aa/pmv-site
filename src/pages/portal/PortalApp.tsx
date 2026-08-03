@@ -34,7 +34,7 @@ export default function PortalApp() {
         <Route element={<OnboardingGate />}>
           <Route element={<Shell nav={portalNav} badge="Client Portal" />}>
             <Route index element={<Dashboard />} />
-            <Route path="calls" element={<ModulePage config={callsConfig} />} />
+            <Route path="planned-calls" element={<ModulePage config={callsConfig} />} />
             <Route path="services" element={<Services />} />
             <Route path="services/:key/apply" element={<ServiceApplication />} />
             <Route path="matters" element={<ModulePage config={mattersConfig} />} />
@@ -44,13 +44,20 @@ export default function PortalApp() {
             <Route path="calendar" element={<ModulePage config={calendarConfig} />} />
             <Route path="billing" element={<Billing />} />
             <Route path="funding" element={<ModulePage config={fundingConfig} />} />
-            <Route path="property" element={<ModulePage config={propertyConfig} />} />
-            <Route path="tax" element={<ModulePage config={taxConfig} />} />
+            <Route path="property-management" element={<ModulePage config={propertyConfig} />} />
+            <Route path="tax-filings" element={<ModulePage config={taxConfig} />} />
             <Route path="support" element={<Support />} />
-            <Route path="profile" element={<BusinessProfile />} />
-            <Route path="team" element={<MyTeam />} />
+            <Route path="business-profile" element={<BusinessProfile />} />
+            <Route path="my-team" element={<MyTeam />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="security" element={<Security />} />
+
+            {/* Old slugs — redirect so existing bookmarks/links keep working. */}
+            <Route path="calls" element={<Navigate to="../planned-calls" replace />} />
+            <Route path="property" element={<Navigate to="../property-management" replace />} />
+            <Route path="tax" element={<Navigate to="../tax-filings" replace />} />
+            <Route path="profile" element={<Navigate to="../business-profile" replace />} />
+            <Route path="team" element={<Navigate to="../my-team" replace />} />
           </Route>
         </Route>
       </Route>

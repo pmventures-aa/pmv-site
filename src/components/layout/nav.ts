@@ -15,8 +15,8 @@ export const portalNav: NavItem[] = [
   { key: 'calendar', label: 'Calendar', to: 'calendar', icon: '▦' },
   { key: 'billing', label: 'Billing', to: 'billing', icon: '$' },
   { key: 'support', label: 'Support', to: 'support', icon: '❓' },
-  { key: 'profile', label: 'Business Profile', to: 'profile', icon: '⚑' },
-  { key: 'team', label: 'My Team', to: 'team', icon: '☺' },
+  { key: 'business-profile', label: 'Business Profile', to: 'business-profile', icon: '⚑' },
+  { key: 'my-team', label: 'My Team', to: 'my-team', icon: '☺' },
   { key: 'notifications', label: 'Notifications', to: 'notifications', icon: '🔔' },
   { key: 'security', label: 'Security', to: 'security', icon: '⚿' },
 ]
@@ -24,7 +24,7 @@ export const portalNav: NavItem[] = [
 // Not in the primary sidebar (kept out to match the requested clean nav list)
 // but still real routes — reachable from Planned Calls request buttons and
 // from service-specific links on the My Services page.
-export const portalHiddenRoutes = ['calls', 'funding', 'property', 'tax'] as const
+export const portalHiddenRoutes = ['planned-calls', 'funding', 'property-management', 'tax-filings'] as const
 
 export const adminNav: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', to: '', icon: '⌂' },

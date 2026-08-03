@@ -57,11 +57,11 @@ export default function AdminDashboard() {
       />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatLink label="Clients" value={stats?.clients ?? '—'} to="/admin/clients" />
-        <StatLink label="Open Tickets" value={stats?.open_tickets ?? '—'} to="/admin/open-items?type=tickets" />
-        <StatLink label="Open Matters" value={stats?.open_matters ?? '—'} to="/admin/open-items?type=matters" />
-        <StatLink label="Pending Tasks" value={stats?.pending_tasks ?? '—'} to="/admin/open-items?type=tasks" />
-        <StatLink label="Calls Pending" value={stats?.pending_calls ?? '—'} to="/admin/open-items?type=calls" />
-        <StatLink label="Open Invoices" value={stats?.open_invoices ?? '—'} to="/admin/open-items?type=invoices" />
+        <StatLink label="Open Tickets" value={stats?.open_tickets ?? '—'} to="/admin/open-items/tickets" />
+        <StatLink label="Open Matters" value={stats?.open_matters ?? '—'} to="/admin/open-items/matters" />
+        <StatLink label="Pending Tasks" value={stats?.pending_tasks ?? '—'} to="/admin/open-items/tasks" />
+        <StatLink label="Calls Pending" value={stats?.pending_calls ?? '—'} to="/admin/open-items/calls" />
+        <StatLink label="Open Invoices" value={stats?.open_invoices ?? '—'} to="/admin/open-items/invoices" />
       </div>
 
       <div className="mt-8 grid gap-5 lg:grid-cols-2">

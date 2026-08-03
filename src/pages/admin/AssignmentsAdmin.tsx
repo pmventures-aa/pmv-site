@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnPrimary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { ConfirmDialog } from '../../components/kit/ConfirmDialog'
 
@@ -30,14 +30,19 @@ export default function AssignmentsAdmin() {
   const [busy, setBusy] = useState(false)
   const [pendingRemove, setPendingRemove] = useState<Assignment | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [forbidden, setForbidden] = useState(false)
 
   const load = useCallback(async () => {
-    const [a, u] = await Promise.all([
-      api.get<{ assignments: Assignment[] }>('/admin/assignments'),
-      api.get<{ users: UserRow[] }>('/admin/users'),
-    ])
-    setAssignments(a.assignments)
-    setUsers(u.users)
+    try {
+      const [a, u] = await Promise.all([
+        api.get<{ assignments: Assignment[] }>('/admin/assignments'),
+        api.get<{ users: UserRow[] }>('/admin/users'),
+      ])
+      setAssignments(a.assignments)
+      setUsers(u.users)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setForbidden(true)
+    }
   }, [])
 
   useEffect(() => {
@@ -78,6 +83,15 @@ export default function AssignmentsAdmin() {
     } finally {
       setRemoving(false)
     }
+  }
+
+  if (forbidden) {
+    return (
+      <div>
+        <PageIntro kicker="Coverage" title="Staff Assignments" />
+        <NoAccess label="Staff Assignments" />
+      </div>
+    )
   }
 
   return (

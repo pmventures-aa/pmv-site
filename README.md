@@ -34,8 +34,11 @@ Built to run entirely on **Cloudflare** (Pages + Functions + D1 + KV).
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:5173 (frontend only — no /api/*)
 ```
+
+To exercise the API too (auth, portal, admin), build and run through Wrangler instead —
+see **DEPLOY.md** for local secrets setup (`.dev.vars.example`) and the exact commands.
 
 ## Build
 
@@ -59,10 +62,10 @@ Bindings to attach to the Pages project:
 
 - D1 database `DB` -> `pmv`
 - KV namespace `SESSIONS` -> `pmv-sessions`
-- Secret `SESSION_SECRET`
 
 The exact IDs are already in `wrangler.toml`. See **DEPLOY.md** for the full step-by-step,
-including how the database schema is applied.
+including the required/optional secrets, local dev setup (`.dev.vars.example`), and how
+the database schema is applied.
 
 ## Project structure
 
