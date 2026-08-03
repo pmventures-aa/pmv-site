@@ -26,7 +26,7 @@
 1. `npx wrangler login`
 2. Create the database: `npx wrangler d1 create pmv` → paste the returned `database_id` into `wrangler.toml`
 3. Create the KV namespace: `npx wrangler kv namespace create SESSIONS` → paste the `id` into `wrangler.toml`
-4. Create the R2 bucket for profile pictures: `npx wrangler r2 bucket create pmv-uploads` — needs no ID to paste anywhere, `wrangler.toml` already references it by name (`pmv-uploads`). Until this bucket exists, avatar uploads 500 in any deployed environment; local dev works regardless (wrangler simulates R2 locally, same as D1).
+4. Create the R2 bucket for profile pictures: `npx wrangler r2 bucket create pmv-uploads`, then **uncomment the `[[r2_buckets]]` block in `wrangler.toml`** and redeploy. It's commented out by default on purpose — Cloudflare Pages resolves every binding at deploy time, so referencing a bucket that doesn't exist yet fails the *entire deploy*, not just the avatar feature. Until you've done this, avatar uploads return a 503 in any deployed environment (the rest of the app is unaffected); local dev works regardless if you uncomment the binding locally (wrangler simulates R2 locally, same as D1) — just re-comment it before pushing until the real bucket exists.
 5. Set the required secrets (see table above): `npx wrangler pages secret put SESSION_SECRET` and `npx wrangler pages secret put PAYMENT_ENCRYPTION_KEY`
 6. Optional — email delivery: `npx wrangler pages secret put RESEND_API_KEY`, then set `RESEND_FROM_EMAIL` (uncomment the `[vars]` block in `wrangler.toml`), a **Notification email** in HQ → Settings → General (`firm_notify_email`, the fallback recipient for firm-wide events like a new inquiry with no assignee yet), and have individual staff opt in from HQ → Settings → Notifications (email is off per staff member by default even once the key is set).
 7. Apply the schema: `npm run db:migrate` (local dev: `npm run db:migrate:local`)
@@ -45,9 +45,10 @@
 | Root directory | `/` |
 | Node version | 20 or later (set `NODE_VERSION=20` env var if needed) |
 
-Bindings (Pages project → Settings → Functions): add the **D1** binding `DB` → `pmv`,
-the **KV** binding `SESSIONS`, and the **R2** binding `UPLOADS` → `pmv-uploads`.
-`wrangler.toml` already declares all three for CLI deploys; the dashboard needs
+Bindings (Pages project → Settings → Functions): add the **D1** binding `DB` → `pmv`
+and the **KV** binding `SESSIONS` now; add the **R2** binding `UPLOADS` → `pmv-uploads`
+once the bucket exists and the `[[r2_buckets]]` block above is uncommented.
+`wrangler.toml` declares each for CLI deploys as it's enabled; the dashboard needs
 them set on the project too, alongside the secrets from the table above.
 
 ## Verify

@@ -1,7 +1,11 @@
 export interface Env {
   DB: D1Database
   SESSIONS: KVNamespace
-  UPLOADS: R2Bucket
+  // Optional: profile picture storage (functions/_lib/routes/uploads.ts).
+  // Unset until the pmv-uploads R2 bucket is provisioned and the binding is
+  // uncommented in wrangler.toml — upload routes return 503 until then
+  // instead of crashing.
+  UPLOADS?: R2Bucket
   SESSION_SECRET: string
   // Encrypts ACH routing/account numbers at rest (see functions/_lib/crypto.ts
   // encryptSensitive/decryptSensitive). Separate from SESSION_SECRET on purpose.

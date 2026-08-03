@@ -15,6 +15,8 @@ const ALLOWED_TYPES: Record<string, string> = {
 }
 
 async function storeAvatar(env: AppEnv['Bindings'], userId: string, req: Request): Promise<{ error: string; status: number } | { key: string }> {
+  if (!env.UPLOADS) return { error: 'photo uploads are not configured yet', status: 503 }
+
   const contentType = req.headers.get('Content-Type') || ''
   const ext = ALLOWED_TYPES[contentType]
   if (!ext) return { error: 'unsupported image type — use PNG, JPEG, or WebP', status: 400 }
@@ -62,6 +64,7 @@ uploadRoutes.post('/admin/clients/:id/avatar', requireUser, async (c) => {
 // cookies cross-origin between the hq./client. subdomains anyway. Keyed by
 // user id, same exposure level as every /admin/clients/:id URL already has.
 uploadRoutes.get('/avatar/:userId', async (c) => {
+  if (!c.env.UPLOADS) return c.json({ error: 'not found' }, 404)
   const userId = c.req.param('userId')
   const row = await c.env.DB.prepare('SELECT avatar_key FROM users WHERE id = ?').bind(userId).first<{ avatar_key: string | null }>()
   if (!row?.avatar_key) return c.json({ error: 'not found' }, 404)
