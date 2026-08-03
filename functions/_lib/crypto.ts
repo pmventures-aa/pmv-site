@@ -19,30 +19,51 @@ function unb64(s: string): Uint8Array {
 // Cloudflare Workers' WebCrypto implementation caps PBKDF2 at 100,000
 // iterations (crypto.subtle.deriveBits throws NotSupportedError above that,
 // even though browsers/Node allow more) — this was the actual root cause of
-// the bootstrap/signup 500s. 100,000 is still a solid modern PBKDF2-SHA256
-// parameter (OWASP's 2023 minimum recommendation).
+// the bootstrap/signup 500s. 100,000 is below current OWASP guidance
+// (~600,000) for PBKDF2-SHA256 alone, so passwords are additionally peppered
+// with an HMAC-SHA256 of SESSION_SECRET before PBKDF2 runs (see hmacPepper
+// below). SESSION_SECRET lives only in the Cloudflare secret store, never in
+// the D1 database, so a stolen users table alone isn't enough to attempt an
+// offline crack — the attacker also needs the secret.
 const PBKDF2_ITERATIONS = 100_000
 
-// Hash a password with PBKDF2-SHA256 (random 16-byte salt, 32-byte derived key).
-// Stored form: pbkdf2$<iterations>$<saltB64>$<hashB64>
-export async function hashPassword(password: string): Promise<string> {
+// Stored form: `pbkdf2$<iterations>$<saltB64>$<hashB64>` (legacy, unpeppered)
+// or `pbkdf2p$<iterations>$<saltB64>$<hashB64>` (current, HMAC-peppered).
+// verifyPassword supports both so existing hashes keep working; hashPassword
+// only ever writes the peppered form when a secret is available.
+export async function hashPassword(password: string, pepperSecret?: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16))
-  const hash = await pbkdf2(password, salt, PBKDF2_ITERATIONS)
-  return `pbkdf2$${PBKDF2_ITERATIONS}$${b64(salt)}$${b64(hash)}`
+  const material = pepperSecret ? await hmacPepper(password, pepperSecret) : password
+  const hash = await pbkdf2(material, salt, PBKDF2_ITERATIONS)
+  const scheme = pepperSecret ? 'pbkdf2p' : 'pbkdf2'
+  return `${scheme}$${PBKDF2_ITERATIONS}$${b64(salt)}$${b64(hash)}`
 }
 
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+export async function verifyPassword(password: string, stored: string, pepperSecret?: string): Promise<boolean> {
   try {
     const [scheme, iterStr, saltB64, hashB64] = stored.split('$')
-    if (scheme !== 'pbkdf2') return false
+    if (scheme !== 'pbkdf2' && scheme !== 'pbkdf2p') return false
     const iterations = parseInt(iterStr, 10)
     const salt = unb64(saltB64)
     const expected = unb64(hashB64)
-    const actual = await pbkdf2(password, salt, iterations, expected.length)
+    const material = scheme === 'pbkdf2p' && pepperSecret ? await hmacPepper(password, pepperSecret) : password
+    const actual = await pbkdf2(material, salt, iterations, expected.length)
     return timingSafeEqual(actual, expected)
   } catch {
     return false
   }
+}
+
+async function hmacPepper(password: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret) as unknown as BufferSource,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(password) as unknown as BufferSource)
+  return b64(new Uint8Array(sig))
 }
 
 async function pbkdf2(password: string, salt: Uint8Array, iterations: number, length = 32): Promise<Uint8Array> {

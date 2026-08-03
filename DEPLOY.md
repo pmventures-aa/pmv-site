@@ -34,5 +34,5 @@ already declares these for CLI deploys; the dashboard needs them set on the proj
 
 ## Verify
 - `GET /api/health` → `{ ok: true }`
-- Auth flow: `POST /api/auth/request-otp` → `POST /api/auth/verify-otp` → `GET /api/me`
-  (in dev, set SESSION_SECRET=`dev` to have request-otp return the code for testing)
+- Auth flow: `POST /api/auth/signup` (or `/api/auth/login`) → `GET /api/me`
+  `SESSION_SECRET` doubles as the password-hashing pepper (see `functions/_lib/crypto.ts`) — it must be set for every environment, not just prod.

@@ -1,6 +1,6 @@
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
-import { Card } from '../../components/ui'
+import { panelCls } from '../../components/public/ui'
 
 const sections: [string, string][] = [
   [
@@ -69,22 +69,22 @@ const sections: [string, string][] = [
 
 export default function Terms() {
   return (
-    <div className="min-h-screen bg-navy-radial">
+    <div className="min-h-screen bg-navy-950">
       <Header />
       <section className="container-pmv py-16">
         <div className="mx-auto max-w-3xl">
           <p className="eyebrow">Legal</p>
-          <h1 className="mt-2 text-4xl font-bold text-white">Terms of Service</h1>
+          <h1 className="mt-3 font-display text-4xl font-medium text-white">Terms of Service</h1>
           <p className="mt-3 text-sm text-slate-400">Effective date: August 2, 2026</p>
 
-          <Card className="mt-8 space-y-6">
+          <div className={`${panelCls} mt-8 space-y-6`}>
             {sections.map(([title, body]) => (
               <div key={title}>
                 <h2 className="text-base font-semibold text-white">{title}</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-300">{body}</p>
               </div>
             ))}
-          </Card>
+          </div>
         </div>
       </section>
       <Footer />

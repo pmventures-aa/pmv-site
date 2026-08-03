@@ -11,20 +11,24 @@ const SIGNUP_MAX_PER_HOUR = 8
 const norm = (e: string) => (e || '').trim().toLowerCase()
 const cleanName = (s: unknown) => (typeof s === 'string' ? s.trim().slice(0, 120) : '')
 
-async function throttleKey(email: string) {
-  return `fail:${email}`
+// Keyed by email+IP (not email alone) so an attacker who only knows a
+// victim's email can't lock that account out from every IP indefinitely —
+// each IP gets its own attempt budget, matching the brute-force protection
+// this is meant to provide without being usable as a targeted DoS.
+function throttleKey(email: string, ip: string) {
+  return `fail:${email}:${ip}`
 }
-async function isLockedOut(env: AppEnv['Bindings'], email: string): Promise<boolean> {
-  const raw = await env.SESSIONS.get(await throttleKey(email))
+async function isLockedOut(env: AppEnv['Bindings'], email: string, ip: string): Promise<boolean> {
+  const raw = await env.SESSIONS.get(throttleKey(email, ip))
   return raw ? parseInt(raw, 10) >= MAX_FAILS : false
 }
-async function recordFailure(env: AppEnv['Bindings'], email: string) {
-  const k = await throttleKey(email)
+async function recordFailure(env: AppEnv['Bindings'], email: string, ip: string) {
+  const k = throttleKey(email, ip)
   const cur = parseInt((await env.SESSIONS.get(k)) || '0', 10) + 1
   await env.SESSIONS.put(k, String(cur), { expirationTtl: LOCKOUT_SECONDS })
 }
-async function clearFailures(env: AppEnv['Bindings'], email: string) {
-  await env.SESSIONS.delete(await throttleKey(email))
+async function clearFailures(env: AppEnv['Bindings'], email: string, ip: string) {
+  await env.SESSIONS.delete(throttleKey(email, ip))
 }
 async function signupThrottled(env: AppEnv['Bindings'], ip: string): Promise<boolean> {
   const k = `signup:${ip}`
@@ -76,7 +80,7 @@ authRoutes.post('/signup', async (c) => {
   if (exists) return c.json({ error: 'an account with that email already exists' }, 409)
 
   const id = uuid()
-  const hash = await hashPassword(body.password)
+  const hash = await hashPassword(body.password, c.env.SESSION_SECRET)
   const fullName = `${firstName} ${lastName}`.trim()
 
   await c.env.DB.batch([
@@ -136,7 +140,7 @@ authRoutes.post('/set-password', async (c) => {
   const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first<any>()
   if (!user || user.status !== 'active') return c.json({ error: 'account not found or inactive' }, 400)
 
-  const hash = await hashPassword(password)
+  const hash = await hashPassword(password, c.env.SESSION_SECRET)
   await c.env.DB.prepare("UPDATE users SET password_hash = ?, last_login_at = datetime('now') WHERE id = ?").bind(hash, userId).run()
 
   const su: SessionUser = {
@@ -158,26 +162,27 @@ authRoutes.post('/login', async (c) => {
     .catch(() => ({ email: '', password: '' }))
   const e = norm(email)
   if (!e || !password) return c.json({ error: 'email and password required' }, 400)
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
 
-  if (await isLockedOut(c.env, e)) {
+  if (await isLockedOut(c.env, e, ip)) {
     return c.json({ error: 'too many attempts — try again in 15 minutes' }, 429)
   }
 
   const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(e).first<any>()
   let ok = false
   if (user && user.status === 'active' && user.password_hash) {
-    ok = await verifyPassword(password, user.password_hash)
+    ok = await verifyPassword(password, user.password_hash, c.env.SESSION_SECRET)
   } else {
     // dummy verify to equalize timing and reduce user enumeration
-    await verifyPassword(password, 'pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')
+    await verifyPassword(password, 'pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', c.env.SESSION_SECRET)
   }
 
   if (!user || user.status !== 'active' || !ok) {
-    await recordFailure(c.env, e)
+    await recordFailure(c.env, e, ip)
     return c.json({ error: 'invalid email or password' }, 401)
   }
 
-  await clearFailures(c.env, e)
+  await clearFailures(c.env, e, ip)
   await c.env.DB.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").bind(user.id).run()
   const su: SessionUser = {
     id: user.id,
