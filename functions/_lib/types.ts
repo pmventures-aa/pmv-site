@@ -2,6 +2,9 @@ export interface Env {
   DB: D1Database
   SESSIONS: KVNamespace
   SESSION_SECRET: string
+  // Encrypts ACH routing/account numbers at rest (see functions/_lib/crypto.ts
+  // encryptSensitive/decryptSensitive). Separate from SESSION_SECRET on purpose.
+  PAYMENT_ENCRYPTION_KEY: string
 }
 
 export type Role = 'client' | 'staff' | 'admin'

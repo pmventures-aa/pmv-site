@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
+import { toast } from '../../components/kit/toast'
+import { ConfirmDialog } from '../../components/kit/ConfirmDialog'
 
 interface UserRow {
   id: string
@@ -26,6 +28,8 @@ export default function AssignmentsAdmin() {
   const [clientId, setClientId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [pendingRemove, setPendingRemove] = useState<Assignment | null>(null)
+  const [removing, setRemoving] = useState(false)
 
   const load = useCallback(async () => {
     const [a, u] = await Promise.all([
@@ -52,6 +56,7 @@ export default function AssignmentsAdmin() {
       await api.post('/admin/assignments', { staff_user_id: staffId, client_user_id: clientId })
       setStaffId('')
       setClientId('')
+      toast.success('Assignment created.')
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create assignment.')
@@ -60,9 +65,19 @@ export default function AssignmentsAdmin() {
     }
   }
 
-  async function remove(id: string) {
-    await api.del(`/admin/assignments/${id}`)
-    await load()
+  async function confirmRemove() {
+    if (!pendingRemove) return
+    setRemoving(true)
+    try {
+      await api.del(`/admin/assignments/${pendingRemove.id}`)
+      toast.success('Assignment removed.')
+      setPendingRemove(null)
+      await load()
+    } catch {
+      toast.error('Could not remove assignment.')
+    } finally {
+      setRemoving(false)
+    }
   }
 
   return (
@@ -122,7 +137,7 @@ export default function AssignmentsAdmin() {
                   <td className="px-5 py-3 text-slate-200">{a.staff_name || a.staff_email}</td>
                   <td className="px-5 py-3 text-slate-200">{a.client_name || a.client_email}</td>
                   <td className="px-5 py-3">
-                    <button onClick={() => remove(a.id)} className="text-xs font-medium text-rose-300 hover:underline">
+                    <button onClick={() => setPendingRemove(a)} className="text-xs font-medium text-rose-300 hover:underline">
                       Remove
                     </button>
                   </td>
@@ -132,6 +147,20 @@ export default function AssignmentsAdmin() {
           </table>
         )}
       </Panel>
+
+      <ConfirmDialog
+        open={!!pendingRemove}
+        onOpenChange={(open) => !open && setPendingRemove(null)}
+        title="Remove this assignment?"
+        description={
+          pendingRemove
+            ? `${pendingRemove.staff_name || pendingRemove.staff_email} will no longer see ${pendingRemove.client_name || pendingRemove.client_email}.`
+            : undefined
+        }
+        confirmLabel="Remove"
+        busy={removing}
+        onConfirm={confirmRemove}
+      />
     </div>
   )
 }

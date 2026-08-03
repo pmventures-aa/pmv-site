@@ -5,13 +5,15 @@
 - **API:** Hono on **Pages Functions** (`functions/api/*`) → served at `/api/*`
 - **Database:** Cloudflare **D1** (SQLite), schema in `migrations/`
 - **Sessions:** Cloudflare **KV**
-- **Secret:** `SESSION_SECRET`
+- **Secrets:** `SESSION_SECRET`, `PAYMENT_ENCRYPTION_KEY`
 
 ## One-time setup (Cloudflare dashboard + CLI)
 1. `npx wrangler login`
 2. Create the database:  `npx wrangler d1 create pmv`  → paste the returned `database_id` into `wrangler.toml`
 3. Create the KV namespace:  `npx wrangler kv namespace create SESSIONS`  → paste the `id` into `wrangler.toml`
-4. Set the secret:  `npx wrangler pages secret put SESSION_SECRET`
+4. Set the secrets:
+   - `npx wrangler pages secret put SESSION_SECRET`
+   - `npx wrangler pages secret put PAYMENT_ENCRYPTION_KEY` — encrypts ACH routing/account numbers at rest (see `functions/_lib/crypto.ts`). Use a long random value, separate from `SESSION_SECRET`. Required before any client submits banking info on a service application — the endpoint 500s without it.
 5. Apply the schema:  `npm run db:migrate`   (local dev: `npm run db:migrate:local`)
 
 ## Deploy
@@ -29,8 +31,9 @@
 | Node version | 20 or later (set `NODE_VERSION=20` env var if needed) |
 
 Bindings (Pages project → Settings → Functions): add the **D1** binding `DB` → `pmv`,
-the **KV** binding `SESSIONS`, and the **SESSION_SECRET** secret. `wrangler.toml`
-already declares these for CLI deploys; the dashboard needs them set on the project too.
+the **KV** binding `SESSIONS`, and the **SESSION_SECRET** / **PAYMENT_ENCRYPTION_KEY**
+secrets. `wrangler.toml` already declares the D1/KV bindings for CLI deploys; the
+dashboard needs them (and both secrets) set on the project too.
 
 ## Verify
 - `GET /api/health` → `{ ok: true }`

@@ -13,10 +13,14 @@
     "db:migrate": "npx wrangler d1 migrations apply pmv --remote"
   },
   "dependencies": {
+    "@radix-ui/react-alert-dialog": "^1.1.23",
+    "@radix-ui/react-dialog": "^1.1.23",
     "hono": "^4.12.33",
+    "motion": "^12.43.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.2"
+    "react-router-dom": "^7.18.2",
+    "sonner": "^2.0.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260801.1",

@@ -75,6 +75,12 @@ export function describeActivity(e: ActivityEvent): string {
       return `${actor} opened a ${d.tax_year ?? ''} tax filing for ${client}`
     case 'tax_filing_status_changed':
       return `${actor} set ${client}’s ${d.tax_year ?? ''} tax filing to ${fmtStatus(d.to)}`
+    case 'service_application_submitted':
+      return `${client} submitted an application for ${d.service_name || fmtStatus(d.service_key)}`
+    case 'service_status_changed':
+      return `${actor} set ${client}’s ${fmtStatus(d.service_key)} application to ${fmtStatus(d.to)}`
+    case 'payment_info_revealed':
+      return `${actor} viewed banking details for ${client} (account ending ${d.account_last4 ?? '····'})`
     default:
       return fmtStatus(e.kind)
   }

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, inputCls, btnPrimary } from '../../components/admin/ui'
+import { toast } from '../../components/kit/toast'
 
 export default function SettingsAdmin() {
   const [settings, setSettings] = useState<Record<string, string>>({})
-  const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -18,10 +18,11 @@ export default function SettingsAdmin() {
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
-    setSaved(false)
     try {
       await api.patch('/admin/settings', settings)
-      setSaved(true)
+      toast.success('Settings saved.')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not save settings.')
     } finally {
       setBusy(false)
     }
@@ -45,7 +46,6 @@ export default function SettingsAdmin() {
             <button type="submit" disabled={busy} className={btnPrimary}>
               {busy ? 'Saving…' : 'Save settings'}
             </button>
-            {saved && <span className="text-sm text-emerald-300">Saved.</span>}
           </div>
         </form>
       </Panel>

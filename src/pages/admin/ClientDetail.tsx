@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
+import { toast } from '../../components/kit/toast'
+import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
   profile: { business_name: string | null; entity_type: string | null; state: string | null } | null
-  services: { service_key: string; name: string; status: string }[]
+  services: { id: string; service_key: string; name: string; status: string }[]
   matters: any[]
   tasks: any[]
   documents: any[]
@@ -17,7 +19,20 @@ interface Bundle {
   tickets: any[]
   calls: any[]
   appointments: any[]
+  application_answers: { service_key: string; question_key: string; value: string; label: string | null; step_label: string | null }[]
+  payment_methods: {
+    id: string
+    service_key: string | null
+    method_type: string
+    account_holder_name: string
+    bank_name: string | null
+    account_type: string | null
+    account_last4: string
+    created_at: string
+  }[]
 }
+
+const SERVICE_STATUS_OPTIONS = ['requested', 'submitted', 'active', 'completed', 'declined']
 
 const statusOptions: Record<string, string[]> = {
   matters: ['open', 'in_progress', 'blocked', 'closed'],
@@ -79,6 +94,7 @@ function CreateForm({
     try {
       const body = config.toBody ? config.toBody(values) : values
       await api.post(`/portal/${config.postPath}`, { ...body, client_user_id: clientId })
+      toast.success('Created.')
       onCreated()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create item.')
@@ -225,6 +241,151 @@ function Section({
   )
 }
 
+function ServiceApplications({
+  services,
+  answers,
+  onStatusChange,
+}: {
+  services: Bundle['services']
+  answers: Bundle['application_answers']
+  onStatusChange: (csId: string, status: string) => void
+}) {
+  if (services.length === 0) return null
+  return (
+    <Panel className="mb-5 !p-0">
+      <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">Service Applications</h3>
+      <div className="divide-y divide-white/5">
+        {services.map((s) => {
+          const svcAnswers = answers.filter((a) => a.service_key === s.service_key)
+          const bySteps = new Map<string, typeof svcAnswers>()
+          for (const a of svcAnswers) {
+            const step = a.step_label ?? 'Details'
+            if (!bySteps.has(step)) bySteps.set(step, [])
+            bySteps.get(step)!.push(a)
+          }
+          return (
+            <div key={s.id} className="px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-white">{s.name}</p>
+                <select
+                  className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
+                  value={s.status}
+                  onChange={(e) => onStatusChange(s.id, e.target.value)}
+                >
+                  {SERVICE_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {svcAnswers.length === 0 ? (
+                <p className="mt-2 text-xs text-slate-500">No application details submitted yet.</p>
+              ) : (
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  {Array.from(bySteps.entries()).map(([step, items]) => (
+                    <div key={step}>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gold/80">{step}</p>
+                      <dl className="mt-2 space-y-1.5">
+                        {items.map((a) => (
+                          <div key={a.question_key} className="text-xs">
+                            <dt className="text-slate-500">{a.label ?? a.question_key}</dt>
+                            <dd className="text-slate-200">{a.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </Panel>
+  )
+}
+
+function RevealPaymentMethodDialog({
+  clientId,
+  method,
+  onRevealed,
+}: {
+  clientId: string
+  method: Bundle['payment_methods'][number]
+  onRevealed: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<{ routing_number: string; account_number: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function handleOpenChange(next: boolean) {
+    setOpen(next)
+    if (next && !data) {
+      setBusy(true)
+      try {
+        const res = await api.post<{ routing_number: string; account_number: string }>(
+          `/admin/clients/${clientId}/payment-methods/${method.id}/reveal`,
+        )
+        setData(res)
+        onRevealed()
+      } catch {
+        toast.error('Could not reveal payment details.')
+        setOpen(false)
+      } finally {
+        setBusy(false)
+      }
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <button className="text-xs font-medium text-gold hover:underline">Reveal (admin only)</button>
+      </DialogTrigger>
+      <DialogContent title="Banking details" description={`${method.account_holder_name} — this view is logged for audit`}>
+        {busy ? (
+          <p className="text-sm text-slate-400">Decrypting…</p>
+        ) : data ? (
+          <dl className="space-y-3 text-sm">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Routing number</dt>
+              <dd className="mt-0.5 font-mono text-base text-white">{data.routing_number}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-500">Account number</dt>
+              <dd className="mt-0.5 font-mono text-base text-white">{data.account_number}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; methods: Bundle['payment_methods']; onRevealed: () => void }) {
+  if (methods.length === 0) return null
+  return (
+    <Panel className="mb-5 !p-0">
+      <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">Payment Methods (ACH)</h3>
+      <div className="divide-y divide-white/5">
+        {methods.map((m) => (
+          <div key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
+            <div>
+              <p className="text-white">{m.account_holder_name}</p>
+              <p className="text-xs text-slate-400">
+                {m.bank_name ?? 'Bank on file'} · {m.account_type ?? 'account'} ending {m.account_last4}
+                {m.service_key ? ` · ${m.service_key.replace(/_/g, ' ')}` : ''}
+              </p>
+            </div>
+            <RevealPaymentMethodDialog clientId={clientId} method={m} onRevealed={onRevealed} />
+          </div>
+        ))}
+      </div>
+    </Panel>
+  )
+}
+
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
@@ -232,7 +393,6 @@ export default function ClientDetail() {
 
   const load = useCallback(async () => {
     if (!id) return
-    setLoading(true)
     try {
       const res = await api.get<Bundle>(`/admin/clients/${id}`)
       setData(res)
@@ -247,6 +407,11 @@ export default function ClientDetail() {
 
   async function setStatus(module: string, itemId: string, status: string) {
     await api.patch(`/portal/${patchPath[module]}/${itemId}`, { status })
+    await load()
+  }
+
+  async function setServiceStatus(csId: string, status: string) {
+    await api.patch(`/portal/services/${csId}`, { status })
     await load()
   }
 
@@ -275,6 +440,9 @@ export default function ClientDetail() {
           </div>
         }
       />
+
+      <ServiceApplications services={data.services} answers={data.application_answers} onStatusChange={setServiceStatus} />
+      <PaymentMethods clientId={clientId} methods={data.payment_methods} onRevealed={load} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Section

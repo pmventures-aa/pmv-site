@@ -7,19 +7,24 @@ export interface NavItem {
 
 export const portalNav: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', to: '', icon: '⌂' },
-  { key: 'calls', label: 'Planned Calls', to: 'calls', icon: '☎' },
-  { key: 'services', label: 'Services', to: 'services', icon: '✦' },
-  { key: 'matters', label: 'Matters', to: 'matters', icon: '⚖' },
+  { key: 'services', label: 'My Services', to: 'services', icon: '✦' },
+  { key: 'matters', label: 'Projects & Matters', to: 'matters', icon: '⚖' },
   { key: 'tasks', label: 'Tasks', to: 'tasks', icon: '✓' },
   { key: 'documents', label: 'Documents', to: 'documents', icon: '⌘' },
   { key: 'messages', label: 'Messages', to: 'messages', icon: '✉' },
   { key: 'calendar', label: 'Calendar', to: 'calendar', icon: '▦' },
   { key: 'billing', label: 'Billing', to: 'billing', icon: '$' },
-  { key: 'funding', label: 'Funding', to: 'funding', icon: '↗' },
-  { key: 'property', label: 'Property', to: 'property', icon: '⌂' },
-  { key: 'tax', label: 'Tax', to: 'tax', icon: '%' },
   { key: 'support', label: 'Support', to: 'support', icon: '❓' },
+  { key: 'profile', label: 'Business Profile', to: 'profile', icon: '⚑' },
+  { key: 'team', label: 'My Team', to: 'team', icon: '☺' },
+  { key: 'notifications', label: 'Notifications', to: 'notifications', icon: '🔔' },
+  { key: 'security', label: 'Security', to: 'security', icon: '⚿' },
 ]
+
+// Not in the primary sidebar (kept out to match the requested clean nav list)
+// but still real routes — reachable from Planned Calls request buttons and
+// from service-specific links on the My Services page.
+export const portalHiddenRoutes = ['calls', 'funding', 'property', 'tax'] as const
 
 export const adminNav: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', to: '', icon: '⌂' },
