@@ -1,0 +1,100 @@
+export interface ActivityEvent {
+  id: string
+  actor_user_id: string | null
+  actor_name?: string | null
+  actor_email?: string | null
+  client_user_id: string | null
+  client_name?: string | null
+  client_email?: string | null
+  kind: string
+  detail: string | null
+  created_at: string
+}
+
+function fmtStatus(s?: string): string {
+  return s ? s.replace(/_/g, ' ') : '—'
+}
+function money(cents?: number | null): string {
+  return typeof cents === 'number' ? `$${(cents / 100).toLocaleString()}` : 'a'
+}
+
+export function describeActivity(e: ActivityEvent): string {
+  let d: any = {}
+  try {
+    d = e.detail ? JSON.parse(e.detail) : {}
+  } catch {
+    d = {}
+  }
+  const actor = e.actor_name || e.actor_email || 'Someone'
+  const client = e.client_name || e.client_email || 'a client'
+
+  switch (e.kind) {
+    case 'inquiry_submitted':
+      return `New inquiry from ${d.name || d.email || 'a website visitor'}${d.service_key ? ` about ${fmtStatus(d.service_key)}` : ''}`
+    case 'client_signed_up':
+      return `${client} signed up${d.business_name ? ` (${d.business_name})` : ''}`
+    case 'user_created':
+      return `${actor} created a${d.role === 'admin' ? 'n' : ''} ${d.role} account for ${d.full_name || d.email}`
+    case 'user_status_changed':
+      return `${actor} updated ${d.name || 'a user'} — ${d.to?.status ?? ''} · ${d.to?.role ?? ''}`.trim()
+    case 'onboarding_completed':
+      return `${client} completed onboarding`
+    case 'matter_created':
+      return `${actor} opened matter “${d.title}” for ${client}`
+    case 'matter_status_changed':
+      return `${actor} moved “${d.title}” (${client}) to ${fmtStatus(d.to)}`
+    case 'task_created':
+      return `${actor} added task “${d.title}” for ${client}`
+    case 'task_status_changed':
+      return `${actor} marked “${d.title}” (${client}) as ${fmtStatus(d.to)}`
+    case 'ticket_created':
+      return `${actor} opened ticket “${d.subject}” for ${client}`
+    case 'ticket_status_changed':
+      return `${actor} set ticket “${d.subject}” (${client}) to ${fmtStatus(d.to)}`
+    case 'call_created':
+      return `${actor} requested a call — “${d.topic}” for ${client}`
+    case 'call_status_changed':
+      return `${actor} set call “${d.topic}” (${client}) to ${fmtStatus(d.to)}`
+    case 'appointment_created':
+      return `${actor} scheduled “${d.title}” for ${client}`
+    case 'appointment_status_changed':
+      return `${actor} set appointment “${d.title}” (${client}) to ${fmtStatus(d.to)}`
+    case 'invoice_created':
+      return `${actor} created a ${money(d.amount_cents)} invoice for ${client}`
+    case 'invoice_status_changed':
+      return `${actor} marked ${client}’s invoice as ${fmtStatus(d.to)}`
+    case 'funding_created':
+      return `${actor} opened a funding application for ${client}`
+    case 'funding_status_changed':
+      return `${actor} set ${client}’s funding application to ${fmtStatus(d.to)}`
+    case 'property_created':
+      return `${actor} added property “${d.address}” for ${client}`
+    case 'property_status_changed':
+      return `${actor} set “${d.address}” (${client}) to ${fmtStatus(d.to)}`
+    case 'tax_filing_created':
+      return `${actor} opened a ${d.tax_year ?? ''} tax filing for ${client}`
+    case 'tax_filing_status_changed':
+      return `${actor} set ${client}’s ${d.tax_year ?? ''} tax filing to ${fmtStatus(d.to)}`
+    default:
+      return fmtStatus(e.kind)
+  }
+}
+
+// SQLite's datetime('now') yields "YYYY-MM-DD HH:MM:SS" (space-separated, UTC, no
+// zone marker) — normalize to a strict ISO string so Date parsing is consistent
+// across browsers (Safari rejects the space-separated form).
+function parseSqliteUtc(s: string): Date {
+  return new Date(s.replace(' ', 'T') + 'Z')
+}
+
+export function timeAgo(iso: string): string {
+  const ms = Date.now() - parseSqliteUtc(iso).getTime()
+  const mins = Math.floor(ms / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d ago`
+  return parseSqliteUtc(iso).toLocaleDateString()
+}

@@ -5,6 +5,7 @@ import { uuid } from '../crypto'
 import { scopeFilter, canAccessClient, ScopeError } from '../scope'
 import { visibleClientIds } from '../access'
 import { createActivationToken } from '../session'
+import { activityInsert, logActivity } from '../activity'
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -21,12 +22,25 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
   const clientCount = await c.env.DB.prepare(`SELECT COUNT(*) n FROM client_profiles WHERE ${where}`).bind(...params).first<{ n: number }>()
 
   const { where: w2, params: p2 } = await scopeFilter(c.env, user)
-  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices] = await Promise.all([
+  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices, appts, activity] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) n FROM support_tickets WHERE ${w2} AND status = 'open'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${w2} AND status != 'closed'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${w2} AND status != 'done'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM planned_calls WHERE ${w2} AND status = 'requested'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM invoices WHERE ${w2} AND status = 'open'`).bind(...p2).first<{ n: number }>(),
+    c.env.DB.prepare(
+      `SELECT a.*, u.full_name AS client_name, u.email AS client_email FROM appointments a JOIN users u ON u.id = a.client_user_id
+       WHERE ${w2.replace(/client_user_id/g, 'a.client_user_id')} AND a.starts_at >= datetime('now') AND a.status != 'cancelled'
+       ORDER BY a.starts_at ASC LIMIT 5`,
+    ).bind(...p2).all(),
+    c.env.DB.prepare(
+      `SELECT ae.*, actor.full_name AS actor_name, cu.full_name AS client_name, cu.email AS client_email
+       FROM activity_events ae
+       LEFT JOIN users actor ON actor.id = ae.actor_user_id
+       LEFT JOIN users cu ON cu.id = ae.client_user_id
+       WHERE (${w2.replace(/client_user_id/g, 'ae.client_user_id')}) OR ae.client_user_id IS NULL
+       ORDER BY ae.created_at DESC LIMIT 15`,
+    ).bind(...p2).all(),
   ])
 
   return c.json({
@@ -38,6 +52,8 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
       pending_calls: pendingCalls?.n ?? 0,
       open_invoices: openInvoices?.n ?? 0,
     },
+    upcoming_appointments: appts.results ?? [],
+    recent_activity: activity.results ?? [],
   })
 })
 
@@ -129,6 +145,7 @@ adminRoutes.get('/users', requireAdmin, async (c) => {
 // their own password, consistent with the "never invent/hardcode a
 // password" rule applied to the admin account.
 adminRoutes.post('/users', requireAdmin, async (c) => {
+  const user = c.get('user')
   const body = await c.req.json<{
     email: string
     role?: string
@@ -152,41 +169,64 @@ adminRoutes.post('/users', requireAdmin, async (c) => {
   const id = uuid()
   const fn = body.full_name || [body.first_name, body.last_name].filter(Boolean).join(' ') || null
   const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) || null : null
-  await c.env.DB.prepare(
-    `INSERT INTO users (id, email, password_hash, role, full_name, first_name, last_name, phone, two_factor_enabled, status)
-     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 0, 'active')`,
-  ).bind(id, e, r, fn, body.first_name ?? null, body.last_name ?? null, phone).run()
 
+  const stmts = [
+    c.env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, role, full_name, first_name, last_name, phone, two_factor_enabled, status)
+       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 0, 'active')`,
+    ).bind(id, e, r, fn, body.first_name ?? null, body.last_name ?? null, phone),
+  ]
   if (r === 'client') {
-    await c.env.DB.prepare(
-      `INSERT INTO client_profiles (id, user_id, business_name, entity_type, ein, state, services_enrolled, onboarding_completed)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-    ).bind(
-      uuid(),
-      id,
-      body.business_name ?? null,
-      body.entity_type ?? null,
-      body.ein ?? null,
-      body.state ?? null,
-      Array.isArray(body.services_enrolled) ? JSON.stringify(body.services_enrolled) : null,
-    ).run()
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO client_profiles (id, user_id, business_name, entity_type, ein, state, services_enrolled, onboarding_completed)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+      ).bind(
+        uuid(),
+        id,
+        body.business_name ?? null,
+        body.entity_type ?? null,
+        body.ein ?? null,
+        body.state ?? null,
+        Array.isArray(body.services_enrolled) ? JSON.stringify(body.services_enrolled) : null,
+      ),
+    )
   } else if (r === 'staff') {
-    await c.env.DB.prepare("INSERT INTO team_members (id, user_id, staff_role) VALUES (?, ?, 'pinnacle_admin')").bind(uuid(), id).run()
+    stmts.push(c.env.DB.prepare("INSERT INTO team_members (id, user_id, staff_role) VALUES (?, ?, 'pinnacle_admin')").bind(uuid(), id))
   }
+  stmts.push(
+    activityInsert(c.env, {
+      actorUserId: user.id,
+      clientUserId: r === 'client' ? id : null,
+      kind: 'user_created',
+      detail: { email: e, role: r, full_name: fn },
+    }),
+  )
+  await c.env.DB.batch(stmts)
 
   const setupToken = await createActivationToken(c.env, id)
   return c.json({ ok: true, user: { id, email: e, role: r, full_name: fn }, setup_token: setupToken }, 201)
 })
 
 adminRoutes.patch('/users/:id', requireAdmin, async (c) => {
+  const actor = c.get('user')
   const id = c.req.param('id')
   const body = await c.req.json<{ status?: string; role?: string }>().catch(() => ({} as { status?: string; role?: string }))
   const status = ['active', 'suspended'].includes(body.status ?? '') ? body.status : undefined
   const role = ['client', 'staff', 'admin'].includes(body.role ?? '') ? body.role : undefined
   if (!status && !role) return c.json({ error: 'nothing to update' }, 400)
+  const target = await c.env.DB.prepare('SELECT role, status, full_name, email FROM users WHERE id = ?').bind(id).first<any>()
   await c.env.DB.prepare(
     'UPDATE users SET status = COALESCE(?, status), role = COALESCE(?, role) WHERE id = ?',
   ).bind(status ?? null, role ?? null, id).run()
+  if (target && ((status && status !== target.status) || (role && role !== target.role))) {
+    await logActivity(c.env, {
+      actorUserId: actor.id,
+      clientUserId: target.role === 'client' ? id : null,
+      kind: 'user_status_changed',
+      detail: { name: target.full_name || target.email, from: { status: target.status, role: target.role }, to: { status: status ?? target.status, role: role ?? target.role } },
+    })
+  }
   return c.json({ ok: true })
 })
 
@@ -234,6 +274,66 @@ adminRoutes.patch('/settings', requireAdmin, async (c) => {
     ).bind(key, String(value)).run()
   }
   return c.json({ ok: true })
+})
+
+// ---------------- staff + admin: activity feed / notifications ----------------
+// Events with client_user_id = NULL (new inquiry, new staff/admin user) are firm-wide
+// and shown to every staff member regardless of client assignment.
+const ACTIVITY_SEEN_KEY = (userId: string) => `activity_seen:${userId}`
+
+adminRoutes.get('/activity', requireStaff, async (c) => {
+  const user = c.get('user')
+  const { where, params } = await scopeFilter(c.env, user, 'ae.client_user_id')
+  const res = await c.env.DB.prepare(
+    `SELECT ae.*, actor.full_name AS actor_name, actor.email AS actor_email,
+            cu.full_name AS client_name, cu.email AS client_email
+     FROM activity_events ae
+     LEFT JOIN users actor ON actor.id = ae.actor_user_id
+     LEFT JOIN users cu ON cu.id = ae.client_user_id
+     WHERE (${where}) OR ae.client_user_id IS NULL
+     ORDER BY ae.created_at DESC LIMIT 100`,
+  ).bind(...params).all()
+  return c.json({ events: res.results ?? [] })
+})
+
+adminRoutes.get('/activity/unread-count', requireStaff, async (c) => {
+  const user = c.get('user')
+  const seen = (await c.env.SESSIONS.get(ACTIVITY_SEEN_KEY(user.id))) || '1970-01-01T00:00:00.000Z'
+  const { where, params } = await scopeFilter(c.env, user, 'ae.client_user_id')
+  const row = await c.env.DB.prepare(
+    `SELECT COUNT(*) n FROM activity_events ae WHERE ((${where}) OR ae.client_user_id IS NULL) AND ae.created_at > ?`,
+  ).bind(...params, seen).first<{ n: number }>()
+  return c.json({ count: row?.n ?? 0 })
+})
+
+adminRoutes.post('/activity/mark-seen', requireStaff, async (c) => {
+  const user = c.get('user')
+  await c.env.SESSIONS.put(ACTIVITY_SEEN_KEY(user.id), new Date().toISOString())
+  return c.json({ ok: true })
+})
+
+// ---------------- staff + admin: open-items drill-down (from dashboard stat cards) ----------------
+const OPEN_ITEM_CONFIG: Record<string, { table: string; statusPredicate: string }> = {
+  tickets: { table: 'support_tickets', statusPredicate: "t.status = 'open'" },
+  matters: { table: 'matters', statusPredicate: "t.status != 'closed'" },
+  tasks: { table: 'client_tasks', statusPredicate: "t.status != 'done'" },
+  calls: { table: 'planned_calls', statusPredicate: "t.status = 'requested'" },
+  invoices: { table: 'invoices', statusPredicate: "t.status = 'open'" },
+}
+
+adminRoutes.get('/open-items', requireStaff, async (c) => {
+  const user = c.get('user')
+  const type = c.req.query('type') ?? ''
+  const cfg = OPEN_ITEM_CONFIG[type]
+  if (!cfg) return c.json({ error: 'unknown type — expected one of ' + Object.keys(OPEN_ITEM_CONFIG).join(', ') }, 400)
+  const { where, params } = await scopeFilter(c.env, user, 't.client_user_id')
+  const res = await c.env.DB.prepare(
+    `SELECT t.*, u.full_name AS client_name, u.email AS client_email
+     FROM ${cfg.table} t JOIN users u ON u.id = t.client_user_id
+     WHERE ${where} AND ${cfg.statusPredicate}
+     ORDER BY t.created_at DESC LIMIT 200`,
+  ).bind(...params).all()
+  return c.json({ type, items: res.results ?? [] })
 })
 
 // unused import guard (visibleClientIds retained for potential future use in reports)

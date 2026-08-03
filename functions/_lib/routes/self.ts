@@ -4,17 +4,23 @@ import { requireClient } from '../mid'
 import { uuid } from '../crypto'
 
 // Self-service endpoints for the authenticated client: profile + dynamic onboarding.
+//
+// requireClient is applied per-route (not via a top-level `.use('*', ...)`) because
+// this sub-app and portalRoutes are both mounted at the same base path ('/portal' —
+// see functions/api/[[route]].ts). A blanket wildcard middleware here would run for
+// ANY /portal/* request — including ones only portalRoutes defines a handler for
+// (e.g. /portal/matters) — and 403 every staff/admin request before portalRoutes
+// ever got a chance to handle it.
 export const selfRoutes = new Hono<AppEnv>()
-selfRoutes.use('*', requireClient)
 
 // ---------- profile ----------
-selfRoutes.get('/profile', async (c) => {
+selfRoutes.get('/profile', requireClient, async (c) => {
   const user = c.get('user')
   const profile = await c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(user.id).first()
   return c.json({ profile })
 })
 
-selfRoutes.patch('/profile', async (c) => {
+selfRoutes.patch('/profile', requireClient, async (c) => {
   const user = c.get('user')
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
   const fields: Record<string, string | null> = {}
@@ -31,13 +37,13 @@ selfRoutes.patch('/profile', async (c) => {
 })
 
 // ---------- services catalog ----------
-selfRoutes.get('/services-catalog', async (c) => {
+selfRoutes.get('/services-catalog', requireClient, async (c) => {
   const res = await c.env.DB.prepare('SELECT * FROM services WHERE active = 1 ORDER BY sort_order').all()
   return c.json({ services: res.results ?? [] })
 })
 
 // current client's enrolled/requested services
-selfRoutes.get('/services', async (c) => {
+selfRoutes.get('/services', requireClient, async (c) => {
   const user = c.get('user')
   const res = await c.env.DB.prepare(
     `SELECT cs.*, s.name, s.description, s.category
@@ -48,7 +54,7 @@ selfRoutes.get('/services', async (c) => {
 })
 
 // self-enroll in an additional service after onboarding
-selfRoutes.post('/services', async (c) => {
+selfRoutes.post('/services', requireClient, async (c) => {
   const user = c.get('user')
   const { service_key } = await c.req.json<{ service_key: string }>().catch(() => ({ service_key: '' }))
   if (!service_key) return c.json({ error: 'service_key is required' }, 400)
@@ -64,7 +70,7 @@ selfRoutes.post('/services', async (c) => {
 
 // ---------- dynamic onboarding ----------
 // Returns merged, ordered question list for the given services (comma-separated query param).
-selfRoutes.get('/onboarding/questions', async (c) => {
+selfRoutes.get('/onboarding/questions', requireClient, async (c) => {
   const keys = (c.req.query('services') || '').split(',').map((s) => s.trim()).filter(Boolean)
   if (keys.length === 0) return c.json({ questions: [] })
   const ph = keys.map(() => '?').join(',')
@@ -75,7 +81,7 @@ selfRoutes.get('/onboarding/questions', async (c) => {
 })
 
 // Current onboarding status + saved answers, for resuming the wizard.
-selfRoutes.get('/onboarding', async (c) => {
+selfRoutes.get('/onboarding', requireClient, async (c) => {
   const user = c.get('user')
   const profile = await c.env.DB.prepare(
     'SELECT onboarding_completed FROM client_profiles WHERE user_id = ?',
@@ -94,7 +100,7 @@ selfRoutes.get('/onboarding', async (c) => {
 })
 
 // Submit (or update) the onboarding wizard: selected services + dynamic answers.
-selfRoutes.post('/onboarding', async (c) => {
+selfRoutes.post('/onboarding', requireClient, async (c) => {
   const user = c.get('user')
   const body = await c.req.json<{
     services: string[]

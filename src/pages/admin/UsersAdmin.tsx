@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
-import { inputCls } from '../auth/AuthLayout'
+import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { services } from '../../data/services'
+
+const ROLE_OPTIONS = ['all', 'client', 'staff', 'admin']
+const STATUS_OPTIONS = ['all', 'active', 'suspended']
 
 interface UserRow {
   id: string
@@ -34,6 +36,9 @@ export default function UsersAdmin() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [setupLink, setSetupLink] = useState<{ email: string; url: string } | null>(null)
+  const [q, setQ] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -97,15 +102,25 @@ export default function UsersAdmin() {
     await load()
   }
 
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    return users.filter((u) => {
+      if (roleFilter !== 'all' && u.role !== roleFilter) return false
+      if (statusFilter !== 'all' && u.status !== statusFilter) return false
+      if (!needle) return true
+      return (u.full_name ?? '').toLowerCase().includes(needle) || u.email.toLowerCase().includes(needle)
+    })
+  }, [users, q, roleFilter, statusFilter])
+
   return (
     <div>
-      <PageHeader
-        eyebrow="Access"
+      <PageIntro
+        kicker="Access"
         title="Users"
         subtitle="Provision staff, admin, and client accounts — including full client business profiles."
         action={
           <button
-            className="btn-gold"
+            className={btnPrimary}
             onClick={() => {
               setSetupLink(null)
               setShowForm((s) => !s)
@@ -117,28 +132,28 @@ export default function UsersAdmin() {
       />
 
       {setupLink && (
-        <Card className="mb-6 border-emerald-400/30 bg-emerald-400/[0.06]">
+        <Panel className="mb-6 border-emerald-400/30 bg-emerald-400/[0.06]">
           <p className="text-sm font-medium text-emerald-200">
             Account created for {setupLink.email}. Send them this one-time setup link — it lets them choose their own
-            password and expires in 48 hours (no password was generated or stored by the system):
+            password and expires in 24 hours (no password was generated or stored by the system):
           </p>
           <div className="mt-3 flex items-center gap-2">
-            <code className="flex-1 overflow-x-auto rounded-lg bg-black/30 px-3 py-2 text-xs text-emerald-100">
+            <code className="flex-1 overflow-x-auto rounded-md bg-black/30 px-3 py-2 text-xs text-emerald-100">
               {setupLink.url}
             </code>
             <button
               type="button"
-              className="btn-outline shrink-0 text-xs"
+              className={`${btnOutline} shrink-0 text-xs`}
               onClick={() => navigator.clipboard.writeText(setupLink.url)}
             >
               Copy
             </button>
           </div>
-        </Card>
+        </Panel>
       )}
 
       {showForm && (
-        <Card className="mb-6">
+        <Panel className="mb-6">
           <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-3">
             <label>
               <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">First name</span>
@@ -192,10 +207,10 @@ export default function UsersAdmin() {
                     {services.map((s) => (
                       <label
                         key={s.key}
-                        className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                        className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs font-medium transition ${
                           form.services_enrolled.includes(s.key)
                             ? 'border-gold/60 bg-gold/10 text-gold'
-                            : 'border-white/10 bg-white/[0.03] text-slate-300'
+                            : 'border-white/10 bg-white/[0.02] text-slate-300'
                         }`}
                       >
                         <input type="checkbox" className="hidden" checked={form.services_enrolled.includes(s.key)} onChange={() => toggleService(s.key)} />
@@ -208,21 +223,44 @@ export default function UsersAdmin() {
             )}
 
             <div className="flex items-center gap-3 sm:col-span-3">
-              <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">
+              <button type="submit" disabled={busy} className={btnPrimary}>
                 {busy ? 'Creating…' : 'Create user'}
               </button>
               {error && <span className="text-sm text-rose-300">{error}</span>}
             </div>
           </form>
-        </Card>
+        </Panel>
       )}
 
-      <Card className="overflow-x-auto !p-0">
+      <div className="mb-4 flex flex-wrap gap-3">
+        <input
+          className={`${inputCls} max-w-xs`}
+          placeholder="Search name or email…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <select className={`${inputCls} max-w-[160px]`} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+          {ROLE_OPTIONS.map((r) => (
+            <option key={r} value={r}>
+              {r === 'all' ? 'All roles' : r}
+            </option>
+          ))}
+        </select>
+        <select className={`${inputCls} max-w-[160px]`} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s === 'all' ? 'All statuses' : s}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <Panel className="overflow-x-auto !p-0">
         {loading ? (
           <div className="p-6 text-sm text-slate-400">Loading…</div>
-        ) : users.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="p-6">
-            <EmptyState label="No users yet." />
+            <EmptyState label={users.length === 0 ? 'No users yet.' : 'No users match your search.'} />
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -235,7 +273,7 @@ export default function UsersAdmin() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {filtered.map((u) => (
                 <tr key={u.id} className="border-b border-white/5 last:border-0">
                   <td className="px-5 py-3">
                     <p className="font-medium text-white">{u.full_name || u.email}</p>
@@ -243,7 +281,7 @@ export default function UsersAdmin() {
                   </td>
                   <td className="px-5 py-3 text-slate-200">{u.role}</td>
                   <td className="px-5 py-3">
-                    <StatusBadge tone={u.status === 'active' ? 'green' : 'red'}>{u.status}</StatusBadge>
+                    <Tag tone={u.status === 'active' ? 'green' : 'red'}>{u.status}</Tag>
                   </td>
                   <td className="px-5 py-3">
                     <button onClick={() => toggleStatus(u)} className="text-xs font-medium text-gold hover:underline">
@@ -255,7 +293,7 @@ export default function UsersAdmin() {
             </tbody>
           </table>
         )}
-      </Card>
+      </Panel>
     </div>
   )
 }

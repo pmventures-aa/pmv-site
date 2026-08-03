@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
-import { Card, PageHeader } from '../../components/ui'
-import { inputCls } from '../auth/AuthLayout'
+import { PageIntro, Panel, inputCls, btnPrimary } from '../../components/admin/ui'
 
 export default function SettingsAdmin() {
   const [settings, setSettings] = useState<Record<string, string>>({})
@@ -30,8 +29,8 @@ export default function SettingsAdmin() {
 
   return (
     <div>
-      <PageHeader eyebrow="Firm settings" title="Settings" subtitle="Global configuration for the Pinnacle console." />
-      <Card>
+      <PageIntro kicker="Firm settings" title="Settings" subtitle="Global configuration for the Pinnacle console." />
+      <Panel>
         <form onSubmit={save} className="max-w-md space-y-4">
           <label>
             <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Notification email</span>
@@ -43,13 +42,13 @@ export default function SettingsAdmin() {
             />
           </label>
           <div className="flex items-center gap-3">
-            <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">
+            <button type="submit" disabled={busy} className={btnPrimary}>
               {busy ? 'Saving…' : 'Save settings'}
             </button>
             {saved && <span className="text-sm text-emerald-300">Saved.</span>}
           </div>
         </form>
-      </Card>
+      </Panel>
     </div>
   )
 }

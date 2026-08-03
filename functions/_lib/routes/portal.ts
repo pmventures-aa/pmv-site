@@ -3,6 +3,7 @@ import type { AppEnv } from '../types'
 import { requireUser } from '../mid'
 import { uuid } from '../crypto'
 import { resolveClientId, loadScopedRow, scopeFilter, ScopeError } from '../scope'
+import { activityInsert, logActivity } from '../activity'
 
 export const portalRoutes = new Hono<AppEnv>()
 portalRoutes.use('*', requireUser)
@@ -62,9 +63,13 @@ portalRoutes.post('/calls', async (c) => {
   if (!body?.topic) return c.json({ error: 'topic is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO planned_calls (id, client_user_id, topic, preferred_times, status) VALUES (?, ?, ?, ?, 'requested')`,
-  ).bind(id, clientId, body.topic.trim().slice(0, 300), JSON.stringify(body.preferred_times ?? [])).run()
+  const topic = body.topic.trim().slice(0, 300)
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO planned_calls (id, client_user_id, topic, preferred_times, status) VALUES (?, ?, ?, ?, 'requested')`,
+    ).bind(id, clientId, topic, JSON.stringify(body.preferred_times ?? [])),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'call_created', detail: { topic } }),
+  ])
   return c.json({ ok: true, id }, 201)
 })
 
@@ -75,7 +80,10 @@ portalRoutes.patch('/calls/:id', async (c) => {
   if (user.role === 'client') {
     if (body.status && body.status !== 'cancelled') return c.json({ error: 'clients may only cancel a call' }, 403)
     if (body.status === 'cancelled') {
-      await c.env.DB.prepare("UPDATE planned_calls SET status = 'cancelled' WHERE id = ?").bind(row.id).run()
+      await c.env.DB.batch([
+        c.env.DB.prepare("UPDATE planned_calls SET status = 'cancelled' WHERE id = ?").bind(row.id),
+        activityInsert(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'call_status_changed', detail: { topic: row.topic, from: row.status, to: 'cancelled' } }),
+      ])
     }
     return c.json({ ok: true })
   }
@@ -84,6 +92,9 @@ portalRoutes.patch('/calls/:id', async (c) => {
     `UPDATE planned_calls SET status = COALESCE(?, status), scheduled_at = COALESCE(?, scheduled_at),
      notes = COALESCE(?, notes), staff_user_id = COALESCE(?, staff_user_id) WHERE id = ?`,
   ).bind(status ?? null, body.scheduled_at ?? null, body.notes ?? null, user.id, row.id).run()
+  if (status && status !== row.status) {
+    await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'call_status_changed', detail: { topic: row.topic, from: row.status, to: status } })
+  }
   return c.json({ ok: true })
 })
 
@@ -96,9 +107,13 @@ portalRoutes.post('/matters', async (c) => {
   if (!body?.title) return c.json({ error: 'title is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO matters (id, client_user_id, title, type, due_date, status) VALUES (?, ?, ?, ?, ?, 'open')`,
-  ).bind(id, clientId, body.title.trim().slice(0, 300), body.type ?? null, body.due_date ?? null).run()
+  const title = body.title.trim().slice(0, 300)
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO matters (id, client_user_id, title, type, due_date, status) VALUES (?, ?, ?, ?, ?, 'open')`,
+    ).bind(id, clientId, title, body.type ?? null, body.due_date ?? null),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'matter_created', detail: { title } }),
+  ])
   return c.json({ ok: true, id }, 201)
 })
 
@@ -108,7 +123,12 @@ portalRoutes.patch('/matters/:id', async (c) => {
   const row = await loadScopedRow<any>(c.env, user, 'matters', c.req.param('id'))
   const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
   const status = ['open', 'in_progress', 'blocked', 'closed'].includes(body.status ?? '') ? body.status : undefined
-  if (status) await c.env.DB.prepare('UPDATE matters SET status = ? WHERE id = ?').bind(status, row.id).run()
+  if (status) {
+    await c.env.DB.prepare('UPDATE matters SET status = ? WHERE id = ?').bind(status, row.id).run()
+    if (status !== row.status) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'matter_status_changed', detail: { title: row.title, from: row.status, to: status } })
+    }
+  }
   return c.json({ ok: true })
 })
 
@@ -121,9 +141,13 @@ portalRoutes.post('/tasks', async (c) => {
   if (!body?.title) return c.json({ error: 'title is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO client_tasks (id, client_user_id, matter_id, title, due_date, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
-  ).bind(id, clientId, body.matter_id ?? null, body.title.trim().slice(0, 300), body.due_date ?? null).run()
+  const title = body.title.trim().slice(0, 300)
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO client_tasks (id, client_user_id, matter_id, title, due_date, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
+    ).bind(id, clientId, body.matter_id ?? null, title, body.due_date ?? null),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'task_created', detail: { title } }),
+  ])
   return c.json({ ok: true, id }, 201)
 })
 
@@ -132,7 +156,12 @@ portalRoutes.patch('/tasks/:id', async (c) => {
   const row = await loadScopedRow<any>(c.env, user, 'client_tasks', c.req.param('id'))
   const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
   const status = ['pending', 'in_progress', 'done'].includes(body.status ?? '') ? body.status : undefined
-  if (status) await c.env.DB.prepare('UPDATE client_tasks SET status = ? WHERE id = ?').bind(status, row.id).run()
+  if (status) {
+    await c.env.DB.prepare('UPDATE client_tasks SET status = ? WHERE id = ?').bind(status, row.id).run()
+    if (status !== row.status) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'task_status_changed', detail: { title: row.title, from: row.status, to: status } })
+    }
+  }
   return c.json({ ok: true })
 })
 
@@ -177,9 +206,13 @@ portalRoutes.post('/calendar', async (c) => {
   if (!body?.title || !body?.starts_at) return c.json({ error: 'title and starts_at are required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO appointments (id, client_user_id, title, starts_at, status) VALUES (?, ?, ?, ?, 'proposed')`,
-  ).bind(id, clientId, body.title.trim().slice(0, 300), body.starts_at).run()
+  const title = body.title.trim().slice(0, 300)
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO appointments (id, client_user_id, title, starts_at, status) VALUES (?, ?, ?, ?, 'proposed')`,
+    ).bind(id, clientId, title, body.starts_at),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'appointment_created', detail: { title, starts_at: body.starts_at } }),
+  ])
   return c.json({ ok: true, id }, 201)
 })
 
@@ -190,6 +223,9 @@ portalRoutes.patch('/calendar/:id', async (c) => {
   const allowed = user.role === 'client' ? ['cancelled'] : ['proposed', 'confirmed', 'completed', 'cancelled']
   if (body.status && allowed.includes(body.status)) {
     await c.env.DB.prepare('UPDATE appointments SET status = ? WHERE id = ?').bind(body.status, row.id).run()
+    if (body.status !== row.status) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'appointment_status_changed', detail: { title: row.title, from: row.status, to: body.status } })
+    }
   }
   return c.json({ ok: true })
 })
@@ -204,9 +240,12 @@ portalRoutes.post('/billing', async (c) => {
   if (!body?.amount_cents || !body.client_user_id) return c.json({ error: 'amount_cents and client_user_id are required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO invoices (id, client_user_id, amount_cents, due_date, status) VALUES (?, ?, ?, ?, 'open')`,
-  ).bind(id, clientId, body.amount_cents, body.due_date ?? null).run()
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO invoices (id, client_user_id, amount_cents, due_date, status) VALUES (?, ?, ?, ?, 'open')`,
+    ).bind(id, clientId, body.amount_cents, body.due_date ?? null),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'invoice_created', detail: { amount_cents: body.amount_cents } }),
+  ])
   return c.json({ ok: true, id }, 201)
 })
 
@@ -216,7 +255,12 @@ portalRoutes.patch('/billing/:id', async (c) => {
   const row = await loadScopedRow<any>(c.env, user, 'invoices', c.req.param('id'))
   const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
   const status = ['open', 'paid', 'void'].includes(body.status ?? '') ? body.status : undefined
-  if (status) await c.env.DB.prepare('UPDATE invoices SET status = ? WHERE id = ?').bind(status, row.id).run()
+  if (status) {
+    await c.env.DB.prepare('UPDATE invoices SET status = ? WHERE id = ?').bind(status, row.id).run()
+    if (status !== row.status) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'invoice_status_changed', detail: { amount_cents: row.amount_cents, from: row.status, to: status } })
+    }
+  }
   return c.json({ ok: true })
 })
 
@@ -228,9 +272,12 @@ portalRoutes.post('/funding', async (c) => {
   const body = await c.req.json<{ amount_requested_cents?: number; use_of_funds?: string; client_user_id?: string }>().catch(() => null)
   const clientId = await resolveClientId(c.env, user, body?.client_user_id)
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO funding_applications (id, client_user_id, amount_requested_cents, use_of_funds, status) VALUES (?, ?, ?, ?, 'draft')`,
-  ).bind(id, clientId, body?.amount_requested_cents ?? null, body?.use_of_funds ?? null).run()
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO funding_applications (id, client_user_id, amount_requested_cents, use_of_funds, status) VALUES (?, ?, ?, ?, 'draft')`,
+    ).bind(id, clientId, body?.amount_requested_cents ?? null, body?.use_of_funds ?? null),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'funding_created', detail: { amount_requested_cents: body?.amount_requested_cents ?? null } }),
+  ])
   return c.json({ ok: true, id }, 201)
 })
 
@@ -240,7 +287,12 @@ portalRoutes.patch('/funding/:id', async (c) => {
   const row = await loadScopedRow<any>(c.env, user, 'funding_applications', c.req.param('id'))
   const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
   const status = ['draft', 'submitted', 'under_review', 'approved', 'declined'].includes(body.status ?? '') ? body.status : undefined
-  if (status) await c.env.DB.prepare('UPDATE funding_applications SET status = ? WHERE id = ?').bind(status, row.id).run()
+  if (status) {
+    await c.env.DB.prepare('UPDATE funding_applications SET status = ? WHERE id = ?').bind(status, row.id).run()
+    if (status !== row.status) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'funding_status_changed', detail: { from: row.status, to: status } })
+    }
+  }
   return c.json({ ok: true })
 })
 
@@ -253,9 +305,13 @@ portalRoutes.post('/property', async (c) => {
   if (!body?.address) return c.json({ error: 'address is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO properties (id, client_user_id, address, property_type, notes, status) VALUES (?, ?, ?, ?, ?, 'active')`,
-  ).bind(id, clientId, body.address.trim().slice(0, 300), body.property_type ?? null, body.notes ?? null).run()
+  const address = body.address.trim().slice(0, 300)
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO properties (id, client_user_id, address, property_type, notes, status) VALUES (?, ?, ?, ?, ?, 'active')`,
+    ).bind(id, clientId, address, body.property_type ?? null, body.notes ?? null),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'property_created', detail: { address } }),
+  ])
   return c.json({ ok: true, id }, 201)
 })
 
@@ -265,7 +321,12 @@ portalRoutes.patch('/property/:id', async (c) => {
   const row = await loadScopedRow<any>(c.env, user, 'properties', c.req.param('id'))
   const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
   const status = ['active', 'under_contract', 'sold', 'inactive'].includes(body.status ?? '') ? body.status : undefined
-  if (status) await c.env.DB.prepare('UPDATE properties SET status = ? WHERE id = ?').bind(status, row.id).run()
+  if (status) {
+    await c.env.DB.prepare('UPDATE properties SET status = ? WHERE id = ?').bind(status, row.id).run()
+    if (status !== row.status) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'property_status_changed', detail: { address: row.address, from: row.status, to: status } })
+    }
+  }
   return c.json({ ok: true })
 })
 
@@ -278,9 +339,12 @@ portalRoutes.post('/tax', async (c) => {
   if (!body?.tax_year) return c.json({ error: 'tax_year is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO tax_filings (id, client_user_id, tax_year, filing_type, due_date, status) VALUES (?, ?, ?, ?, ?, 'not_started')`,
-  ).bind(id, clientId, body.tax_year, body.filing_type ?? null, body.due_date ?? null).run()
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO tax_filings (id, client_user_id, tax_year, filing_type, due_date, status) VALUES (?, ?, ?, ?, ?, 'not_started')`,
+    ).bind(id, clientId, body.tax_year, body.filing_type ?? null, body.due_date ?? null),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'tax_filing_created', detail: { tax_year: body.tax_year, filing_type: body.filing_type ?? null } }),
+  ])
   return c.json({ ok: true, id }, 201)
 })
 
@@ -290,7 +354,12 @@ portalRoutes.patch('/tax/:id', async (c) => {
   const row = await loadScopedRow<any>(c.env, user, 'tax_filings', c.req.param('id'))
   const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
   const status = ['not_started', 'in_progress', 'filed', 'extended'].includes(body.status ?? '') ? body.status : undefined
-  if (status) await c.env.DB.prepare('UPDATE tax_filings SET status = ? WHERE id = ?').bind(status, row.id).run()
+  if (status) {
+    await c.env.DB.prepare('UPDATE tax_filings SET status = ? WHERE id = ?').bind(status, row.id).run()
+    if (status !== row.status) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'tax_filing_status_changed', detail: { tax_year: row.tax_year, from: row.status, to: status } })
+    }
+  }
   return c.json({ ok: true })
 })
 
@@ -304,9 +373,13 @@ portalRoutes.post('/support', async (c) => {
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const priority = ['low', 'normal', 'high', 'urgent'].includes(body.priority ?? '') ? body.priority! : 'normal'
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO support_tickets (id, client_user_id, subject, category, priority, status) VALUES (?, ?, ?, ?, ?, 'open')`,
-  ).bind(id, clientId, body.subject.trim().slice(0, 300), body.category ?? null, priority).run()
+  const subject = body.subject.trim().slice(0, 300)
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO support_tickets (id, client_user_id, subject, category, priority, status) VALUES (?, ?, ?, ?, ?, 'open')`,
+    ).bind(id, clientId, subject, body.category ?? null, priority),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'ticket_created', detail: { subject, priority } }),
+  ])
   return c.json({ ok: true, id }, 201)
 })
 
@@ -317,6 +390,9 @@ portalRoutes.patch('/support/:id', async (c) => {
   const allowed = user.role === 'client' ? ['closed'] : ['open', 'in_progress', 'closed']
   if (body.status && allowed.includes(body.status)) {
     await c.env.DB.prepare('UPDATE support_tickets SET status = ? WHERE id = ?').bind(body.status, row.id).run()
+    if (body.status !== row.status) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'ticket_status_changed', detail: { subject: row.subject, from: row.status, to: body.status } })
+    }
   }
   return c.json({ ok: true })
 })
