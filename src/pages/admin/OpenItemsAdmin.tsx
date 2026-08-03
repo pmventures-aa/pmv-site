@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, EmptyState } from '../../components/admin/ui'
+import { useAppPath } from '../../lib/basePath'
 
 type ItemType = 'tickets' | 'matters' | 'tasks' | 'calls' | 'invoices'
 
@@ -14,6 +15,7 @@ const TYPE_CONFIG: Record<ItemType, { title: string; titleKey: string; extra: (r
 }
 
 export default function OpenItemsAdmin() {
+  const p = useAppPath()
   // /admin/open-items/:type is the current URL shape; ?type= (the old shape)
   // is kept as a fallback so any existing bookmarks/links still resolve.
   const { type: pathType } = useParams<{ type: string }>()
@@ -56,7 +58,7 @@ export default function OpenItemsAdmin() {
               {items.map((r) => (
                 <tr key={r.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                   <td className="px-5 py-3">
-                    <Link to={`/admin/clients/${r.client_user_id}`} className="font-medium text-white hover:text-gold">
+                    <Link to={p(`clients/${r.client_user_id}`)} className="font-medium text-white hover:text-gold">
                       {r.client_name || r.client_email}
                     </Link>
                   </td>

@@ -4,6 +4,7 @@ import { AdminLayout } from '../../components/admin/AdminLayout'
 import { adminNav } from '../../components/layout/nav'
 import { useAuth } from '../../lib/auth'
 import { useCapabilities } from '../../lib/capabilities'
+import { BasePathProvider, useAppPath } from '../../lib/basePath'
 import Login from '../auth/Login'
 import SetPassword from '../auth/SetPassword'
 import AdminDashboard from './AdminDashboard'
@@ -33,30 +34,37 @@ function AdminShell() {
   return <AdminLayout nav={nav} badge="Staff Console" />
 }
 
-export default function AdminApp() {
+function CatchAll() {
+  const p = useAppPath()
+  return <Navigate to={p()} replace />
+}
+
+export default function AdminApp({ basePath }: { basePath: string }) {
   return (
-    <Routes>
-      <Route path="login" element={<Login surface="staff" />} />
-      <Route path="set-password" element={<SetPassword surface="staff" />} />
+    <BasePathProvider base={basePath}>
+      <Routes>
+        <Route path="login" element={<Login surface="staff" />} />
+        <Route path="set-password" element={<SetPassword surface="staff" />} />
 
-      <Route element={<ProtectedRoute allow={['staff', 'admin']} />}>
-        <Route element={<AdminShell />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="pipelines" element={<PipelinesAdmin />} />
-          <Route path="clients" element={<ClientsList />} />
-          <Route path="clients/:id" element={<ClientDetail />} />
-          <Route path="inquiries" element={<InquiriesAdmin />} />
-          <Route path="activity" element={<ActivityAdmin />} />
-          <Route path="open-items/:type" element={<OpenItemsAdmin />} />
-          {/* Old shape (?type=...) — OpenItemsAdmin falls back to the query param when there's no :type segment. */}
-          <Route path="open-items" element={<OpenItemsAdmin />} />
-          <Route path="users" element={<UsersAdmin />} />
-          <Route path="assignments" element={<AssignmentsAdmin />} />
-          <Route path="settings" element={<SettingsAdmin />} />
+        <Route element={<ProtectedRoute allow={['staff', 'admin']} />}>
+          <Route element={<AdminShell />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="pipelines" element={<PipelinesAdmin />} />
+            <Route path="clients" element={<ClientsList />} />
+            <Route path="clients/:id" element={<ClientDetail />} />
+            <Route path="inquiries" element={<InquiriesAdmin />} />
+            <Route path="activity" element={<ActivityAdmin />} />
+            <Route path="open-items/:type" element={<OpenItemsAdmin />} />
+            {/* Old shape (?type=...) — OpenItemsAdmin falls back to the query param when there's no :type segment. */}
+            <Route path="open-items" element={<OpenItemsAdmin />} />
+            <Route path="users" element={<UsersAdmin />} />
+            <Route path="assignments" element={<AssignmentsAdmin />} />
+            <Route path="settings" element={<SettingsAdmin />} />
+          </Route>
         </Route>
-      </Route>
 
-      <Route path="*" element={<Navigate to="" replace />} />
-    </Routes>
+        <Route path="*" element={<CatchAll />} />
+      </Routes>
+    </BasePathProvider>
   )
 }

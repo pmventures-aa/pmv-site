@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { KanbanBoard, StageSelect, type KanbanColumn } from '../../components/admin/Kanban'
+import { useAppPath } from '../../lib/basePath'
 
 interface Inquiry {
   id: string
@@ -61,6 +62,7 @@ function money(cents?: number | null): string {
 }
 
 export default function PipelinesAdmin() {
+  const p = useAppPath()
   const [tab, setTab] = useState<ModuleKey>('inquiries')
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [items, setItems] = useState<PipelineItem[]>([])
@@ -155,7 +157,7 @@ export default function PipelinesAdmin() {
                 <p className="mt-2 line-clamp-2 text-xs text-slate-400">{i.message}</p>
                 {(i.status === 'qualified' || i.status === 'converted') && (
                   <Link
-                    to={`/admin/users?name=${encodeURIComponent(i.name)}&email=${encodeURIComponent(i.email)}&phone=${encodeURIComponent(i.phone ?? '')}`}
+                    to={p(`users?name=${encodeURIComponent(i.name)}&email=${encodeURIComponent(i.email)}&phone=${encodeURIComponent(i.phone ?? '')}`)}
                     className="mt-2 inline-block text-xs font-medium text-gold hover:underline"
                   >
                     Convert to client →
@@ -178,7 +180,7 @@ export default function PipelinesAdmin() {
           onMove={moveItem}
           renderCard={(i) => (
             <div>
-              <Link to={`/admin/clients/${i.client_user_id}`} className="font-medium text-white hover:text-gold">
+              <Link to={p(`clients/${i.client_user_id}`)} className="font-medium text-white hover:text-gold">
                 {i.client_name || i.client_email}
               </Link>
               <p className="mt-0.5 text-xs text-slate-400">

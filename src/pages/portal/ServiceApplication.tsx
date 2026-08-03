@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { Card, PageHeader, StatusBadge } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
+import { useAppPath } from '../../lib/basePath'
 
 interface CatalogItem {
   key: string
@@ -63,6 +64,7 @@ function Field({ q, value, onChange }: { q: Question; value: string; onChange: (
 export default function ServiceApplication() {
   const { key } = useParams<{ key: string }>()
   const navigate = useNavigate()
+  const p = useAppPath()
   const [loading, setLoading] = useState(true)
   const [service, setService] = useState<CatalogItem | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
@@ -170,7 +172,7 @@ export default function ServiceApplication() {
           <p className="mt-2 text-sm text-slate-300">
             Your {service.name} application has been sent to your Pinnacle team. They'll follow up shortly.
           </p>
-          <Link to="/portal/services" className="btn-gold mt-6 inline-block">
+          <Link to={p('services')} className="btn-gold mt-6 inline-block">
             Back to My Services
           </Link>
         </Card>

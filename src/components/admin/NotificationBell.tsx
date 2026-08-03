@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
+import { useAppPath } from '../../lib/basePath'
 
 const POLL_MS = 45_000
 
 export function NotificationBell() {
+  const p = useAppPath()
   const [count, setCount] = useState(0)
   const [open, setOpen] = useState(false)
   const [events, setEvents] = useState<ActivityEvent[]>([])
@@ -65,7 +67,7 @@ export function NotificationBell() {
         <div className="absolute right-0 top-11 z-30 w-80 rounded-md border border-white/10 bg-navy-900 shadow-lg sm:w-96">
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <p className="text-sm font-semibold text-white">Activity</p>
-            <Link to="/admin/activity" onClick={() => setOpen(false)} className="text-xs font-medium text-gold hover:underline">
+            <Link to={p('activity')} onClick={() => setOpen(false)} className="text-xs font-medium text-gold hover:underline">
               View all
             </Link>
           </div>

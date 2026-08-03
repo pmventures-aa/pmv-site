@@ -35,7 +35,7 @@ function App() {
     return (
       <Suspense fallback={<SurfaceFallback />}>
         <Routes>
-          <Route path="/*" element={<AdminApp />} />
+          <Route path="/*" element={<AdminApp basePath="" />} />
         </Routes>
       </Suspense>
     )
@@ -44,7 +44,7 @@ function App() {
     return (
       <Suspense fallback={<SurfaceFallback />}>
         <Routes>
-          <Route path="/*" element={<PortalApp />} />
+          <Route path="/*" element={<PortalApp basePath="" />} />
         </Routes>
       </Suspense>
     )
@@ -62,7 +62,7 @@ function App() {
         path="/portal/*"
         element={
           <Suspense fallback={<SurfaceFallback />}>
-            <PortalApp />
+            <PortalApp basePath="/portal" />
           </Suspense>
         }
       />
@@ -70,7 +70,7 @@ function App() {
         path="/admin/*"
         element={
           <Suspense fallback={<SurfaceFallback />}>
-            <AdminApp />
+            <AdminApp basePath="/admin" />
           </Suspense>
         }
       />

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { Card, PageHeader, StatCard, EmptyState } from '../../components/ui'
+import { useAppPath } from '../../lib/basePath'
 
 interface DashboardData {
   stats: {
@@ -19,6 +20,7 @@ interface DashboardData {
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const p = useAppPath()
   const [data, setData] = useState<DashboardData | null>(null)
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function Dashboard() {
               ))}
             </ul>
           )}
-          <Link to="calendar" className="mt-4 inline-block text-sm font-medium text-gold hover:underline">
+          <Link to={p('calendar')} className="mt-4 inline-block text-sm font-medium text-gold hover:underline">
             View calendar →
           </Link>
         </Card>
@@ -72,7 +74,7 @@ export default function Dashboard() {
               ))}
             </ul>
           )}
-          <Link to="messages" className="mt-4 inline-block text-sm font-medium text-gold hover:underline">
+          <Link to={p('messages')} className="mt-4 inline-block text-sm font-medium text-gold hover:underline">
             Open messages →
           </Link>
         </Card>

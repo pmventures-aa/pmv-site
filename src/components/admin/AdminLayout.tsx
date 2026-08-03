@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
+import { useAppPath } from '../../lib/basePath'
 import type { NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
 import { btnOutline } from './ui'
@@ -14,6 +15,7 @@ import { btnOutline } from './ui'
 export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const p = useAppPath()
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 rounded-md border-l-2 px-3 py-2.5 text-sm font-medium transition ${
@@ -27,7 +29,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {nav.map((item) => (
-          <NavLink key={item.key} to={item.to} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
+          <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
             <span className="grid h-6 w-6 place-items-center text-base leading-none text-gold">{item.icon}</span>
             {item.label}
           </NavLink>

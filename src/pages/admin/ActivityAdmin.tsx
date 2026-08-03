@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, EmptyState } from '../../components/admin/ui'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
+import { useAppPath } from '../../lib/basePath'
 
 export default function ActivityAdmin() {
+  const p = useAppPath()
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -32,7 +34,7 @@ export default function ActivityAdmin() {
               <div>
                 <p className="text-slate-200">{describeActivity(e)}</p>
                 {e.client_user_id && (
-                  <Link to={`/admin/clients/${e.client_user_id}`} className="mt-1 inline-block text-xs text-gold hover:underline">
+                  <Link to={p(`clients/${e.client_user_id}`)} className="mt-1 inline-block text-xs text-gold hover:underline">
                     View client →
                   </Link>
                 )}
