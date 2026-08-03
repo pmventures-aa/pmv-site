@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-import { PageHeader, Card, EmptyState } from '../../components/ui'
+import { PageIntro, Panel, EmptyState, StatCard } from '../../components/admin/ui'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 
 interface Stats {
@@ -28,13 +28,14 @@ interface DashboardResponse {
 }
 
 function StatLink({ label, value, to }: { label: string; value: number | string; to?: string }) {
-  const content = (
-    <Card className={`p-5 ${to ? 'transition hover:border-gold/40' : ''}`}>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
-    </Card>
+  const content = <StatCard label={label} value={value} />
+  return to ? (
+    <Link to={to} className="block transition hover:border-gold/40 [&>div]:hover:border-gold/40">
+      {content}
+    </Link>
+  ) : (
+    content
   )
-  return to ? <Link to={to}>{content}</Link> : content
 }
 
 export default function AdminDashboard() {
@@ -49,8 +50,8 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Staff console"
+      <PageIntro
+        kicker="Staff console"
         title={`Welcome, ${user?.first_name || user?.full_name || 'team'}`}
         subtitle={user?.role === 'admin' ? 'Full access across all clients.' : 'Showing clients assigned to you.'}
       />
@@ -64,7 +65,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="mt-8 grid gap-5 lg:grid-cols-2">
-        <Card className="!p-0">
+        <Panel className="!p-0">
           <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
             <h2 className="text-sm font-semibold text-white">Upcoming appointments</h2>
           </div>
@@ -88,9 +89,9 @@ export default function AdminDashboard() {
               ))}
             </ul>
           )}
-        </Card>
+        </Panel>
 
-        <Card className="!p-0">
+        <Panel className="!p-0">
           <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
             <h2 className="text-sm font-semibold text-white">Recent activity</h2>
             <Link to="/admin/activity" className="text-xs font-medium text-gold hover:underline">
@@ -113,7 +114,7 @@ export default function AdminDashboard() {
               ))}
             </ul>
           )}
-        </Card>
+        </Panel>
       </div>
     </div>
   )

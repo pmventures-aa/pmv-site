@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
-import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
-import { inputCls } from '../auth/AuthLayout'
+import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
@@ -116,7 +115,7 @@ function CreateForm({
         ))}
       </div>
       <div className="mt-4 flex items-center gap-3">
-        <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">
+        <button type="submit" disabled={busy} className={btnPrimary}>
           {busy ? 'Creating…' : 'Create'}
         </button>
         <button type="button" onClick={onCancel} className="text-sm text-slate-400 hover:text-white">
@@ -154,7 +153,7 @@ function Section({
   const [adding, setAdding] = useState(false)
 
   return (
-    <Card className="!p-0">
+    <Panel className="!p-0">
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
         <h3 className="text-sm font-semibold text-white">{title}</h3>
         {createConfig && (
@@ -204,7 +203,7 @@ function Section({
                   {statusKey && onStatusChange && (
                     <td className="px-5 py-2.5">
                       <select
-                        className="rounded-lg border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
+                        className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
                         value={r[statusKey]}
                         onChange={(e) => onStatusChange(r.id, e.target.value)}
                       >
@@ -222,7 +221,7 @@ function Section({
           </table>
         </div>
       )}
-    </Card>
+    </Panel>
   )
 }
 
@@ -262,16 +261,16 @@ export default function ClientDetail() {
       <Link to=".." relative="path" className="mb-4 inline-block text-sm text-slate-400 hover:text-gold">
         ← Back to clients
       </Link>
-      <PageHeader
-        eyebrow={data.profile?.business_name ?? 'Client'}
+      <PageIntro
+        kicker={data.profile?.business_name ?? 'Client'}
         title={data.account.full_name || data.account.email}
         subtitle={`${data.account.email}${data.account.phone ? ` · ${data.account.phone}` : ''}`}
         action={
           <div className="flex flex-wrap gap-2">
             {data.services.map((s) => (
-              <StatusBadge key={s.service_key} tone="gold">
+              <Tag key={s.service_key} tone="gold">
                 {s.name}
-              </StatusBadge>
+              </Tag>
             ))}
           </div>
         }

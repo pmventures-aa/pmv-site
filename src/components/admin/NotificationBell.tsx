@@ -62,7 +62,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-30 w-80 rounded-xl border border-white/10 bg-navy-900 shadow-glass sm:w-96">
+        <div className="absolute right-0 top-11 z-30 w-80 rounded-md border border-white/10 bg-navy-900 shadow-lg sm:w-96">
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <p className="text-sm font-semibold text-white">Activity</p>
             <Link to="/admin/activity" onClick={() => setOpen(false)} className="text-xs font-medium text-gold hover:underline">

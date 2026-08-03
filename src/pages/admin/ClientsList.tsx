@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
-import { inputCls } from '../auth/AuthLayout'
+import { PageIntro, Panel, Tag, EmptyState, inputCls } from '../../components/admin/ui'
 
 interface ClientRow {
   id: string
@@ -49,7 +48,7 @@ export default function ClientsList() {
 
   return (
     <div>
-      <PageHeader eyebrow="Client accounts" title="Clients" subtitle="Everyone you have access to." />
+      <PageIntro kicker="Client accounts" title="Clients" subtitle="Everyone you have access to." />
       <div className="mb-4 flex flex-wrap gap-3">
         <input
           className={`${inputCls} max-w-xs`}
@@ -65,7 +64,7 @@ export default function ClientsList() {
           ))}
         </select>
       </div>
-      <Card className="overflow-x-auto !p-0">
+      <Panel className="overflow-x-auto !p-0">
         {loading ? (
           <div className="p-6 text-sm text-slate-400">Loading…</div>
         ) : filtered.length === 0 ? (
@@ -93,17 +92,17 @@ export default function ClientsList() {
                   </td>
                   <td className="px-5 py-3 text-slate-200">{c.business_name ?? '—'}</td>
                   <td className="px-5 py-3">
-                    <StatusBadge tone={c.onboarding_completed ? 'green' : 'gold'}>
+                    <Tag tone={c.onboarding_completed ? 'green' : 'gold'}>
                       {c.onboarding_completed ? 'Complete' : 'Pending'}
-                    </StatusBadge>
+                    </Tag>
                   </td>
-                  <td className="px-5 py-3 text-slate-400">{new Date(c.created_at).toLocaleDateString()}</td>
+                  <td className="px-5 py-3 text-slate-400">{new Date(c.created_at.replace(' ', 'T') + 'Z').toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </Card>
+      </Panel>
     </div>
   )
 }

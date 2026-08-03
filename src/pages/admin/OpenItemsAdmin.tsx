@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { Card, PageHeader, EmptyState } from '../../components/ui'
+import { PageIntro, Panel, EmptyState } from '../../components/admin/ui'
 
 type ItemType = 'tickets' | 'matters' | 'tasks' | 'calls' | 'invoices'
 
@@ -18,7 +18,7 @@ export default function OpenItemsAdmin() {
   const type = (params.get('type') as ItemType) || 'tickets'
   const cfg = TYPE_CONFIG[type] ?? TYPE_CONFIG.tickets
 
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -31,15 +31,15 @@ export default function OpenItemsAdmin() {
 
   return (
     <div>
-      <PageHeader eyebrow="Dashboard drill-down" title={cfg.title} subtitle="Everything accessible to you in this queue, most recent first." />
+      <PageIntro kicker="Dashboard drill-down" title={cfg.title} subtitle="Everything accessible to you in this queue, most recent first." />
       {loading ? (
         <p className="text-sm text-slate-400">Loading…</p>
       ) : items.length === 0 ? (
-        <Card>
+        <Panel>
           <EmptyState label="Nothing here right now." />
-        </Card>
+        </Panel>
       ) : (
-        <Card className="overflow-x-auto !p-0">
+        <Panel className="overflow-x-auto !p-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -64,7 +64,7 @@ export default function OpenItemsAdmin() {
               ))}
             </tbody>
           </table>
-        </Card>
+        </Panel>
       )}
     </div>
   )

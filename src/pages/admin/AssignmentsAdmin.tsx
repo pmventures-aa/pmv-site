@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { Card, PageHeader, EmptyState } from '../../components/ui'
-import { inputCls } from '../auth/AuthLayout'
+import { PageIntro, Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
 
 interface UserRow {
   id: string
@@ -68,9 +67,9 @@ export default function AssignmentsAdmin() {
 
   return (
     <div>
-      <PageHeader eyebrow="Coverage" title="Staff Assignments" subtitle="Control which staff can see which clients." />
+      <PageIntro kicker="Coverage" title="Staff Assignments" subtitle="Control which staff can see which clients." />
 
-      <Card className="mb-6">
+      <Panel className="mb-6">
         <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-3">
           <label>
             <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Staff member</span>
@@ -95,15 +94,15 @@ export default function AssignmentsAdmin() {
             </select>
           </label>
           <div className="flex items-end gap-3">
-            <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">
+            <button type="submit" disabled={busy} className={btnPrimary}>
               {busy ? 'Saving…' : 'Assign'}
             </button>
           </div>
           {error && <span className="text-sm text-rose-300 sm:col-span-3">{error}</span>}
         </form>
-      </Card>
+      </Panel>
 
-      <Card className="overflow-x-auto !p-0">
+      <Panel className="overflow-x-auto !p-0">
         {assignments.length === 0 ? (
           <div className="p-6">
             <EmptyState label="No assignments yet." />
@@ -132,7 +131,7 @@ export default function AssignmentsAdmin() {
             </tbody>
           </table>
         )}
-      </Card>
+      </Panel>
     </div>
   )
 }

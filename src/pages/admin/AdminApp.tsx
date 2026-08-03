@@ -1,8 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
-import { Shell } from '../../components/layout/Shell'
+import { AdminLayout } from '../../components/admin/AdminLayout'
 import { adminNav } from '../../components/layout/nav'
-import { NotificationBell } from '../../components/admin/NotificationBell'
 import { useAuth } from '../../lib/auth'
 import Login from '../auth/Login'
 import SetPassword from '../auth/SetPassword'
@@ -21,7 +20,7 @@ const STAFF_VISIBLE = ['dashboard', 'clients', 'inquiries', 'activity']
 function AdminShell() {
   const { user } = useAuth()
   const nav = user?.role === 'admin' ? adminNav : adminNav.filter((n) => STAFF_VISIBLE.includes(n.key))
-  return <Shell nav={nav} badge="Staff Console" topRight={<NotificationBell />} />
+  return <AdminLayout nav={nav} badge="Staff Console" />
 }
 
 export default function AdminApp() {

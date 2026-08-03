@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { Card, PageHeader, EmptyState } from '../../components/ui'
+import { PageIntro, Panel, EmptyState } from '../../components/admin/ui'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 
 export default function ActivityAdmin() {
@@ -18,31 +18,29 @@ export default function ActivityAdmin() {
 
   return (
     <div>
-      <PageHeader eyebrow="Firm-wide" title="Activity" subtitle="Everything happening across your clients and team." />
+      <PageIntro kicker="Firm-wide" title="Activity" subtitle="Everything happening across your clients and team." />
       {loading ? (
         <p className="text-sm text-slate-400">Loading…</p>
       ) : events.length === 0 ? (
-        <Card>
+        <Panel>
           <EmptyState label="No activity yet." />
-        </Card>
+        </Panel>
       ) : (
-        <Card className="!p-0">
-          <ul className="divide-y divide-white/5">
-            {events.map((e) => (
-              <li key={e.id} className="flex items-start justify-between gap-4 px-5 py-4 text-sm">
-                <div>
-                  <p className="text-slate-200">{describeActivity(e)}</p>
-                  {e.client_user_id && (
-                    <Link to={`/admin/clients/${e.client_user_id}`} className="mt-1 inline-block text-xs text-gold hover:underline">
-                      View client →
-                    </Link>
-                  )}
-                </div>
-                <span className="shrink-0 whitespace-nowrap text-xs text-slate-500">{timeAgo(e.created_at)}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <Panel className="divide-y divide-white/5 !p-0">
+          {events.map((e) => (
+            <div key={e.id} className="flex items-start justify-between gap-4 px-5 py-4 text-sm">
+              <div>
+                <p className="text-slate-200">{describeActivity(e)}</p>
+                {e.client_user_id && (
+                  <Link to={`/admin/clients/${e.client_user_id}`} className="mt-1 inline-block text-xs text-gold hover:underline">
+                    View client →
+                  </Link>
+                )}
+              </div>
+              <span className="shrink-0 whitespace-nowrap text-xs text-slate-500">{timeAgo(e.created_at)}</span>
+            </div>
+          ))}
+        </Panel>
       )}
     </div>
   )

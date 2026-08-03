@@ -2,21 +2,22 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
-import type { NavItem } from './nav'
+import type { NavItem } from '../layout/nav'
+import { NotificationBell } from './NotificationBell'
+import { btnOutline } from './ui'
 
-export function Shell({
-  nav,
-  badge,
-}: {
-  nav: NavItem[]
-  badge: string
-}) {
+// Self-contained staff-console shell (sidebar + topbar). Deliberately not the
+// shared ../layout/Shell used by the client portal — same interactive
+// behavior (nav highlighting, mobile drawer) but a flat, sharp-edged look
+// instead of the glass/blur/gradient treatment, so this can evolve
+// independently of the portal.
+export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-      isActive ? 'bg-gold/15 text-gold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+    `flex items-center gap-3 rounded-md border-l-2 px-3 py-2.5 text-sm font-medium transition ${
+      isActive ? 'border-gold bg-gold/10 text-gold' : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-white'
     }`
 
   const sidebarContent = (
@@ -32,10 +33,10 @@ export function Shell({
           </NavLink>
         ))}
       </nav>
-      <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <div className="mt-6 rounded-md border border-white/10 bg-white/[0.02] p-3">
         <p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p>
         <p className="truncate text-xs text-slate-500">{user?.email}</p>
-        <button onClick={() => logout()} className="btn-outline mt-3 w-full !py-1.5 text-xs">
+        <button onClick={() => logout()} className={`${btnOutline} mt-3 w-full !py-1.5 text-xs`}>
           Sign out
         </button>
       </div>
@@ -43,20 +44,21 @@ export function Shell({
   )
 
   return (
-    <div className="min-h-screen bg-navy-radial lg:flex">
+    <div className="min-h-screen bg-navy-950 lg:flex">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/5 bg-navy-950/60 p-4 backdrop-blur lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/10 bg-navy-900 p-4 lg:flex">
         {sidebarContent}
       </aside>
 
       {/* Mobile top bar */}
-      <header className="flex items-center justify-between border-b border-white/5 bg-navy-950/80 px-4 py-3 backdrop-blur lg:hidden">
+      <header className="flex items-center justify-between border-b border-white/10 bg-navy-900 px-4 py-3 lg:hidden">
         <Logo />
         <div className="flex items-center gap-3">
           <span className="hidden text-xs text-slate-400 sm:inline">{badge}</span>
+          <NotificationBell />
           <button
             onClick={() => setMobileOpen(true)}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white"
+            className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-white"
             aria-label="Open menu"
           >
             ☰
@@ -71,7 +73,7 @@ export function Shell({
           <div className="absolute left-0 top-0 flex h-full w-72 flex-col bg-navy-950 p-4 shadow-2xl">
             <button
               onClick={() => setMobileOpen(false)}
-              className="mb-4 self-end grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-white"
+              className="mb-4 self-end grid h-8 w-8 place-items-center rounded-md border border-white/10 text-white"
               aria-label="Close menu"
             >
               ✕
@@ -82,7 +84,8 @@ export function Shell({
       )}
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <div className="hidden items-center justify-end border-b border-white/5 bg-navy-950/40 px-8 py-3 lg:flex">
+        <div className="hidden items-center justify-end gap-4 border-b border-white/10 bg-navy-900/60 px-8 py-3 lg:flex">
+          <NotificationBell />
           <span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span>
         </div>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
