@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { AppEnv } from '../types'
+import type { AppEnv, Env, SessionUser } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
 import { uuid, decryptSensitive } from '../crypto'
 import { scopeFilter, canAccessClient, ScopeError } from '../scope'
@@ -14,6 +14,27 @@ adminRoutes.onError((err, c) => {
   console.error(err)
   return c.json({ error: 'internal error' }, 500)
 })
+
+// Admins always pass; a staff member passes only with the named grant on
+// their team_members row (see /users/:id/staff-profile). Lets an admin hand
+// out specific admin-adjacent powers (user management, firm settings)
+// without promoting someone to full admin.
+type Capability = 'can_reveal_payment_info' | 'can_manage_users' | 'can_manage_settings'
+async function hasCapability(env: Env, user: SessionUser, cap: Capability): Promise<boolean> {
+  if (user.role === 'admin') return true
+  if (user.role !== 'staff') return false
+  const row = await env.DB.prepare(`SELECT ${cap} AS v FROM team_members WHERE user_id = ?`).bind(user.id).first<{ v: number }>()
+  return !!row?.v
+}
+
+// Chain after requireStaff. Assumes c.get('user') is already set.
+function requireCapability(cap: Capability) {
+  return async (c: any, next: () => Promise<void>) => {
+    const user = c.get('user')
+    if (!(await hasCapability(c.env, user, cap))) return c.json({ error: 'forbidden' }, 403)
+    await next()
+  }
+}
 
 // ---------------- staff + admin: cross-client views ----------------
 adminRoutes.get('/dashboard', requireStaff, async (c) => {
@@ -124,12 +145,21 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   })
 })
 
-// Reveal a payment method's full (decrypted) routing/account numbers. Admin-only
-// (not requireStaff) given the sensitivity, and every reveal is itself logged.
-adminRoutes.post('/clients/:id/payment-methods/:pmId/reveal', requireAdmin, async (c) => {
+// Reveal a payment method's full (decrypted) routing/account numbers.
+// Admin, or a staff member specifically granted can_reveal_payment_info
+// (see /users/:id/staff-profile) — given the sensitivity, everyone else is
+// blocked and every successful reveal is itself logged.
+adminRoutes.post('/clients/:id/payment-methods/:pmId/reveal', requireStaff, async (c) => {
   const user = c.get('user')
-  const clientId = c.req.param('id')
+  const clientId = c.req.param('id') ?? ''
   const pmId = c.req.param('pmId')
+
+  if (!(await hasCapability(c.env, user, 'can_reveal_payment_info'))) return c.json({ error: 'forbidden' }, 403)
+  if (user.role !== 'admin') {
+    const ok = await canAccessClient(c.env, user, clientId)
+    if (!ok) return c.json({ error: 'forbidden' }, 403)
+  }
+
   const row = await c.env.DB.prepare(
     'SELECT * FROM client_payment_methods WHERE id = ? AND client_user_id = ?',
   ).bind(pmId, clientId).first<any>()
@@ -160,21 +190,106 @@ adminRoutes.get('/inquiries', requireStaff, async (c) => {
   return c.json({ inquiries: res.results ?? [] })
 })
 
+const INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'converted', 'lost']
+
 adminRoutes.patch('/inquiries/:id', requireStaff, async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id')
   const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
-  const status = ['new', 'contacted', 'closed'].includes(body.status ?? '') ? body.status : undefined
+  const status = INQUIRY_STATUSES.includes(body.status ?? '') ? body.status : undefined
   if (status) {
-    await c.env.DB.prepare('UPDATE contact_inquiries SET status = ? WHERE id = ?').bind(status, c.req.param('id')).run()
+    const row = await c.env.DB.prepare('SELECT * FROM contact_inquiries WHERE id = ?').bind(id).first<any>()
+    if (!row) return c.json({ error: 'not found' }, 404)
+    await c.env.DB.prepare('UPDATE contact_inquiries SET status = ? WHERE id = ?').bind(status, id).run()
+    if (status !== row.status) {
+      await logActivity(c.env, {
+        actorUserId: user.id,
+        clientUserId: null,
+        kind: 'inquiry_status_changed',
+        detail: { name: row.name, email: row.email, from: row.status, to: status },
+      })
+    }
   }
   return c.json({ ok: true })
 })
 
-// ---------------- admin-only: users ----------------
-adminRoutes.get('/users', requireAdmin, async (c) => {
+const STAFF_ROLES = [
+  'representative',
+  'billing_specialist',
+  'funding_specialist',
+  'affiliate_paralegal',
+  'accountant',
+  'enrolled_agent',
+  'property_manager',
+  'support_specialist',
+  'auditor_readonly',
+  'pinnacle_admin',
+]
+
+// ---------------- users: admin, or staff granted can_manage_users ----------------
+// Role changes and capability grants stay strictly admin-only below (a
+// delegated "can manage users" staffer could otherwise promote themselves
+// to admin) — this capability only opens up viewing the list and
+// onboarding new accounts at their requested role.
+adminRoutes.get('/users', requireStaff, async (c) => {
+  const user = c.get('user')
+  if (!(await hasCapability(c.env, user, 'can_manage_users'))) return c.json({ error: 'forbidden' }, 403)
   const res = await c.env.DB.prepare(
-    'SELECT id, email, role, full_name, first_name, last_name, status, created_at, last_login_at FROM users ORDER BY created_at DESC LIMIT 500',
+    `SELECT u.id, u.email, u.role, u.full_name, u.first_name, u.last_name, u.status, u.created_at, u.last_login_at,
+            tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings
+     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
+     ORDER BY u.created_at DESC LIMIT 500`,
   ).all()
   return c.json({ users: res.results ?? [] })
+})
+
+// Staff role + capability grants — separate from the coarse staff/admin
+// split on `users.role`. A capability lets an admin hand a specific staff
+// member access to something normally admin-only (e.g. viewing decrypted
+// banking info) without promoting them to full admin. Admin-only: granting
+// capabilities is itself a privilege-escalation-sensitive action.
+adminRoutes.patch('/users/:id/staff-profile', requireAdmin, async (c) => {
+  const actor = c.get('user')
+  const id = c.req.param('id')
+  const target = await c.env.DB.prepare('SELECT role, full_name, email FROM users WHERE id = ?').bind(id).first<any>()
+  if (!target) return c.json({ error: 'not found' }, 404)
+  if (target.role === 'client') return c.json({ error: 'only staff/admin accounts have a staff profile' }, 400)
+
+  const body = await c.req.json<{
+    staff_role?: string
+    title?: string
+    can_reveal_payment_info?: boolean
+    can_manage_users?: boolean
+    can_manage_settings?: boolean
+  }>().catch(() => ({}) as any)
+  const staffRole = STAFF_ROLES.includes(body.staff_role ?? '') ? body.staff_role : 'representative'
+  const title = typeof body.title === 'string' ? body.title.trim().slice(0, 100) || null : null
+
+  await c.env.DB.prepare(
+    `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET
+       staff_role = excluded.staff_role, title = excluded.title,
+       can_reveal_payment_info = excluded.can_reveal_payment_info,
+       can_manage_users = excluded.can_manage_users,
+       can_manage_settings = excluded.can_manage_settings`,
+  ).bind(
+    uuid(),
+    id,
+    staffRole,
+    title,
+    body.can_reveal_payment_info ? 1 : 0,
+    body.can_manage_users ? 1 : 0,
+    body.can_manage_settings ? 1 : 0,
+  ).run()
+
+  await logActivity(c.env, {
+    actorUserId: actor.id,
+    clientUserId: null,
+    kind: 'staff_profile_updated',
+    detail: { name: target.full_name || target.email, staff_role: staffRole },
+  })
+  return c.json({ ok: true })
 })
 
 // Creates a user account AND, for clients, a real client_profile with
@@ -183,8 +298,9 @@ adminRoutes.get('/users', requireAdmin, async (c) => {
 // activation link (via setup_token) for the new account holder to set
 // their own password, consistent with the "never invent/hardcode a
 // password" rule applied to the admin account.
-adminRoutes.post('/users', requireAdmin, async (c) => {
+adminRoutes.post('/users', requireStaff, async (c) => {
   const user = c.get('user')
+  if (!(await hasCapability(c.env, user, 'can_manage_users'))) return c.json({ error: 'forbidden' }, 403)
   const body = await c.req.json<{
     email: string
     role?: string
@@ -200,6 +316,9 @@ adminRoutes.post('/users', requireAdmin, async (c) => {
   }>().catch(() => ({ email: '' }) as any)
   const e = (body.email || '').trim().toLowerCase()
   const r = ['client', 'staff', 'admin'].includes(body.role ?? '') ? (body.role as string) : 'client'
+  // A delegated (non-admin) can_manage_users grant can onboard staff/clients
+  // but not mint new admins — that stays a real-admin-only action.
+  if (r === 'admin' && user.role !== 'admin') return c.json({ error: 'only an admin can create an admin account' }, 403)
   if (!e) return c.json({ error: 'email required' }, 400)
 
   const exists = await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(e).first()
@@ -298,13 +417,141 @@ adminRoutes.delete('/assignments/:id', requireAdmin, async (c) => {
   return c.json({ ok: true })
 })
 
+// ---------------- admin-only: service catalog ----------------
+// Drives what a client can apply for in the portal (services + their
+// multi-step application question sets). Separate from the public
+// marketing site's src/data/services.ts, which is static copy compiled
+// into the frontend bundle — editing here does not change public page
+// content, only what's available to apply for once logged in.
+adminRoutes.get('/services', requireStaff, requireCapability('can_manage_settings'), async (c) => {
+  const res = await c.env.DB.prepare(
+    `SELECT s.*, (SELECT COUNT(*) FROM onboarding_questions q WHERE q.service_key = s.key) AS question_count
+     FROM services s ORDER BY s.sort_order, s.name`,
+  ).all()
+  return c.json({ services: res.results ?? [] })
+})
+
+adminRoutes.post('/services', requireStaff, requireCapability('can_manage_settings'), async (c) => {
+  const body = await c.req.json<{ key: string; name: string; description?: string; category?: string; sort_order?: number }>()
+    .catch(() => ({ key: '', name: '' }) as any)
+  const key = (body.key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  const name = (body.name || '').trim()
+  if (!key || !name) return c.json({ error: 'key and name are required' }, 400)
+  const exists = await c.env.DB.prepare('SELECT 1 FROM services WHERE key = ?').bind(key).first()
+  if (exists) return c.json({ error: 'a service with that key already exists' }, 409)
+  await c.env.DB.prepare(
+    'INSERT INTO services (key, name, description, category, sort_order, active) VALUES (?, ?, ?, ?, ?, 1)',
+  ).bind(key, name, body.description ?? null, body.category ?? null, body.sort_order ?? 0).run()
+  return c.json({ ok: true, key }, 201)
+})
+
+adminRoutes.patch('/services/:key', requireStaff, requireCapability('can_manage_settings'), async (c) => {
+  const key = c.req.param('key')
+  const body = await c.req.json<{ name?: string; description?: string; category?: string; sort_order?: number; active?: boolean }>()
+    .catch(() => ({}) as any)
+  await c.env.DB.prepare(
+    `UPDATE services SET name = COALESCE(?, name), description = COALESCE(?, description),
+     category = COALESCE(?, category), sort_order = COALESCE(?, sort_order),
+     active = COALESCE(?, active) WHERE key = ?`,
+  ).bind(
+    body.name ?? null,
+    body.description ?? null,
+    body.category ?? null,
+    typeof body.sort_order === 'number' ? body.sort_order : null,
+    typeof body.active === 'boolean' ? (body.active ? 1 : 0) : null,
+    key,
+  ).run()
+  return c.json({ ok: true })
+})
+
+adminRoutes.get('/services/:key/questions', requireStaff, requireCapability('can_manage_settings'), async (c) => {
+  const res = await c.env.DB.prepare(
+    'SELECT * FROM onboarding_questions WHERE service_key = ? ORDER BY step_order, sort_order',
+  ).bind(c.req.param('key')).all()
+  return c.json({ questions: res.results ?? [] })
+})
+
+adminRoutes.post('/services/:key/questions', requireStaff, requireCapability('can_manage_settings'), async (c) => {
+  const serviceKey = c.req.param('key')
+  const body = await c.req.json<{
+    question_key: string
+    label: string
+    help_text?: string
+    input_type?: string
+    options?: string
+    required?: boolean
+    step_label?: string
+    step_order?: number
+    sort_order?: number
+  }>().catch(() => ({}) as any)
+  const questionKey = (body.question_key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  const label = (body.label || '').trim()
+  if (!questionKey || !label) return c.json({ error: 'question_key and label are required' }, 400)
+  const id = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO onboarding_questions
+       (id, service_key, question_key, label, help_text, input_type, options, required, step_label, step_order, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    id,
+    serviceKey,
+    questionKey,
+    label,
+    body.help_text ?? null,
+    body.input_type ?? 'text',
+    body.options ?? null,
+    body.required === false ? 0 : 1,
+    body.step_label ?? null,
+    body.step_order ?? 1,
+    body.sort_order ?? 0,
+  ).run()
+  return c.json({ ok: true, id }, 201)
+})
+
+adminRoutes.patch('/services/questions/:id', requireStaff, requireCapability('can_manage_settings'), async (c) => {
+  const id = c.req.param('id')
+  const body = await c.req.json<{
+    label?: string
+    help_text?: string
+    input_type?: string
+    options?: string
+    required?: boolean
+    step_label?: string
+    step_order?: number
+    sort_order?: number
+  }>().catch(() => ({}) as any)
+  await c.env.DB.prepare(
+    `UPDATE onboarding_questions SET
+       label = COALESCE(?, label), help_text = COALESCE(?, help_text), input_type = COALESCE(?, input_type),
+       options = COALESCE(?, options), required = COALESCE(?, required),
+       step_label = COALESCE(?, step_label), step_order = COALESCE(?, step_order), sort_order = COALESCE(?, sort_order)
+     WHERE id = ?`,
+  ).bind(
+    body.label ?? null,
+    body.help_text ?? null,
+    body.input_type ?? null,
+    body.options ?? null,
+    typeof body.required === 'boolean' ? (body.required ? 1 : 0) : null,
+    body.step_label ?? null,
+    typeof body.step_order === 'number' ? body.step_order : null,
+    typeof body.sort_order === 'number' ? body.sort_order : null,
+    id,
+  ).run()
+  return c.json({ ok: true })
+})
+
+adminRoutes.delete('/services/questions/:id', requireStaff, requireCapability('can_manage_settings'), async (c) => {
+  await c.env.DB.prepare('DELETE FROM onboarding_questions WHERE id = ?').bind(c.req.param('id')).run()
+  return c.json({ ok: true })
+})
+
 // ---------------- admin-only: settings ----------------
-adminRoutes.get('/settings', requireAdmin, async (c) => {
+adminRoutes.get('/settings', requireStaff, requireCapability('can_manage_settings'), async (c) => {
   const res = await c.env.DB.prepare('SELECT * FROM app_settings').all()
   return c.json({ settings: res.results ?? [] })
 })
 
-adminRoutes.patch('/settings', requireAdmin, async (c) => {
+adminRoutes.patch('/settings', requireStaff, requireCapability('can_manage_settings'), async (c) => {
   const body = await c.req.json<Record<string, string>>().catch(() => ({} as Record<string, string>))
   const entries = Object.entries(body).slice(0, 50)
   for (const [key, value] of entries) {
@@ -320,34 +567,93 @@ adminRoutes.patch('/settings', requireAdmin, async (c) => {
 // and shown to every staff member regardless of client assignment.
 const ACTIVITY_SEEN_KEY = (userId: string) => `activity_seen:${userId}`
 
+async function mutedKinds(env: Env, userId: string): Promise<string[]> {
+  const row = await env.DB.prepare('SELECT muted_kinds FROM notification_prefs WHERE user_id = ?').bind(userId).first<{ muted_kinds: string }>()
+  if (!row) return []
+  try {
+    return JSON.parse(row.muted_kinds)
+  } catch {
+    return []
+  }
+}
+
 adminRoutes.get('/activity', requireStaff, async (c) => {
   const user = c.get('user')
   const { where, params } = await scopeFilter(c.env, user, 'ae.client_user_id')
-  const res = await c.env.DB.prepare(
-    `SELECT ae.*, actor.full_name AS actor_name, actor.email AS actor_email,
-            cu.full_name AS client_name, cu.email AS client_email
-     FROM activity_events ae
-     LEFT JOIN users actor ON actor.id = ae.actor_user_id
-     LEFT JOIN users cu ON cu.id = ae.client_user_id
-     WHERE (${where}) OR ae.client_user_id IS NULL
-     ORDER BY ae.created_at DESC LIMIT 100`,
-  ).bind(...params).all()
-  return c.json({ events: res.results ?? [] })
+  const [res, muted] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT ae.*, actor.full_name AS actor_name, actor.email AS actor_email,
+              cu.full_name AS client_name, cu.email AS client_email
+       FROM activity_events ae
+       LEFT JOIN users actor ON actor.id = ae.actor_user_id
+       LEFT JOIN users cu ON cu.id = ae.client_user_id
+       WHERE (${where}) OR ae.client_user_id IS NULL
+       ORDER BY ae.created_at DESC LIMIT 100`,
+    ).bind(...params).all<{ kind: string }>(),
+    mutedKinds(c.env, user.id),
+  ])
+  const events = muted.length > 0 ? (res.results ?? []).filter((e) => !muted.includes(e.kind)) : res.results ?? []
+  return c.json({ events })
 })
 
 adminRoutes.get('/activity/unread-count', requireStaff, async (c) => {
   const user = c.get('user')
   const seen = (await c.env.SESSIONS.get(ACTIVITY_SEEN_KEY(user.id))) || '1970-01-01T00:00:00.000Z'
   const { where, params } = await scopeFilter(c.env, user, 'ae.client_user_id')
+  const muted = await mutedKinds(c.env, user.id)
+  const mutedClause = muted.length > 0 ? `AND ae.kind NOT IN (${muted.map(() => '?').join(',')})` : ''
   const row = await c.env.DB.prepare(
-    `SELECT COUNT(*) n FROM activity_events ae WHERE ((${where}) OR ae.client_user_id IS NULL) AND ae.created_at > ?`,
-  ).bind(...params, seen).first<{ n: number }>()
+    `SELECT COUNT(*) n FROM activity_events ae WHERE ((${where}) OR ae.client_user_id IS NULL) AND ae.created_at > ? ${mutedClause}`,
+  ).bind(...params, seen, ...muted).first<{ n: number }>()
   return c.json({ count: row?.n ?? 0 })
 })
 
 adminRoutes.post('/activity/mark-seen', requireStaff, async (c) => {
   const user = c.get('user')
   await c.env.SESSIONS.put(ACTIVITY_SEEN_KEY(user.id), new Date().toISOString())
+  return c.json({ ok: true })
+})
+
+// ---------------- staff + admin: notification preferences (own account) ----------------
+const NOTIFICATION_KINDS = [
+  'inquiry_submitted',
+  'inquiry_status_changed',
+  'client_signed_up',
+  'matter_created',
+  'matter_status_changed',
+  'task_created',
+  'task_status_changed',
+  'ticket_created',
+  'ticket_status_changed',
+  'call_created',
+  'call_status_changed',
+  'invoice_created',
+  'invoice_status_changed',
+  'funding_created',
+  'funding_status_changed',
+  'service_application_submitted',
+  'service_status_changed',
+  'payment_info_revealed',
+]
+
+adminRoutes.get('/notification-prefs', requireStaff, async (c) => {
+  const user = c.get('user')
+  const row = await c.env.DB.prepare('SELECT muted_kinds, email_enabled FROM notification_prefs WHERE user_id = ?').bind(user.id).first<{ muted_kinds: string; email_enabled: number }>()
+  return c.json({
+    kinds: NOTIFICATION_KINDS,
+    muted_kinds: row ? JSON.parse(row.muted_kinds) : [],
+    email_enabled: row ? !!row.email_enabled : false,
+  })
+})
+
+adminRoutes.patch('/notification-prefs', requireStaff, async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ muted_kinds?: string[]; email_enabled?: boolean }>().catch(() => ({}) as { muted_kinds?: string[]; email_enabled?: boolean })
+  const muted = Array.isArray(body.muted_kinds) ? body.muted_kinds.filter((k: string) => NOTIFICATION_KINDS.includes(k)) : []
+  await c.env.DB.prepare(
+    `INSERT INTO notification_prefs (user_id, muted_kinds, email_enabled, updated_at) VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET muted_kinds = excluded.muted_kinds, email_enabled = excluded.email_enabled, updated_at = excluded.updated_at`,
+  ).bind(user.id, JSON.stringify(muted), body.email_enabled ? 1 : 0).run()
   return c.json({ ok: true })
 })
 
@@ -359,6 +665,40 @@ const OPEN_ITEM_CONFIG: Record<string, { table: string; statusPredicate: string 
   calls: { table: 'planned_calls', statusPredicate: "t.status = 'requested'" },
   invoices: { table: 'invoices', statusPredicate: "t.status = 'open'" },
 }
+
+// ---------------- staff + admin: pipelines (kanban-style stage boards) ----------------
+// Cross-client, all-statuses views for the Pipelines page. Status *changes*
+// go through the existing per-module PATCH endpoints (/portal/matters/:id,
+// /portal/funding/:id, /portal/services/:id, /admin/inquiries/:id) — this is
+// read-only, just reshaped for a board instead of a single client's detail page.
+const PIPELINE_CONFIG: Record<string, { table: string; statuses: string[]; select?: string; join?: string }> = {
+  matters: { table: 'matters', statuses: ['open', 'in_progress', 'blocked', 'closed'] },
+  tasks: { table: 'client_tasks', statuses: ['pending', 'in_progress', 'done'] },
+  funding: { table: 'funding_applications', statuses: ['draft', 'submitted', 'under_review', 'approved', 'declined'] },
+  service_applications: {
+    table: 'client_services',
+    statuses: ['requested', 'submitted', 'active', 'completed', 'declined'],
+    select: 's.name AS service_name',
+    join: 'JOIN services s ON s.key = t.service_key',
+  },
+}
+
+adminRoutes.get('/pipeline/:type', requireStaff, async (c) => {
+  const user = c.get('user')
+  const type = c.req.param('type') ?? ''
+  const cfg = PIPELINE_CONFIG[type]
+  if (!cfg) return c.json({ error: 'unknown pipeline type — expected one of ' + Object.keys(PIPELINE_CONFIG).join(', ') }, 400)
+  const { where, params } = await scopeFilter(c.env, user, 't.client_user_id')
+  const res = await c.env.DB.prepare(
+    `SELECT t.*, u.full_name AS client_name, u.email AS client_email${cfg.select ? ', ' + cfg.select : ''}
+     FROM ${cfg.table} t
+     JOIN users u ON u.id = t.client_user_id
+     ${cfg.join ?? ''}
+     WHERE ${where}
+     ORDER BY t.created_at DESC LIMIT 300`,
+  ).bind(...params).all()
+  return c.json({ type, statuses: cfg.statuses, items: res.results ?? [] })
+})
 
 adminRoutes.get('/open-items', requireStaff, async (c) => {
   const user = c.get('user')

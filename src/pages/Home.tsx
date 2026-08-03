@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { Header } from '../components/public/Header'
 import { Footer } from '../components/public/Footer'
 import { btnOutline, btnPrimary, CtaBand, ServiceList, SplitFeatures } from '../components/public/ui'
-import { Reveal, StaggerOnMount, staggerItem } from '../components/public/motion'
+import { AmbientGlow, Marquee, Reveal, StaggerOnMount, staggerItem } from '../components/public/motion'
 import { services } from '../data/services'
 
 const categories = ['Consulting', 'Funding', 'Property', 'Notary', 'Inspections', 'Admin']
@@ -14,8 +14,9 @@ export default function Home() {
       <Header />
 
       {/* Hero */}
-      <section className="container-pmv pt-16 pb-20 sm:pt-24">
-        <div className="grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:items-start lg:gap-16">
+      <section className="relative container-pmv pt-16 pb-20 sm:pt-24">
+        <AmbientGlow />
+        <div className="relative grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:items-start lg:gap-16">
           <StaggerOnMount>
             <motion.p variants={staggerItem} className="eyebrow">Professional Services &amp; Business Support</motion.p>
             <motion.h1
@@ -35,9 +36,6 @@ export default function Home() {
               <Link to="/contact" className={btnPrimary}>Request Service</Link>
               <Link to="/services" className={btnOutline}>Explore Our Services</Link>
             </motion.div>
-            <motion.p variants={staggerItem} className="mt-8 text-sm text-slate-500">
-              {categories.join(' · ')}
-            </motion.p>
           </StaggerOnMount>
 
           <motion.div
@@ -58,6 +56,8 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
+
+      <Marquee items={categories} />
 
       {/* Services */}
       <section id="services" className="container-pmv py-16">

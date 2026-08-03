@@ -5,7 +5,7 @@
 - **API:** Hono on **Pages Functions** (`functions/api/*`) → served at `/api/*`
 - **Database:** Cloudflare **D1** (SQLite), schema in `migrations/`
 - **Sessions:** Cloudflare **KV**
-- **Secrets:** `SESSION_SECRET`, `PAYMENT_ENCRYPTION_KEY`
+- **Secrets:** `SESSION_SECRET`, `PAYMENT_ENCRYPTION_KEY`, `RESEND_API_KEY` (optional)
 
 ## One-time setup (Cloudflare dashboard + CLI)
 1. `npx wrangler login`
@@ -14,6 +14,13 @@
 4. Set the secrets:
    - `npx wrangler pages secret put SESSION_SECRET`
    - `npx wrangler pages secret put PAYMENT_ENCRYPTION_KEY` — encrypts ACH routing/account numbers at rest (see `functions/_lib/crypto.ts`). Use a long random value, separate from `SESSION_SECRET`. Required before any client submits banking info on a service application — the endpoint 500s without it.
+   - **Optional — email delivery ([Resend](https://resend.com)):** new inquiries and service applications currently only notify in-app (activity feed + bell). To also send real email:
+     1. Create a Resend account, verify a sending domain (or use their shared test domain while testing).
+     2. `npx wrangler pages secret put RESEND_API_KEY`
+     3. Set the `RESEND_FROM_EMAIL` var in `wrangler.toml` (or as a dashboard env var) to a verified sender, e.g. `Pinnacle Management Ventures <notifications@pinnaclemanagementventures.com>`.
+     4. Set a **Notification email** in HQ → Settings → General (`firm_notify_email`) — this is the fallback recipient for firm-wide events (like a brand-new inquiry with no assigned staff yet).
+     5. Individual staff opt into email per-event from HQ → Settings → Notifications (or their own notification preferences) — email is off by default per staff member even once the key is set.
+     Without `RESEND_API_KEY` set, sending silently no-ops (logged, not thrown) — nothing breaks, it just stays in-app-only.
 5. Apply the schema:  `npm run db:migrate`   (local dev: `npm run db:migrate:local`)
 
 ## Deploy

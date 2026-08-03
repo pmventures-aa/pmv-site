@@ -49,3 +49,42 @@ export function StaggerOnMount({ children, className = '' }: { children: ReactNo
     </motion.div>
   )
 }
+
+// Two soft, blurred gradient shapes that drift slowly and continuously —
+// ambient background motion for the hero so there's always something moving
+// on screen, not just a one-shot entrance animation. Purely decorative:
+// pointer-events-none, sits behind content via z-index in the caller.
+export function AmbientGlow({ className = '' }: { className?: string }) {
+  return (
+    <div className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`} aria-hidden="true">
+      <motion.div
+        className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-gold/20 blur-3xl"
+        animate={{ x: [0, 40, 0], y: [0, 30, 0] }}
+        transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute -right-16 top-1/3 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl"
+        animate={{ x: [0, -30, 0], y: [0, -40, 0] }}
+        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+      />
+    </div>
+  )
+}
+
+// Infinite horizontal scroller (pure CSS animation, no JS ticking) — used
+// for the service-category strip so there's an obvious, always-moving
+// element visible the instant the page loads, no scroll/hover required.
+export function Marquee({ items }: { items: string[] }) {
+  const doubled = [...items, ...items]
+  return (
+    <div className="relative overflow-hidden border-y border-white/10 py-4">
+      <div className="animate-marquee flex w-max gap-10 whitespace-nowrap">
+        {doubled.map((item, i) => (
+          <span key={`${item}-${i}`} className="text-sm font-medium uppercase tracking-[0.15em] text-slate-500">
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}

@@ -4,6 +4,7 @@ import { requireClient } from '../mid'
 import { uuid, hashPassword, verifyPassword, encryptSensitive } from '../crypto'
 import { MIN_PASSWORD } from './auth'
 import { activityInsert } from '../activity'
+import { notifyStaff } from '../email'
 
 // Self-service endpoints for the authenticated client: profile + dynamic onboarding.
 //
@@ -340,5 +341,16 @@ selfRoutes.post('/services/:key/apply', requireClient, async (c) => {
   stmts.push(activityInsert(c.env, { actorUserId: user.id, clientUserId: user.id, kind: 'service_application_submitted', detail: { service_key: serviceKey, service_name: svc.name } }))
 
   await c.env.DB.batch(stmts)
+
+  const assigned = await c.env.DB.prepare('SELECT staff_user_id FROM staff_assignments WHERE client_user_id = ?').bind(user.id).all<{ staff_user_id: string }>()
+  c.executionCtx.waitUntil(
+    notifyStaff(c.env, {
+      staffUserIds: (assigned.results ?? []).map((r) => r.staff_user_id),
+      kind: 'service_application_submitted',
+      subject: `New application: ${svc.name} — ${user.full_name || user.email}`,
+      html: `<p><strong>${user.full_name || user.email}</strong> submitted an application for <strong>${svc.name}</strong>. Review it in the client's HQ profile.</p>`,
+    }),
+  )
+
   return c.json({ ok: true })
 })

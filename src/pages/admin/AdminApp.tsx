@@ -14,8 +14,9 @@ import SettingsAdmin from './SettingsAdmin'
 import InquiriesAdmin from './InquiriesAdmin'
 import ActivityAdmin from './ActivityAdmin'
 import OpenItemsAdmin from './OpenItemsAdmin'
+import PipelinesAdmin from './PipelinesAdmin'
 
-const STAFF_VISIBLE = ['dashboard', 'clients', 'inquiries', 'activity']
+const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'activity']
 
 function AdminShell() {
   const { user } = useAuth()
@@ -32,6 +33,7 @@ export default function AdminApp() {
       <Route element={<ProtectedRoute allow={['staff', 'admin']} />}>
         <Route element={<AdminShell />}>
           <Route index element={<AdminDashboard />} />
+          <Route path="pipelines" element={<PipelinesAdmin />} />
           <Route path="clients" element={<ClientsList />} />
           <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="inquiries" element={<InquiriesAdmin />} />
