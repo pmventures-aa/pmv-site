@@ -4,6 +4,8 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
+import { Avatar } from '../../components/kit/Avatar'
+import { timeAgo } from '../../lib/activity'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
@@ -30,6 +32,18 @@ interface Bundle {
     account_last4: string
     created_at: string
   }[]
+  notes: NoteRow[]
+}
+
+interface NoteRow {
+  id: string
+  client_user_id: string
+  matter_id: string | null
+  author_user_id: string
+  author_name: string | null
+  author_email: string
+  body: string
+  created_at: string
 }
 
 const SERVICE_STATUS_OPTIONS = ['requested', 'submitted', 'active', 'completed', 'declined']
@@ -386,6 +400,114 @@ function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; m
   )
 }
 
+// Shared list + add-note form — used both inline (profile notes) and inside
+// a Dialog (matter notes). Staff-only, never exposed to the client API.
+function NoteThread({ notes, onAdd, busy }: { notes: NoteRow[]; onAdd: (body: string) => Promise<void>; busy: boolean }) {
+  const [draft, setDraft] = useState('')
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!draft.trim()) return
+    await onAdd(draft.trim())
+    setDraft('')
+  }
+
+  return (
+    <div>
+      {notes.length === 0 ? (
+        <p className="text-sm text-slate-500">No notes yet.</p>
+      ) : (
+        <ul className="mb-4 max-h-72 space-y-3 overflow-y-auto">
+          {notes.map((n) => (
+            <li key={n.id} className="rounded-md border border-white/10 bg-navy-950 p-3">
+              <p className="whitespace-pre-wrap text-sm text-slate-200">{n.body}</p>
+              <p className="mt-1.5 text-xs text-slate-500">
+                {n.author_name || n.author_email} · {timeAgo(n.created_at)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={submit} className="flex gap-2">
+        <textarea
+          className={`${inputCls} min-h-[2.5rem]`}
+          rows={2}
+          placeholder="Add a note for the team…"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <button type="submit" disabled={busy || !draft.trim()} className={`${btnPrimary} self-end`}>
+          {busy ? '…' : 'Post'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function ProfileNotes({ clientId, notes, onChanged }: { clientId: string; notes: NoteRow[]; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false)
+
+  async function addNote(body: string) {
+    setBusy(true)
+    try {
+      await api.post(`/admin/clients/${clientId}/notes`, { body })
+      onChanged()
+    } catch {
+      toast.error('Could not post note.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Panel className="mb-5">
+      <h3 className="mb-3 text-sm font-semibold text-white">Internal Notes</h3>
+      <p className="mb-3 text-xs text-slate-500">Staff-only — never visible to the client. Anyone on the team can add to this thread.</p>
+      <NoteThread notes={notes} onAdd={addNote} busy={busy} />
+    </Panel>
+  )
+}
+
+function MatterNotesDialog({ clientId, matterId, title }: { clientId: string; matterId: string; title: string }) {
+  const [open, setOpen] = useState(false)
+  const [notes, setNotes] = useState<NoteRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await api.get<{ notes: NoteRow[] }>(`/admin/matters/${matterId}/notes`)
+      setNotes(res.notes)
+    } finally {
+      setLoading(false)
+    }
+  }, [matterId])
+
+  async function addNote(body: string) {
+    setBusy(true)
+    try {
+      await api.post(`/admin/clients/${clientId}/notes`, { body, matter_id: matterId })
+      await load()
+    } catch {
+      toast.error('Could not post note.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) load() }}>
+      <DialogTrigger asChild>
+        <button className="text-xs font-medium text-gold hover:underline">Notes</button>
+      </DialogTrigger>
+      <DialogContent title={`Notes — ${title}`} description="Staff-only, never visible to the client.">
+        {loading ? <p className="text-sm text-slate-400">Loading…</p> : <NoteThread notes={notes} onAdd={addNote} busy={busy} />}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
@@ -430,6 +552,15 @@ export default function ClientDetail() {
         kicker={data.profile?.business_name ?? 'Client'}
         title={data.account.full_name || data.account.email}
         subtitle={`${data.account.email}${data.account.phone ? ` · ${data.account.phone}` : ''}`}
+        leading={
+          <Avatar
+            userId={clientId}
+            name={data.account.full_name}
+            size={56}
+            editable
+            uploadPath={`/admin/clients/${clientId}/avatar`}
+          />
+        }
         action={
           <div className="flex flex-wrap gap-2">
             {data.services.map((s) => (
@@ -443,13 +574,18 @@ export default function ClientDetail() {
 
       <ServiceApplications services={data.services} answers={data.application_answers} onStatusChange={setServiceStatus} />
       <PaymentMethods clientId={clientId} methods={data.payment_methods} onRevealed={load} />
+      <ProfileNotes clientId={clientId} notes={data.notes} onChanged={load} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Section
           title="Matters"
           statusOptionsKey="matters"
           rows={data.matters}
-          columns={[{ key: 'title', label: 'Title' }, { key: 'type', label: 'Type' }]}
+          columns={[
+            { key: 'title', label: 'Title' },
+            { key: 'type', label: 'Type' },
+            { key: 'notes', label: '', render: (r) => <MatterNotesDialog clientId={clientId} matterId={r.id} title={r.title} /> },
+          ]}
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('matters', itemId, status)}
           emptyLabel="No matters."

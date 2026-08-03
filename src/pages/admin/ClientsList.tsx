@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls } from '../../components/admin/ui'
+import { useAppPath } from '../../lib/basePath'
 
 interface ClientRow {
   id: string
@@ -20,6 +21,7 @@ const ONBOARDING_OPTIONS = [
 ]
 
 export default function ClientsList() {
+  const p = useAppPath()
   const [clients, setClients] = useState<ClientRow[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
@@ -85,7 +87,7 @@ export default function ClientsList() {
               {filtered.map((c) => (
                 <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                   <td className="px-5 py-3">
-                    <Link to={c.id} className="font-medium text-white hover:text-gold">
+                    <Link to={p(`clients/${c.id}`)} className="font-medium text-white hover:text-gold">
                       {c.full_name || c.email}
                     </Link>
                     <p className="text-xs text-slate-500">{c.email}</p>

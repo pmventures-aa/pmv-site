@@ -4,6 +4,7 @@ import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { PageIntro, Panel, EmptyState, StatCard } from '../../components/admin/ui'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
+import { useAppPath } from '../../lib/basePath'
 
 interface Stats {
   clients: number
@@ -38,12 +39,18 @@ function StatLink({ label, value, to }: { label: string; value: number | string;
   )
 }
 
+const POLL_MS = 60_000
+
 export default function AdminDashboard() {
   const { user } = useAuth()
+  const p = useAppPath()
   const [data, setData] = useState<DashboardResponse | null>(null)
 
   useEffect(() => {
-    api.get<DashboardResponse>('/admin/dashboard').then(setData).catch(() => setData(null))
+    const load = () => api.get<DashboardResponse>('/admin/dashboard').then(setData).catch(() => {})
+    load()
+    const t = setInterval(load, POLL_MS)
+    return () => clearInterval(t)
   }, [])
 
   const stats = data?.stats
@@ -56,12 +63,12 @@ export default function AdminDashboard() {
         subtitle={user?.role === 'admin' ? 'Full access across all clients.' : 'Showing clients assigned to you.'}
       />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <StatLink label="Clients" value={stats?.clients ?? '—'} to="/admin/clients" />
-        <StatLink label="Open Tickets" value={stats?.open_tickets ?? '—'} to="/admin/open-items/tickets" />
-        <StatLink label="Open Matters" value={stats?.open_matters ?? '—'} to="/admin/open-items/matters" />
-        <StatLink label="Pending Tasks" value={stats?.pending_tasks ?? '—'} to="/admin/open-items/tasks" />
-        <StatLink label="Calls Pending" value={stats?.pending_calls ?? '—'} to="/admin/open-items/calls" />
-        <StatLink label="Open Invoices" value={stats?.open_invoices ?? '—'} to="/admin/open-items/invoices" />
+        <StatLink label="Clients" value={stats?.clients ?? '—'} to={p('clients')} />
+        <StatLink label="Open Tickets" value={stats?.open_tickets ?? '—'} to={p('open-items/tickets')} />
+        <StatLink label="Open Matters" value={stats?.open_matters ?? '—'} to={p('open-items/matters')} />
+        <StatLink label="Pending Tasks" value={stats?.pending_tasks ?? '—'} to={p('open-items/tasks')} />
+        <StatLink label="Calls Pending" value={stats?.pending_calls ?? '—'} to={p('open-items/calls')} />
+        <StatLink label="Open Invoices" value={stats?.open_invoices ?? '—'} to={p('open-items/invoices')} />
       </div>
 
       <div className="mt-8 grid gap-5 lg:grid-cols-2">
@@ -79,7 +86,7 @@ export default function AdminDashboard() {
             <ul className="divide-y divide-white/5">
               {data.upcoming_appointments.map((a) => (
                 <li key={a.id} className="px-5 py-3 text-sm">
-                  <Link to={`/admin/clients/${a.client_user_id}`} className="font-medium text-white hover:text-gold">
+                  <Link to={p(`clients/${a.client_user_id}`)} className="font-medium text-white hover:text-gold">
                     {a.title || 'Appointment'}
                   </Link>
                   <p className="mt-1 text-xs text-slate-400">
@@ -94,7 +101,7 @@ export default function AdminDashboard() {
         <Panel className="!p-0">
           <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
             <h2 className="text-sm font-semibold text-white">Recent activity</h2>
-            <Link to="/admin/activity" className="text-xs font-medium text-gold hover:underline">
+            <Link to={p('activity')} className="text-xs font-medium text-gold hover:underline">
               View all
             </Link>
           </div>

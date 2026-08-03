@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
+import { useAppPath } from '../../lib/basePath'
 
 interface CatalogItem {
   key: string
@@ -25,11 +26,12 @@ const STATUS_TONE: Record<string, 'gold' | 'green' | 'blue' | 'slate' | 'red'> =
 
 // Enrolled services that have their own dedicated workspace elsewhere in the portal.
 const SERVICE_MODULE_LINKS: Record<string, { to: string; label: string }> = {
-  funding: { to: '/portal/funding', label: 'View your funding applications →' },
-  property_management: { to: '/portal/property-management', label: 'View your properties →' },
+  funding: { to: 'funding', label: 'View your funding applications →' },
+  property_management: { to: 'property-management', label: 'View your properties →' },
 }
 
 export default function Services() {
+  const p = useAppPath()
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [enrolled, setEnrolled] = useState<Enrolled[]>([])
   const [loading, setLoading] = useState(true)
@@ -68,7 +70,7 @@ export default function Services() {
                   <div>
                     <span className="block text-sm font-medium text-white">{e.name}</span>
                     {link && (
-                      <Link to={link.to} className="mt-1 inline-block text-xs text-gold hover:underline">
+                      <Link to={p(link.to)} className="mt-1 inline-block text-xs text-gold hover:underline">
                         {link.label}
                       </Link>
                     )}
@@ -93,7 +95,7 @@ export default function Services() {
                   <p className="text-sm font-medium text-white">{c.name}</p>
                   <p className="mt-1 text-xs text-slate-400">{c.description}</p>
                 </div>
-                <Link to={`/portal/services/${c.key}/apply`} className="btn-outline shrink-0 !px-4 !py-1.5 text-xs">
+                <Link to={p(`services/${c.key}/apply`)} className="btn-outline shrink-0 !px-4 !py-1.5 text-xs">
                   Start
                 </Link>
               </div>

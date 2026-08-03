@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
+import { useAppPath } from '../../lib/basePath'
+import { Avatar } from '../kit/Avatar'
 import type { NavItem } from './nav'
 
 export function Shell({
@@ -13,6 +15,7 @@ export function Shell({
 }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const p = useAppPath()
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
@@ -26,15 +29,20 @@ export function Shell({
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {nav.map((item) => (
-          <NavLink key={item.key} to={item.to} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
+          <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
             <span className="grid h-6 w-6 place-items-center text-base leading-none text-gold">{item.icon}</span>
             {item.label}
           </NavLink>
         ))}
       </nav>
       <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-        <p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p>
-        <p className="truncate text-xs text-slate-500">{user?.email}</p>
+        <div className="flex items-center gap-3">
+          {user && <Avatar userId={user.id} name={user.full_name} size={36} editable uploadPath="/me/avatar" />}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p>
+            <p className="truncate text-xs text-slate-500">{user?.email}</p>
+          </div>
+        </div>
         <button onClick={() => logout()} className="btn-outline mt-3 w-full !py-1.5 text-xs">
           Sign out
         </button>
