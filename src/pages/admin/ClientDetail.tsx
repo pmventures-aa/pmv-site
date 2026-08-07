@@ -72,13 +72,14 @@ const patchPath: Record<string, string> = {
 }
 
 // ---------- generic "+ Add" form, config-driven per module ----------
-type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'datetime-local'
+type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'datetime-local' | 'select'
 interface FieldDef {
   key: string
   label: string
   type?: FieldType
   required?: boolean
   placeholder?: string
+  options?: { value: string; label: string }[]
 }
 interface CreateConfig {
   postPath: string
@@ -132,6 +133,14 @@ function CreateForm({
                 value={values[f.key] ?? ''}
                 onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
               />
+            ) : f.type === 'select' ? (
+              <select className={inputCls} required={f.required} value={values[f.key] ?? ''} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}>
+                {(f.options ?? []).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             ) : (
               <input
                 className={inputCls}
@@ -572,13 +581,27 @@ function MatterNotesDialog({ clientId, matterId, title }: { clientId: string; ma
   )
 }
 
+interface StaffMember {
+  id: string
+  full_name: string | null
+  email: string
+}
+
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
   const [loading, setLoading] = useState(true)
+  const [staff, setStaff] = useState<StaffMember[]>([])
   // Bumped whenever `id` changes so a slow response for a previously-viewed
   // client can't land after a newer one and overwrite the screen.
   const requestId = useRef(0)
+
+  useEffect(() => {
+    api.get<{ staff: StaffMember[] }>('/admin/staff-directory').then((r) => setStaff(r.staff)).catch(() => {})
+  }, [])
+
+  const staffOptions = [{ value: '', label: 'Unassigned' }, ...staff.map((s) => ({ value: s.id, label: s.full_name || s.email }))]
+  const staffName = (staffId: string | null | undefined) => staff.find((s) => s.id === staffId)?.full_name || staff.find((s) => s.id === staffId)?.email || '—'
 
   const load = useCallback(async () => {
     if (!id) return
@@ -661,6 +684,7 @@ export default function ClientDetail() {
           columns={[
             { key: 'title', label: 'Title' },
             { key: 'type', label: 'Type' },
+            { key: 'assigned_staff_user_id', label: 'Assigned to', render: (r) => staffName(r.assigned_staff_user_id) },
             { key: 'notes', label: '', render: (r) => <MatterNotesDialog clientId={clientId} matterId={r.id} title={r.title} /> },
           ]}
           statusKey="status"
@@ -675,6 +699,7 @@ export default function ClientDetail() {
               { key: 'title', label: 'Title', required: true },
               { key: 'type', label: 'Type', placeholder: 'tax_resolution, document_prep…' },
               { key: 'due_date', label: 'Due date', type: 'date' },
+              { key: 'assigned_staff_user_id', label: 'Assigned to', type: 'select', options: staffOptions },
             ],
           }}
         />
@@ -682,7 +707,10 @@ export default function ClientDetail() {
           title="Tasks"
           statusOptionsKey="tasks"
           rows={data.tasks}
-          columns={[{ key: 'title', label: 'Title' }]}
+          columns={[
+            { key: 'title', label: 'Title' },
+            { key: 'assigned_staff_user_id', label: 'Assigned to', render: (r) => staffName(r.assigned_staff_user_id) },
+          ]}
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('tasks', itemId, status)}
           emptyLabel="No tasks."
@@ -694,6 +722,7 @@ export default function ClientDetail() {
             fields: [
               { key: 'title', label: 'Title', required: true },
               { key: 'due_date', label: 'Due date', type: 'date' },
+              { key: 'assigned_staff_user_id', label: 'Assigned to', type: 'select', options: staffOptions },
             ],
           }}
         />
@@ -701,7 +730,11 @@ export default function ClientDetail() {
           title="Tickets"
           statusOptionsKey="tickets"
           rows={data.tickets}
-          columns={[{ key: 'subject', label: 'Subject' }, { key: 'priority', label: 'Priority' }]}
+          columns={[
+            { key: 'subject', label: 'Subject' },
+            { key: 'priority', label: 'Priority' },
+            { key: 'assigned_staff_user_id', label: 'Assigned to', render: (r) => staffName(r.assigned_staff_user_id) },
+          ]}
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('tickets', itemId, status)}
           emptyLabel="No support tickets."
@@ -713,6 +746,7 @@ export default function ClientDetail() {
             fields: [
               { key: 'subject', label: 'Subject', required: true },
               { key: 'category', label: 'Category' },
+              { key: 'assigned_staff_user_id', label: 'Assigned to', type: 'select', options: staffOptions },
             ],
           }}
         />

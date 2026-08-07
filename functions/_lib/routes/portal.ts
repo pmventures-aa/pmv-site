@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { AppEnv } from '../types'
+import type { AppEnv, Env, SessionUser } from '../types'
 import { requireUser } from '../mid'
 import { uuid } from '../crypto'
 import { resolveClientId, loadScopedRow, scopeFilter, ScopeError } from '../scope'
@@ -13,6 +13,17 @@ portalRoutes.onError((err, c) => {
   console.error(err)
   return c.json({ error: 'internal error' }, 500)
 })
+
+// Assignment (Employee Management Center) — clients never set an assignee;
+// staff/admin may, but only to an actual staff/admin account. Silently
+// resolves to "unassigned" (null) rather than erroring on a bad id, since
+// this is a secondary field on an otherwise-valid create/update request.
+async function resolveAssignee(env: Env, user: SessionUser, assigneeId?: string): Promise<string | null> {
+  if (user.role === 'client' || !assigneeId) return null
+  const row = await env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(assigneeId).first<{ role: string }>()
+  if (!row || (row.role !== 'staff' && row.role !== 'admin')) return null
+  return assigneeId
+}
 
 async function listScoped(c: any, table: string, extra = '') {
   const user = c.get('user')
@@ -103,15 +114,16 @@ portalRoutes.get('/matters', async (c) => c.json({ matters: await listScoped(c, 
 
 portalRoutes.post('/matters', async (c) => {
   const user = c.get('user')
-  const body = await c.req.json<{ title: string; type?: string; due_date?: string; client_user_id?: string }>().catch(() => null)
+  const body = await c.req.json<{ title: string; type?: string; due_date?: string; client_user_id?: string; assigned_staff_user_id?: string }>().catch(() => null)
   if (!body?.title) return c.json({ error: 'title is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const assigneeId = await resolveAssignee(c.env, user, body.assigned_staff_user_id)
   const id = uuid()
   const title = body.title.trim().slice(0, 300)
   await c.env.DB.batch([
     c.env.DB.prepare(
-      `INSERT INTO matters (id, client_user_id, title, type, due_date, status) VALUES (?, ?, ?, ?, ?, 'open')`,
-    ).bind(id, clientId, title, body.type ?? null, body.due_date ?? null),
+      `INSERT INTO matters (id, client_user_id, title, type, due_date, status, assigned_staff_user_id) VALUES (?, ?, ?, ?, ?, 'open', ?)`,
+    ).bind(id, clientId, title, body.type ?? null, body.due_date ?? null, assigneeId),
     activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'matter_created', detail: { title } }),
   ])
   return c.json({ ok: true, id }, 201)
@@ -121,12 +133,19 @@ portalRoutes.patch('/matters/:id', async (c) => {
   const user = c.get('user')
   if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
   const row = await loadScopedRow<any>(c.env, user, 'matters', c.req.param('id'))
-  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const body = await c.req.json<{ status?: string; assigned_staff_user_id?: string | null }>().catch(() => ({}) as { status?: string; assigned_staff_user_id?: string | null })
   const status = ['open', 'in_progress', 'blocked', 'closed'].includes(body.status ?? '') ? body.status : undefined
   if (status) {
     await c.env.DB.prepare('UPDATE matters SET status = ? WHERE id = ?').bind(status, row.id).run()
     if (status !== row.status) {
       await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'matter_status_changed', detail: { title: row.title, from: row.status, to: status } })
+    }
+  }
+  if (body.assigned_staff_user_id !== undefined) {
+    const assigneeId = await resolveAssignee(c.env, user, body.assigned_staff_user_id ?? undefined)
+    await c.env.DB.prepare('UPDATE matters SET assigned_staff_user_id = ? WHERE id = ?').bind(assigneeId, row.id).run()
+    if (assigneeId !== row.assigned_staff_user_id) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'matter_assigned', detail: { title: row.title, assigned_staff_user_id: assigneeId } })
     }
   }
   return c.json({ ok: true })
@@ -137,15 +156,16 @@ portalRoutes.get('/tasks', async (c) => c.json({ tasks: await listScoped(c, 'cli
 
 portalRoutes.post('/tasks', async (c) => {
   const user = c.get('user')
-  const body = await c.req.json<{ title: string; due_date?: string; matter_id?: string; client_user_id?: string }>().catch(() => null)
+  const body = await c.req.json<{ title: string; due_date?: string; matter_id?: string; client_user_id?: string; assigned_staff_user_id?: string }>().catch(() => null)
   if (!body?.title) return c.json({ error: 'title is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const assigneeId = await resolveAssignee(c.env, user, body.assigned_staff_user_id)
   const id = uuid()
   const title = body.title.trim().slice(0, 300)
   await c.env.DB.batch([
     c.env.DB.prepare(
-      `INSERT INTO client_tasks (id, client_user_id, matter_id, title, due_date, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
-    ).bind(id, clientId, body.matter_id ?? null, title, body.due_date ?? null),
+      `INSERT INTO client_tasks (id, client_user_id, matter_id, title, due_date, status, assigned_staff_user_id) VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+    ).bind(id, clientId, body.matter_id ?? null, title, body.due_date ?? null, assigneeId),
     activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'task_created', detail: { title } }),
   ])
   return c.json({ ok: true, id }, 201)
@@ -154,12 +174,19 @@ portalRoutes.post('/tasks', async (c) => {
 portalRoutes.patch('/tasks/:id', async (c) => {
   const user = c.get('user')
   const row = await loadScopedRow<any>(c.env, user, 'client_tasks', c.req.param('id'))
-  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const body = await c.req.json<{ status?: string; assigned_staff_user_id?: string | null }>().catch(() => ({}) as { status?: string; assigned_staff_user_id?: string | null })
   const status = ['pending', 'in_progress', 'done'].includes(body.status ?? '') ? body.status : undefined
   if (status) {
     await c.env.DB.prepare('UPDATE client_tasks SET status = ? WHERE id = ?').bind(status, row.id).run()
     if (status !== row.status) {
       await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'task_status_changed', detail: { title: row.title, from: row.status, to: status } })
+    }
+  }
+  if (body.assigned_staff_user_id !== undefined && user.role !== 'client') {
+    const assigneeId = await resolveAssignee(c.env, user, body.assigned_staff_user_id ?? undefined)
+    await c.env.DB.prepare('UPDATE client_tasks SET assigned_staff_user_id = ? WHERE id = ?').bind(assigneeId, row.id).run()
+    if (assigneeId !== row.assigned_staff_user_id) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'task_assigned', detail: { title: row.title, assigned_staff_user_id: assigneeId } })
     }
   }
   return c.json({ ok: true })
@@ -377,16 +404,17 @@ portalRoutes.get('/support', async (c) => c.json({ tickets: await listScoped(c, 
 
 portalRoutes.post('/support', async (c) => {
   const user = c.get('user')
-  const body = await c.req.json<{ subject: string; category?: string; priority?: string; client_user_id?: string }>().catch(() => null)
+  const body = await c.req.json<{ subject: string; category?: string; priority?: string; client_user_id?: string; assigned_staff_user_id?: string }>().catch(() => null)
   if (!body?.subject) return c.json({ error: 'subject is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
+  const assigneeId = await resolveAssignee(c.env, user, body.assigned_staff_user_id)
   const priority = ['low', 'normal', 'high', 'urgent'].includes(body.priority ?? '') ? body.priority! : 'normal'
   const id = uuid()
   const subject = body.subject.trim().slice(0, 300)
   await c.env.DB.batch([
     c.env.DB.prepare(
-      `INSERT INTO support_tickets (id, client_user_id, subject, category, priority, status) VALUES (?, ?, ?, ?, ?, 'open')`,
-    ).bind(id, clientId, subject, body.category ?? null, priority),
+      `INSERT INTO support_tickets (id, client_user_id, subject, category, priority, status, assigned_staff_user_id) VALUES (?, ?, ?, ?, ?, 'open', ?)`,
+    ).bind(id, clientId, subject, body.category ?? null, priority, assigneeId),
     activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'ticket_created', detail: { subject, priority } }),
   ])
   return c.json({ ok: true, id }, 201)
@@ -395,12 +423,25 @@ portalRoutes.post('/support', async (c) => {
 portalRoutes.patch('/support/:id', async (c) => {
   const user = c.get('user')
   const row = await loadScopedRow<any>(c.env, user, 'support_tickets', c.req.param('id'))
-  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
+  const body = await c.req.json<{ status?: string; assigned_staff_user_id?: string | null }>().catch(() => ({}) as { status?: string; assigned_staff_user_id?: string | null })
   const allowed = user.role === 'client' ? ['closed'] : ['open', 'in_progress', 'closed']
   if (body.status && allowed.includes(body.status)) {
+    // First time staff moves a ticket off 'open' is treated as the first
+    // response — there's no separate reply/thread table on support_tickets
+    // to hang a more precise timestamp off of (see migration 0016).
+    if (user.role !== 'client' && !row.first_response_at && body.status !== 'open') {
+      await c.env.DB.prepare("UPDATE support_tickets SET first_response_at = datetime('now') WHERE id = ?").bind(row.id).run()
+    }
     await c.env.DB.prepare('UPDATE support_tickets SET status = ? WHERE id = ?').bind(body.status, row.id).run()
     if (body.status !== row.status) {
       await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'ticket_status_changed', detail: { subject: row.subject, from: row.status, to: body.status } })
+    }
+  }
+  if (body.assigned_staff_user_id !== undefined && user.role !== 'client') {
+    const assigneeId = await resolveAssignee(c.env, user, body.assigned_staff_user_id ?? undefined)
+    await c.env.DB.prepare('UPDATE support_tickets SET assigned_staff_user_id = ? WHERE id = ?').bind(assigneeId, row.id).run()
+    if (assigneeId !== row.assigned_staff_user_id) {
+      await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'ticket_assigned', detail: { subject: row.subject, assigned_staff_user_id: assigneeId } })
     }
   }
   return c.json({ ok: true })

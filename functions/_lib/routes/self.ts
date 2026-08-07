@@ -160,11 +160,7 @@ selfRoutes.post('/onboarding', requireClient, async (c) => {
   stmts.push(
     c.env.DB.prepare('UPDATE client_profiles SET onboarding_completed = 1 WHERE user_id = ?').bind(user.id),
   )
-  stmts.push(
-    c.env.DB.prepare(
-      "INSERT INTO activity_events (id, actor_user_id, client_user_id, kind, detail) VALUES (?, ?, ?, 'onboarding_completed', ?)",
-    ).bind(uuid(), user.id, user.id, JSON.stringify({ services })),
-  )
+  stmts.push(activityInsert(c.env, { actorUserId: user.id, clientUserId: user.id, kind: 'onboarding_completed', detail: { services } }))
 
   await c.env.DB.batch(stmts)
   return c.json({ ok: true })

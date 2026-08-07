@@ -28,7 +28,25 @@ export async function getUser(env: Env, request: Request): Promise<SessionUser |
   const m = cookie.match(new RegExp(`${COOKIE}=([^;]+)`))
   if (!m) return null
   const raw = await env.SESSIONS.get(`sess:${m[1]}`)
-  return raw ? (JSON.parse(raw) as SessionUser) : null
+  if (!raw) return null
+  const user = JSON.parse(raw) as SessionUser
+  await touchLastSeen(env, user.id)
+  return user
+}
+
+// "Last activity" for the Employee Management Center — throttled via a KV
+// marker so this costs one D1 write per user per 5 minutes, not one per
+// request. Cheaper at read time than deriving it from a MAX(created_at)
+// scan over audit_log per employee on every roster load.
+const LAST_SEEN_THROTTLE_SECONDS = 5 * 60
+async function touchLastSeen(env: Env, userId: string): Promise<void> {
+  const key = `lastseen:${userId}`
+  const marker = await env.SESSIONS.get(key)
+  if (marker) return
+  await Promise.all([
+    env.SESSIONS.put(key, '1', { expirationTtl: LAST_SEEN_THROTTLE_SECONDS }),
+    env.DB.prepare("UPDATE users SET last_seen_at = datetime('now') WHERE id = ?").bind(userId).run(),
+  ])
 }
 
 export async function destroySession(env: Env, request: Request): Promise<void> {
