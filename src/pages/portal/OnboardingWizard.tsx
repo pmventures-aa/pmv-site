@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { Card, StatusBadge, Crest } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
+import { LoadingScreen } from '../../components/LoadingScreen'
 
 interface Service {
   key: string
@@ -111,11 +112,7 @@ export default function OnboardingWizard() {
   }
 
   if (loading) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-navy-radial">
-        <Crest size={64} className="animate-pulse" />
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   const steps: Step[] = ['services', 'questions', 'review']

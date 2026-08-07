@@ -6,6 +6,7 @@ import { toast } from '../../components/kit/toast'
 import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 import { Avatar } from '../../components/kit/Avatar'
 import { timeAgo } from '../../lib/activity'
+import { InlineLoading } from '../../components/LoadingScreen'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
@@ -614,7 +615,7 @@ export default function ClientDetail() {
   }
 
   if (loading || !data) {
-    return <p className="text-sm text-slate-400">Loading…</p>
+    return <InlineLoading />
   }
 
   const clientId = data.account.id
