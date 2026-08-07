@@ -4,7 +4,7 @@ import { requireClient } from '../mid'
 import { uuid, hashPassword, verifyPassword, encryptSensitive } from '../crypto'
 import { MIN_PASSWORD } from './auth'
 import { activityInsert } from '../activity'
-import { notifyStaff } from '../email'
+import { notifyStaff, escapeHtml } from '../email'
 
 // Self-service endpoints for the authenticated client: profile + dynamic onboarding.
 //
@@ -160,11 +160,7 @@ selfRoutes.post('/onboarding', requireClient, async (c) => {
   stmts.push(
     c.env.DB.prepare('UPDATE client_profiles SET onboarding_completed = 1 WHERE user_id = ?').bind(user.id),
   )
-  stmts.push(
-    c.env.DB.prepare(
-      "INSERT INTO activity_events (id, actor_user_id, client_user_id, kind, detail) VALUES (?, ?, ?, 'onboarding_completed', ?)",
-    ).bind(uuid(), user.id, user.id, JSON.stringify({ services })),
-  )
+  stmts.push(activityInsert(c.env, { actorUserId: user.id, clientUserId: user.id, kind: 'onboarding_completed', detail: { services } }))
 
   await c.env.DB.batch(stmts)
   return c.json({ ok: true })
@@ -348,7 +344,7 @@ selfRoutes.post('/services/:key/apply', requireClient, async (c) => {
       staffUserIds: (assigned.results ?? []).map((r) => r.staff_user_id),
       kind: 'service_application_submitted',
       subject: `New application: ${svc.name} — ${user.full_name || user.email}`,
-      html: `<p><strong>${user.full_name || user.email}</strong> submitted an application for <strong>${svc.name}</strong>. Review it in the client's HQ profile.</p>`,
+      html: `<p><strong>${escapeHtml(user.full_name || user.email)}</strong> submitted an application for <strong>${escapeHtml(svc.name)}</strong>. Review it in the client's HQ profile.</p>`,
     }),
   )
 

@@ -32,11 +32,14 @@ interface PipelineItem {
   use_of_funds?: string | null
 }
 
+// No "Converted" column: converting a lead now creates the client account
+// atomically (see the Convert to Client button on each card below) and the
+// lead is immediately excluded from GET /admin/inquiries — it just leaves
+// the board, rather than needing a status to sit in.
 const INQUIRY_COLUMNS: KanbanColumn[] = [
   { key: 'new', label: 'New' },
   { key: 'contacted', label: 'Contacted' },
   { key: 'qualified', label: 'Qualified' },
-  { key: 'converted', label: 'Converted' },
   { key: 'lost', label: 'Lost' },
 ]
 
@@ -102,6 +105,16 @@ export default function PipelinesAdmin() {
     }
   }
 
+  async function convertInquiry(item: Inquiry) {
+    try {
+      await api.post(`/admin/inquiries/${item.id}/convert`)
+      toast.success(`${item.name} is now a client.`)
+      setInquiries((cur) => cur.filter((i) => i.id !== item.id))
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not convert this lead.')
+    }
+  }
+
   async function moveItem(item: PipelineItem, status: string) {
     setItems((cur) => cur.map((i) => (i.id === item.id ? { ...i, status } : i)))
     try {
@@ -155,14 +168,12 @@ export default function PipelinesAdmin() {
                 <p className="text-xs text-slate-400">{i.email}</p>
                 {i.service_name && <p className="mt-1 text-xs text-gold">{i.service_name}</p>}
                 <p className="mt-2 line-clamp-2 text-xs text-slate-400">{i.message}</p>
-                {(i.status === 'qualified' || i.status === 'converted') && (
-                  <Link
-                    to={p(`users?name=${encodeURIComponent(i.name)}&email=${encodeURIComponent(i.email)}&phone=${encodeURIComponent(i.phone ?? '')}`)}
-                    className="mt-2 inline-block text-xs font-medium text-gold hover:underline"
-                  >
-                    Convert to client →
-                  </Link>
-                )}
+                <button
+                  onClick={() => convertInquiry(i)}
+                  className="mt-2 block text-xs font-semibold text-gold hover:underline"
+                >
+                  Convert to Client
+                </button>
                 <StageSelect value={i.status} columns={inquiryColumns} onChange={(s) => moveInquiry(i, s)} />
               </div>
             )}

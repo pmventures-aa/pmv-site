@@ -11,6 +11,7 @@ import Contact from './pages/public/Contact'
 import Terms from './pages/public/Terms'
 import { AuthProvider } from './lib/auth'
 import { AppToaster } from './components/kit/Toaster'
+import { LoadingScreen } from './components/LoadingScreen'
 
 // Portal and admin are full, separate SPAs bundled with their own dependencies
 // (Radix Dialog/AlertDialog, sonner) — code-split so a public-site visitor
@@ -19,7 +20,7 @@ const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
 
 function SurfaceFallback() {
-  return <div className="min-h-screen bg-navy-950" />
+  return <LoadingScreen />
 }
 
 // Serve different apps from one deployment based on hostname:

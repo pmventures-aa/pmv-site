@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api'
 import { Card, PageHeader, StatusBadge } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
 import { useAppPath } from '../../lib/basePath'
+import { InlineLoading } from '../../components/LoadingScreen'
 
 interface CatalogItem {
   key: string
@@ -160,7 +161,7 @@ export default function ServiceApplication() {
     }
   }
 
-  if (loading) return <p className="text-sm text-slate-400">Loading…</p>
+  if (loading) return <InlineLoading />
   if (!service) return <p className="text-sm text-slate-400">Unknown service.</p>
 
   if (done) {

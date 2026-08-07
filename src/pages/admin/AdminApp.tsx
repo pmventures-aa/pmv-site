@@ -17,6 +17,9 @@ import InquiriesAdmin from './InquiriesAdmin'
 import ActivityAdmin from './ActivityAdmin'
 import OpenItemsAdmin from './OpenItemsAdmin'
 import PipelinesAdmin from './PipelinesAdmin'
+import AuditLogAdmin from './AuditLogAdmin'
+import EmployeesAdmin from './EmployeesAdmin'
+import ReportingCenter from './ReportingCenter'
 
 const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'activity']
 
@@ -30,6 +33,11 @@ function AdminShell() {
     visible.add('settings') // Staff & Permissions tab lives inside Settings
   }
   if (caps.can_manage_settings) visible.add('settings')
+  if (caps.can_view_audit_log) visible.add('audit-log')
+  if (caps.can_view_reports) visible.add('reports')
+  // Employees stays out of `visible` even for a delegated can_manage_users
+  // staffer — it's Admin/Owner only, no capability grant (see the nested
+  // ProtectedRoute below).
   const nav = user?.role === 'admin' ? adminNav : adminNav.filter((n) => visible.has(n.key))
   return <AdminLayout nav={nav} badge="Staff Console" />
 }
@@ -54,6 +62,11 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="clients/:id" element={<ClientDetail />} />
             <Route path="inquiries" element={<InquiriesAdmin />} />
             <Route path="activity" element={<ActivityAdmin />} />
+            <Route path="audit-log" element={<AuditLogAdmin />} />
+            <Route path="reports" element={<ReportingCenter />} />
+            <Route path="employees" element={<ProtectedRoute allow={['admin']} />}>
+              <Route index element={<EmployeesAdmin />} />
+            </Route>
             <Route path="open-items/:type" element={<OpenItemsAdmin />} />
             {/* Old shape (?type=...) — OpenItemsAdmin falls back to the query param when there's no :type segment. */}
             <Route path="open-items" element={<OpenItemsAdmin />} />

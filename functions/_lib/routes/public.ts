@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
-import { notifyStaff } from '../email'
+import { notifyStaff, escapeHtml } from '../email'
 
 const CONTACT_MAX_PER_HOUR = 10
 
@@ -62,7 +62,7 @@ publicRoutes.post('/contact', async (c) => {
       staffUserIds: [],
       kind: 'inquiry_submitted',
       subject: `New inquiry: ${name}`,
-      html: `<p><strong>${name}</strong> (${email}${phone ? `, ${phone}` : ''}) submitted a new inquiry${resolvedServiceKey ? ` about ${resolvedServiceKey}` : ''}:</p><p>${message}</p>`,
+      html: `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(email)}${phone ? `, ${escapeHtml(phone)}` : ''}) submitted a new inquiry${resolvedServiceKey ? ` about ${escapeHtml(resolvedServiceKey)}` : ''}:</p><p>${escapeHtml(message)}</p>`,
     }),
   )
 

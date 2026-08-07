@@ -12,7 +12,7 @@ export const btnOutline =
   'inline-flex items-center justify-center gap-2 rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-gold hover:text-gold disabled:opacity-60'
 export const panelCls = 'rounded-md border border-white/10 bg-white/[0.02]'
 export const inputCls =
-  'w-full rounded-md border border-white/10 bg-navy-900 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-gold/50 focus:outline-none'
+  'w-full rounded-md border border-white/10 bg-navy-900 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-gold/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-navy-950'
 
 export function PageIntro({
   kicker,

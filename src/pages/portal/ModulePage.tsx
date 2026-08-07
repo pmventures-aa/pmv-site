@@ -3,6 +3,7 @@ import { useAuth } from '../../lib/auth'
 import { api, ApiError } from '../../lib/api'
 import { Card, EmptyState, PageHeader, StatusBadge, type Tone } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
+import { toast } from '../../components/kit/toast'
 
 export interface FieldConfig {
   key: string
@@ -52,6 +53,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
   const [form, setForm] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
   const isStaff = user?.role === 'staff' || user?.role === 'admin'
 
@@ -60,8 +62,10 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     try {
       const res = await api.get<any>(config.apiPath)
       setItems(res[config.listKey] ?? [])
+      setLoadError(false)
     } catch {
       setItems([])
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -92,8 +96,8 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
     try {
       await api.patch(`${config.apiPath}/${id}`, { status })
       await load()
-    } catch {
-      // surfaced implicitly by list not changing; keep it simple for now
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update status. Try again.')
     }
   }
 
@@ -153,6 +157,13 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       <Card className="overflow-x-auto !p-0">
         {loading ? (
           <div className="p-6 text-sm text-slate-400">Loading…</div>
+        ) : loadError ? (
+          <div className="space-y-2 p-6 text-sm text-slate-400">
+            <p>Couldn't load this list.</p>
+            <button onClick={() => load()} className="text-gold hover:underline">
+              Try again
+            </button>
+          </div>
         ) : items.length === 0 ? (
           <div className="p-6">
             <EmptyState label={config.emptyLabel} />

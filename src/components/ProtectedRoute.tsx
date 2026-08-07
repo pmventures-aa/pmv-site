@@ -1,17 +1,8 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth, type Role } from '../lib/auth'
-import { Crest } from './ui'
+import { LoadingScreen } from './LoadingScreen'
 
-export function LoadingScreen() {
-  return (
-    <div className="grid min-h-screen place-items-center bg-navy-radial">
-      <div className="flex flex-col items-center gap-4">
-        <Crest size={64} className="animate-pulse" />
-        <p className="text-sm text-slate-400">Loading…</p>
-      </div>
-    </div>
-  )
-}
+export { LoadingScreen }
 
 export function ProtectedRoute({ allow }: { allow: Role[] }) {
   const { user, loading } = useAuth()

@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnPrimary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { ConfirmDialog } from '../../components/kit/ConfirmDialog'
+import { useAuth } from '../../lib/auth'
 
 interface UserRow {
   id: string
@@ -22,6 +23,8 @@ interface Assignment {
 }
 
 export default function AssignmentsAdmin() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [users, setUsers] = useState<UserRow[]>([])
   const [staffId, setStaffId] = useState('')
@@ -96,8 +99,13 @@ export default function AssignmentsAdmin() {
 
   return (
     <div>
-      <PageIntro kicker="Coverage" title="Staff Assignments" subtitle="Control which staff can see which clients." />
+      <PageIntro
+        kicker="Coverage"
+        title="Staff Assignments"
+        subtitle={isAdmin ? 'Control which staff can see which clients.' : 'Who can see which clients. Ask an admin to change assignments.'}
+      />
 
+      {isAdmin && (
       <Panel className="mb-6">
         <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-3">
           <label>
@@ -130,6 +138,7 @@ export default function AssignmentsAdmin() {
           {error && <span className="text-sm text-rose-300 sm:col-span-3">{error}</span>}
         </form>
       </Panel>
+      )}
 
       <Panel className="overflow-x-auto !p-0">
         {assignments.length === 0 ? (
@@ -142,7 +151,7 @@ export default function AssignmentsAdmin() {
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-3 font-medium">Staff</th>
                 <th className="px-5 py-3 font-medium">Client</th>
-                <th className="px-5 py-3 font-medium"></th>
+                {isAdmin && <th className="px-5 py-3 font-medium"></th>}
               </tr>
             </thead>
             <tbody>
@@ -150,11 +159,13 @@ export default function AssignmentsAdmin() {
                 <tr key={a.id} className="border-b border-white/5 last:border-0">
                   <td className="px-5 py-3 text-slate-200">{a.staff_name || a.staff_email}</td>
                   <td className="px-5 py-3 text-slate-200">{a.client_name || a.client_email}</td>
-                  <td className="px-5 py-3">
-                    <button onClick={() => setPendingRemove(a)} className="text-xs font-medium text-rose-300 hover:underline">
-                      Remove
-                    </button>
-                  </td>
+                  {isAdmin && (
+                    <td className="px-5 py-3">
+                      <button onClick={() => setPendingRemove(a)} className="text-xs font-medium text-rose-300 hover:underline">
+                        Remove
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -162,6 +173,7 @@ export default function AssignmentsAdmin() {
         )}
       </Panel>
 
+      {isAdmin && (
       <ConfirmDialog
         open={!!pendingRemove}
         onOpenChange={(open) => !open && setPendingRemove(null)}
@@ -175,6 +187,7 @@ export default function AssignmentsAdmin() {
         busy={removing}
         onConfirm={confirmRemove}
       />
+      )}
     </div>
   )
 }

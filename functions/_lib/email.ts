@@ -1,5 +1,17 @@
 import type { Env } from './types'
 
+// Outbound notification emails interpolate user-supplied text (contact-form
+// fields, a client's display name) directly into an HTML body — escape it
+// first so a submitter can't inject markup/links into what staff see.
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 // Thin wrapper over the Resend REST API (https://resend.com/docs/api-reference/emails/send-email).
 // No-ops (logs, doesn't throw) when RESEND_API_KEY isn't set — dev/preview
 // environments and any deploy before the secret is provisioned keep working,

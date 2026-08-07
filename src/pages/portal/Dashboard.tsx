@@ -4,6 +4,7 @@ import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { Card, PageHeader, StatCard, EmptyState } from '../../components/ui'
 import { useAppPath } from '../../lib/basePath'
+import { QuoteOfTheDay } from '../../components/portal/QuoteOfTheDay'
 
 interface DashboardData {
   stats: {
@@ -29,7 +30,13 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader eyebrow="Overview" title={`Welcome back${user?.first_name ? `, ${user.first_name}` : ''}`} subtitle="Here's what's happening across your account." />
+      <PageHeader
+        eyebrow="Overview"
+        title={`Welcome back${user?.first_name ? `, ${user.first_name}` : ''}! :)`}
+        subtitle="Here's what's happening across your account."
+      />
+
+      <QuoteOfTheDay className="mb-8" />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Open Matters" value={data?.stats.open_matters ?? '—'} />

@@ -3,6 +3,7 @@ import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { Card, PageHeader, EmptyState } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
+import { toast } from '../../components/kit/toast'
 
 interface Msg {
   id: string
@@ -15,14 +16,21 @@ export default function Messages() {
   const { user } = useAuth()
   const [messages, setMessages] = useState<Msg[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
-    const res = await api.get<{ messages: Msg[] }>('/portal/messages')
-    setMessages([...res.messages].reverse())
-    setLoading(false)
+    try {
+      const res = await api.get<{ messages: Msg[] }>('/portal/messages')
+      setMessages([...res.messages].reverse())
+      setLoadError(false)
+    } catch {
+      setLoadError(true)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -41,6 +49,8 @@ export default function Messages() {
       await api.post('/portal/messages', { body: draft.trim() })
       setDraft('')
       await load()
+    } catch {
+      toast.error('Message could not be sent. Try again.')
     } finally {
       setSending(false)
     }
@@ -53,6 +63,13 @@ export default function Messages() {
         <div className="flex-1 overflow-y-auto p-5">
           {loading ? (
             <p className="text-sm text-slate-400">Loading…</p>
+          ) : loadError ? (
+            <div className="space-y-2 text-sm text-slate-400">
+              <p>Couldn't load messages.</p>
+              <button onClick={() => { setLoading(true); load() }} className="text-gold hover:underline">
+                Try again
+              </button>
+            </div>
           ) : messages.length === 0 ? (
             <EmptyState label="No messages yet — say hello below." />
           ) : (

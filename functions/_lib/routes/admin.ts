@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
-import type { AppEnv, Env, SessionUser } from '../types'
+import type { AppEnv, Env } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
 import { uuid, decryptSensitive } from '../crypto'
 import { scopeFilter, canAccessClient, ScopeError } from '../scope'
 import { visibleClientIds } from '../access'
-import { createActivationToken } from '../session'
+import { createActivationToken, revokeUserSessions } from '../session'
 import { activityInsert, logActivity } from '../activity'
+import { hasCapability, requireCapability } from '../capabilities'
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -15,42 +16,41 @@ adminRoutes.onError((err, c) => {
   return c.json({ error: 'internal error' }, 500)
 })
 
-// Admins always pass; a staff member passes only with the named grant on
-// their team_members row (see /users/:id/staff-profile). Lets an admin hand
-// out specific admin-adjacent powers (user management, firm settings)
-// without promoting someone to full admin.
-type Capability = 'can_reveal_payment_info' | 'can_manage_users' | 'can_manage_settings'
-async function hasCapability(env: Env, user: SessionUser, cap: Capability): Promise<boolean> {
-  if (user.role === 'admin') return true
-  if (user.role !== 'staff') return false
-  const row = await env.DB.prepare(`SELECT ${cap} AS v FROM team_members WHERE user_id = ?`).bind(user.id).first<{ v: number }>()
-  return !!row?.v
-}
-
-// Chain after requireStaff. Assumes c.get('user') is already set.
-function requireCapability(cap: Capability) {
-  return async (c: any, next: () => Promise<void>) => {
-    const user = c.get('user')
-    if (!(await hasCapability(c.env, user, cap))) return c.json({ error: 'forbidden' }, 403)
-    await next()
-  }
-}
-
 // The staff console's own nav decides what to show a signed-in staff member
 // based on this — without it, a capability grant is invisible until someone
 // knows the exact URL to type. Admins get every capability implicitly.
+// Owner is included too so the frontend can gate the Permanent Deletions
+// view without a separate round-trip.
 adminRoutes.get('/my-capabilities', requireStaff, async (c) => {
   const user = c.get('user')
   if (user.role === 'admin') {
-    return c.json({ can_reveal_payment_info: true, can_manage_users: true, can_manage_settings: true })
+    const row = await c.env.DB.prepare('SELECT is_owner FROM team_members WHERE user_id = ?').bind(user.id).first<{ is_owner: number }>()
+    return c.json({
+      can_reveal_payment_info: true,
+      can_manage_users: true,
+      can_manage_settings: true,
+      can_view_reports: true,
+      can_view_audit_log: true,
+      is_owner: !!row?.is_owner,
+    })
   }
   const row = await c.env.DB.prepare(
-    'SELECT can_reveal_payment_info, can_manage_users, can_manage_settings FROM team_members WHERE user_id = ?',
-  ).bind(user.id).first<{ can_reveal_payment_info: number; can_manage_users: number; can_manage_settings: number }>()
+    'SELECT can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, is_owner FROM team_members WHERE user_id = ?',
+  ).bind(user.id).first<{
+    can_reveal_payment_info: number
+    can_manage_users: number
+    can_manage_settings: number
+    can_view_reports: number
+    can_view_audit_log: number
+    is_owner: number
+  }>()
   return c.json({
     can_reveal_payment_info: !!row?.can_reveal_payment_info,
     can_manage_users: !!row?.can_manage_users,
     can_manage_settings: !!row?.can_manage_settings,
+    can_view_reports: !!row?.can_view_reports,
+    can_view_audit_log: !!row?.can_view_audit_log,
+    is_owner: false,
   })
 })
 
@@ -253,10 +253,16 @@ adminRoutes.post('/clients/:id/payment-methods/:pmId/reveal', requireStaff, asyn
 })
 
 // ---------------- staff + admin: contact inquiries ----------------
+// Converted or archived leads are excluded by default — this is what makes
+// a converted lead "automatically disappear from the sales pipeline"
+// (both this list and the Pipelines board's Inquiries tab read from here).
+// See GET /admin/conversions for converted leads and GET
+// /admin/records/inquiries/archived for archived ones.
 adminRoutes.get('/inquiries', requireStaff, async (c) => {
   const res = await c.env.DB.prepare(
     `SELECT ci.*, s.name AS service_name FROM contact_inquiries ci
      LEFT JOIN services s ON s.key = ci.service_key
+     WHERE ci.client_user_id IS NULL AND ci.archived_at IS NULL
      ORDER BY ci.created_at DESC LIMIT 200`,
   ).all()
   return c.json({ inquiries: res.results ?? [] })
@@ -345,7 +351,8 @@ adminRoutes.get('/users', requireStaff, async (c) => {
   if (!(await hasCapability(c.env, user, 'can_manage_users'))) return c.json({ error: 'forbidden' }, 403)
   const res = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.role, u.full_name, u.first_name, u.last_name, u.status, u.created_at, u.last_login_at,
-            tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings
+            tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
+            tm.can_view_reports, tm.can_view_audit_log, tm.is_owner
      FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
      ORDER BY u.created_at DESC LIMIT 500`,
   ).all()
@@ -370,18 +377,27 @@ adminRoutes.patch('/users/:id/staff-profile', requireAdmin, async (c) => {
     can_reveal_payment_info?: boolean
     can_manage_users?: boolean
     can_manage_settings?: boolean
+    can_view_reports?: boolean
+    can_view_audit_log?: boolean
+    is_owner?: boolean
   }>().catch(() => ({}) as any)
   const staffRole = STAFF_ROLES.includes(body.staff_role ?? '') ? body.staff_role : 'representative'
   const title = typeof body.title === 'string' ? body.title.trim().slice(0, 100) || null : null
+  // Owner is a superset of admin (see requireOwner in mid.ts) — only
+  // meaningful, and only settable, on an admin account.
+  const isOwner = body.is_owner && target.role === 'admin' ? 1 : 0
 
   await c.env.DB.prepare(
-    `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, is_owner)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET
        staff_role = excluded.staff_role, title = excluded.title,
        can_reveal_payment_info = excluded.can_reveal_payment_info,
        can_manage_users = excluded.can_manage_users,
-       can_manage_settings = excluded.can_manage_settings`,
+       can_manage_settings = excluded.can_manage_settings,
+       can_view_reports = excluded.can_view_reports,
+       can_view_audit_log = excluded.can_view_audit_log,
+       is_owner = excluded.is_owner`,
   ).bind(
     uuid(),
     id,
@@ -390,6 +406,9 @@ adminRoutes.patch('/users/:id/staff-profile', requireAdmin, async (c) => {
     body.can_reveal_payment_info ? 1 : 0,
     body.can_manage_users ? 1 : 0,
     body.can_manage_settings ? 1 : 0,
+    body.can_view_reports ? 1 : 0,
+    body.can_view_audit_log ? 1 : 0,
+    isOwner,
   ).run()
 
   await logActivity(c.env, {
@@ -477,7 +496,7 @@ adminRoutes.post('/users', requireStaff, async (c) => {
 
 adminRoutes.patch('/users/:id', requireAdmin, async (c) => {
   const actor = c.get('user')
-  const id = c.req.param('id')
+  const id = c.req.param('id')!
   const body = await c.req.json<{ status?: string; role?: string }>().catch(() => ({} as { status?: string; role?: string }))
   const status = ['active', 'suspended'].includes(body.status ?? '') ? body.status : undefined
   const role = ['client', 'staff', 'admin'].includes(body.role ?? '') ? body.role : undefined
@@ -487,6 +506,9 @@ adminRoutes.patch('/users/:id', requireAdmin, async (c) => {
     'UPDATE users SET status = COALESCE(?, status), role = COALESCE(?, role) WHERE id = ?',
   ).bind(status ?? null, role ?? null, id).run()
   if (target && ((status && status !== target.status) || (role && role !== target.role))) {
+    // A status/role change is a privilege change — kill any session issued
+    // under the old status/role instead of leaving it valid for up to 12h.
+    await revokeUserSessions(c.env, id)
     await logActivity(c.env, {
       actorUserId: actor.id,
       clientUserId: target.role === 'client' ? id : null,
@@ -513,7 +535,11 @@ adminRoutes.get('/assignments', requireStaff, requireCapability('can_manage_user
   return c.json({ assignments: res.results ?? [] })
 })
 
-adminRoutes.post('/assignments', requireStaff, requireCapability('can_manage_users'), async (c) => {
+// Creating/deleting an assignment grants real data access to a client, not just
+// visibility into the list — same class of power as a capability grant itself,
+// so (like those grants) it stays admin-only. A can_manage_users staffer could
+// otherwise assign themselves to any client and bypass scoping entirely.
+adminRoutes.post('/assignments', requireAdmin, async (c) => {
   const { staff_user_id, client_user_id } = await c.req.json<{ staff_user_id: string; client_user_id: string }>()
     .catch(() => ({ staff_user_id: '', client_user_id: '' }))
   if (!staff_user_id || !client_user_id) return c.json({ error: 'staff_user_id and client_user_id are required' }, 400)
@@ -525,7 +551,7 @@ adminRoutes.post('/assignments', requireStaff, requireCapability('can_manage_use
   return c.json({ ok: true, id }, 201)
 })
 
-adminRoutes.delete('/assignments/:id', requireStaff, requireCapability('can_manage_users'), async (c) => {
+adminRoutes.delete('/assignments/:id', requireAdmin, async (c) => {
   await c.env.DB.prepare('DELETE FROM staff_assignments WHERE id = ?').bind(c.req.param('id')).run()
   return c.json({ ok: true })
 })

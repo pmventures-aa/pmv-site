@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
@@ -6,6 +6,7 @@ import { toast } from '../../components/kit/toast'
 import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 import { Avatar } from '../../components/kit/Avatar'
 import { timeAgo } from '../../lib/activity'
+import { InlineLoading } from '../../components/LoadingScreen'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
@@ -71,13 +72,14 @@ const patchPath: Record<string, string> = {
 }
 
 // ---------- generic "+ Add" form, config-driven per module ----------
-type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'datetime-local'
+type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'datetime-local' | 'select'
 interface FieldDef {
   key: string
   label: string
   type?: FieldType
   required?: boolean
   placeholder?: string
+  options?: { value: string; label: string }[]
 }
 interface CreateConfig {
   postPath: string
@@ -131,6 +133,14 @@ function CreateForm({
                 value={values[f.key] ?? ''}
                 onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
               />
+            ) : f.type === 'select' ? (
+              <select className={inputCls} required={f.required} value={values[f.key] ?? ''} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}>
+                {(f.options ?? []).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             ) : (
               <input
                 className={inputCls}
@@ -157,6 +167,11 @@ function CreateForm({
   )
 }
 
+// Entity keys the backend's generic archive routes recognize
+// (functions/_lib/routes/deletion.ts ARCHIVABLE map) — only sections for
+// one of these get an Archive action.
+type ArchiveEntity = 'matters' | 'tasks' | 'invoices' | 'documents' | 'tickets'
+
 function Section({
   title,
   rows,
@@ -168,6 +183,7 @@ function Section({
   createConfig,
   clientId,
   onCreated,
+  archiveEntity,
 }: {
   title: string
   rows: any[]
@@ -179,8 +195,20 @@ function Section({
   createConfig?: CreateConfig
   clientId: string
   onCreated: () => void
+  archiveEntity?: ArchiveEntity
 }) {
   const [adding, setAdding] = useState(false)
+
+  async function archive(id: string) {
+    if (!archiveEntity) return
+    try {
+      await api.patch(`/admin/records/${archiveEntity}/${id}/archive`)
+      toast.success('Archived.')
+      onCreated()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not archive this record.')
+    }
+  }
 
   return (
     <Panel className="!p-0">
@@ -220,6 +248,7 @@ function Section({
                   </th>
                 ))}
                 {statusKey && <th className="px-5 py-2 font-medium">Status</th>}
+                {archiveEntity && <th className="px-5 py-2 font-medium"></th>}
               </tr>
             </thead>
             <tbody>
@@ -243,6 +272,13 @@ function Section({
                           </option>
                         ))}
                       </select>
+                    </td>
+                  )}
+                  {archiveEntity && (
+                    <td className="whitespace-nowrap px-5 py-2.5">
+                      <button onClick={() => archive(r.id)} className="text-xs font-medium text-slate-500 hover:text-rose-300">
+                        Archive
+                      </button>
                     </td>
                   )}
                 </tr>
@@ -402,7 +438,17 @@ function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; m
 
 // Shared list + add-note form — used both inline (profile notes) and inside
 // a Dialog (matter notes). Staff-only, never exposed to the client API.
-function NoteThread({ notes, onAdd, busy }: { notes: NoteRow[]; onAdd: (body: string) => Promise<void>; busy: boolean }) {
+function NoteThread({
+  notes,
+  onAdd,
+  busy,
+  onArchive,
+}: {
+  notes: NoteRow[]
+  onAdd: (body: string) => Promise<void>
+  busy: boolean
+  onArchive?: (id: string) => void
+}) {
   const [draft, setDraft] = useState('')
 
   async function submit(e: React.FormEvent) {
@@ -421,8 +467,15 @@ function NoteThread({ notes, onAdd, busy }: { notes: NoteRow[]; onAdd: (body: st
           {notes.map((n) => (
             <li key={n.id} className="rounded-md border border-white/10 bg-navy-950 p-3">
               <p className="whitespace-pre-wrap text-sm text-slate-200">{n.body}</p>
-              <p className="mt-1.5 text-xs text-slate-500">
-                {n.author_name || n.author_email} · {timeAgo(n.created_at)}
+              <p className="mt-1.5 flex items-center justify-between gap-3 text-xs text-slate-500">
+                <span>
+                  {n.author_name || n.author_email} · {timeAgo(n.created_at)}
+                </span>
+                {onArchive && (
+                  <button onClick={() => onArchive(n.id)} className="font-medium text-slate-500 hover:text-rose-300">
+                    Archive
+                  </button>
+                )}
               </p>
             </li>
           ))}
@@ -459,11 +512,21 @@ function ProfileNotes({ clientId, notes, onChanged }: { clientId: string; notes:
     }
   }
 
+  async function archiveNote(id: string) {
+    try {
+      await api.patch(`/admin/records/notes/${id}/archive`)
+      toast.success('Note archived.')
+      onChanged()
+    } catch {
+      toast.error('Could not archive this note.')
+    }
+  }
+
   return (
     <Panel className="mb-5">
       <h3 className="mb-3 text-sm font-semibold text-white">Internal Notes</h3>
       <p className="mb-3 text-xs text-slate-500">Staff-only — never visible to the client. Anyone on the team can add to this thread.</p>
-      <NoteThread notes={notes} onAdd={addNote} busy={busy} />
+      <NoteThread notes={notes} onAdd={addNote} busy={busy} onArchive={archiveNote} />
     </Panel>
   )
 }
@@ -496,49 +559,86 @@ function MatterNotesDialog({ clientId, matterId, title }: { clientId: string; ma
     }
   }
 
+  async function archiveNote(id: string) {
+    try {
+      await api.patch(`/admin/records/notes/${id}/archive`)
+      toast.success('Note archived.')
+      await load()
+    } catch {
+      toast.error('Could not archive this note.')
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) load() }}>
       <DialogTrigger asChild>
         <button className="text-xs font-medium text-gold hover:underline">Notes</button>
       </DialogTrigger>
       <DialogContent title={`Notes — ${title}`} description="Staff-only, never visible to the client.">
-        {loading ? <p className="text-sm text-slate-400">Loading…</p> : <NoteThread notes={notes} onAdd={addNote} busy={busy} />}
+        {loading ? <p className="text-sm text-slate-400">Loading…</p> : <NoteThread notes={notes} onAdd={addNote} busy={busy} onArchive={archiveNote} />}
       </DialogContent>
     </Dialog>
   )
+}
+
+interface StaffMember {
+  id: string
+  full_name: string | null
+  email: string
 }
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
   const [loading, setLoading] = useState(true)
+  const [staff, setStaff] = useState<StaffMember[]>([])
+  // Bumped whenever `id` changes so a slow response for a previously-viewed
+  // client can't land after a newer one and overwrite the screen.
+  const requestId = useRef(0)
+
+  useEffect(() => {
+    api.get<{ staff: StaffMember[] }>('/admin/staff-directory').then((r) => setStaff(r.staff)).catch(() => {})
+  }, [])
+
+  const staffOptions = [{ value: '', label: 'Unassigned' }, ...staff.map((s) => ({ value: s.id, label: s.full_name || s.email }))]
+  const staffName = (staffId: string | null | undefined) => staff.find((s) => s.id === staffId)?.full_name || staff.find((s) => s.id === staffId)?.email || '—'
 
   const load = useCallback(async () => {
     if (!id) return
+    const thisRequest = ++requestId.current
     try {
       const res = await api.get<Bundle>(`/admin/clients/${id}`)
-      setData(res)
+      if (requestId.current === thisRequest) setData(res)
     } finally {
-      setLoading(false)
+      if (requestId.current === thisRequest) setLoading(false)
     }
   }, [id])
 
   useEffect(() => {
+    setLoading(true)
     load()
   }, [load])
 
   async function setStatus(module: string, itemId: string, status: string) {
-    await api.patch(`/portal/${patchPath[module]}/${itemId}`, { status })
-    await load()
+    try {
+      await api.patch(`/portal/${patchPath[module]}/${itemId}`, { status })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update status. Try again.')
+    }
   }
 
   async function setServiceStatus(csId: string, status: string) {
-    await api.patch(`/portal/services/${csId}`, { status })
-    await load()
+    try {
+      await api.patch(`/portal/services/${csId}`, { status })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update status. Try again.')
+    }
   }
 
   if (loading || !data) {
-    return <p className="text-sm text-slate-400">Loading…</p>
+    return <InlineLoading />
   }
 
   const clientId = data.account.id
@@ -584,6 +684,7 @@ export default function ClientDetail() {
           columns={[
             { key: 'title', label: 'Title' },
             { key: 'type', label: 'Type' },
+            { key: 'assigned_staff_user_id', label: 'Assigned to', render: (r) => staffName(r.assigned_staff_user_id) },
             { key: 'notes', label: '', render: (r) => <MatterNotesDialog clientId={clientId} matterId={r.id} title={r.title} /> },
           ]}
           statusKey="status"
@@ -591,12 +692,14 @@ export default function ClientDetail() {
           emptyLabel="No matters."
           clientId={clientId}
           onCreated={load}
+          archiveEntity="matters"
           createConfig={{
             postPath: 'matters',
             fields: [
               { key: 'title', label: 'Title', required: true },
               { key: 'type', label: 'Type', placeholder: 'tax_resolution, document_prep…' },
               { key: 'due_date', label: 'Due date', type: 'date' },
+              { key: 'assigned_staff_user_id', label: 'Assigned to', type: 'select', options: staffOptions },
             ],
           }}
         />
@@ -604,17 +707,22 @@ export default function ClientDetail() {
           title="Tasks"
           statusOptionsKey="tasks"
           rows={data.tasks}
-          columns={[{ key: 'title', label: 'Title' }]}
+          columns={[
+            { key: 'title', label: 'Title' },
+            { key: 'assigned_staff_user_id', label: 'Assigned to', render: (r) => staffName(r.assigned_staff_user_id) },
+          ]}
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('tasks', itemId, status)}
           emptyLabel="No tasks."
           clientId={clientId}
           onCreated={load}
+          archiveEntity="tasks"
           createConfig={{
             postPath: 'tasks',
             fields: [
               { key: 'title', label: 'Title', required: true },
               { key: 'due_date', label: 'Due date', type: 'date' },
+              { key: 'assigned_staff_user_id', label: 'Assigned to', type: 'select', options: staffOptions },
             ],
           }}
         />
@@ -622,17 +730,23 @@ export default function ClientDetail() {
           title="Tickets"
           statusOptionsKey="tickets"
           rows={data.tickets}
-          columns={[{ key: 'subject', label: 'Subject' }, { key: 'priority', label: 'Priority' }]}
+          columns={[
+            { key: 'subject', label: 'Subject' },
+            { key: 'priority', label: 'Priority' },
+            { key: 'assigned_staff_user_id', label: 'Assigned to', render: (r) => staffName(r.assigned_staff_user_id) },
+          ]}
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('tickets', itemId, status)}
           emptyLabel="No support tickets."
           clientId={clientId}
           onCreated={load}
+          archiveEntity="tickets"
           createConfig={{
             postPath: 'support',
             fields: [
               { key: 'subject', label: 'Subject', required: true },
               { key: 'category', label: 'Category' },
+              { key: 'assigned_staff_user_id', label: 'Assigned to', type: 'select', options: staffOptions },
             ],
           }}
         />
@@ -723,6 +837,7 @@ export default function ClientDetail() {
           emptyLabel="No invoices."
           clientId={clientId}
           onCreated={load}
+          archiveEntity="invoices"
           createConfig={{
             postPath: 'billing',
             fields: [
@@ -739,6 +854,7 @@ export default function ClientDetail() {
           emptyLabel="No documents."
           clientId={clientId}
           onCreated={load}
+          archiveEntity="documents"
         />
         <Section
           title="Appointments"

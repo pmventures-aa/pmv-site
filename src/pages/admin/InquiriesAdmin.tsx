@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { services } from '../../data/services'
+import { timeAgo } from '../../lib/activity'
 
 interface Inquiry {
   id: string
@@ -15,33 +16,83 @@ interface Inquiry {
   created_at: string
 }
 
+interface Conversion {
+  id: string
+  inquiry_id: string
+  client_user_id: string
+  lead_name: string
+  lead_email: string
+  converted_by_name: string | null
+  converted_by_email: string
+  notes_transferred: number
+  emails_transferred: number
+  activity_transferred: number
+  created_at: string
+}
+
 const emptyForm = { name: '', email: '', phone: '', service_key: '', message: '' }
+const STATUS_OPTIONS = ['new', 'contacted', 'qualified', 'lost']
 
 export default function InquiriesAdmin() {
+  const [tab, setTab] = useState<'active' | 'converted'>('active')
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
+  const [conversions, setConversions] = useState<Conversion[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [converting, setConverting] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.get<{ inquiries: Inquiry[] }>('/admin/inquiries')
-      setInquiries(res.inquiries)
+      if (tab === 'active') {
+        const res = await api.get<{ inquiries: Inquiry[] }>('/admin/inquiries')
+        setInquiries(res.inquiries)
+      } else {
+        const res = await api.get<{ conversions: Conversion[] }>('/admin/conversions')
+        setConversions(res.conversions)
+      }
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [tab])
 
   useEffect(() => {
     load()
   }, [load])
 
   async function setStatus(id: string, status: string) {
-    await api.patch(`/admin/inquiries/${id}`, { status })
-    await load()
+    try {
+      await api.patch(`/admin/inquiries/${id}`, { status })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update status.')
+    }
+  }
+
+  async function archive(id: string) {
+    try {
+      await api.patch(`/admin/records/inquiries/${id}/archive`)
+      toast.success('Lead archived.')
+      setInquiries((rows) => rows.filter((r) => r.id !== id))
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not archive this lead.')
+    }
+  }
+
+  async function convert(i: Inquiry) {
+    setConverting(i.id)
+    try {
+      await api.post(`/admin/inquiries/${i.id}/convert`)
+      toast.success(`${i.name} is now a client — notes, emails, and activity carried over automatically.`)
+      setInquiries((rows) => rows.filter((r) => r.id !== i.id))
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not convert this lead.')
+    } finally {
+      setConverting(null)
+    }
   }
 
   async function onCreate(e: React.FormEvent) {
@@ -68,13 +119,34 @@ export default function InquiriesAdmin() {
         title="Request Service Inquiries"
         subtitle="Submissions from the public contact form, plus any leads you enter directly."
         action={
-          <button className={btnPrimary} onClick={() => setShowForm((s) => !s)}>
-            {showForm ? 'Cancel' : '+ New lead'}
-          </button>
+          tab === 'active' && (
+            <button className={btnPrimary} onClick={() => setShowForm((s) => !s)}>
+              {showForm ? 'Cancel' : '+ New lead'}
+            </button>
+          )
         }
       />
 
-      {showForm && (
+      <div className="mb-5 flex gap-1.5 border-b border-white/10">
+        {(
+          [
+            ['active', 'Active pipeline'],
+            ['converted', 'Converted'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
+              tab === key ? 'border-gold text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'active' && showForm && (
         <Panel className="mb-6">
           <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
             <label>
@@ -122,34 +194,69 @@ export default function InquiriesAdmin() {
 
       {loading ? (
         <p className="text-sm text-slate-400">Loading…</p>
-      ) : inquiries.length === 0 ? (
+      ) : tab === 'active' ? (
+        inquiries.length === 0 ? (
+          <Panel>
+            <EmptyState label="No inquiries yet." />
+          </Panel>
+        ) : (
+          <Panel className="divide-y divide-white/5 !p-0">
+            {inquiries.map((i) => (
+              <div key={i.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+                <div>
+                  <p className="text-sm font-medium text-white">
+                    {i.name} <span className="font-normal text-slate-400">— {i.email}</span>
+                  </p>
+                  {i.phone && <p className="text-xs text-slate-500">{i.phone}</p>}
+                  {i.service_name && <p className="mt-1 text-xs text-gold">{i.service_name}</p>}
+                  {i.message && <p className="mt-2 max-w-xl text-sm text-slate-300">{i.message}</p>}
+                  <p className="mt-2 text-xs text-slate-500">{new Date(i.created_at.replace(' ', 'T') + 'Z').toLocaleString()}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <select
+                    className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
+                    value={STATUS_OPTIONS.includes(i.status) ? i.status : 'new'}
+                    onChange={(e) => setStatus(i.id, e.target.value)}
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => convert(i)}
+                    disabled={converting === i.id}
+                    className="text-xs font-semibold text-gold hover:underline disabled:opacity-60"
+                  >
+                    {converting === i.id ? 'Converting…' : 'Convert to Client'}
+                  </button>
+                  <button onClick={() => archive(i.id)} className="text-xs font-medium text-slate-500 hover:text-rose-300">
+                    Archive
+                  </button>
+                </div>
+              </div>
+            ))}
+          </Panel>
+        )
+      ) : conversions.length === 0 ? (
         <Panel>
-          <EmptyState label="No inquiries yet." />
+          <EmptyState label="No leads converted yet." />
         </Panel>
       ) : (
         <Panel className="divide-y divide-white/5 !p-0">
-          {inquiries.map((i) => (
-            <div key={i.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
-              <div>
-                <p className="text-sm font-medium text-white">
-                  {i.name} <span className="font-normal text-slate-400">— {i.email}</span>
-                </p>
-                {i.phone && <p className="text-xs text-slate-500">{i.phone}</p>}
-                {i.service_name && <p className="mt-1 text-xs text-gold">{i.service_name}</p>}
-                {i.message && <p className="mt-2 max-w-xl text-sm text-slate-300">{i.message}</p>}
-                <p className="mt-2 text-xs text-slate-500">{new Date(i.created_at.replace(' ', 'T') + 'Z').toLocaleString()}</p>
-              </div>
-              <select
-                className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
-                value={i.status}
-                onChange={(e) => setStatus(i.id, e.target.value)}
-              >
-                {['new', 'contacted', 'qualified', 'converted', 'lost'].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+          {conversions.map((c) => (
+            <div key={c.id} className="px-5 py-4">
+              <p className="text-sm font-medium text-white">
+                {c.lead_name} <span className="font-normal text-slate-400">— {c.lead_email}</span>
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Converted by {c.converted_by_name || c.converted_by_email} · {timeAgo(c.created_at)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Carried over: {c.notes_transferred} note{c.notes_transferred === 1 ? '' : 's'}, {c.emails_transferred} email
+                {c.emails_transferred === 1 ? '' : 's'}, {c.activity_transferred} activity event{c.activity_transferred === 1 ? '' : 's'}
+              </p>
             </div>
           ))}
         </Panel>

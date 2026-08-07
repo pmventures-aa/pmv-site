@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { Header } from '../components/public/Header'
 import { Footer } from '../components/public/Footer'
 import { btnOutline, btnPrimary, CtaBand, ServiceList, SplitFeatures } from '../components/public/ui'
-import { AmbientGlow, Marquee, Reveal, StaggerOnMount, staggerItem } from '../components/public/motion'
+import { AmbientGlow, Marquee, Reveal, ServiceRotator, StaggerOnMount, staggerItem } from '../components/public/motion'
 import { services } from '../data/services'
 
 const categories = ['Consulting', 'Funding', 'Property', 'Notary', 'Inspections', 'Admin']
@@ -42,17 +42,8 @@ export default function Home() {
             initial={{ opacity: 0, x: 24 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
-            className="rounded-md border border-white/10 bg-white/[0.03] p-7"
           >
-            <p className="eyebrow">What we help with</p>
-            <ul className="mt-4 divide-y divide-white/10">
-              {categories.map((c) => (
-                <li key={c} className="py-2.5 text-sm text-slate-300">{c}</li>
-              ))}
-            </ul>
-            <Link to="/services" className="mt-5 inline-block text-sm font-medium text-gold hover:underline">
-              View all services →
-            </Link>
+            <ServiceRotator items={services} />
           </motion.div>
         </div>
       </section>

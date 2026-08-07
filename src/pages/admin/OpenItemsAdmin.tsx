@@ -27,11 +27,19 @@ export default function OpenItemsAdmin() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let stale = false
     setLoading(true)
     api
       .get<{ items: any[] }>(`/admin/open-items?type=${encodeURIComponent(type)}`)
-      .then((r) => setItems(r.items))
-      .finally(() => setLoading(false))
+      .then((r) => {
+        if (!stale) setItems(r.items)
+      })
+      .finally(() => {
+        if (!stale) setLoading(false)
+      })
+    return () => {
+      stale = true
+    }
   }, [type])
 
   return (
