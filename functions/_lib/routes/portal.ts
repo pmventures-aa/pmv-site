@@ -432,6 +432,12 @@ portalRoutes.patch('/support/:id', async (c) => {
     if (user.role !== 'client' && !row.first_response_at && body.status !== 'open') {
       await c.env.DB.prepare("UPDATE support_tickets SET first_response_at = datetime('now') WHERE id = ?").bind(row.id).run()
     }
+    if (body.status === 'closed' && !row.resolved_at) {
+      await c.env.DB.prepare("UPDATE support_tickets SET resolved_at = datetime('now') WHERE id = ?").bind(row.id).run()
+    } else if (body.status !== 'closed' && row.resolved_at) {
+      // Reopened — clear so resolution-time reports don't count it twice.
+      await c.env.DB.prepare('UPDATE support_tickets SET resolved_at = NULL WHERE id = ?').bind(row.id).run()
+    }
     await c.env.DB.prepare('UPDATE support_tickets SET status = ? WHERE id = ?').bind(body.status, row.id).run()
     if (body.status !== row.status) {
       await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'ticket_status_changed', detail: { subject: row.subject, from: row.status, to: body.status } })

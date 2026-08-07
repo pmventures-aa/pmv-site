@@ -19,13 +19,9 @@ import OpenItemsAdmin from './OpenItemsAdmin'
 import PipelinesAdmin from './PipelinesAdmin'
 import AuditLogAdmin from './AuditLogAdmin'
 import EmployeesAdmin from './EmployeesAdmin'
+import ReportingCenter from './ReportingCenter'
 
-// 'reports' is added to adminNav ahead of its route existing (Phase 6,
-// this same session) — filtered out of the visible set entirely until
-// it's wired in, so a staff/admin account never sees a nav item with
-// nothing behind it in the meantime.
 const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'activity']
-const NOT_YET_WIRED = new Set(['reports'])
 
 function AdminShell() {
   const { user } = useAuth()
@@ -38,7 +34,11 @@ function AdminShell() {
   }
   if (caps.can_manage_settings) visible.add('settings')
   if (caps.can_view_audit_log) visible.add('audit-log')
-  const nav = (user?.role === 'admin' ? adminNav : adminNav.filter((n) => visible.has(n.key))).filter((n) => !NOT_YET_WIRED.has(n.key))
+  if (caps.can_view_reports) visible.add('reports')
+  // Employees stays out of `visible` even for a delegated can_manage_users
+  // staffer — it's Admin/Owner only, no capability grant (see the nested
+  // ProtectedRoute below).
+  const nav = user?.role === 'admin' ? adminNav : adminNav.filter((n) => visible.has(n.key))
   return <AdminLayout nav={nav} badge="Staff Console" />
 }
 
@@ -63,6 +63,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="inquiries" element={<InquiriesAdmin />} />
             <Route path="activity" element={<ActivityAdmin />} />
             <Route path="audit-log" element={<AuditLogAdmin />} />
+            <Route path="reports" element={<ReportingCenter />} />
             <Route path="employees" element={<ProtectedRoute allow={['admin']} />}>
               <Route index element={<EmployeesAdmin />} />
             </Route>

@@ -13,6 +13,7 @@ import { deletionRoutes } from '../_lib/routes/deletion'
 import { conversionRoutes } from '../_lib/routes/conversion'
 import { auditRoutes } from '../_lib/routes/auditRoutes'
 import { employeeRoutes } from '../_lib/routes/employees'
+import { reportRoutes } from '../_lib/routes/reports'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -32,6 +33,7 @@ app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
 app.route('/admin', auditRoutes)
 app.route('/admin', employeeRoutes)
+app.route('/admin', reportRoutes)
 
 app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
 
