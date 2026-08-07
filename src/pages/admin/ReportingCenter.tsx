@@ -91,7 +91,10 @@ export default function ReportingCenter() {
   }, [catalog.length, runReport])
 
   useEffect(() => {
-    for (const entry of catalog.filter((c) => c.category === category)) runReport(entry.key)
+    // KPI_KEYS are already fetched by the effect above (and shown in the
+    // KPI strip) — skip re-fetching/re-rendering them here as a duplicate
+    // card in the Business tab.
+    for (const entry of catalog.filter((c) => c.category === category && !KPI_KEYS.includes(c.key))) runReport(entry.key)
   }, [category, catalog, runReport])
 
   async function saveTemplate(reportKey: string, name: string) {
@@ -135,7 +138,7 @@ export default function ReportingCenter() {
     )
   }
 
-  const categoryEntries = catalog.filter((c) => c.category === category)
+  const categoryEntries = catalog.filter((c) => c.category === category && !KPI_KEYS.includes(c.key))
 
   return (
     <div>

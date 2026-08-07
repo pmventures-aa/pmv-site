@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
-import type { AppEnv } from '../types'
+import type { AppEnv, SessionUser } from '../types'
 import { requireStaff } from '../mid'
 import { requireCapability } from '../capabilities'
 import { visibleClientIds } from '../access'
-import { REPORTS, REPORTS_BY_KEY, type ReportCtx, type ReportResult } from '../reportRegistry'
+import { REPORTS, REPORTS_BY_KEY, type ReportCtx, type ReportDef, type ReportResult } from '../reportRegistry'
 import { csvResponse } from '../csv'
 import { uuid } from '../crypto'
 
@@ -18,8 +18,18 @@ function dateRange(c: { req: { query(key: string): string | undefined } }): { fr
   return { from: `${from} 00:00:00`, to: `${to} 23:59:59` }
 }
 
+// Employee-category reports expose every staff member's name and
+// firm-wide performance data — unlike Business/Client/Operations, that's
+// Admin/Owner only, same restriction as the Employees page itself
+// (functions/_lib/routes/employees.ts), not delegable via can_view_reports.
+function canRunReport(user: SessionUser, def: ReportDef): boolean {
+  return def.category !== 'employee' || user.role === 'admin'
+}
+
 reportRoutes.get('/reports/catalog', requireStaff, requireCapability('can_view_reports'), async (c) => {
-  return c.json({ reports: REPORTS.map(({ key, label, category, description }) => ({ key, label, category, description })) })
+  const user = c.get('user')
+  const reports = REPORTS.filter((r) => canRunReport(user, r))
+  return c.json({ reports: reports.map(({ key, label, category, description }) => ({ key, label, category, description })) })
 })
 
 reportRoutes.get('/reports/:key', requireStaff, requireCapability('can_view_reports'), async (c) => {
@@ -27,6 +37,7 @@ reportRoutes.get('/reports/:key', requireStaff, requireCapability('can_view_repo
   const def = REPORTS_BY_KEY[key]
   if (!def) return c.json({ error: 'unknown report' }, 404)
   const user = c.get('user')
+  if (!canRunReport(user, def)) return c.json({ error: 'forbidden' }, 403)
   const { from, to } = dateRange(c)
   const ctx: ReportCtx = { env: c.env, from, to, clientIds: await visibleClientIds(c.env, user) }
   const result = await def.run(ctx)
@@ -38,6 +49,7 @@ reportRoutes.get('/reports/:key/export.csv', requireStaff, requireCapability('ca
   const def = REPORTS_BY_KEY[key]
   if (!def) return c.json({ error: 'unknown report' }, 404)
   const user = c.get('user')
+  if (!canRunReport(user, def)) return c.json({ error: 'forbidden' }, 403)
   const { from, to } = dateRange(c)
   const ctx: ReportCtx = { env: c.env, from, to, clientIds: await visibleClientIds(c.env, user) }
   const result: ReportResult = await def.run(ctx)
@@ -58,7 +70,9 @@ reportRoutes.post('/report-templates', requireStaff, requireCapability('can_view
   const body = await c.req.json<{ name?: string; report_key?: string; filters?: Record<string, unknown>; schedule_cron?: string }>().catch(() => ({}) as any)
   const name = (body.name || '').trim().slice(0, 200)
   if (!name) return c.json({ error: 'name is required' }, 400)
-  if (!body.report_key || !REPORTS_BY_KEY[body.report_key]) return c.json({ error: 'unknown report' }, 400)
+  const def = body.report_key ? REPORTS_BY_KEY[body.report_key] : undefined
+  if (!def) return c.json({ error: 'unknown report' }, 400)
+  if (!canRunReport(user, def)) return c.json({ error: 'forbidden' }, 403)
   const id = uuid()
   await c.env.DB.prepare(
     'INSERT INTO report_templates (id, name, report_key, filters_json, schedule_cron, created_by) VALUES (?, ?, ?, ?, ?, ?)',
@@ -84,15 +98,23 @@ reportRoutes.post('/report-templates/:id/run', requireStaff, requireCapability('
   if (!template) return c.json({ error: 'not found' }, 404)
   const def = REPORTS_BY_KEY[template.report_key]
   if (!def) return c.json({ error: 'unknown report' }, 400)
+  if (!canRunReport(user, def)) return c.json({ error: 'forbidden' }, 403)
   const filters = JSON.parse(template.filters_json || '{}')
   const { from, to } = dateRange({ req: { query: (k: string) => filters[k] } })
   const ctx: ReportCtx = { env: c.env, from, to, clientIds: await visibleClientIds(c.env, user) }
-  const result = await def.run(ctx)
   const runId = uuid()
-  await c.env.DB.prepare(
-    "INSERT INTO scheduled_report_runs (id, template_id, status, run_at) VALUES (?, ?, 'succeeded', datetime('now'))",
-  ).bind(runId, template.id).run()
-  return c.json({ key: template.report_key, label: def.label, from, to, ...result })
+  try {
+    const result = await def.run(ctx)
+    await c.env.DB.prepare(
+      "INSERT INTO scheduled_report_runs (id, template_id, status, run_at) VALUES (?, ?, 'succeeded', datetime('now'))",
+    ).bind(runId, template.id).run()
+    return c.json({ key: template.report_key, label: def.label, from, to, ...result })
+  } catch (err) {
+    await c.env.DB.prepare(
+      "INSERT INTO scheduled_report_runs (id, template_id, status, error, run_at) VALUES (?, ?, 'failed', ?, datetime('now'))",
+    ).bind(runId, template.id, err instanceof Error ? err.message : 'unknown error').run()
+    return c.json({ error: 'this report failed to run' }, 500)
+  }
 })
 
 reportRoutes.get('/report-templates/:id/runs', requireStaff, requireCapability('can_view_reports'), async (c) => {
