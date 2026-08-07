@@ -47,7 +47,7 @@ export function Field({
 }
 
 export const inputCls =
-  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-gold/60 focus:bg-white/[0.06]'
+  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-gold/60 focus:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-navy-950'
 
 export function ErrorBanner({ message }: { message: string | null }) {
   if (!message) return null

@@ -27,7 +27,7 @@ export function Header() {
             </NavLink>
           ))}
         </nav>
-        <div className="hidden items-center gap-3 sm:flex">
+        <div className="hidden items-center gap-3 md:flex">
           <a href="https://client.pinnaclemanagementventures.com/login" className={btnOutline}>
             Client Login
           </a>
@@ -37,14 +37,14 @@ export function Header() {
         </div>
         <button
           onClick={() => setOpen((o) => !o)}
-          className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white sm:hidden"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white md:hidden"
           aria-label="Open menu"
         >
           ☰
         </button>
       </div>
       {open && (
-        <div className="border-t border-white/5 bg-navy-950/95 px-6 py-4 sm:hidden">
+        <div className="border-t border-white/5 bg-navy-950/95 px-6 py-4 md:hidden">
           <nav className="flex flex-col gap-3 text-sm text-slate-300">
             {navItems.map((item) => (
               <NavLink key={item.to} to={item.to} className={linkCls} onClick={() => setOpen(false)}>

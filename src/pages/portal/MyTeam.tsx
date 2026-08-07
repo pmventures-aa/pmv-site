@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { Card, PageHeader, EmptyState } from '../../components/ui'
 import { Avatar } from '../../components/kit/Avatar'
@@ -28,19 +28,38 @@ const ROLE_LABELS: Record<string, string> = {
 export default function MyTeam() {
   const [team, setTeam] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true)
     api
       .get<{ team: TeamMember[] }>('/portal/team')
-      .then((r) => setTeam(r.team))
+      .then((r) => {
+        setTeam(r.team)
+        setLoadError(false)
+      })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   return (
     <div>
       <PageHeader eyebrow="Your Pinnacle team" title="My Team" subtitle="The people assigned to your account." />
       {loading ? (
         <p className="text-sm text-slate-400">Loading…</p>
+      ) : loadError ? (
+        <Card>
+          <div className="space-y-2 text-sm text-slate-400">
+            <p>Couldn't load your team.</p>
+            <button onClick={load} className="text-gold hover:underline">
+              Try again
+            </button>
+          </div>
+        </Card>
       ) : team.length === 0 ? (
         <Card>
           <EmptyState label="No one's been assigned yet — we'll introduce your team shortly." />

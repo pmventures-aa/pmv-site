@@ -237,7 +237,10 @@ portalRoutes.post('/billing', async (c) => {
   const user = c.get('user')
   if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
   const body = await c.req.json<{ amount_cents: number; due_date?: string; client_user_id: string }>().catch(() => null)
-  if (!body?.amount_cents || !body.client_user_id) return c.json({ error: 'amount_cents and client_user_id are required' }, 400)
+  if (typeof body?.amount_cents !== 'number' || !Number.isInteger(body.amount_cents) || body.amount_cents < 0) {
+    return c.json({ error: 'amount_cents must be a non-negative integer' }, 400)
+  }
+  if (!body.client_user_id) return c.json({ error: 'client_user_id is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const id = uuid()
   await c.env.DB.batch([
@@ -270,6 +273,12 @@ portalRoutes.get('/funding', async (c) => c.json({ applications: await listScope
 portalRoutes.post('/funding', async (c) => {
   const user = c.get('user')
   const body = await c.req.json<{ amount_requested_cents?: number; use_of_funds?: string; client_user_id?: string }>().catch(() => null)
+  if (
+    body?.amount_requested_cents !== undefined &&
+    (typeof body.amount_requested_cents !== 'number' || !Number.isInteger(body.amount_requested_cents) || body.amount_requested_cents < 0)
+  ) {
+    return c.json({ error: 'amount_requested_cents must be a non-negative integer' }, 400)
+  }
   const clientId = await resolveClientId(c.env, user, body?.client_user_id)
   const id = uuid()
   await c.env.DB.batch([

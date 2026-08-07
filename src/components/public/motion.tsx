@@ -1,4 +1,4 @@
-import { motion, type Variants } from 'motion/react'
+import { motion, useReducedMotion, type Variants } from 'motion/react'
 import type { ReactNode } from 'react'
 
 // Motion helpers for the public marketing site only — deliberately not used
@@ -55,16 +55,17 @@ export function StaggerOnMount({ children, className = '' }: { children: ReactNo
 // on screen, not just a one-shot entrance animation. Purely decorative:
 // pointer-events-none, sits behind content via z-index in the caller.
 export function AmbientGlow({ className = '' }: { className?: string }) {
+  const reduceMotion = useReducedMotion()
   return (
     <div className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`} aria-hidden="true">
       <motion.div
         className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-gold/20 blur-3xl"
-        animate={{ x: [0, 40, 0], y: [0, 30, 0] }}
+        animate={reduceMotion ? undefined : { x: [0, 40, 0], y: [0, 30, 0] }}
         transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
       />
       <motion.div
         className="absolute -right-16 top-1/3 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl"
-        animate={{ x: [0, -30, 0], y: [0, -40, 0] }}
+        animate={reduceMotion ? undefined : { x: [0, -30, 0], y: [0, -40, 0] }}
         transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
       />
     </div>

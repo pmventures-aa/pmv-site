@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
@@ -512,29 +512,42 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
   const [loading, setLoading] = useState(true)
+  // Bumped whenever `id` changes so a slow response for a previously-viewed
+  // client can't land after a newer one and overwrite the screen.
+  const requestId = useRef(0)
 
   const load = useCallback(async () => {
     if (!id) return
+    const thisRequest = ++requestId.current
     try {
       const res = await api.get<Bundle>(`/admin/clients/${id}`)
-      setData(res)
+      if (requestId.current === thisRequest) setData(res)
     } finally {
-      setLoading(false)
+      if (requestId.current === thisRequest) setLoading(false)
     }
   }, [id])
 
   useEffect(() => {
+    setLoading(true)
     load()
   }, [load])
 
   async function setStatus(module: string, itemId: string, status: string) {
-    await api.patch(`/portal/${patchPath[module]}/${itemId}`, { status })
-    await load()
+    try {
+      await api.patch(`/portal/${patchPath[module]}/${itemId}`, { status })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update status. Try again.')
+    }
   }
 
   async function setServiceStatus(csId: string, status: string) {
-    await api.patch(`/portal/services/${csId}`, { status })
-    await load()
+    try {
+      await api.patch(`/portal/services/${csId}`, { status })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update status. Try again.')
+    }
   }
 
   if (loading || !data) {

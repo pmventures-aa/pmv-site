@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, NoAccess, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { services } from '../../data/services'
+import { toast } from '../../components/kit/toast'
 
 const ROLE_OPTIONS = ['all', 'client', 'staff', 'admin']
 const STATUS_OPTIONS = ['all', 'active', 'suspended']
@@ -120,8 +121,12 @@ export default function UsersAdmin() {
 
   async function toggleStatus(u: UserRow) {
     const status = u.status === 'active' ? 'suspended' : 'active'
-    await api.patch(`/admin/users/${u.id}`, { status })
-    await load()
+    try {
+      await api.patch(`/admin/users/${u.id}`, { status })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update this user. Try again.')
+    }
   }
 
   const filtered = useMemo(() => {

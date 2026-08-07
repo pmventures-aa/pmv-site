@@ -4,7 +4,7 @@ import { requireStaff, requireAdmin } from '../mid'
 import { uuid, decryptSensitive } from '../crypto'
 import { scopeFilter, canAccessClient, ScopeError } from '../scope'
 import { visibleClientIds } from '../access'
-import { createActivationToken } from '../session'
+import { createActivationToken, revokeUserSessions } from '../session'
 import { activityInsert, logActivity } from '../activity'
 
 export const adminRoutes = new Hono<AppEnv>()
@@ -477,7 +477,7 @@ adminRoutes.post('/users', requireStaff, async (c) => {
 
 adminRoutes.patch('/users/:id', requireAdmin, async (c) => {
   const actor = c.get('user')
-  const id = c.req.param('id')
+  const id = c.req.param('id')!
   const body = await c.req.json<{ status?: string; role?: string }>().catch(() => ({} as { status?: string; role?: string }))
   const status = ['active', 'suspended'].includes(body.status ?? '') ? body.status : undefined
   const role = ['client', 'staff', 'admin'].includes(body.role ?? '') ? body.role : undefined
@@ -487,6 +487,9 @@ adminRoutes.patch('/users/:id', requireAdmin, async (c) => {
     'UPDATE users SET status = COALESCE(?, status), role = COALESCE(?, role) WHERE id = ?',
   ).bind(status ?? null, role ?? null, id).run()
   if (target && ((status && status !== target.status) || (role && role !== target.role))) {
+    // A status/role change is a privilege change — kill any session issued
+    // under the old status/role instead of leaving it valid for up to 12h.
+    await revokeUserSessions(c.env, id)
     await logActivity(c.env, {
       actorUserId: actor.id,
       clientUserId: target.role === 'client' ? id : null,
@@ -513,7 +516,11 @@ adminRoutes.get('/assignments', requireStaff, requireCapability('can_manage_user
   return c.json({ assignments: res.results ?? [] })
 })
 
-adminRoutes.post('/assignments', requireStaff, requireCapability('can_manage_users'), async (c) => {
+// Creating/deleting an assignment grants real data access to a client, not just
+// visibility into the list — same class of power as a capability grant itself,
+// so (like those grants) it stays admin-only. A can_manage_users staffer could
+// otherwise assign themselves to any client and bypass scoping entirely.
+adminRoutes.post('/assignments', requireAdmin, async (c) => {
   const { staff_user_id, client_user_id } = await c.req.json<{ staff_user_id: string; client_user_id: string }>()
     .catch(() => ({ staff_user_id: '', client_user_id: '' }))
   if (!staff_user_id || !client_user_id) return c.json({ error: 'staff_user_id and client_user_id are required' }, 400)
@@ -525,7 +532,7 @@ adminRoutes.post('/assignments', requireStaff, requireCapability('can_manage_use
   return c.json({ ok: true, id }, 201)
 })
 
-adminRoutes.delete('/assignments/:id', requireStaff, requireCapability('can_manage_users'), async (c) => {
+adminRoutes.delete('/assignments/:id', requireAdmin, async (c) => {
   await c.env.DB.prepare('DELETE FROM staff_assignments WHERE id = ?').bind(c.req.param('id')).run()
   return c.json({ ok: true })
 })

@@ -19,12 +19,16 @@ export default function Documents() {
   const [form, setForm] = useState({ category: '', tax_year: '', file_name: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await api.get<{ documents: Doc[] }>('/portal/documents')
       setDocs(res.documents)
+      setLoadError(false)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -95,6 +99,13 @@ export default function Documents() {
       <Card className="overflow-x-auto !p-0">
         {loading ? (
           <div className="p-6 text-sm text-slate-400">Loading…</div>
+        ) : loadError ? (
+          <div className="space-y-2 p-6 text-sm text-slate-400">
+            <p>Couldn't load documents.</p>
+            <button onClick={() => load()} className="text-gold hover:underline">
+              Try again
+            </button>
+          </div>
         ) : docs.length === 0 ? (
           <div className="p-6">
             <EmptyState label="No documents logged yet." />

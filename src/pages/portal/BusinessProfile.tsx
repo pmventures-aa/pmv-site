@@ -16,6 +16,7 @@ export default function BusinessProfile() {
   const [form, setForm] = useState<Profile>({ business_name: '', entity_type: '', ein: '', state: '' })
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     api
@@ -23,7 +24,9 @@ export default function BusinessProfile() {
       .then((r) => {
         setProfile(r.profile)
         if (r.profile) setForm(r.profile)
+        setLoadError(false)
       })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
   }, [])
 
@@ -46,6 +49,13 @@ export default function BusinessProfile() {
       <Card className="max-w-2xl">
         {loading ? (
           <p className="text-sm text-slate-400">Loading…</p>
+        ) : loadError ? (
+          <div className="space-y-2 text-sm text-slate-400">
+            <p>Couldn't load your business profile.</p>
+            <button onClick={() => window.location.reload()} className="text-gold hover:underline">
+              Try again
+            </button>
+          </div>
         ) : (
           <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
             <label className="sm:col-span-2">
@@ -80,7 +90,7 @@ export default function BusinessProfile() {
             </div>
           </form>
         )}
-        {!loading && !profile && (
+        {!loading && !loadError && !profile && (
           <p className="mt-4 text-xs text-slate-500">No business profile on file yet — fill in what you can above.</p>
         )}
       </Card>

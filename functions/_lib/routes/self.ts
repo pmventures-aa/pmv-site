@@ -4,7 +4,7 @@ import { requireClient } from '../mid'
 import { uuid, hashPassword, verifyPassword, encryptSensitive } from '../crypto'
 import { MIN_PASSWORD } from './auth'
 import { activityInsert } from '../activity'
-import { notifyStaff } from '../email'
+import { notifyStaff, escapeHtml } from '../email'
 
 // Self-service endpoints for the authenticated client: profile + dynamic onboarding.
 //
@@ -348,7 +348,7 @@ selfRoutes.post('/services/:key/apply', requireClient, async (c) => {
       staffUserIds: (assigned.results ?? []).map((r) => r.staff_user_id),
       kind: 'service_application_submitted',
       subject: `New application: ${svc.name} — ${user.full_name || user.email}`,
-      html: `<p><strong>${user.full_name || user.email}</strong> submitted an application for <strong>${svc.name}</strong>. Review it in the client's HQ profile.</p>`,
+      html: `<p><strong>${escapeHtml(user.full_name || user.email)}</strong> submitted an application for <strong>${escapeHtml(svc.name)}</strong>. Review it in the client's HQ profile.</p>`,
     }),
   )
 
