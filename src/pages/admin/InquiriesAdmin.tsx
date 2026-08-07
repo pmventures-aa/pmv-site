@@ -40,8 +40,22 @@ export default function InquiriesAdmin() {
   }, [load])
 
   async function setStatus(id: string, status: string) {
-    await api.patch(`/admin/inquiries/${id}`, { status })
-    await load()
+    try {
+      await api.patch(`/admin/inquiries/${id}`, { status })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update status.')
+    }
+  }
+
+  async function archive(id: string) {
+    try {
+      await api.patch(`/admin/records/inquiries/${id}/archive`)
+      toast.success('Lead archived.')
+      setInquiries((rows) => rows.filter((r) => r.id !== id))
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not archive this lead.')
+    }
   }
 
   async function onCreate(e: React.FormEvent) {
@@ -139,17 +153,22 @@ export default function InquiriesAdmin() {
                 {i.message && <p className="mt-2 max-w-xl text-sm text-slate-300">{i.message}</p>}
                 <p className="mt-2 text-xs text-slate-500">{new Date(i.created_at.replace(' ', 'T') + 'Z').toLocaleString()}</p>
               </div>
-              <select
-                className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
-                value={i.status}
-                onChange={(e) => setStatus(i.id, e.target.value)}
-              >
-                {['new', 'contacted', 'qualified', 'converted', 'lost'].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <div className="flex shrink-0 items-center gap-3">
+                <select
+                  className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
+                  value={i.status}
+                  onChange={(e) => setStatus(i.id, e.target.value)}
+                >
+                  {['new', 'contacted', 'qualified', 'converted', 'lost'].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <button onClick={() => archive(i.id)} className="text-xs font-medium text-slate-500 hover:text-rose-300">
+                  Archive
+                </button>
+              </div>
             </div>
           ))}
         </Panel>

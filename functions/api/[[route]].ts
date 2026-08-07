@@ -9,6 +9,7 @@ import { portalRoutes } from '../_lib/routes/portal'
 import { adminRoutes } from '../_lib/routes/admin'
 import { publicRoutes } from '../_lib/routes/public'
 import { uploadRoutes } from '../_lib/routes/uploads'
+import { deletionRoutes } from '../_lib/routes/deletion'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -24,6 +25,7 @@ app.route('/portal', selfRoutes)
 app.route('/portal', portalRoutes)
 // staff/admin console — cross-client views, user + settings management
 app.route('/admin', adminRoutes)
+app.route('/admin', deletionRoutes)
 
 app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
 

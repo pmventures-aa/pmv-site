@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
-import type { AppEnv, Env, SessionUser } from '../types'
+import type { AppEnv, Env } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
 import { uuid, decryptSensitive } from '../crypto'
 import { scopeFilter, canAccessClient, ScopeError } from '../scope'
 import { visibleClientIds } from '../access'
 import { createActivationToken, revokeUserSessions } from '../session'
 import { activityInsert, logActivity } from '../activity'
+import { hasCapability, requireCapability } from '../capabilities'
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -15,42 +16,41 @@ adminRoutes.onError((err, c) => {
   return c.json({ error: 'internal error' }, 500)
 })
 
-// Admins always pass; a staff member passes only with the named grant on
-// their team_members row (see /users/:id/staff-profile). Lets an admin hand
-// out specific admin-adjacent powers (user management, firm settings)
-// without promoting someone to full admin.
-type Capability = 'can_reveal_payment_info' | 'can_manage_users' | 'can_manage_settings'
-async function hasCapability(env: Env, user: SessionUser, cap: Capability): Promise<boolean> {
-  if (user.role === 'admin') return true
-  if (user.role !== 'staff') return false
-  const row = await env.DB.prepare(`SELECT ${cap} AS v FROM team_members WHERE user_id = ?`).bind(user.id).first<{ v: number }>()
-  return !!row?.v
-}
-
-// Chain after requireStaff. Assumes c.get('user') is already set.
-function requireCapability(cap: Capability) {
-  return async (c: any, next: () => Promise<void>) => {
-    const user = c.get('user')
-    if (!(await hasCapability(c.env, user, cap))) return c.json({ error: 'forbidden' }, 403)
-    await next()
-  }
-}
-
 // The staff console's own nav decides what to show a signed-in staff member
 // based on this — without it, a capability grant is invisible until someone
 // knows the exact URL to type. Admins get every capability implicitly.
+// Owner is included too so the frontend can gate the Permanent Deletions
+// view without a separate round-trip.
 adminRoutes.get('/my-capabilities', requireStaff, async (c) => {
   const user = c.get('user')
   if (user.role === 'admin') {
-    return c.json({ can_reveal_payment_info: true, can_manage_users: true, can_manage_settings: true })
+    const row = await c.env.DB.prepare('SELECT is_owner FROM team_members WHERE user_id = ?').bind(user.id).first<{ is_owner: number }>()
+    return c.json({
+      can_reveal_payment_info: true,
+      can_manage_users: true,
+      can_manage_settings: true,
+      can_view_reports: true,
+      can_view_audit_log: true,
+      is_owner: !!row?.is_owner,
+    })
   }
   const row = await c.env.DB.prepare(
-    'SELECT can_reveal_payment_info, can_manage_users, can_manage_settings FROM team_members WHERE user_id = ?',
-  ).bind(user.id).first<{ can_reveal_payment_info: number; can_manage_users: number; can_manage_settings: number }>()
+    'SELECT can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, is_owner FROM team_members WHERE user_id = ?',
+  ).bind(user.id).first<{
+    can_reveal_payment_info: number
+    can_manage_users: number
+    can_manage_settings: number
+    can_view_reports: number
+    can_view_audit_log: number
+    is_owner: number
+  }>()
   return c.json({
     can_reveal_payment_info: !!row?.can_reveal_payment_info,
     can_manage_users: !!row?.can_manage_users,
     can_manage_settings: !!row?.can_manage_settings,
+    can_view_reports: !!row?.can_view_reports,
+    can_view_audit_log: !!row?.can_view_audit_log,
+    is_owner: false,
   })
 })
 
@@ -345,7 +345,8 @@ adminRoutes.get('/users', requireStaff, async (c) => {
   if (!(await hasCapability(c.env, user, 'can_manage_users'))) return c.json({ error: 'forbidden' }, 403)
   const res = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.role, u.full_name, u.first_name, u.last_name, u.status, u.created_at, u.last_login_at,
-            tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings
+            tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
+            tm.can_view_reports, tm.can_view_audit_log, tm.is_owner
      FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
      ORDER BY u.created_at DESC LIMIT 500`,
   ).all()
@@ -370,18 +371,27 @@ adminRoutes.patch('/users/:id/staff-profile', requireAdmin, async (c) => {
     can_reveal_payment_info?: boolean
     can_manage_users?: boolean
     can_manage_settings?: boolean
+    can_view_reports?: boolean
+    can_view_audit_log?: boolean
+    is_owner?: boolean
   }>().catch(() => ({}) as any)
   const staffRole = STAFF_ROLES.includes(body.staff_role ?? '') ? body.staff_role : 'representative'
   const title = typeof body.title === 'string' ? body.title.trim().slice(0, 100) || null : null
+  // Owner is a superset of admin (see requireOwner in mid.ts) — only
+  // meaningful, and only settable, on an admin account.
+  const isOwner = body.is_owner && target.role === 'admin' ? 1 : 0
 
   await c.env.DB.prepare(
-    `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, is_owner)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET
        staff_role = excluded.staff_role, title = excluded.title,
        can_reveal_payment_info = excluded.can_reveal_payment_info,
        can_manage_users = excluded.can_manage_users,
-       can_manage_settings = excluded.can_manage_settings`,
+       can_manage_settings = excluded.can_manage_settings,
+       can_view_reports = excluded.can_view_reports,
+       can_view_audit_log = excluded.can_view_audit_log,
+       is_owner = excluded.is_owner`,
   ).bind(
     uuid(),
     id,
@@ -390,6 +400,9 @@ adminRoutes.patch('/users/:id/staff-profile', requireAdmin, async (c) => {
     body.can_reveal_payment_info ? 1 : 0,
     body.can_manage_users ? 1 : 0,
     body.can_manage_settings ? 1 : 0,
+    body.can_view_reports ? 1 : 0,
+    body.can_view_audit_log ? 1 : 0,
+    isOwner,
   ).run()
 
   await logActivity(c.env, {

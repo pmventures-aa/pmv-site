@@ -3,22 +3,28 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, NoAccess, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { useAuth } from '../../lib/auth'
+import { useCapabilities } from '../../lib/capabilities'
+import PermanentDeletions from './PermanentDeletions'
 
 const TABS = [
   { key: 'general', label: 'General' },
   { key: 'catalog', label: 'Service Catalog' },
   { key: 'staff', label: 'Staff & Permissions' },
   { key: 'notifications', label: 'Notifications' },
+  { key: 'deletions', label: 'Permanent Deletions' },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
 export default function SettingsAdmin() {
   const [tab, setTab] = useState<TabKey>('general')
+  const caps = useCapabilities()
+  const visibleTabs = TABS.filter((t) => t.key !== 'deletions' || caps.is_owner)
+
   return (
     <div>
       <PageIntro kicker="Firm settings" title="Settings" subtitle="Global configuration for the Pinnacle console." />
       <div className="mb-5 flex gap-1.5 border-b border-white/10">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
@@ -34,6 +40,7 @@ export default function SettingsAdmin() {
       {tab === 'catalog' && <CatalogTab />}
       {tab === 'staff' && <StaffTab />}
       {tab === 'notifications' && <NotificationsTab />}
+      {tab === 'deletions' && (caps.is_owner ? <PermanentDeletions /> : <NoAccess label="Permanent Deletions" />)}
     </div>
   )
 }
@@ -424,6 +431,9 @@ interface StaffUser {
   can_reveal_payment_info: number | null
   can_manage_users: number | null
   can_manage_settings: number | null
+  can_view_reports: number | null
+  can_view_audit_log: number | null
+  is_owner: number | null
 }
 
 const STAFF_ROLE_OPTIONS = [
@@ -471,6 +481,9 @@ function StaffTab() {
         can_reveal_payment_info: !!u.can_reveal_payment_info,
         can_manage_users: !!u.can_manage_users,
         can_manage_settings: !!u.can_manage_settings,
+        can_view_reports: !!u.can_view_reports,
+        can_view_audit_log: !!u.can_view_audit_log,
+        is_owner: !!u.is_owner,
       })
       toast.success(`Updated ${u.full_name || u.email}.`)
     } catch (err) {
@@ -497,9 +510,12 @@ function StaffTab() {
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-2 font-medium">Name</th>
                 <th className="px-5 py-2 font-medium">Role</th>
+                <th className="px-5 py-2 font-medium">Owner</th>
                 <th className="px-5 py-2 font-medium">Banking</th>
                 <th className="px-5 py-2 font-medium">Users</th>
                 <th className="px-5 py-2 font-medium">Settings</th>
+                <th className="px-5 py-2 font-medium">Reports</th>
+                <th className="px-5 py-2 font-medium">Audit log</th>
               </tr>
             </thead>
             <tbody>
@@ -509,9 +525,12 @@ function StaffTab() {
                   <td className="px-5 py-2">
                     <Tag tone={u.role === 'admin' ? 'gold' : 'slate'}>{u.role}</Tag>
                   </td>
+                  <td className="px-5 py-2">{u.is_owner ? '✓' : '—'}</td>
                   <td className="px-5 py-2">{u.role === 'admin' || u.can_reveal_payment_info ? '✓' : '—'}</td>
                   <td className="px-5 py-2">{u.role === 'admin' || u.can_manage_users ? '✓' : '—'}</td>
                   <td className="px-5 py-2">{u.role === 'admin' || u.can_manage_settings ? '✓' : '—'}</td>
+                  <td className="px-5 py-2">{u.role === 'admin' || u.can_view_reports ? '✓' : '—'}</td>
+                  <td className="px-5 py-2">{u.role === 'admin' || u.can_view_audit_log ? '✓' : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -568,6 +587,8 @@ function StaffTab() {
                     ['can_reveal_payment_info', 'View decrypted banking info'],
                     ['can_manage_users', 'Manage users (not admin promotion)'],
                     ['can_manage_settings', 'Manage settings & service catalog'],
+                    ['can_view_reports', 'View the Reporting Center'],
+                    ['can_view_audit_log', 'View the Audit Log'],
                   ] as const
                 ).map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 text-xs text-slate-300">
@@ -580,6 +601,19 @@ function StaffTab() {
                     {label}
                   </label>
                 ))}
+              </div>
+            )}
+            {u.role === 'admin' && (
+              <div className="mt-3 border-t border-white/10 pt-3">
+                <label className="flex items-center gap-2 text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    disabled={!isAdmin}
+                    checked={!!u.is_owner}
+                    onChange={(e) => setUsers((us) => us.map((x) => (x.id === u.id ? { ...x, is_owner: e.target.checked ? 1 : 0 } : x)))}
+                  />
+                  Owner — can permanently delete archived records (Settings → Permanent Deletions)
+                </label>
               </div>
             )}
           </Panel>
