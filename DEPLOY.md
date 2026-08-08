@@ -32,8 +32,18 @@
 7. Apply the schema: `npm run db:migrate` (local dev: `npm run db:migrate:local`)
 
 ## Deploy
-- **Git (recommended):** push to GitHub, then in the Cloudflare dashboard
+- **GitHub Actions (recommended):** `.github/workflows/deploy.yml` builds, runs
+  D1 migrations against `--remote`, and deploys to Pages on every push to
+  `main` (or via **Actions → Deploy to Cloudflare Pages → Run workflow**).
+  Requires two repo secrets (Settings → Secrets and variables → Actions):
+  `CLOUDFLARE_API_TOKEN` (D1 Edit + Pages Edit permissions) and
+  `CLOUDFLARE_ACCOUNT_ID`. Don't also connect this repo via the Cloudflare
+  dashboard's "Connect to Git" — that runs Cloudflare's own build on push too
+  and would double-deploy.
+- **Manual / local:** push to GitHub, then in the Cloudflare dashboard
   **Workers & Pages → Create → Pages → Connect to Git**. Settings below.
+  Migrations still need `npm run db:migrate` run separately (this path
+  doesn't run them).
 - **Direct upload:** `npm run deploy`
 
 ## Dashboard settings to select
