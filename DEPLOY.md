@@ -32,9 +32,18 @@
 7. Apply the schema: `npm run db:migrate` (local dev: `npm run db:migrate:local`)
 
 ## Deploy
-- **Git (recommended):** push to GitHub, then in the Cloudflare dashboard
-  **Workers & Pages → Create → Pages → Connect to Git**. Settings below.
-- **Direct upload:** `npm run deploy`
+- **Build + deploy:** already handled by Cloudflare Pages' own dashboard Git
+  integration (Workers & Pages → `pmv-site` → Settings → Builds & deployments)
+  — it builds and deploys automatically on every push (production on `main`,
+  preview URLs on other branches/PRs). Don't add a second GitHub Actions step
+  that also runs `wrangler pages deploy`; that would double-deploy alongside it.
+- **D1 migrations:** the dashboard integration only builds and deploys the
+  Pages app — it never touches the database. `.github/workflows/db-migrate.yml`
+  covers that gap: it runs `npm run db:migrate` (`--remote`) on every push to
+  `main`, or on demand via **Actions → Apply D1 migrations → Run workflow**.
+  Requires two repo secrets (Settings → Secrets and variables → Actions):
+  `CLOUDFLARE_API_TOKEN` (D1 Edit permission) and `CLOUDFLARE_ACCOUNT_ID`.
+- **Direct upload (manual, rarely needed):** `npm run deploy`
 
 ## Dashboard settings to select
 | Field | Value |
