@@ -3,10 +3,16 @@ import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { btnOutline, btnPrimary, panelCls, ServiceList, TagLine } from '../../components/public/ui'
 import { getServiceBySlug, services } from '../../data/services'
+import { usePageMeta } from '../../lib/usePageMeta'
 
 export default function ServiceDetail() {
   const { slug } = useParams<{ slug: string }>()
   const service = getServiceBySlug(slug)
+
+  // Hooks must run unconditionally — fall back to a generic title/description
+  // when there's no matching service, since the redirect below still needs
+  // to render once before <Navigate> takes effect.
+  usePageMeta(service?.title ?? 'Services', service?.shortDescription)
 
   if (!service) return <Navigate to="/services" replace />
 

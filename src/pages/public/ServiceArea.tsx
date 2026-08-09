@@ -1,8 +1,10 @@
 import { CtaBand, PageIntro, panelCls } from '../../components/public/ui'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
+import { usePageMeta } from '../../lib/usePageMeta'
 
 export default function ServiceArea() {
+  usePageMeta('Service Area', 'Pinnacle Management Ventures supports clients nationwide, with on-site services available in South Florida.')
   return (
     <div className="min-h-screen bg-navy-950">
       <Header />
