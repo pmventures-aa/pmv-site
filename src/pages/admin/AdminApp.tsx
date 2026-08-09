@@ -27,23 +27,25 @@ import ReportingCenter from './ReportingCenter'
 import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
 import InvoicesAdmin from './InvoicesAdmin'
 import ServiceAssignmentsAdmin from './ServiceAssignmentsAdmin'
+import InvitationsAdmin from './InvitationsAdmin'
+import RolesPermissionsAdmin from './RolesPermissionsAdmin'
+import DocumentCenter from './DocumentCenter'
 
-const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity', 'service-assignments', 'invoices']
+const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity', 'service-assignments', 'invoices', 'document-center']
+const OWNER_ONLY_NAV = new Set(['invitations', 'roles'])
 
 function AdminShell() {
   const { user } = useAuth()
   const caps = useCapabilities()
   const visible = new Set(STAFF_VISIBLE)
-  if (caps.can_manage_users) {
-    visible.add('users')
-    visible.add('assignments')
-    visible.add('settings')
-  }
+  if (caps.can_manage_users) { visible.add('users'); visible.add('assignments') }
   if (caps.can_manage_settings) visible.add('settings')
   if (caps.can_view_audit_log) visible.add('audit-log')
   if (caps.can_view_reports) visible.add('reports')
   if (caps.can_manage_communications) visible.add('communications')
-  const nav = user?.role === 'admin' ? adminNav : adminNav.filter((n) => visible.has(n.key))
+  const nav = user?.role === 'admin'
+    ? adminNav.filter((n) => !OWNER_ONLY_NAV.has(n.key) || caps.is_owner)
+    : adminNav.filter((n) => visible.has(n.key))
   return <AdminLayout nav={nav} badge="Staff Console" />
 }
 
@@ -73,20 +75,20 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="activity" element={<ActivityAdmin />} />
             <Route path="service-assignments" element={<ServiceAssignmentsAdmin />} />
             <Route path="invoices" element={<InvoicesAdmin />} />
+            <Route path="document-center" element={<DocumentCenter />} />
             <Route path="audit-log" element={<AuditLogAdmin />} />
             <Route path="reports" element={<ReportingCenter />} />
             <Route path="communications" element={<CommunicationsCRMAdmin />} />
-            <Route path="employees" element={<ProtectedRoute allow={['admin']} />}>
-              <Route index element={<EmployeesAdmin />} />
-            </Route>
+            <Route path="employees" element={<ProtectedRoute allow={['admin']} />}><Route index element={<EmployeesAdmin />} /></Route>
             <Route path="open-items/:type" element={<OpenItemsAdmin />} />
             <Route path="open-items" element={<OpenItemsAdmin />} />
+            <Route path="invitations" element={<InvitationsAdmin />} />
+            <Route path="roles" element={<RolesPermissionsAdmin />} />
             <Route path="users" element={<UsersAdmin />} />
             <Route path="assignments" element={<AssignmentsAdmin />} />
             <Route path="settings" element={<SettingsAdmin />} />
           </Route>
         </Route>
-
         <Route path="*" element={<CatchAll />} />
       </Routes>
     </BasePathProvider>
