@@ -18,6 +18,7 @@ import { reportRoutes } from '../_lib/routes/reports'
 import { searchRoutes } from '../_lib/routes/search'
 import { serviceApplicationRoutes } from '../_lib/routes/serviceApplications'
 import { intakeAdminRoutes } from '../_lib/routes/intakeAdmin'
+import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -27,19 +28,13 @@ app.route('/', uploadRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
-// Rich service applications + secure document visibility are mounted before
-// the legacy portal modules so their exact routes take precedence.
+app.route('/portal', intakeCopyRoutes)
 app.route('/portal', serviceApplicationRoutes)
-// self-service (profile, onboarding, service catalog) — client accounts only
 app.route('/portal', selfRoutes)
-// shared data modules — client (self) + staff/admin (scoped via assignments)
 app.route('/portal', portalRoutes)
 app.route('/portal', messageRoutes)
 
-// Intake-specific HQ routes override the older catalog/pipeline/activity
-// implementations while reusing the rest of the admin console unchanged.
 app.route('/admin', intakeAdminRoutes)
-// staff/admin console — cross-client views, user + settings management
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
