@@ -32,8 +32,7 @@ import InvitationsAdmin from './InvitationsAdmin'
 import RolesPermissionsAdmin from './RolesPermissionsAdmin'
 import DocumentCenter from './DocumentCenter'
 
-const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity', 'service-assignments', 'invoices', 'document-center']
-const OWNER_ONLY_NAV = new Set(['invitations', 'roles'])
+const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity', 'service-assignments', 'invoices']
 
 function AdminShell() {
   const { user } = useAuth()
@@ -44,9 +43,12 @@ function AdminShell() {
   if (caps.can_view_audit_log) visible.add('audit-log')
   if (caps.can_view_reports) visible.add('reports')
   if (caps.can_manage_communications) visible.add('communications')
-  const nav = user?.role === 'admin'
-    ? adminNav.filter((n) => !OWNER_ONLY_NAV.has(n.key) || caps.is_owner)
-    : adminNav.filter((n) => visible.has(n.key))
+  if (caps.can_manage_invitations) visible.add('invitations')
+  if (caps.can_manage_documents) visible.add('document-center')
+  if (caps.can_manage_team) visible.add('employees')
+  if (caps.is_owner) visible.add('roles')
+
+  const nav = user?.role === 'admin' ? adminNav.filter((item) => item.key !== 'roles' || caps.is_owner) : adminNav.filter((item) => visible.has(item.key))
   return <AdminLayout nav={nav} badge="Staff Console" />
 }
 
@@ -81,7 +83,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="audit-log" element={<AuditLogAdmin />} />
             <Route path="reports" element={<ReportingCenter />} />
             <Route path="communications" element={<CommunicationsCRMAdmin />} />
-            <Route path="employees" element={<ProtectedRoute allow={['admin']} />}><Route index element={<EmployeesAdmin />} /></Route>
+            <Route path="employees" element={<EmployeesAdmin />} />
             <Route path="open-items/:type" element={<OpenItemsAdmin />} />
             <Route path="open-items" element={<OpenItemsAdmin />} />
             <Route path="invitations" element={<InvitationsAdmin />} />
