@@ -7,9 +7,14 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(raw)
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+}
+
 async function signature(secretBytes: Uint8Array, id: string, timestamp: string, payload: string): Promise<string> {
-  const key = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const signed = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${timestamp}.${payload}`))
+  const key = await crypto.subtle.importKey('raw', toArrayBuffer(secretBytes), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const message = new TextEncoder().encode(`${id}.${timestamp}.${payload}`)
+  const signed = await crypto.subtle.sign('HMAC', key, toArrayBuffer(message))
   return bytesToBase64(new Uint8Array(signed))
 }
 
