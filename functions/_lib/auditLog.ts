@@ -18,6 +18,8 @@ export type AuditAction =
   | 'task_assigned'
   | 'file_uploaded'
   | 'client_converted'
+  | 'service_application_assigned'
+  | 'service_application_signed'
   | 'service_application_submitted'
   | 'application_pdf_generated'
   | 'internal_document_attached'
