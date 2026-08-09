@@ -5,6 +5,7 @@ import { createSession, sessionCookie, clearCookie, destroySession, createActiva
 import { activityInsert } from '../activity'
 import { logAudit, actorIp, actorUserAgent } from '../auditLog'
 import { notifyStaff, escapeHtml } from '../email'
+import { CLIENT_PORTAL_URL, sendAccountWelcome, sendVendorApplicationReceived } from '../accountEmails'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -101,6 +102,18 @@ authRoutes.post('/signup', async (c) => {
       html: `<p><strong>${escapeHtml(fullName)}</strong> created a new Pinnacle client account.</p><p>Email: ${escapeHtml(e)}<br>Phone: ${escapeHtml(phone)}${businessName ? `<br>Business: ${escapeHtml(businessName)}` : ''}</p><p>The client can now continue through portal onboarding and service intake.</p>`,
     }),
   )
+  c.executionCtx.waitUntil(
+    sendAccountWelcome(c.env, {
+      userId: id,
+      role: 'client',
+      email: e,
+      firstName,
+      businessName,
+      creationType: 'self_signup',
+      actionLabel: 'Open My Client Portal',
+      actionUrl: CLIENT_PORTAL_URL,
+    }).catch((err) => console.error('[account-email] client signup welcome failed', err)),
+  )
 
   const su: SessionUser = { id, email: e, role: 'client', full_name: fullName, first_name: firstName, last_name: lastName }
   const token = await createSession(c.env, su)
@@ -171,6 +184,13 @@ authRoutes.post('/vendor-signup', async (c) => {
       subject: `New vendor/provider signup: ${fullName}`,
       html: `<p><strong>${escapeHtml(fullName)}</strong> applied for a vendor/provider account.</p><p>Email: ${escapeHtml(e)}${phone ? `<br>Phone: ${escapeHtml(phone)}` : ''}<br>Provides: ${escapeHtml(vendorCategory)}${companyName ? `<br>Company: ${escapeHtml(companyName)}` : ''}${notes ? `<br>Notes: ${escapeHtml(notes)}` : ''}</p><p>Review and approve from Team &amp; Vendors in HQ before they can sign in.</p>`,
     }),
+  )
+  c.executionCtx.waitUntil(
+    sendVendorApplicationReceived(c.env, {
+      userId: id,
+      email: e,
+      firstName: fullName.split(/\s+/)[0] || fullName,
+    }).catch((err) => console.error('[account-email] vendor receipt failed', err)),
   )
 
   return c.json({ ok: true, status: 'pending' }, 201)
