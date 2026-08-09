@@ -1,0 +1,24 @@
+name: Validate client journey theme and public UX
+
+on:
+  push:
+    branches: [agent/client-journey-theme-ux]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Apply full migration chain to fresh local D1
+        run: npm run db:migrate:local
+      - name: Tests
+        run: npm test
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
