@@ -4,6 +4,8 @@ import { api } from '../../lib/api'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 import { useAppPath } from '../../lib/basePath'
 import { displayValue, type IntakeValue } from '../../lib/intake'
+import { serviceOfferings } from '../../data/serviceOfferings'
+import { services as publicServices } from '../../data/services'
 
 interface CatalogItem { key:string; name:string; description:string; category:string; intake_intro?:string|null; estimated_minutes?:number }
 interface Enrolled { service_key:string; name:string; status:string }
@@ -39,6 +41,7 @@ export default function Services(){
     for(const item of available){const key=item.category||'Other support';if(!groups.has(key))groups.set(key,[]);groups.get(key)!.push(item)}
     return [...groups.entries()]
   },[available])
+  const offeringGroups=useMemo(()=>publicServices.map((service)=>({service,offerings:serviceOfferings.filter((item)=>item.serviceKey===service.key)})).filter((group)=>group.offerings.length),[])
 
   return <div>
     <PageHeader eyebrow="Your Pinnacle relationship" title="Services" subtitle="Keep current work easy to find. Additional services stay here to explore when they become relevant — there is no need to take everything on at once."/>
@@ -58,9 +61,14 @@ export default function Services(){
         </div>})}</div>
     </Card>}
 
-    <Card>
+    <Card className="mb-6">
       <div className="max-w-2xl"><p className="eyebrow">Discover as you need it</p><h2 className="mt-1 text-lg font-semibold text-white">Other ways Pinnacle can help</h2><p className="mt-1 text-sm leading-6 text-slate-400">Browse without pressure. Starting an application only gathers context for that service; it does not lock you into a package.</p></div>
       {groupedAvailable.length===0&&!loading?<p className="mt-5 text-sm text-slate-500">You’re already enrolled in every currently available service.</p>:<div className="mt-6 space-y-7">{groupedAvailable.map(([category,items])=><section key={category}><h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{category.replace(/_/g,' ')}</h3><div className="divide-y divide-white/10 border-y border-white/10">{items.map((item)=>{const draft=draftsByService.get(item.key);return <div key={item.key} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="max-w-2xl"><p className="text-sm font-medium text-white">{item.name}</p><p className="mt-1 text-xs leading-5 text-slate-400">{item.description}</p>{item.estimated_minutes&&<p className="mt-1 text-[11px] text-slate-500">About {item.estimated_minutes} minutes if you decide to apply</p>}</div><Link to={p(`services/${item.key}/apply`)} className="shrink-0 text-sm font-medium text-gold hover:underline">{draft?'Resume':'Learn more & start'} →</Link></div>})}</div></section>)}</div>}
+    </Card>
+
+    <Card>
+      <div className="max-w-2xl"><p className="eyebrow">One-time service library</p><h2 className="mt-1 text-lg font-semibold text-white">Defined services with straightforward starting prices</h2><p className="mt-1 text-sm leading-6 text-slate-400">Open only the category that interests you. Standard local pricing is shown as a starting point; unusual access, rush timing, distance, size, complexity, or third-party costs may require a different quote.</p></div>
+      <div className="mt-6 divide-y divide-white/10 border-y border-white/10">{offeringGroups.map(({service,offerings})=><details key={service.key} className="group py-1"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4"><div><p className="text-sm font-semibold text-white">{service.title}</p><p className="mt-1 text-xs text-slate-500">{offerings.length} defined option{offerings.length===1?'':'s'} · from ${Math.min(...offerings.map((item)=>item.startingPrice||Infinity).filter(Number.isFinite))}</p></div><span className="text-gold transition group-open:rotate-45">＋</span></summary><div className="pb-4"><div className="divide-y divide-white/10 border-t border-white/10">{offerings.map((item)=><div key={item.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6"><div className="max-w-2xl"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-white">{item.name}</p>{item.badge&&<span className="text-[10px] font-semibold uppercase tracking-wide text-gold">{item.badge}</span>}</div><p className="mt-1 text-xs leading-5 text-slate-400">{item.description}</p>{item.note&&<p className="mt-1 text-[11px] leading-5 text-slate-500">{item.note}</p>}</div><div className="flex shrink-0 items-center justify-between gap-4 sm:flex-col sm:items-end"><p className="text-xs font-semibold text-white">{item.pricingLabel || (item.startingPrice?`From $${item.startingPrice}`:'Custom quote')}</p><Link to={p(`services/${service.key}/apply?offering=${encodeURIComponent(item.id)}`)} className="text-xs font-medium text-gold hover:underline">Start →</Link></div></div>)}</div></div></details>)}</div>
     </Card>
   </div>
 }
