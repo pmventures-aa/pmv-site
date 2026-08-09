@@ -2,16 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAppPath } from '../../lib/basePath'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, StatCard } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 import { Avatar } from '../../components/kit/Avatar'
-import { timeAgo } from '../../lib/activity'
+import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { InlineLoading } from '../../components/LoadingScreen'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
-  profile: { business_name: string | null; entity_type: string | null; state: string | null } | null
+  profile: { business_name: string | null; entity_type: string | null; ein: string | null; state: string | null; onboarding_completed: number } | null
+  assigned_staff: { id: string; full_name: string | null; email: string }[]
+  recent_activity: ActivityEvent[]
   services: { id: string; service_key: string; name: string; status: string }[]
   matters: any[]
   tasks: any[]
@@ -301,10 +303,14 @@ function ServiceApplications({
   answers: Bundle['application_answers']
   onStatusChange: (csId: string, status: string) => void
 }) {
-  if (services.length === 0) return null
   return (
     <Panel className="mb-5 !p-0">
       <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">Service Applications</h3>
+      {services.length === 0 ? (
+        <div className="p-5">
+          <EmptyState label="No services enrolled yet." />
+        </div>
+      ) : (
       <div className="divide-y divide-white/5">
         {services.map((s) => {
           const svcAnswers = answers.filter((a) => a.service_key === s.service_key)
@@ -353,6 +359,7 @@ function ServiceApplications({
           )
         })}
       </div>
+      )}
     </Panel>
   )
 }
@@ -415,10 +422,14 @@ function RevealPaymentMethodDialog({
 }
 
 function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; methods: Bundle['payment_methods']; onRevealed: () => void }) {
-  if (methods.length === 0) return null
   return (
     <Panel className="mb-5 !p-0">
       <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">Payment Methods (ACH)</h3>
+      {methods.length === 0 ? (
+        <div className="p-5">
+          <EmptyState label="No payment methods on file." />
+        </div>
+      ) : (
       <div className="divide-y divide-white/5">
         {methods.map((m) => (
           <div key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
@@ -433,6 +444,7 @@ function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; m
           </div>
         ))}
       </div>
+      )}
     </Panel>
   )
 }
@@ -588,12 +600,242 @@ interface StaffMember {
   email: string
 }
 
+// ---------- Profile tab ----------
+
+function ProfileEditForm({
+  account,
+  profile,
+  clientId,
+  onSaved,
+}: {
+  account: Bundle['account']
+  profile: Bundle['profile']
+  clientId: string
+  onSaved: () => void
+}) {
+  const [form, setForm] = useState({
+    full_name: account.full_name ?? '',
+    phone: account.phone ?? '',
+    business_name: profile?.business_name ?? '',
+    entity_type: profile?.entity_type ?? '',
+    ein: profile?.ein ?? '',
+    state: profile?.state ?? '',
+  })
+  const [busy, setBusy] = useState(false)
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api.patch(`/admin/clients/${clientId}/profile`, form)
+      toast.success('Profile saved.')
+      onSaved()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not save profile.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+      <label>
+        <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Full name</span>
+        <input className={inputCls} value={form.full_name} onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} />
+      </label>
+      <label>
+        <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Phone</span>
+        <input className={inputCls} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+      </label>
+      <label>
+        <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Business name</span>
+        <input className={inputCls} value={form.business_name} onChange={(e) => setForm((f) => ({ ...f, business_name: e.target.value }))} />
+      </label>
+      <label>
+        <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Entity type</span>
+        <input className={inputCls} value={form.entity_type} onChange={(e) => setForm((f) => ({ ...f, entity_type: e.target.value }))} />
+      </label>
+      <label>
+        <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">EIN</span>
+        <input className={inputCls} value={form.ein} onChange={(e) => setForm((f) => ({ ...f, ein: e.target.value }))} />
+      </label>
+      <label>
+        <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">State</span>
+        <input className={inputCls} value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} />
+      </label>
+      <div className="sm:col-span-2">
+        <button type="submit" disabled={busy} className={btnPrimary}>
+          {busy ? 'Saving…' : 'Save changes'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function AssignedStaffPanel({ staff }: { staff: Bundle['assigned_staff'] }) {
+  const p = useAppPath()
+  return (
+    <Panel>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-white">Assigned Staff</h3>
+        <Link to={p('assignments')} className="text-xs font-medium text-gold hover:underline">
+          Manage assignments →
+        </Link>
+      </div>
+      {staff.length === 0 ? (
+        <EmptyState label="No staff assigned yet." />
+      ) : (
+        <ul className="space-y-2">
+          {staff.map((s) => (
+            <li key={s.id} className="text-sm text-slate-200">
+              {s.full_name || s.email}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  )
+}
+
+function ProfileTab({
+  data,
+  clientId,
+  onChanged,
+  onServiceStatusChange,
+}: {
+  data: Bundle
+  clientId: string
+  onChanged: () => void
+  onServiceStatusChange: (csId: string, status: string) => void
+}) {
+  return (
+    <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
+      <div className="space-y-5">
+        <Panel>
+          <h3 className="mb-4 text-sm font-semibold text-white">Contact &amp; Business Info</h3>
+          <ProfileEditForm account={data.account} profile={data.profile} clientId={clientId} onSaved={onChanged} />
+        </Panel>
+        <ServiceApplications services={data.services} answers={data.application_answers} onStatusChange={onServiceStatusChange} />
+        <ProfileNotes clientId={clientId} notes={data.notes} onChanged={onChanged} />
+      </div>
+      <div className="space-y-5">
+        <Panel>
+          <h3 className="mb-3 text-sm font-semibold text-white">Onboarding</h3>
+          <Tag tone={data.profile?.onboarding_completed ? 'green' : 'gold'}>
+            {data.profile?.onboarding_completed ? 'Complete' : 'Pending'}
+          </Tag>
+        </Panel>
+        <AssignedStaffPanel staff={data.assigned_staff} />
+        <Panel>
+          <h3 className="mb-3 text-sm font-semibold text-white">Account</h3>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-500">Client since</dt>
+              <dd className="text-slate-200">{new Date(data.account.created_at).toLocaleDateString()}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-500">Last login</dt>
+              <dd className="text-slate-200">{data.account.last_login_at ? timeAgo(data.account.last_login_at) : 'never'}</dd>
+            </div>
+          </dl>
+        </Panel>
+      </div>
+    </div>
+  )
+}
+
+// ---------- Dashboard tab ----------
+
+function DashboardTab({
+  data,
+  clientId,
+  onGoToRecords,
+  onChanged,
+}: {
+  data: Bundle
+  clientId: string
+  onGoToRecords: () => void
+  onChanged: () => void
+}) {
+  const openMatters = data.matters.filter((m) => m.status !== 'closed').length
+  const openTasks = data.tasks.filter((t) => t.status !== 'done').length
+  const openTickets = data.tickets.filter((t) => t.status !== 'closed').length
+  const openInvoices = data.invoices.filter((i) => i.status === 'open')
+  const balanceOwedCents = openInvoices.reduce((sum, i) => sum + (i.amount_cents ?? 0), 0)
+  const upcoming = [...data.appointments]
+    .filter((a) => new Date(a.starts_at).getTime() >= Date.now())
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
+  const openFunding = data.funding.filter((f) => !['approved', 'declined'].includes(f.status)).length
+
+  return (
+    <div className="space-y-5">
+      <button onClick={onGoToRecords} className="grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6 text-left">
+        <StatCard label="Open Matters" value={openMatters} />
+        <StatCard label="Open Tasks" value={openTasks} />
+        <StatCard label="Open Tickets" value={openTickets} />
+        <StatCard label="Upcoming Appts." value={upcoming.length} />
+        <StatCard label="Open Funding" value={openFunding} />
+        <StatCard label="Balance Owed" value={`$${(balanceOwedCents / 100).toLocaleString()}`} />
+      </button>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">Upcoming Appointments</h3>
+            <button onClick={onGoToRecords} className="text-xs font-medium text-gold hover:underline">
+              View all →
+            </button>
+          </div>
+          {upcoming.length === 0 ? (
+            <EmptyState label="Nothing scheduled." />
+          ) : (
+            <ul className="space-y-2">
+              {upcoming.slice(0, 5).map((a) => (
+                <li key={a.id} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-200">{a.title}</span>
+                  <span className="text-slate-500">{new Date(a.starts_at).toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel>
+          <h3 className="mb-3 text-sm font-semibold text-white">Recent Activity</h3>
+          {data.recent_activity.length === 0 ? (
+            <EmptyState label="No activity yet." />
+          ) : (
+            <ul className="space-y-3">
+              {data.recent_activity.map((e) => (
+                <li key={e.id} className="text-sm">
+                  <p className="text-slate-200">{describeActivity(e)}</p>
+                  <p className="text-xs text-slate-500">{timeAgo(e.created_at)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
+
+      <PaymentMethods clientId={clientId} methods={data.payment_methods} onRevealed={onChanged} />
+    </div>
+  )
+}
+
+type ClientTab = 'dashboard' | 'profile' | 'records'
+const TABS: { key: ClientTab; label: string }[] = [
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'profile', label: 'Profile' },
+  { key: 'records', label: 'Records' },
+]
+
 export default function ClientDetail() {
   const p = useAppPath()
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
   const [loading, setLoading] = useState(true)
   const [staff, setStaff] = useState<StaffMember[]>([])
+  const [tab, setTab] = useState<ClientTab>('dashboard')
   // Bumped whenever `id` changes so a slow response for a previously-viewed
   // client can't land after a newer one and overwrite the screen.
   const requestId = useRef(0)
@@ -618,6 +860,7 @@ export default function ClientDetail() {
 
   useEffect(() => {
     setLoading(true)
+    setTab('dashboard')
     load()
   }, [load])
 
@@ -677,10 +920,29 @@ export default function ClientDetail() {
         }
       />
 
-      <ServiceApplications services={data.services} answers={data.application_answers} onStatusChange={setServiceStatus} />
-      <PaymentMethods clientId={clientId} methods={data.payment_methods} onRevealed={load} />
-      <ProfileNotes clientId={clientId} notes={data.notes} onChanged={load} />
+      <div className="mb-5 flex gap-1 border-b border-white/10">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`border-b-2 px-4 py-2.5 text-sm font-medium transition ${
+              tab === t.key ? 'border-gold text-gold' : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
+      {tab === 'dashboard' && (
+        <DashboardTab data={data} clientId={clientId} onGoToRecords={() => setTab('records')} onChanged={load} />
+      )}
+
+      {tab === 'profile' && (
+        <ProfileTab data={data} clientId={clientId} onChanged={load} onServiceStatusChange={setServiceStatus} />
+      )}
+
+      {tab === 'records' && (
       <div className="grid gap-5 lg:grid-cols-2">
         <Section
           title="Matters"
@@ -878,6 +1140,7 @@ export default function ClientDetail() {
           }}
         />
       </div>
+      )}
     </div>
   )
 }

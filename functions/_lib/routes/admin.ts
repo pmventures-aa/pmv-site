@@ -115,7 +115,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   const ok = await canAccessClient(c.env, user, id)
   if (!ok) return c.json({ error: 'forbidden' }, 403)
 
-  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes] = await Promise.all([
+  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes, assignedStaff, recentActivity] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT cs.*, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE client_user_id = ?').bind(id).all(),
@@ -148,6 +148,14 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
        FROM internal_notes n LEFT JOIN users a ON a.id = n.author_user_id
        WHERE n.client_user_id = ? AND n.matter_id IS NULL ORDER BY n.created_at DESC`,
     ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT u.id, u.full_name, u.email FROM staff_assignments sa JOIN users u ON u.id = sa.staff_user_id WHERE sa.client_user_id = ?`,
+    ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT ae.*, actor.full_name AS actor_name, actor.email AS actor_email
+       FROM activity_events ae LEFT JOIN users actor ON actor.id = ae.actor_user_id
+       WHERE ae.client_user_id = ? ORDER BY ae.created_at DESC LIMIT 10`,
+    ).bind(id).all(),
   ])
 
   if (!account) return c.json({ error: 'not found' }, 404)
@@ -169,7 +177,51 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
     application_answers: answers.results ?? [],
     payment_methods: paymentMethods.results ?? [],
     notes: notes.results ?? [],
+    assigned_staff: assignedStaff.results ?? [],
+    recent_activity: recentActivity.results ?? [],
   })
+})
+
+// Staff/admin editable client contact + business profile -- scoped like
+// every other client-touching write (canAccessClient), not requireAdmin,
+// since staff already edit matters/tasks/etc. for clients they're assigned
+// to. Separate from PATCH /portal/profile (self.ts), which is the client's
+// own requireClient-only endpoint for the same client_profiles columns.
+adminRoutes.patch('/clients/:id/profile', requireStaff, async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id')!
+  const ok = await canAccessClient(c.env, user, id)
+  if (!ok) return c.json({ error: 'forbidden' }, 403)
+
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>)
+  const profileFields: Record<string, string | null> = {}
+  for (const key of ['business_name', 'entity_type', 'ein', 'state'] as const) {
+    if (typeof body[key] === 'string') profileFields[key] = (body[key] as string).trim().slice(0, 200) || null
+  }
+  const userFields: Record<string, string | null> = {}
+  for (const key of ['full_name', 'phone'] as const) {
+    if (typeof body[key] === 'string') userFields[key] = (body[key] as string).trim().slice(0, 200) || null
+  }
+  const profileCols = Object.keys(profileFields)
+  const userCols = Object.keys(userFields)
+  if (profileCols.length === 0 && userCols.length === 0) return c.json({ error: 'no valid fields supplied' }, 400)
+
+  const stmts: D1PreparedStatement[] = []
+  if (profileCols.length > 0) {
+    stmts.push(
+      c.env.DB.prepare(`UPDATE client_profiles SET ${profileCols.map((k) => `${k} = ?`).join(', ')} WHERE user_id = ?`)
+        .bind(...profileCols.map((k) => profileFields[k]), id),
+    )
+  }
+  if (userCols.length > 0) {
+    stmts.push(
+      c.env.DB.prepare(`UPDATE users SET ${userCols.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`)
+        .bind(...userCols.map((k) => userFields[k]), id),
+    )
+  }
+  stmts.push(activityInsert(c.env, { actorUserId: user.id, clientUserId: id, kind: 'client_profile_updated', detail: { ...profileFields, ...userFields } }))
+  await c.env.DB.batch(stmts)
+  return c.json({ ok: true })
 })
 
 // ---------------- internal notes (staff-only, never exposed to clients) ----------------
