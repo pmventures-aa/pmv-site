@@ -3,9 +3,11 @@ import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { Shell } from '../../components/layout/Shell'
 import { portalNav } from '../../components/layout/nav'
 import { BasePathProvider, useAppPath } from '../../lib/basePath'
+import { useAuth } from '../../lib/auth'
 import Login from '../auth/Login'
 import Signup from '../auth/Signup'
 import SetPassword from '../auth/SetPassword'
+import TrustedInvite from '../auth/TrustedInvite'
 import OnboardingWizard from './OnboardingWizard'
 import Dashboard from './Dashboard'
 import Services from './Services'
@@ -16,14 +18,25 @@ import Support from './Support'
 import Billing from './Billing'
 import BusinessProfile from './BusinessProfile'
 import MyTeam from './MyTeam'
+import TrustedContacts from './TrustedContacts'
+import TrustedPortal from './TrustedPortal'
 import Notifications from './Notifications'
 import Security from './Security'
 import { ModulePage } from './ModulePage'
 import { callsConfig, mattersConfig, tasksConfig, calendarConfig, fundingConfig, propertyConfig, taxConfig } from './moduleConfigs'
 
-function CatchAll() {
+function PortalRoot() {
+  const { user, loading } = useAuth()
   const p = useAppPath()
+  if (loading) return null
+  if (user?.role === 'trusted_contact') return <Navigate to={p('trusted')} replace />
   return <Navigate to={p()} replace />
+}
+
+function CatchAll() {
+  const { user } = useAuth()
+  const p = useAppPath()
+  return <Navigate to={user?.role === 'trusted_contact' ? p('trusted') : p()} replace />
 }
 
 export default function PortalApp({ basePath }: { basePath: string }) {
@@ -33,10 +46,14 @@ export default function PortalApp({ basePath }: { basePath: string }) {
         <Route path="login" element={<Login surface="client" />} />
         <Route path="signup" element={<Signup />} />
         <Route path="set-password" element={<SetPassword surface="client" />} />
+        <Route path="trusted-invite/:token" element={<TrustedInvite />} />
+
+        <Route element={<ProtectedRoute allow={['trusted_contact']} />}>
+          <Route path="trusted" element={<TrustedPortal />} />
+        </Route>
 
         <Route element={<ProtectedRoute allow={['client']} />}>
           <Route path="onboarding" element={<OnboardingWizard />} />
-
           <Route element={<Shell nav={portalNav} badge="Client Portal" />}>
             <Route index element={<Dashboard />} />
             <Route path="planned-calls" element={<ModulePage config={callsConfig} />} />
@@ -54,10 +71,10 @@ export default function PortalApp({ basePath }: { basePath: string }) {
             <Route path="support" element={<Support />} />
             <Route path="business-profile" element={<BusinessProfile />} />
             <Route path="my-team" element={<MyTeam />} />
+            <Route path="trusted-contacts" element={<TrustedContacts />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="security" element={<Security />} />
 
-            {/* Old slugs — redirect so existing bookmarks/links keep working. */}
             <Route path="calls" element={<Navigate to="../planned-calls" replace />} />
             <Route path="property" element={<Navigate to="../property-management" replace />} />
             <Route path="tax" element={<Navigate to="../tax-filings" replace />} />
@@ -66,6 +83,7 @@ export default function PortalApp({ basePath }: { basePath: string }) {
           </Route>
         </Route>
 
+        <Route path="_root" element={<PortalRoot />} />
         <Route path="*" element={<CatchAll />} />
       </Routes>
     </BasePathProvider>
