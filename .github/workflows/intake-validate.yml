@@ -14,9 +14,11 @@ jobs:
           ref: agent/intake-application-wizard
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
+      - name: Apply D1 migrations locally
+        run: npm run db:migrate:local
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
