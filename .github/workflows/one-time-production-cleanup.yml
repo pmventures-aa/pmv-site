@@ -1,0 +1,64 @@
+name: One-time production QA data cleanup
+
+on:
+  push:
+    branches: [agent/invitations-trusted-documents-roles]
+    paths:
+      - .github/workflows/one-time-production-cleanup.yml
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: Revoke test-account KV sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          NS="d88bb30fe5544ba5aac0f5e74ce58234"
+          for USER_ID in \
+            cb22c2c0-1854-487a-90db-37f6bc1be953 \
+            9d865f83-8edf-4e92-9a69-518a722d8604 \
+            d8cb48da-6bc1-4c51-9f80-bbadf6ec9dbb
+          do
+            RESP=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$NS/keys?prefix=usess:${USER_ID}:")
+            echo "$RESP" | jq -r '.result[].name' | while read -r REVERSE_KEY; do
+              [ -z "$REVERSE_KEY" ] && continue
+              TOKEN="${REVERSE_KEY#usess:${USER_ID}:}"
+              FORWARD_KEY="sess:${TOKEN}"
+              ENCODED_FORWARD=$(jq -rn --arg v "$FORWARD_KEY" '$v|@uri')
+              ENCODED_REVERSE=$(jq -rn --arg v "$REVERSE_KEY" '$v|@uri')
+              curl -fsS -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+                "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$NS/values/$ENCODED_FORWARD" >/dev/null
+              curl -fsS -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+                "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$NS/values/$ENCODED_REVERSE" >/dev/null
+            done
+            for KEY in "lastseen:${USER_ID}" "activate-user:${USER_ID}"; do
+              ENCODED=$(jq -rn --arg v "$KEY" '$v|@uri')
+              curl -fsS -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+                "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$NS/values/$ENCODED" >/dev/null || true
+            done
+          done
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Delete production QA records from D1
+        run: npx wrangler d1 execute pmv --remote --file .github/production-test-data-cleanup.sql
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify clean production identity state
+        run: |
+          npx wrangler d1 execute pmv --remote --command "SELECT id,email,role,status,full_name FROM users; SELECT COUNT(*) AS client_profiles FROM client_profiles; SELECT COUNT(*) AS contact_inquiries FROM contact_inquiries; SELECT COUNT(*) AS team_members FROM team_members; SELECT COUNT(*) AS fk_violations FROM pragma_foreign_key_check;"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
