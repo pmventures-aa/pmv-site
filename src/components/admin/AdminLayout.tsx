@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import type { NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
+import { GlobalSearch } from './GlobalSearch'
 import { MailBell } from '../kit/MailBell'
 import { Avatar } from '../kit/Avatar'
 import { btnOutline } from './ui'
@@ -17,6 +18,7 @@ import { btnOutline } from './ui'
 export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const p = useAppPath()
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
@@ -60,20 +62,34 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="flex items-center justify-between border-b border-white/10 bg-navy-900 px-4 py-3 lg:hidden print:hidden">
-        <Logo />
-        <div className="flex items-center gap-3">
-          <span className="hidden text-xs text-slate-400 sm:inline">{badge}</span>
-          <MailBell />
-          <NotificationBell />
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-white"
-            aria-label="Open menu"
-          >
-            ☰
-          </button>
+      <header className="border-b border-white/10 bg-navy-900 lg:hidden print:hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Logo />
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs text-slate-400 sm:inline">{badge}</span>
+            <button
+              onClick={() => setMobileSearchOpen((v) => !v)}
+              className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-slate-300"
+              aria-label="Search"
+            >
+              🔍
+            </button>
+            <MailBell />
+            <NotificationBell />
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-white"
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+          </div>
         </div>
+        {mobileSearchOpen && (
+          <div className="border-t border-white/10 px-4 py-3">
+            <GlobalSearch />
+          </div>
+        )}
       </header>
 
       {/* Mobile drawer */}
@@ -94,10 +110,13 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
       )}
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <div className="hidden items-center justify-end gap-4 border-b border-white/10 bg-navy-900/60 px-8 py-3 lg:flex print:hidden">
-          <MailBell />
-          <NotificationBell />
-          <span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span>
+        <div className="hidden items-center justify-between gap-4 border-b border-white/10 bg-navy-900/60 px-8 py-3 lg:flex print:hidden">
+          <GlobalSearch className="w-full max-w-sm" />
+          <div className="flex shrink-0 items-center gap-4">
+            <MailBell />
+            <NotificationBell />
+            <span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span>
+          </div>
         </div>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
           <Outlet />
