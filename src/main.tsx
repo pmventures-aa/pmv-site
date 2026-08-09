@@ -11,6 +11,7 @@ import Contact from './pages/public/Contact'
 import Professionals from './pages/public/Professionals'
 import Terms from './pages/public/Terms'
 import { AuthProvider } from './lib/auth'
+import { ThemeProvider } from './lib/theme'
 import { AppToaster } from './components/kit/Toaster'
 import { LoadingScreen } from './components/LoadingScreen'
 
@@ -27,18 +28,10 @@ const surface: 'admin' | 'portal' | 'public' =
 
 function App() {
   if (surface === 'admin') {
-    return (
-      <Suspense fallback={<SurfaceFallback />}>
-        <Routes><Route path="/*" element={<AdminApp basePath="" />} /></Routes>
-      </Suspense>
-    )
+    return <Suspense fallback={<SurfaceFallback />}><Routes><Route path="/*" element={<AdminApp basePath="" />} /></Routes></Suspense>
   }
   if (surface === 'portal') {
-    return (
-      <Suspense fallback={<SurfaceFallback />}>
-        <Routes><Route path="/*" element={<PortalApp basePath="" />} /></Routes>
-      </Suspense>
-    )
+    return <Suspense fallback={<SurfaceFallback />}><Routes><Route path="/*" element={<PortalApp basePath="" />} /></Routes></Suspense>
   }
   return (
     <Routes>
@@ -61,10 +54,12 @@ function App() {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <App />
-        <AppToaster />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <App />
+          <AppToaster />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )

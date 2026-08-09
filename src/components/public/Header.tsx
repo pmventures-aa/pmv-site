@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
 import { Logo } from '../ui'
 import { Icon } from '../kit/Icon'
+import { ThemeToggle } from '../ThemeToggle'
 import { btnOutline, btnPrimary } from './ui'
 
 const navItems = [
@@ -17,26 +18,29 @@ const CLIENT_SIGNUP = 'https://client.pinnaclemanagementventures.com/signup'
 
 export function Header() {
   const [open, setOpen] = useState(false)
-  const linkCls = ({ isActive }: { isActive: boolean }) =>
-    `${isActive ? 'text-gold' : 'hover:text-gold'} transition-colors duration-200`
+  const linkCls = ({ isActive }: { isActive: boolean }) => `${isActive ? 'text-gold' : 'hover:text-gold'} transition-colors duration-200`
 
   return (
     <header className="sticky top-0 z-20 border-b border-white/5 bg-navy-950/70 backdrop-blur">
-      <div className="container-pmv flex h-16 items-center justify-between">
-        <Link to="/" className="transition-transform duration-200 hover:scale-[1.015]"><Logo /></Link>
-        <nav className="hidden items-center gap-6 text-sm text-slate-300 lg:flex">
+      <div className="container-pmv flex h-16 items-center justify-between gap-4">
+        <Link to="/" className="shrink-0 transition-transform duration-200 hover:scale-[1.015]"><Logo /></Link>
+        <nav className="hidden items-center gap-5 text-sm text-slate-300 xl:flex">
           {navItems.map((item) => <NavLink key={item.to} to={item.to} className={linkCls}>{item.label}</NavLink>)}
         </nav>
-        <div className="hidden items-center gap-3 lg:flex">
+        <div className="hidden items-center gap-2 xl:flex">
+          <ThemeToggle compact />
           <a href={CLIENT_LOGIN} className={btnOutline}>Client Login</a>
           <a href={CLIENT_SIGNUP} className={btnPrimary}>Get Started</a>
         </div>
-        <button onClick={() => setOpen((o) => !o)} className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white transition hover:border-gold/60 hover:text-gold lg:hidden" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open}>
-          <Icon name={open ? 'close' : 'menu'} size={18} />
-        </button>
+        <div className="flex items-center gap-2 xl:hidden">
+          <ThemeToggle compact />
+          <button onClick={() => setOpen((o) => !o)} className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white transition hover:border-gold/60 hover:text-gold" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open}>
+            <Icon name={open ? 'close' : 'menu'} size={18} />
+          </button>
+        </div>
       </div>
       {open && (
-        <div className="border-t border-white/5 bg-navy-950/95 px-6 py-4 lg:hidden">
+        <div className="border-t border-white/5 bg-navy-950/95 px-6 py-4 xl:hidden">
           <nav className="flex flex-col gap-3 text-sm text-slate-300">
             {navItems.map((item) => <NavLink key={item.to} to={item.to} className={linkCls} onClick={() => setOpen(false)}>{item.label}</NavLink>)}
             <a href={CLIENT_LOGIN} className={`${btnOutline} mt-2`}>Client Login</a>

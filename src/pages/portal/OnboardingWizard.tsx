@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
-import { Card, StatusBadge, Crest } from '../../components/ui'
+import { Card, StatusBadge, Logo } from '../../components/ui'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { inputCls } from '../auth/AuthLayout'
 import { LoadingScreen } from '../../components/LoadingScreen'
+import { useAppPath } from '../../lib/basePath'
 
 interface Service {
   key: string
@@ -26,11 +28,16 @@ type Step = 'services' | 'questions' | 'review'
 
 export default function OnboardingWizard() {
   const navigate = useNavigate()
+  const p = useAppPath()
+  const [params] = useSearchParams()
+  const intentService = params.get('service') || ''
+  const isFreshWelcome = params.get('welcome') === '1'
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState<Step>('services')
   const [catalog, setCatalog] = useState<Service[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [questions, setQuestions] = useState<Question[]>([])
+  const [questionServiceIndex, setQuestionServiceIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -44,30 +51,38 @@ export default function OnboardingWizard() {
         ])
         setCatalog(cat.services)
         if (status.completed) {
-          navigate('..', { relative: 'path', replace: true })
+          navigate(p(), { replace: true })
           return
         }
-        if (status.services?.length) setSelected(new Set(status.services))
+        const initial = new Set(status.services || [])
+        if (intentService && cat.services.some((service) => service.key === intentService)) initial.add(intentService)
+        setSelected(initial)
       } catch {
-        // ignore — fall through to empty state
+        setError('We could not load your welcome setup. You can return to the portal and try again.')
       } finally {
         setLoading(false)
       }
     })()
-  }, [navigate])
+  }, [intentService, navigate, p])
 
   const grouped = useMemo(() => {
-    const byService = new Map<string, Question[]>()
-    for (const q of questions) {
-      if (!byService.has(q.service_key)) byService.set(q.service_key, [])
-      byService.get(q.service_key)!.push(q)
+    const map = new Map<string, Question[]>()
+    for (const question of questions) {
+      if (!map.has(question.service_key)) map.set(question.service_key, [])
+      map.get(question.service_key)!.push(question)
     }
-    return byService
+    return map
   }, [questions])
 
+  const selectedServices = useMemo(() => catalog.filter((service) => selected.has(service.key)), [catalog, selected])
+  const currentService = selectedServices[questionServiceIndex]
+  const currentQuestions = currentService ? grouped.get(currentService.key) || [] : []
+  const totalJourneySteps = Math.max(3, selectedServices.length + 2)
+  const progressStep = step === 'services' ? 1 : step === 'review' ? totalJourneySteps : Math.min(totalJourneySteps - 1, questionServiceIndex + 2)
+
   function toggleService(key: string) {
-    setSelected((prev) => {
-      const next = new Set(prev)
+    setSelected((previous) => {
+      const next = new Set(previous)
       if (next.has(key)) next.delete(key)
       else next.add(key)
       return next
@@ -76,21 +91,37 @@ export default function OnboardingWizard() {
 
   async function goToQuestions() {
     setError(null)
-    if (selected.size === 0) {
-      setError('Select at least one service to continue.')
-      return
-    }
+    if (selected.size === 0) return setError('Choose the area that feels closest to what brought you here. You can change it later.')
     setBusy(true)
     try {
       const keys = Array.from(selected)
-      const res = await api.get<{ questions: Question[] }>(`/portal/onboarding/questions?services=${keys.join(',')}`)
-      setQuestions(res.questions)
-      setStep('questions')
+      const response = await api.get<{ questions: Question[] }>(`/portal/onboarding/questions?services=${keys.join(',')}`)
+      setQuestions(response.questions)
+      setQuestionServiceIndex(0)
+      setStep(response.questions.length ? 'questions' : 'review')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not load questions.')
+      setError(err instanceof ApiError ? err.message : 'Could not load the next step.')
     } finally {
       setBusy(false)
     }
+  }
+
+  function questionKey(question: Question) {
+    return `${question.service_key}.${question.question_key}`
+  }
+
+  function nextQuestionGroup() {
+    setError(null)
+    const missing = currentQuestions.filter((question) => question.required && !String(answers[questionKey(question)] || '').trim())
+    if (missing.length) return setError(`Please complete ${missing.length === 1 ? 'the required field' : 'the required fields'} before continuing.`)
+    if (questionServiceIndex < selectedServices.length - 1) setQuestionServiceIndex((index) => index + 1)
+    else setStep('review')
+  }
+
+  function previousQuestionGroup() {
+    setError(null)
+    if (questionServiceIndex > 0) setQuestionServiceIndex((index) => index - 1)
+    else setStep('services')
   }
 
   async function submit() {
@@ -98,176 +129,117 @@ export default function OnboardingWizard() {
     setBusy(true)
     try {
       await api.post('/portal/onboarding', { services: Array.from(selected), answers })
-      navigate('..', { relative: 'path', replace: true })
+      navigate(p(), { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
-        setError('Please fill in all required fields before submitting.')
+        setError('A required detail is still missing. We brought you back so you can finish it.')
+        setQuestionServiceIndex(0)
         setStep('questions')
-      } else {
-        setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
-      }
+      } else setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
     } finally {
       setBusy(false)
     }
   }
 
-  if (loading) {
-    return <LoadingScreen />
-  }
-
-  const steps: Step[] = ['services', 'questions', 'review']
+  if (loading) return <LoadingScreen />
 
   return (
-    <div className="min-h-screen bg-navy-radial px-4 py-10">
-      <div className="mx-auto max-w-3xl">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <Crest size={64} />
-          <p className="eyebrow mt-4">Let's set up your account</p>
-          <h1 className="mt-2 text-2xl font-bold text-white">Tell us what you need</h1>
-          <p className="mt-2 text-sm text-slate-400">A few quick questions so we can route your work to the right specialists.</p>
+    <div className="min-h-screen bg-navy-radial px-4 py-7 sm:py-10">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <Logo />
+          <ThemeToggle compact />
         </div>
 
-        <div className="mb-6 flex items-center justify-center gap-2">
-          {steps.map((s, i) => (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={`grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${
-                  step === s ? 'bg-gold text-navy-950' : steps.indexOf(step) > i ? 'bg-emerald-400/80 text-navy-950' : 'bg-white/10 text-slate-400'
-                }`}
-              >
-                {i + 1}
-              </div>
-              {i < steps.length - 1 && <div className="h-px w-8 bg-white/10" />}
+        <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
+          <aside className="lg:pt-3">
+            <p className="eyebrow">Your Pinnacle journey</p>
+            <h1 className="mt-2 text-2xl font-semibold text-white">{isFreshWelcome ? 'Welcome. Start with what brought you here.' : 'A little context goes a long way.'}</h1>
+            <p className="mt-3 text-sm leading-6 text-slate-400">You do not need to map every service or explain everything at once. We’ll gather enough to understand the situation, then your portal stays open for the rest of the journey.</p>
+            <div className="mt-6 border-l border-white/10 pl-4">
+              <p className="text-xs font-semibold text-white">Step {progressStep} of {totalJourneySteps}</p>
+              <p className="mt-1 text-xs text-slate-500">{step === 'services' ? 'What brought you here' : step === 'questions' ? `A little about ${currentService?.name || 'your needs'}` : 'Confirm and enter your portal'}</p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-gold transition-all" style={{ width: `${Math.round((progressStep / totalJourneySteps) * 100)}%` }} /></div>
             </div>
-          ))}
-        </div>
+          </aside>
 
-        {error && (
-          <div className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-2.5 text-sm text-rose-200">{error}</div>
-        )}
+          <main>
+            {error && <div className="mb-4 rounded-lg border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">{error}</div>}
 
-        {step === 'services' && (
-          <Card>
-            <h2 className="mb-4 text-lg font-semibold text-white">Which services are you interested in?</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {catalog.map((svc) => (
-                <label
-                  key={svc.key}
-                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
-                    selected.has(svc.key) ? 'border-gold/60 bg-gold/10' : 'border-white/10 bg-white/[0.03] hover:border-white/20'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={selected.has(svc.key)}
-                    onChange={() => toggleService(svc.key)}
-                  />
-                  <span>
-                    <span className="block font-medium text-white">{svc.name}</span>
-                    <span className="block text-xs text-slate-400">{svc.description}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button onClick={goToQuestions} disabled={busy} className="btn-gold disabled:opacity-60">
-                {busy ? 'Loading…' : 'Continue'}
-              </button>
-            </div>
-          </Card>
-        )}
+            {step === 'services' && (
+              <Card className="!p-0">
+                <div className="border-b border-white/10 px-5 py-5 sm:px-6">
+                  <h2 className="text-lg font-semibold text-white">What are you working through right now?</h2>
+                  <p className="mt-1 text-sm text-slate-400">Choose what feels relevant. This is a starting point, not a commitment to buy every service you select.</p>
+                </div>
+                <div className="divide-y divide-white/10">
+                  {catalog.map((service) => {
+                    const checked = selected.has(service.key)
+                    return (
+                      <label key={service.key} className={`flex cursor-pointer items-start gap-4 px-5 py-4 transition sm:px-6 ${checked ? 'bg-gold/[0.06]' : 'hover:bg-white/[0.025]'}`}>
+                        <input type="checkbox" className="mt-1 h-4 w-4 accent-gold" checked={checked} onChange={() => toggleService(service.key)} />
+                        <span className="flex-1">
+                          <span className="flex flex-wrap items-center gap-2"><span className="font-medium text-white">{service.name}</span>{service.key === intentService && <span className="text-[10px] font-semibold uppercase tracking-wide text-gold">What brought you here</span>}</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-400">{service.description}</span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-white/10 px-5 py-4 sm:px-6">
+                  <button type="button" onClick={() => navigate(p(), { replace: true })} className="text-sm text-slate-400 hover:text-white">Explore the portal first</button>
+                  <button onClick={goToQuestions} disabled={busy} className="btn-gold disabled:opacity-60">{busy ? 'Loading…' : 'Continue'}</button>
+                </div>
+              </Card>
+            )}
 
-        {step === 'questions' && (
-          <Card>
-            {Array.from(grouped.entries()).map(([serviceKey, qs]) => {
-              const svc = catalog.find((s) => s.key === serviceKey)
-              return (
-                <div key={serviceKey} className="mb-6 last:mb-0">
-                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gold">
-                    {svc?.name ?? serviceKey}
-                  </h3>
-                  <div className="space-y-4">
-                    {qs.map((q) => {
-                      const key = `${q.service_key}.${q.question_key}`
-                      const opts: string[] = q.options ? JSON.parse(q.options) : []
+            {step === 'questions' && currentService && (
+              <Card>
+                <p className="eyebrow">{currentService.category || 'Your needs'}</p>
+                <h2 className="mt-2 text-xl font-semibold text-white">A little about {currentService.name}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">Share what you know today. Your Pinnacle team can clarify the rest with you later.</p>
+
+                {currentQuestions.length === 0 ? <p className="mt-6 text-sm text-slate-400">No additional details are needed for this area right now.</p> : (
+                  <div className="mt-6 space-y-5">
+                    {currentQuestions.map((question) => {
+                      const key = questionKey(question)
+                      let options: string[] = []
+                      try { options = question.options ? JSON.parse(question.options) as string[] : [] } catch { options = [] }
                       return (
                         <label key={key} className="block">
-                          <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                            {q.label} {q.required ? <span className="text-gold">*</span> : null}
-                          </span>
-                          {q.input_type === 'select' ? (
-                            <select
-                              className={inputCls}
-                              required={!!q.required}
-                              value={answers[key] ?? ''}
-                              onChange={(e) => setAnswers((a) => ({ ...a, [key]: e.target.value }))}
-                            >
-                              <option value="">Select…</option>
-                              {opts.map((o) => (
-                                <option key={o} value={o}>
-                                  {o}
-                                </option>
-                              ))}
-                            </select>
-                          ) : q.input_type === 'textarea' ? (
-                            <textarea
-                              className={`${inputCls} min-h-[90px]`}
-                              required={!!q.required}
-                              value={answers[key] ?? ''}
-                              onChange={(e) => setAnswers((a) => ({ ...a, [key]: e.target.value }))}
-                            />
+                          <span className="mb-1.5 block text-sm font-medium text-white">{question.label} {question.required ? <span className="text-gold">*</span> : null}</span>
+                          {question.help_text && <span className="mb-2 block text-xs leading-5 text-slate-500">{question.help_text}</span>}
+                          {question.input_type === 'select' ? (
+                            <select className={inputCls} required={!!question.required} value={answers[key] ?? ''} onChange={(event) => setAnswers((current) => ({ ...current, [key]: event.target.value }))}><option value="">Choose an option…</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>
+                          ) : question.input_type === 'textarea' ? (
+                            <textarea className={`${inputCls} min-h-[100px]`} required={!!question.required} value={answers[key] ?? ''} onChange={(event) => setAnswers((current) => ({ ...current, [key]: event.target.value }))} />
+                          ) : question.input_type === 'checkbox' ? (
+                            <span className="flex items-center gap-3 rounded-lg border border-white/10 px-4 py-3"><input type="checkbox" className="h-4 w-4 accent-gold" checked={answers[key] === 'true'} onChange={(event) => setAnswers((current) => ({ ...current, [key]: event.target.checked ? 'true' : '' }))} /><span className="text-sm text-slate-300">Yes</span></span>
                           ) : (
-                            <input
-                              className={inputCls}
-                              type={q.input_type === 'number' ? 'number' : q.input_type === 'date' ? 'date' : 'text'}
-                              required={!!q.required}
-                              value={answers[key] ?? ''}
-                              onChange={(e) => setAnswers((a) => ({ ...a, [key]: e.target.value }))}
-                            />
+                            <input className={inputCls} type={question.input_type === 'number' ? 'number' : question.input_type === 'date' ? 'date' : 'text'} required={!!question.required} value={answers[key] ?? ''} onChange={(event) => setAnswers((current) => ({ ...current, [key]: event.target.value }))} />
                           )}
                         </label>
                       )
                     })}
                   </div>
-                </div>
-              )
-            })}
-            <div className="mt-6 flex justify-between">
-              <button onClick={() => setStep('services')} className="btn-outline">
-                Back
-              </button>
-              <button onClick={() => setStep('review')} className="btn-gold">
-                Review
-              </button>
-            </div>
-          </Card>
-        )}
+                )}
 
-        {step === 'review' && (
-          <Card>
-            <h2 className="mb-4 text-lg font-semibold text-white">Review &amp; submit</h2>
-            <div className="mb-6 flex flex-wrap gap-2">
-              {Array.from(selected).map((key) => (
-                <StatusBadge key={key} tone="gold">
-                  {catalog.find((s) => s.key === key)?.name ?? key}
-                </StatusBadge>
-              ))}
-            </div>
-            <p className="mb-6 text-sm text-slate-400">
-              We'll route these to the right team members and follow up to schedule an intro call. You can add more
-              services anytime from the Services tab.
-            </p>
-            <div className="flex justify-between">
-              <button onClick={() => setStep('questions')} className="btn-outline">
-                Back
-              </button>
-              <button onClick={submit} disabled={busy} className="btn-gold disabled:opacity-60">
-                {busy ? 'Submitting…' : 'Finish setup'}
-              </button>
-            </div>
-          </Card>
-        )}
+                <div className="mt-7 flex items-center justify-between gap-3"><button onClick={previousQuestionGroup} className="btn-outline">Back</button><button onClick={nextQuestionGroup} className="btn-gold">{questionServiceIndex < selectedServices.length - 1 ? 'Next' : 'Review'}</button></div>
+              </Card>
+            )}
+
+            {step === 'review' && (
+              <Card>
+                <p className="eyebrow">Ready for the portal</p>
+                <h2 className="mt-2 text-xl font-semibold text-white">We have enough to start the conversation.</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">Your selections help Pinnacle understand where to begin. They do not lock you into a package. From here you can message us, upload documents, track work, and discover other support only when it becomes useful.</p>
+                <div className="mt-5 flex flex-wrap gap-2">{selectedServices.map((service) => <StatusBadge key={service.key} tone="gold">{service.name}</StatusBadge>)}</div>
+                <div className="mt-7 border-l-2 border-gold pl-4"><p className="text-sm font-medium text-white">What happens next</p><p className="mt-1 text-xs leading-5 text-slate-400">We’ll review what you shared, route it appropriately, and follow up if anything needs clarification. Your dashboard will keep the next action visible without making you learn the whole portal at once.</p></div>
+                <div className="mt-7 flex items-center justify-between gap-3"><button onClick={() => { setQuestionServiceIndex(Math.max(0, selectedServices.length - 1)); setStep(questions.length ? 'questions' : 'services') }} className="btn-outline">Back</button><button onClick={submit} disabled={busy} className="btn-gold disabled:opacity-60">{busy ? 'Saving…' : 'Enter my portal'}</button></div>
+              </Card>
+            )}
+          </main>
+        </div>
       </div>
     </div>
   )

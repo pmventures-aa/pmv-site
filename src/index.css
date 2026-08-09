@@ -3,18 +3,36 @@
 @tailwind utilities;
 
 :root { color-scheme: dark; }
+:root[data-theme='light'] { color-scheme: light; }
 
 body {
   @apply bg-navy-950 text-slate-100 font-sans antialiased;
   margin: 0;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+/* Native select menus can ignore utility-class foreground/background pairing.
+   Give option rows an explicit palette so Windows/Chrome never renders white
+   text on the browser's white popup menu. */
+select { color-scheme: dark; }
+select option,
+select optgroup {
+  background: #081525;
+  color: #f1f5f9;
+}
+:root[data-theme='light'] select { color-scheme: light; }
+:root[data-theme='light'] select option,
+:root[data-theme='light'] select optgroup {
+  background: #ffffff;
+  color: #172033;
 }
 
 @layer components {
   .glass-card {
-    @apply rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-md shadow-glass;
+    @apply rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-md shadow-glass;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition;
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-semibold transition;
   }
   .btn-gold {
     @apply btn bg-gold text-navy-950 hover:bg-gold-400;
@@ -26,50 +44,97 @@ body {
   .eyebrow { @apply text-xs font-semibold uppercase tracking-[0.2em] text-gold; }
 }
 
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,.035);
+}
+.theme-toggle button {
+  border: 0;
+  border-radius: 7px;
+  padding: 5px 8px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-toggle button:hover { color: #f8fafc; }
+.theme-toggle button.is-active { background: rgba(201,162,39,.16); color: #e3cc7a; }
+.theme-toggle-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 9px;
+  background: rgba(255,255,255,.025);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-toggle-compact:hover { border-color: rgba(201,162,39,.45); color: #c9a227; }
+.theme-indicator { color: #c9a227; font-size: 10px; }
+
+/* Light mode is intentionally warm and restrained rather than a white clone of
+   the dark UI. Existing Tailwind utility classes stay the source of layout;
+   these semantic overrides remap the established dark palette. */
+:root[data-theme='light'] body {
+  background: #f5f2ec;
+  color: #172033;
+}
+:root[data-theme='light'] [class~='bg-navy-950'] { background-color: #f5f2ec !important; }
+:root[data-theme='light'] [class~='bg-navy-900'] { background-color: #ffffff !important; }
+:root[data-theme='light'] [class~='bg-navy-800'] { background-color: #f0ede7 !important; }
+:root[data-theme='light'] [class~='bg-navy-radial'] {
+  background-image: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, #f6f3ed 58%, #eee9df 100%) !important;
+}
+:root[data-theme='light'] [class*='bg-navy-950/'],
+:root[data-theme='light'] [class*='bg-navy-900/'] { background-color: rgba(255,255,255,.88) !important; }
+:root[data-theme='light'] [class*='bg-white/['],
+:root[data-theme='light'] [class*='bg-white/5'],
+:root[data-theme='light'] [class*='bg-white/10'] { background-color: rgba(255,255,255,.72) !important; }
+:root[data-theme='light'] [class*='border-white/'] { border-color: rgba(15,36,63,.13) !important; }
+:root[data-theme='light'] [class~='text-white'] { color: #10233d !important; }
+:root[data-theme='light'] [class~='text-slate-100'],
+:root[data-theme='light'] [class~='text-slate-200'] { color: #24334a !important; }
+:root[data-theme='light'] [class~='text-slate-300'] { color: #3d4b5f !important; }
+:root[data-theme='light'] [class~='text-slate-400'] { color: #5e6978 !important; }
+:root[data-theme='light'] [class~='text-slate-500'] { color: #737d8a !important; }
+:root[data-theme='light'] [class~='text-slate-600'] { color: #808894 !important; }
+:root[data-theme='light'] .glass-card,
+:root[data-theme='light'] [class*='shadow-glass'] { box-shadow: 0 12px 32px rgba(28,43,59,.08) !important; }
+:root[data-theme='light'] .btn-outline { border-color: rgba(15,36,63,.2); color: #24334a; }
+:root[data-theme='light'] .btn-outline:hover { border-color: #c9a227; color: #9a7612; }
+:root[data-theme='light'] .theme-toggle,
+:root[data-theme='light'] .theme-toggle-compact { border-color: rgba(15,36,63,.15); background: rgba(255,255,255,.78); color: #4b5869; }
+:root[data-theme='light'] .theme-toggle button { color: #667180; }
+:root[data-theme='light'] .theme-toggle button:hover { color: #10233d; }
+:root[data-theme='light'] .theme-toggle button.is-active { background: rgba(201,162,39,.15); color: #7d600f; }
+
 @keyframes marquee-scroll {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
-.animate-marquee {
-  animation: marquee-scroll 28s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .animate-marquee { animation: none; }
-}
+.animate-marquee { animation: marquee-scroll 28s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .animate-marquee { animation: none; } }
 
-/* Branded loading screen (src/components/LoadingScreen.tsx) — a slow
-   gold light sweeping around a ring behind the crest, plus two soft
-   "sonar" pulses and a gentle breathing scale on the crest itself.
-   Deliberately plain CSS keyframes, not framer-motion — this mounts in
-   the portal/admin bundles too, which stay motion-library-free on
-   purpose (see src/components/public/motion.tsx). */
-@keyframes loading-spin {
-  to { transform: rotate(360deg); }
-}
-@keyframes loading-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
-}
-@keyframes loading-pulse-ring {
-  0% { transform: scale(0.82); opacity: 0.55; }
-  70%, 100% { transform: scale(1.18); opacity: 0; }
-}
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+@keyframes loading-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes loading-pulse-ring { 0% { transform: scale(0.82); opacity: 0.55; } 70%, 100% { transform: scale(1.18); opacity: 0; } }
 .loading-sweep {
   background: conic-gradient(from 0deg, transparent 0%, rgba(201, 162, 39, 0.65) 22%, transparent 46%, transparent 100%);
   -webkit-mask-image: radial-gradient(closest-side, transparent 76%, black 80%, black 90%, transparent 94%);
   mask-image: radial-gradient(closest-side, transparent 76%, black 80%, black 90%, transparent 94%);
   animation: loading-spin 2.6s linear infinite;
 }
-.loading-pulse {
-  border: 1px solid rgba(201, 162, 39, 0.45);
-  animation: loading-pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-.loading-pulse-delay {
-  animation-delay: 1.2s;
-}
-.loading-breathe {
-  animation: loading-breathe 2.6s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .loading-sweep, .loading-pulse, .loading-breathe { animation: none; }
-}
+.loading-pulse { border: 1px solid rgba(201, 162, 39, 0.45); animation: loading-pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.loading-pulse-delay { animation-delay: 1.2s; }
+.loading-breathe { animation: loading-breathe 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .loading-sweep, .loading-pulse, .loading-breathe { animation: none; } }
