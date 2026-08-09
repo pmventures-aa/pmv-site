@@ -22,7 +22,8 @@ employeeRoutes.get('/employees', requireStaff, requireNamedPermission('manage_te
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status != 'done' AND due_date IS NOT NULL AND due_date < date('now')) AS tasks_overdue,
             (SELECT COUNT(*) FROM internal_notes WHERE author_user_id = u.id) AS notes_added,
             (SELECT COUNT(*) FROM email_log WHERE sent_by_user_id = u.id) AS emails_sent,
-            (SELECT COUNT(*) FROM activity_events WHERE actor_user_id = u.id) AS client_interactions
+            (SELECT COUNT(*) FROM activity_events WHERE actor_user_id = u.id) AS client_interactions,
+            (SELECT COUNT(*) FROM vendor_application_documents WHERE user_id = u.id) AS application_documents
      FROM users u
      LEFT JOIN team_members tm ON tm.user_id = u.id
      LEFT JOIN role_definitions rd ON rd.id = tm.role_definition_id
@@ -46,7 +47,7 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
   ).bind(id).first()
   if (!employee) return c.json({ error: 'not found' }, 404)
 
-  const [logins, tasks, notes, avgResponse] = await Promise.all([
+  const [logins, tasks, notes, avgResponse, vendorDocuments] = await Promise.all([
     c.env.DB.prepare("SELECT created_at, actor_ip, actor_user_agent FROM audit_log WHERE actor_user_id = ? AND action = 'login' ORDER BY created_at DESC LIMIT 20").bind(id).all(),
     c.env.DB.prepare(
       `SELECT t.id,t.title,t.status,t.due_date,t.created_at,u.full_name client_name,u.email client_email
@@ -62,6 +63,10 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
       `SELECT AVG((julianday(first_response_at) - julianday(created_at)) * 24) avg_hours
        FROM support_tickets WHERE assigned_staff_user_id = ? AND first_response_at IS NOT NULL`,
     ).bind(id).first<{ avg_hours: number | null }>(),
+    c.env.DB.prepare(
+      `SELECT id, document_type, file_name, content_type, size_bytes, created_at
+       FROM vendor_application_documents WHERE user_id = ? ORDER BY created_at`,
+    ).bind(id).all(),
   ])
 
   return c.json({
@@ -69,6 +74,23 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
     login_history: logins.results ?? [],
     tasks: tasks.results ?? [],
     notes: notes.results ?? [],
+    vendor_documents: vendorDocuments.results ?? [],
     avg_response_hours: avgResponse?.avg_hours ?? null,
   })
+})
+
+employeeRoutes.get('/employees/:id/vendor-documents/:documentId/download', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  if (!c.env.UPLOADS) return c.json({ error: 'secure file storage is not configured' }, 503)
+  const row = await c.env.DB.prepare(
+    `SELECT id, object_key, file_name, content_type FROM vendor_application_documents WHERE id = ? AND user_id = ?`,
+  ).bind(c.req.param('documentId') || '', c.req.param('id') || '').first<{ id:string; object_key:string; file_name:string; content_type:string|null }>()
+  if (!row) return c.json({ error: 'document not found' }, 404)
+  const object = await c.env.UPLOADS.get(row.object_key)
+  if (!object) return c.json({ error: 'stored document not found' }, 404)
+  const safe = row.file_name.replace(/["\r\n]/g, '_')
+  return new Response(object.body, { headers: {
+    'Content-Type': row.content_type || object.httpMetadata?.contentType || 'application/octet-stream',
+    'Content-Disposition': `attachment; filename="${safe}"`,
+    'Cache-Control': 'private, no-store',
+  } })
 })
