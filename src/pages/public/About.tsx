@@ -1,6 +1,7 @@
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { CtaBand, PageIntro, SplitFeatures } from '../../components/public/ui'
+import { usePageMeta } from '../../lib/usePageMeta'
 
 const values: [string, string][] = [
   ['Straight answers', 'We tell you what a service actually involves — and what it doesn’t — before you commit to anything.'],
@@ -9,6 +10,7 @@ const values: [string, string][] = [
 ]
 
 export default function About() {
+  usePageMeta('About', 'Pinnacle Management Ventures connects businesses and property owners with the professional resources they need, coordinated under one roof.')
   return (
     <div className="min-h-screen bg-navy-950">
       <Header />

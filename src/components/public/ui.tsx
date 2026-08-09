@@ -92,6 +92,60 @@ export function SplitFeatures({ items }: { items: [string, string][] }) {
   )
 }
 
+// Placeholder client quotes — generic, role-only attribution (no invented
+// person names) so this reads as template copy to swap for real feedback,
+// not as a fabricated review of a specific person. Content only; replace
+// the `quotes` array below with real testimonials when available.
+const placeholderQuotes: [string, string][] = [
+  ['Pinnacle coordinated everything for our property portfolio — maintenance, tenant communication, reporting — without us having to manage five different vendors.', 'Property Owner, South Florida'],
+  ['We came in unsure what kind of financing even made sense for us. Pinnacle walked us through the options honestly, including the ones that weren’t a fit.', 'Small Business Owner'],
+  ['Having one team handle consulting and the day-to-day admin work meant we stopped repeating ourselves to a different vendor every week.', 'Founder, Professional Services Firm'],
+]
+
+export function Testimonials({ quotes = placeholderQuotes }: { quotes?: [string, string][] }) {
+  return (
+    <StaggerGroup className="grid gap-px overflow-hidden rounded-md border border-white/10 bg-white/10 sm:grid-cols-3">
+      {quotes.map(([quote, attribution]) => (
+        <motion.div key={attribution} variants={staggerItem} className={`${panelCls} rounded-none border-0`}>
+          <p className="text-gold">&ldquo;</p>
+          <p className="text-sm leading-relaxed text-slate-300">{quote}</p>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{attribution}</p>
+        </motion.div>
+      ))}
+    </StaggerGroup>
+  )
+}
+
+// Brief credentials/trust strip — placeholder values, swap for real figures.
+const placeholderCredentials: [string, string][] = [
+  ['Licensed & Insured', 'Commissioned Florida notary; licensed and insured for on-site services'],
+  ['Nationwide + On-Site', 'Remote support anywhere, in-person service across South Florida'],
+  ['One Point of Contact', 'A single coordinated team across every service you use'],
+]
+
+export function CredentialsStrip({ items = placeholderCredentials }: { items?: [string, string][] }) {
+  return <SplitFeatures items={items} />
+}
+
+// Simple, dependency-free FAQ — native <details>/<summary> instead of a
+// third-party accordion component (matches the codebase's no-extra-deps
+// pattern; no JS needed for the expand/collapse behavior).
+export function Faq({ items }: { items: [string, string][] }) {
+  return (
+    <div className="divide-y divide-white/10 border-y border-white/10">
+      {items.map(([question, answer]) => (
+        <details key={question} className="group py-5">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-white marker:content-none">
+            {question}
+            <span className="shrink-0 text-gold transition group-open:rotate-45">+</span>
+          </summary>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-300">{answer}</p>
+        </details>
+      ))}
+    </div>
+  )
+}
+
 // Divided service list — replaces the boxed-card grid used for service navigation.
 export function ServiceList({ items, compact = false }: { items: ServiceInfo[]; compact?: boolean }) {
   return (

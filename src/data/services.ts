@@ -110,6 +110,22 @@ export const services: ServiceInfo[] = [
     idealFor: ['Real estate and closing documents', 'Legal filings with tight deadlines', 'Recurring interoffice or client deliveries'],
   },
   {
+    slug: 'merchant-services',
+    key: 'merchant_services',
+    title: 'Merchant Services',
+    tag: 'Merchant',
+    shortDescription: 'Payment processing setup and rate review for card and online payments.',
+    heroDescription:
+      'From accepting your first card payment to reviewing what you’re paying today, we help you set up or improve how your business gets paid.',
+    highlights: [
+      'Payment processing setup for card-present and online payments',
+      'Rate and statement review against your current processor',
+      'Guidance on point-of-sale and payment system options',
+      'Support switching processors without disrupting your business',
+    ],
+    idealFor: ['New businesses setting up payments for the first time', 'Owners unsure if they’re overpaying on processing fees', 'Businesses outgrowing their current payment setup'],
+  },
+  {
     slug: 'administrative-support',
     key: 'admin_support',
     title: 'Administrative Support',

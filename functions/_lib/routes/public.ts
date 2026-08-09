@@ -23,8 +23,15 @@ publicRoutes.post('/contact', async (c) => {
     phone?: string
     service_key?: string
     message: string
+    website?: string // honeypot — real visitors never see or fill this field
   }>().catch(() => null)
   if (!body) return c.json({ error: 'invalid request body' }, 400)
+
+  // Report success without ever writing the row, so bots get no signal
+  // their submission was rejected and don't adapt.
+  if (typeof body.website === 'string' && body.website.trim()) {
+    return c.json({ ok: true }, 201)
+  }
 
   const name = (body.name || '').trim().slice(0, 200)
   const email = (body.email || '').trim().toLowerCase().slice(0, 200)

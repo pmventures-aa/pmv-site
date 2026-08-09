@@ -1,6 +1,7 @@
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { panelCls } from '../../components/public/ui'
+import { usePageMeta } from '../../lib/usePageMeta'
 
 const sections: [string, string][] = [
   [
@@ -68,6 +69,7 @@ const sections: [string, string][] = [
 ]
 
 export default function Terms() {
+  usePageMeta('Terms of Service', 'Terms of service for Pinnacle Management Ventures consulting, funding, property management, notary, inspection, courier, and administrative support.')
   return (
     <div className="min-h-screen bg-navy-950">
       <Header />

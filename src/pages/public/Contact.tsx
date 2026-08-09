@@ -5,9 +5,16 @@ import { btnPrimary, PageIntro, panelCls } from '../../components/public/ui'
 import { services } from '../../data/services'
 import { api, ApiError } from '../../lib/api'
 import { inputCls } from '../auth/AuthLayout'
+import { usePageMeta } from '../../lib/usePageMeta'
 
 export default function Contact() {
+  usePageMeta('Contact', 'Tell us what you need and we’ll follow up to map the right service and next steps.')
   const [form, setForm] = useState({ name: '', email: '', phone: '', service_key: '', message: '' })
+  // Honeypot: a field real visitors never see or fill (off-screen, not just
+  // display:none — some bots skip hidden fields but not off-screen ones).
+  // Server-side, /contact silently accepts and drops anything with it filled
+  // in rather than erroring, so bots get no signal their submission failed.
+  const [website, setWebsite] = useState('')
   const [status, setStatus] = useState<'idle' | 'busy' | 'sent'>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -20,7 +27,7 @@ export default function Contact() {
     setStatus('busy')
     setError(null)
     try {
-      await api.post('/contact', form)
+      await api.post('/contact', { ...form, website })
       setStatus('sent')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again, or email us directly.')
@@ -49,13 +56,26 @@ export default function Contact() {
               </div>
             ) : (
               <form onSubmit={onSubmit} className="space-y-4">
+                {/* Honeypot — off-screen, not display:none, and never focusable/announced. */}
+                <div className="absolute -left-[9999px] top-auto h-0 w-0 overflow-hidden" aria-hidden="true">
+                  <label>
+                    Website
+                    <input
+                      type="text"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                    />
+                  </label>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label>
-                    <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Name</span>
+                    <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Name <span className="text-gold">*</span></span>
                     <input className={inputCls} required value={form.name} onChange={(e) => set('name', e.target.value)} />
                   </label>
                   <label>
-                    <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Email</span>
+                    <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Email <span className="text-gold">*</span></span>
                     <input className={inputCls} type="email" required value={form.email} onChange={(e) => set('email', e.target.value)} />
                   </label>
                 </div>
@@ -77,13 +97,16 @@ export default function Contact() {
                   </label>
                 </div>
                 <label>
-                  <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">What do you need help with?</span>
+                  <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">What do you need help with? <span className="text-gold">*</span></span>
                   <textarea className={`${inputCls} min-h-[120px]`} required value={form.message} onChange={(e) => set('message', e.target.value)} />
                 </label>
                 {error && <p className="text-sm text-rose-300">{error}</p>}
                 <button type="submit" disabled={status === 'busy'} className={`${btnPrimary} disabled:opacity-60`}>
                   {status === 'busy' ? 'Sending…' : 'Send request'}
                 </button>
+                <p className="text-xs text-slate-500">
+                  We only use your information to respond to this request — never sold or shared with third parties.
+                </p>
               </form>
             )}
           </div>
