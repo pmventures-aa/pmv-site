@@ -61,7 +61,7 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
   const clientCount = await c.env.DB.prepare(`SELECT COUNT(*) n FROM client_profiles WHERE ${where}`).bind(...params).first<{ n: number }>()
 
   const { where: w2, params: p2 } = await scopeFilter(c.env, user)
-  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices, appts, activity] = await Promise.all([
+  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices, appts, activity, overdueTasks, overdueInvoices, staleTickets, staleInquiries] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) n FROM support_tickets WHERE ${w2} AND status = 'open'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${w2} AND status != 'closed'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${w2} AND status != 'done'`).bind(...p2).first<{ n: number }>(),
@@ -80,6 +80,36 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
        WHERE (${w2.replace(/client_user_id/g, 'ae.client_user_id')}) OR ae.client_user_id IS NULL
        ORDER BY ae.created_at DESC LIMIT 15`,
     ).bind(...p2).all(),
+    // "Needs attention" — items a staffer would otherwise have to go hunting
+    // for on separate pages: overdue tasks, overdue invoices, tickets that
+    // have sat a full day with no first response, and leads still marked
+    // 'new' two days after coming in.
+    c.env.DB.prepare(
+      `SELECT t.id, t.title, t.due_date, t.client_user_id, u.full_name AS client_name, u.email AS client_email
+       FROM client_tasks t JOIN users u ON u.id = t.client_user_id
+       WHERE ${w2.replace(/client_user_id/g, 't.client_user_id')} AND t.status != 'done' AND t.due_date IS NOT NULL AND t.due_date < date('now')
+       ORDER BY t.due_date ASC LIMIT 5`,
+    ).bind(...p2).all(),
+    c.env.DB.prepare(
+      `SELECT i.id, i.amount_cents, i.due_date, i.client_user_id, u.full_name AS client_name, u.email AS client_email
+       FROM invoices i JOIN users u ON u.id = i.client_user_id
+       WHERE ${w2.replace(/client_user_id/g, 'i.client_user_id')} AND i.status = 'open' AND i.archived_at IS NULL AND i.due_date IS NOT NULL AND i.due_date < date('now')
+       ORDER BY i.due_date ASC LIMIT 5`,
+    ).bind(...p2).all(),
+    c.env.DB.prepare(
+      `SELECT tk.id, tk.subject, tk.created_at, tk.client_user_id, u.full_name AS client_name, u.email AS client_email
+       FROM support_tickets tk JOIN users u ON u.id = tk.client_user_id
+       WHERE ${w2.replace(/client_user_id/g, 'tk.client_user_id')} AND tk.status = 'open' AND tk.archived_at IS NULL
+             AND tk.first_response_at IS NULL AND tk.created_at < datetime('now', '-1 day')
+       ORDER BY tk.created_at ASC LIMIT 5`,
+    ).bind(...p2).all(),
+    // Leads aren't assigned to specific staff, so this one isn't scoped —
+    // same as the existing /admin/inquiries list.
+    c.env.DB.prepare(
+      `SELECT id, name, email, created_at FROM contact_inquiries
+       WHERE status = 'new' AND archived_at IS NULL AND created_at < datetime('now', '-2 days')
+       ORDER BY created_at ASC LIMIT 5`,
+    ).all(),
   ])
 
   return c.json({
@@ -93,6 +123,12 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
     },
     upcoming_appointments: appts.results ?? [],
     recent_activity: activity.results ?? [],
+    needs_attention: {
+      overdue_tasks: overdueTasks.results ?? [],
+      overdue_invoices: overdueInvoices.results ?? [],
+      stale_tickets: staleTickets.results ?? [],
+      stale_inquiries: staleInquiries.results ?? [],
+    },
   })
 })
 
@@ -115,7 +151,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   const ok = await canAccessClient(c.env, user, id)
   if (!ok) return c.json({ error: 'forbidden' }, 403)
 
-  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes] = await Promise.all([
+  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes, assignedStaff, recentActivity] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT cs.*, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE client_user_id = ?').bind(id).all(),
@@ -148,9 +184,32 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
        FROM internal_notes n LEFT JOIN users a ON a.id = n.author_user_id
        WHERE n.client_user_id = ? AND n.matter_id IS NULL ORDER BY n.created_at DESC`,
     ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT u.id, u.full_name, u.email FROM staff_assignments sa JOIN users u ON u.id = sa.staff_user_id WHERE sa.client_user_id = ?`,
+    ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT ae.*, actor.full_name AS actor_name, actor.email AS actor_email
+       FROM activity_events ae LEFT JOIN users actor ON actor.id = ae.actor_user_id
+       WHERE ae.client_user_id = ? ORDER BY ae.created_at DESC LIMIT 10`,
+    ).bind(id).all(),
   ])
 
   if (!account) return c.json({ error: 'not found' }, 404)
+
+  // Onboarding progress — required questions across the client's selected
+  // services vs. how many they've actually answered. Distinct from the
+  // completed flag: a client can be mid-wizard (some answers saved, flag
+  // still 0) or have answered nothing yet if they haven't picked services.
+  const onboardingTotals = await c.env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(DISTINCT q.question_key || '::' || q.service_key)
+        FROM onboarding_questions q JOIN client_services cs ON cs.service_key = q.service_key
+        WHERE cs.client_user_id = ? AND q.required = 1) AS total,
+       (SELECT COUNT(DISTINCT r.question_key || '::' || r.service_key)
+        FROM client_onboarding_responses r
+        JOIN onboarding_questions q ON q.service_key = r.service_key AND q.question_key = r.question_key
+        WHERE r.client_user_id = ? AND q.required = 1 AND r.value IS NOT NULL AND r.value != '') AS answered`,
+  ).bind(id, id).first<{ total: number; answered: number }>()
 
   return c.json({
     account,
@@ -169,7 +228,52 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
     application_answers: answers.results ?? [],
     payment_methods: paymentMethods.results ?? [],
     notes: notes.results ?? [],
+    assigned_staff: assignedStaff.results ?? [],
+    recent_activity: recentActivity.results ?? [],
+    onboarding_progress: { answered: onboardingTotals?.answered ?? 0, total: onboardingTotals?.total ?? 0 },
   })
+})
+
+// Staff/admin editable client contact + business profile -- scoped like
+// every other client-touching write (canAccessClient), not requireAdmin,
+// since staff already edit matters/tasks/etc. for clients they're assigned
+// to. Separate from PATCH /portal/profile (self.ts), which is the client's
+// own requireClient-only endpoint for the same client_profiles columns.
+adminRoutes.patch('/clients/:id/profile', requireStaff, async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id')!
+  const ok = await canAccessClient(c.env, user, id)
+  if (!ok) return c.json({ error: 'forbidden' }, 403)
+
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>)
+  const profileFields: Record<string, string | null> = {}
+  for (const key of ['business_name', 'entity_type', 'ein', 'state'] as const) {
+    if (typeof body[key] === 'string') profileFields[key] = (body[key] as string).trim().slice(0, 200) || null
+  }
+  const userFields: Record<string, string | null> = {}
+  for (const key of ['full_name', 'phone'] as const) {
+    if (typeof body[key] === 'string') userFields[key] = (body[key] as string).trim().slice(0, 200) || null
+  }
+  const profileCols = Object.keys(profileFields)
+  const userCols = Object.keys(userFields)
+  if (profileCols.length === 0 && userCols.length === 0) return c.json({ error: 'no valid fields supplied' }, 400)
+
+  const stmts: D1PreparedStatement[] = []
+  if (profileCols.length > 0) {
+    stmts.push(
+      c.env.DB.prepare(`UPDATE client_profiles SET ${profileCols.map((k) => `${k} = ?`).join(', ')} WHERE user_id = ?`)
+        .bind(...profileCols.map((k) => profileFields[k]), id),
+    )
+  }
+  if (userCols.length > 0) {
+    stmts.push(
+      c.env.DB.prepare(`UPDATE users SET ${userCols.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`)
+        .bind(...userCols.map((k) => userFields[k]), id),
+    )
+  }
+  stmts.push(activityInsert(c.env, { actorUserId: user.id, clientUserId: id, kind: 'client_profile_updated', detail: { ...profileFields, ...userFields } }))
+  await c.env.DB.batch(stmts)
+  return c.json({ ok: true })
 })
 
 // ---------------- internal notes (staff-only, never exposed to clients) ----------------
@@ -549,6 +653,30 @@ adminRoutes.post('/assignments', requireAdmin, async (c) => {
      ON CONFLICT(staff_user_id, client_user_id) DO NOTHING`,
   ).bind(id, staff_user_id, client_user_id).run()
   return c.json({ ok: true, id }, 201)
+})
+
+// Same access-granting concern as the single-assignment route above —
+// admin-only. Ignores duplicates the same way (ON CONFLICT DO NOTHING) so
+// re-running a bulk assign over an overlapping client set is a no-op for
+// pairs that already exist rather than an error.
+adminRoutes.post('/assignments/bulk', requireAdmin, async (c) => {
+  const user = c.get('user')
+  const { staff_user_id, client_user_ids } = await c.req
+    .json<{ staff_user_id: string; client_user_ids: string[] }>()
+    .catch(() => ({ staff_user_id: '', client_user_ids: [] as string[] }))
+  if (!staff_user_id || !Array.isArray(client_user_ids) || client_user_ids.length === 0) {
+    return c.json({ error: 'staff_user_id and at least one client_user_id are required' }, 400)
+  }
+  const ids = [...new Set(client_user_ids)].slice(0, 500)
+  const stmts = ids.map((clientId) =>
+    c.env.DB.prepare(
+      `INSERT INTO staff_assignments (id, staff_user_id, client_user_id) VALUES (?, ?, ?)
+       ON CONFLICT(staff_user_id, client_user_id) DO NOTHING`,
+    ).bind(uuid(), staff_user_id, clientId),
+  )
+  stmts.push(activityInsert(c.env, { actorUserId: user.id, kind: 'bulk_assignment_created', detail: { staff_user_id, client_count: ids.length } }))
+  await c.env.DB.batch(stmts)
+  return c.json({ ok: true, count: ids.length }, 201)
 })
 
 adminRoutes.delete('/assignments/:id', requireAdmin, async (c) => {

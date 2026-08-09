@@ -28,7 +28,8 @@ export default function AssignmentsAdmin() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [users, setUsers] = useState<UserRow[]>([])
   const [staffId, setStaffId] = useState('')
-  const [clientId, setClientId] = useState('')
+  const [clientIds, setClientIds] = useState<Set<string>>(new Set())
+  const [clientFilter, setClientFilter] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [pendingRemove, setPendingRemove] = useState<Assignment | null>(null)
@@ -57,20 +58,33 @@ export default function AssignmentsAdmin() {
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault()
-    if (!staffId || !clientId) return
+    if (!staffId || clientIds.size === 0) return
     setBusy(true)
     setError(null)
     try {
-      await api.post('/admin/assignments', { staff_user_id: staffId, client_user_id: clientId })
+      const r = await api.post<{ count: number }>('/admin/assignments/bulk', {
+        staff_user_id: staffId,
+        client_user_ids: [...clientIds],
+      })
       setStaffId('')
-      setClientId('')
-      toast.success('Assignment created.')
+      setClientIds(new Set())
+      setClientFilter('')
+      toast.success(r.count === 1 ? 'Assignment created.' : `${r.count} clients assigned.`)
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not create assignment.')
+      setError(err instanceof ApiError ? err.message : 'Could not create assignment(s).')
     } finally {
       setBusy(false)
     }
+  }
+
+  function toggleClient(id: string) {
+    setClientIds((cur) => {
+      const next = new Set(cur)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   async function confirmRemove() {
@@ -107,7 +121,7 @@ export default function AssignmentsAdmin() {
 
       {isAdmin && (
       <Panel className="mb-6">
-        <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-3">
+        <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
           <label>
             <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Staff member</span>
             <select className={inputCls} value={staffId} onChange={(e) => setStaffId(e.target.value)}>
@@ -119,23 +133,38 @@ export default function AssignmentsAdmin() {
               ))}
             </select>
           </label>
-          <label>
-            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Client</span>
-            <select className={inputCls} value={clientId} onChange={(e) => setClientId(e.target.value)}>
-              <option value="">Select…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.full_name || c.email}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex items-end gap-3">
-            <button type="submit" disabled={busy} className={btnPrimary}>
-              {busy ? 'Saving…' : 'Assign'}
-            </button>
+          <div>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              Clients {clientIds.size > 0 ? `(${clientIds.size} selected)` : ''}
+            </span>
+            <input
+              className={`${inputCls} mb-2`}
+              placeholder="Filter clients…"
+              value={clientFilter}
+              onChange={(e) => setClientFilter(e.target.value)}
+            />
+            <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-white/10 p-2">
+              {clients
+                .filter((c) => {
+                  const q = clientFilter.trim().toLowerCase()
+                  if (!q) return true
+                  return (c.full_name || '').toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+                })
+                .map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm text-slate-200 hover:bg-white/5">
+                    <input type="checkbox" checked={clientIds.has(c.id)} onChange={() => toggleClient(c.id)} />
+                    {c.full_name || c.email}
+                  </label>
+                ))}
+              {clients.length === 0 && <p className="px-2 py-1 text-sm text-slate-500">No clients yet.</p>}
+            </div>
           </div>
-          {error && <span className="text-sm text-rose-300 sm:col-span-3">{error}</span>}
+          <div className="flex items-center gap-3 sm:col-span-2">
+            <button type="submit" disabled={busy || !staffId || clientIds.size === 0} className={`${btnPrimary} disabled:opacity-60`}>
+              {busy ? 'Saving…' : clientIds.size > 1 ? `Assign ${clientIds.size} clients` : 'Assign'}
+            </button>
+            {error && <span className="text-sm text-rose-300">{error}</span>}
+          </div>
         </form>
       </Panel>
       )}
@@ -146,7 +175,7 @@ export default function AssignmentsAdmin() {
             <EmptyState label="No assignments yet." />
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[520px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-3 font-medium">Staff</th>

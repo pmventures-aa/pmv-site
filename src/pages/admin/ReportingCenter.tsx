@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, NoAccess, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, NoAccess, inputCls, btnPrimary, btnOutline, SkeletonStatCard, SkeletonTable } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { useCapabilities } from '../../lib/capabilities'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
@@ -172,6 +172,7 @@ export default function ReportingCenter() {
           const r = results[key]
           const col = r?.columns[0]
           const val = r?.rows[0]?.[col?.key ?? '']
+          if (loadingKeys.has(key) && !r) return <SkeletonStatCard key={key} />
           return (
             <Panel key={key} className="p-5">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{r?.label ?? key.replace(/_/g, ' ')}</p>
@@ -271,15 +272,15 @@ function ReportCard({
         </div>
       </div>
       <div className="p-5">
-        {loading ? (
-          <p className="text-sm text-slate-400">Loading…</p>
+        {loading && !result ? (
+          <SkeletonTable rows={3} cols={4} />
         ) : !result || result.rows.length === 0 ? (
           <p className="text-sm text-slate-500">No data for this range.</p>
         ) : isSingleStat ? (
           <p className="font-display text-3xl font-medium text-white tabular-nums">{formatValue(result.rows[0][result.columns[0].key], result.columns[0].type)}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                   {result.columns.map((c) => (

@@ -50,6 +50,35 @@ export function EmptyState({ label }: { label: string }) {
   return <div className="rounded-md border border-dashed border-white/10 py-10 text-center text-sm text-slate-500">{label}</div>
 }
 
+// A single pulsing placeholder bar. Compose into skeleton layouts for
+// cards/tables while data is loading, instead of bare "Loading…" text.
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-white/10 ${className}`} />
+}
+
+export function SkeletonStatCard() {
+  return (
+    <Panel className="p-5">
+      <Skeleton className="h-3 w-24" />
+      <Skeleton className="mt-3 h-8 w-16" />
+    </Panel>
+  )
+}
+
+export function SkeletonTable({ rows = 4, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} className="flex gap-4">
+          {Array.from({ length: cols }).map((_, c) => (
+            <Skeleton key={c} className="h-4 flex-1" />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // Shown instead of a blank/broken page when a staff member hits a
 // capability-gated route (Users, Assignments, Settings) without the grant —
 // e.g. an old bookmark, or before an admin has granted them access.

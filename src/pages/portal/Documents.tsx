@@ -111,7 +111,7 @@ export default function Documents() {
             <EmptyState label="No documents logged yet." />
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[520px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-3 font-medium">File</th>

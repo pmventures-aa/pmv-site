@@ -85,6 +85,10 @@ export function describeActivity(e: ActivityEvent): string {
       return `${actor} viewed banking details for ${client} (account ending ${d.account_last4 ?? '····'})`
     case 'staff_profile_updated':
       return `${actor} updated ${d.name || 'a staff member'}’s role to ${fmtStatus(d.staff_role)}`
+    case 'client_profile_updated':
+      return `${actor} updated ${client}’s profile`
+    case 'bulk_assignment_created':
+      return `${actor} assigned ${d.client_count ?? 'several'} client${d.client_count === 1 ? '' : 's'} to a staff member`
     case 'message_received':
       return `${client} sent a message — “${d.subject}”`
     case 'message_sent':

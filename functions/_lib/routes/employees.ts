@@ -47,7 +47,7 @@ employeeRoutes.get('/employees/:id', requireAdmin, async (c) => {
   if (!employee) return c.json({ error: 'not found' }, 404)
 
   const [logins, tasks, notes, avgResponse] = await Promise.all([
-    c.env.DB.prepare("SELECT created_at, actor_ip FROM audit_log WHERE actor_user_id = ? AND action = 'login' ORDER BY created_at DESC LIMIT 20").bind(id).all(),
+    c.env.DB.prepare("SELECT created_at, actor_ip, actor_user_agent FROM audit_log WHERE actor_user_id = ? AND action = 'login' ORDER BY created_at DESC LIMIT 20").bind(id).all(),
     c.env.DB.prepare(
       `SELECT t.id, t.title, t.status, t.due_date, t.created_at, u.full_name AS client_name, u.email AS client_email
        FROM client_tasks t JOIN users u ON u.id = t.client_user_id

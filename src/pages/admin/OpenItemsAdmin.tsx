@@ -53,7 +53,7 @@ export default function OpenItemsAdmin() {
         </Panel>
       ) : (
         <Panel className="overflow-x-auto !p-0">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-3 font-medium">Client</th>

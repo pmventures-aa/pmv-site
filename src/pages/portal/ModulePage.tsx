@@ -169,7 +169,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
             <EmptyState label={config.emptyLabel} />
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 {config.columns.map((col) => (
