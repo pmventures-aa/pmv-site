@@ -280,7 +280,7 @@ function ReportCard({
           <p className="font-display text-3xl font-medium text-white tabular-nums">{formatValue(result.rows[0][result.columns[0].key], result.columns[0].type)}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                   {result.columns.map((c) => (

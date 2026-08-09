@@ -505,7 +505,7 @@ function StaffTab() {
       {isAdmin && users.length > 0 && (
         <Panel className="mb-5 overflow-x-auto !p-0">
           <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">All grants at a glance</h3>
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[520px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-2 font-medium">Name</th>
