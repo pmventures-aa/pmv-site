@@ -61,7 +61,7 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
   const clientCount = await c.env.DB.prepare(`SELECT COUNT(*) n FROM client_profiles WHERE ${where}`).bind(...params).first<{ n: number }>()
 
   const { where: w2, params: p2 } = await scopeFilter(c.env, user)
-  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices, appts, activity] = await Promise.all([
+  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices, appts, activity, overdueTasks, overdueInvoices, staleTickets, staleInquiries] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) n FROM support_tickets WHERE ${w2} AND status = 'open'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${w2} AND status != 'closed'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${w2} AND status != 'done'`).bind(...p2).first<{ n: number }>(),
@@ -80,6 +80,36 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
        WHERE (${w2.replace(/client_user_id/g, 'ae.client_user_id')}) OR ae.client_user_id IS NULL
        ORDER BY ae.created_at DESC LIMIT 15`,
     ).bind(...p2).all(),
+    // "Needs attention" — items a staffer would otherwise have to go hunting
+    // for on separate pages: overdue tasks, overdue invoices, tickets that
+    // have sat a full day with no first response, and leads still marked
+    // 'new' two days after coming in.
+    c.env.DB.prepare(
+      `SELECT t.id, t.title, t.due_date, t.client_user_id, u.full_name AS client_name, u.email AS client_email
+       FROM client_tasks t JOIN users u ON u.id = t.client_user_id
+       WHERE ${w2.replace(/client_user_id/g, 't.client_user_id')} AND t.status != 'done' AND t.due_date IS NOT NULL AND t.due_date < date('now')
+       ORDER BY t.due_date ASC LIMIT 5`,
+    ).bind(...p2).all(),
+    c.env.DB.prepare(
+      `SELECT i.id, i.amount_cents, i.due_date, i.client_user_id, u.full_name AS client_name, u.email AS client_email
+       FROM invoices i JOIN users u ON u.id = i.client_user_id
+       WHERE ${w2.replace(/client_user_id/g, 'i.client_user_id')} AND i.status = 'open' AND i.archived_at IS NULL AND i.due_date IS NOT NULL AND i.due_date < date('now')
+       ORDER BY i.due_date ASC LIMIT 5`,
+    ).bind(...p2).all(),
+    c.env.DB.prepare(
+      `SELECT tk.id, tk.subject, tk.created_at, tk.client_user_id, u.full_name AS client_name, u.email AS client_email
+       FROM support_tickets tk JOIN users u ON u.id = tk.client_user_id
+       WHERE ${w2.replace(/client_user_id/g, 'tk.client_user_id')} AND tk.status = 'open' AND tk.archived_at IS NULL
+             AND tk.first_response_at IS NULL AND tk.created_at < datetime('now', '-1 day')
+       ORDER BY tk.created_at ASC LIMIT 5`,
+    ).bind(...p2).all(),
+    // Leads aren't assigned to specific staff, so this one isn't scoped —
+    // same as the existing /admin/inquiries list.
+    c.env.DB.prepare(
+      `SELECT id, name, email, created_at FROM contact_inquiries
+       WHERE status = 'new' AND archived_at IS NULL AND created_at < datetime('now', '-2 days')
+       ORDER BY created_at ASC LIMIT 5`,
+    ).all(),
   ])
 
   return c.json({
@@ -93,6 +123,12 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
     },
     upcoming_appointments: appts.results ?? [],
     recent_activity: activity.results ?? [],
+    needs_attention: {
+      overdue_tasks: overdueTasks.results ?? [],
+      overdue_invoices: overdueInvoices.results ?? [],
+      stale_tickets: staleTickets.results ?? [],
+      stale_inquiries: staleInquiries.results ?? [],
+    },
   })
 })
 
