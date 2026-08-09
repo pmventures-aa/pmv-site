@@ -11,7 +11,7 @@ const clean = (value: unknown, max = 300) => typeof value === 'string' ? value.t
 
 crmWriteRoutes.post('/crm/records', async (c) => {
   const actor = c.get('user')
-  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}))
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as any))
   const recordType = body.record_type === 'business' ? 'business' : 'person'
   const firstName = clean(body.first_name, 100)
   const lastName = clean(body.last_name, 100)

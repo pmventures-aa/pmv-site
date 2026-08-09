@@ -179,7 +179,7 @@ crmRoutes.patch('/crm/records/:id', async (c) => {
   const id = c.req.param('id')
   const existing = await c.env.DB.prepare('SELECT * FROM contact_inquiries WHERE id = ?').bind(id).first<any>()
   if (!existing) return c.json({ error: 'not found' }, 404)
-  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}))
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as any))
 
   const textFields = [
     'first_name', 'last_name', 'company_name', 'job_title', 'website', 'industry', 'source', 'phone', 'service_key',
@@ -220,7 +220,7 @@ crmRoutes.post('/crm/records/:id/notes', async (c) => {
   const id = c.req.param('id')
   const record = await c.env.DB.prepare('SELECT id FROM contact_inquiries WHERE id = ?').bind(id).first()
   if (!record) return c.json({ error: 'not found' }, 404)
-  const body = await c.req.json<{ body?: string }>().catch(() => ({}))
+  const body = await c.req.json<{ body?: string }>().catch(() => ({} as any))
   const note = clean(body.body, 8000)
   if (!note) return c.json({ error: 'note is required' }, 400)
   const noteId = uuid()
@@ -243,7 +243,7 @@ crmRoutes.get('/crm/lists', async (c) => {
 
 crmRoutes.post('/crm/lists', async (c) => {
   const actor = c.get('user')
-  const body = await c.req.json<{ name?: string; description?: string; list_type?: string; record_type?: string; filter?: DynamicFilter }>().catch(() => ({}))
+  const body = await c.req.json<{ name?: string; description?: string; list_type?: string; record_type?: string; filter?: DynamicFilter }>().catch(() => ({} as any))
   const name = clean(body.name, 160)
   if (!name) return c.json({ error: 'name is required' }, 400)
   const listType = body.list_type === 'dynamic' ? 'dynamic' : 'static'
@@ -258,7 +258,7 @@ crmRoutes.post('/crm/lists', async (c) => {
 
 crmRoutes.patch('/crm/lists/:id', async (c) => {
   const id = c.req.param('id')
-  const body = await c.req.json<{ name?: string; description?: string; filter?: DynamicFilter; archived?: boolean }>().catch(() => ({}))
+  const body = await c.req.json<{ name?: string; description?: string; filter?: DynamicFilter; archived?: boolean }>().catch(() => ({} as any))
   const row = await c.env.DB.prepare('SELECT * FROM crm_lists WHERE id = ?').bind(id).first<any>()
   if (!row) return c.json({ error: 'not found' }, 404)
   await c.env.DB.prepare(
@@ -285,7 +285,7 @@ crmRoutes.post('/crm/lists/:id/members', async (c) => {
   const list = await c.env.DB.prepare('SELECT list_type FROM crm_lists WHERE id = ? AND archived_at IS NULL').bind(listId).first<{ list_type: string }>()
   if (!list) return c.json({ error: 'not found' }, 404)
   if (list.list_type !== 'static') return c.json({ error: 'dynamic segments are controlled by their filter rules' }, 400)
-  const body = await c.req.json<{ inquiry_ids?: string[] }>().catch(() => ({}))
+  const body = await c.req.json<{ inquiry_ids?: string[] }>().catch(() => ({} as any))
   const ids = Array.isArray(body.inquiry_ids) ? [...new Set(body.inquiry_ids.filter((v) => typeof v === 'string'))].slice(0, 5000) : []
   if (ids.length === 0) return c.json({ error: 'pick at least one record' }, 400)
   await c.env.DB.batch(ids.map((recordId) => c.env.DB.prepare(
@@ -308,7 +308,7 @@ crmRoutes.post('/crm/imports', async (c) => {
     record_type?: string
     duplicate_mode?: 'skip' | 'update'
     rows?: Record<string, unknown>[]
-  }>().catch(() => ({}))
+  }>().catch(() => ({} as any))
   const rows = Array.isArray(body.rows) ? body.rows.slice(0, 2000) : []
   if (rows.length === 0) return c.json({ error: 'no import rows supplied' }, 400)
   const defaultType = normalizeRecordType(body.record_type)

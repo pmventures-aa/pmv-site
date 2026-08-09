@@ -235,7 +235,7 @@ commsRoutes.get('/comms/messages', requireStaff, async (c) => {
 })
 
 commsRoutes.get('/comms/messages/:id', requireStaff, async (c) => {
-  const id = c.req.param('id')
+  const id = c.req.param('id') ?? ''
   const [message, recipients] = await Promise.all([
     c.env.DB.prepare(`SELECT m.*, u.full_name AS created_by_name FROM comms_messages m JOIN users u ON u.id = m.created_by_user_id WHERE m.id = ?`).bind(id).first(),
     c.env.DB.prepare('SELECT * FROM comms_recipients WHERE message_id = ? ORDER BY full_name, email').bind(id).all(),
@@ -340,7 +340,7 @@ commsRoutes.post('/comms/audience/preview', requireStaff, requireCapability('can
 
 commsRoutes.post('/comms/messages/:id/send', requireStaff, requireCapability('can_manage_communications'), async (c) => {
   const user = c.get('user')
-  const id = c.req.param('id')
+  const id = c.req.param('id') ?? ''
   const message = await c.env.DB.prepare('SELECT * FROM comms_messages WHERE id = ?').bind(id).first<any>()
   if (!message) return c.json({ error: 'not found' }, 404)
   if (message.status !== 'draft') return c.json({ error: 'only drafts can be sent this way' }, 400)
@@ -355,7 +355,7 @@ commsRoutes.post('/comms/messages/:id/send', requireStaff, requireCapability('ca
 })
 
 commsRoutes.delete('/comms/messages/:id', requireStaff, requireCapability('can_manage_communications'), async (c) => {
-  const id = c.req.param('id')
+  const id = c.req.param('id') ?? ''
   const message = await c.env.DB.prepare('SELECT status FROM comms_messages WHERE id = ?').bind(id).first<{ status: string }>()
   if (!message) return c.json({ error: 'not found' }, 404)
   if (message.status === 'sending' || message.status === 'sent') return c.json({ error: 'a message that has already gone out cannot be canceled' }, 400)
