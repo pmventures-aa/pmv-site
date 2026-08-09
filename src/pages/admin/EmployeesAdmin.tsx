@@ -13,6 +13,8 @@ interface Employee {
   status: string
   staff_role: string | null
   title: string | null
+  party_type: string | null
+  vendor_category: string | null
   tasks_assigned: number
   tasks_completed: number
   tasks_overdue: number
@@ -22,13 +24,16 @@ interface Employee {
 }
 
 type SortKey = 'name' | 'tasks_assigned' | 'tasks_completed' | 'tasks_overdue' | 'last_seen_at'
+type FilterKey = 'all' | 'employees' | 'vendors' | 'pending'
 
 export default function EmployeesAdmin() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [sort, setSort] = useState<SortKey>('name')
+  const [filter, setFilter] = useState<FilterKey>('all')
   const [selected, setSelected] = useState<Employee | null>(null)
+  const [approving, setApproving] = useState<string | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -44,7 +49,32 @@ export default function EmployeesAdmin() {
 
   useEffect(load, [])
 
-  const sorted = [...employees].sort((a, b) => {
+  async function approve(e: Employee) {
+    setApproving(e.id)
+    try {
+      await api.patch(`/admin/users/${e.id}/staff-profile`, {
+        staff_role: e.staff_role || 'representative',
+        title: e.title,
+        party_type: e.party_type === 'vendor' ? 'vendor' : 'employee',
+        vendor_category: e.vendor_category,
+        status: 'active',
+      })
+      load()
+    } catch {
+      window.alert('Could not approve this account.')
+    } finally {
+      setApproving(null)
+    }
+  }
+
+  const filtered = employees.filter((e) => {
+    if (filter === 'employees') return e.party_type !== 'vendor'
+    if (filter === 'vendors') return e.party_type === 'vendor'
+    if (filter === 'pending') return e.status === 'pending'
+    return true
+  })
+
+  const sorted = [...filtered].sort((a, b) => {
     switch (sort) {
       case 'tasks_assigned':
         return b.tasks_assigned - a.tasks_assigned
@@ -63,9 +93,28 @@ export default function EmployeesAdmin() {
     <div>
       <PageIntro
         kicker="Team performance"
-        title="Employees"
-        subtitle="Login activity, workload, and response times across the team. Admin/Owner only."
+        title="Team & Vendors"
+        subtitle="Login activity, workload, and response times across employees and vendors/providers. Admin/Owner only."
       />
+
+      <div className="mb-4 flex gap-2">
+        {(['all', 'employees', 'vendors', 'pending'] as FilterKey[]).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition ${
+              filter === f ? 'border-gold bg-gold/10 text-gold' : 'border-white/10 text-slate-400 hover:text-white'
+            }`}
+          >
+            {f}
+            {f === 'pending' && employees.some((e) => e.status === 'pending') && (
+              <span className="ml-1.5 rounded-full bg-rose-400/20 px-1.5 text-rose-300">
+                {employees.filter((e) => e.status === 'pending').length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
 
       {loading ? (
         <p className="text-sm text-slate-400">Loading…</p>
@@ -88,6 +137,7 @@ export default function EmployeesAdmin() {
                 <th className="cursor-pointer px-5 py-3 font-medium" onClick={() => setSort('name')}>
                   Name
                 </th>
+                <th className="px-5 py-3 font-medium">Type</th>
                 <th className="px-5 py-3 font-medium">Role</th>
                 <th className="cursor-pointer px-5 py-3 font-medium" onClick={() => setSort('last_seen_at')}>
                   Last active
@@ -102,18 +152,27 @@ export default function EmployeesAdmin() {
                   Overdue
                 </th>
                 <th className="px-5 py-3 font-medium">Notes / Emails</th>
+                <th className="px-5 py-3 font-medium" />
               </tr>
             </thead>
             <tbody>
               {sorted.map((e) => (
-                <tr key={e.id} className="cursor-pointer border-t border-white/5 hover:bg-white/[0.02]" onClick={() => setSelected(e)}>
-                  <td className="px-5 py-3 text-slate-200">
+                <tr key={e.id} className="border-t border-white/5 hover:bg-white/[0.02]">
+                  <td className="cursor-pointer px-5 py-3 text-slate-200" onClick={() => setSelected(e)}>
                     {e.full_name || e.email}
                     {e.status === 'suspended' && (
                       <Tag tone="red">
                         <span className="ml-1">suspended</span>
                       </Tag>
                     )}
+                    {e.status === 'pending' && (
+                      <Tag tone="gold">
+                        <span className="ml-1">pending</span>
+                      </Tag>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-slate-400">
+                    {e.party_type === 'vendor' ? <Tag tone="blue">Vendor{e.vendor_category ? ` · ${e.vendor_category}` : ''}</Tag> : <Tag>Employee</Tag>}
                   </td>
                   <td className="px-5 py-3 text-slate-400">{e.title || e.staff_role?.replace(/_/g, ' ') || '—'}</td>
                   <td className="px-5 py-3 text-slate-400">{e.last_seen_at ? timeAgo(e.last_seen_at) : 'never'}</td>
@@ -124,6 +183,20 @@ export default function EmployeesAdmin() {
                   </td>
                   <td className="px-5 py-3 text-slate-400 tabular-nums">
                     {e.notes_added} / {e.emails_sent}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    {e.status === 'pending' && (
+                      <button
+                        className="rounded-md border border-emerald-400/30 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-400/10 disabled:opacity-60"
+                        disabled={approving === e.id}
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          approve(e)
+                        }}
+                      >
+                        {approving === e.id ? 'Approving…' : 'Approve'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -8,6 +8,7 @@ interface StaffUser {
   id: string
   email: string
   role: string
+  status: string
   full_name: string | null
   staff_role: string | null
   title: string | null
@@ -16,7 +17,10 @@ interface StaffUser {
   can_manage_settings: number | null
   can_view_reports: number | null
   can_view_audit_log: number | null
+  can_manage_communications: number | null
   is_owner: number | null
+  party_type: string | null
+  vendor_category: string | null
 }
 
 const STAFF_ROLE_OPTIONS = [
@@ -64,7 +68,11 @@ export default function StaffSettings() {
         can_manage_settings: !!u.can_manage_settings,
         can_view_reports: !!u.can_view_reports,
         can_view_audit_log: !!u.can_view_audit_log,
+        can_manage_communications: !!u.can_manage_communications,
         is_owner: !!u.is_owner,
+        party_type: u.party_type === 'vendor' ? 'vendor' : 'employee',
+        vendor_category: u.vendor_category,
+        status: u.status === 'suspended' ? 'suspended' : 'active',
       })
       toast.success(`Updated ${u.full_name || u.email}.`)
     } catch (err) {
@@ -97,15 +105,45 @@ export default function StaffSettings() {
         {users.map((u) => (
           <Panel key={u.id}>
             <div className="mb-3 flex items-center justify-between">
-              <div><p className="font-medium text-white">{u.full_name || u.email}</p><p className="text-xs text-slate-500">{u.email} · <Tag tone={u.role === 'admin' ? 'gold' : 'slate'}>{u.role}</Tag></p></div>
+              <div>
+                <p className="font-medium text-white">{u.full_name || u.email}</p>
+                <p className="text-xs text-slate-500">
+                  {u.email} · <Tag tone={u.role === 'admin' ? 'gold' : 'slate'}>{u.role}</Tag>{' '}
+                  {u.party_type === 'vendor' && <Tag tone="blue">vendor</Tag>}{' '}
+                  {u.status === 'pending' && <Tag tone="gold">pending</Tag>}
+                  {u.status === 'suspended' && <Tag tone="red">suspended</Tag>}
+                </p>
+              </div>
               {isAdmin && <button onClick={() => save(u)} className={`${btnOutline} text-xs`}>Save</button>}
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Staff role</span><select className={inputCls} disabled={!isAdmin} value={u.staff_role ?? 'representative'} onChange={(e) => setUsers((us) => us.map((x) => x.id === u.id ? { ...x, staff_role: e.target.value } : x))}>{STAFF_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}</select></label>
               <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Title</span><input className={inputCls} disabled={!isAdmin} value={u.title ?? ''} onChange={(e) => setUsers((us) => us.map((x) => x.id === u.id ? { ...x, title: e.target.value } : x))} /></label>
             </div>
+            {u.role !== 'admin' && (
+              <div className="mt-3 grid gap-3 border-t border-white/10 pt-3 sm:grid-cols-3">
+                <label>
+                  <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Type</span>
+                  <select className={inputCls} disabled={!isAdmin} value={u.party_type === 'vendor' ? 'vendor' : 'employee'} onChange={(e) => setUsers((us) => us.map((x) => x.id === u.id ? { ...x, party_type: e.target.value } : x))}>
+                    <option value="employee">Employee</option>
+                    <option value="vendor">Vendor / provider</option>
+                  </select>
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Vendor category</span>
+                  <input className={inputCls} disabled={!isAdmin || u.party_type !== 'vendor'} placeholder="What they provide" value={u.vendor_category ?? ''} onChange={(e) => setUsers((us) => us.map((x) => x.id === u.id ? { ...x, vendor_category: e.target.value } : x))} />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Account status</span>
+                  <select className={inputCls} disabled={!isAdmin} value={u.status === 'suspended' ? 'suspended' : 'active'} onChange={(e) => setUsers((us) => us.map((x) => x.id === u.id ? { ...x, status: e.target.value } : x))}>
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </label>
+              </div>
+            )}
             {u.role !== 'admin' && <div className="mt-3 flex flex-wrap gap-4 border-t border-white/10 pt-3">{([
-              ['can_reveal_payment_info', 'View decrypted banking info'], ['can_manage_users', 'Manage users (not admin promotion)'], ['can_manage_settings', 'Manage settings & service catalog'], ['can_view_reports', 'View the Reporting Center'], ['can_view_audit_log', 'View the Audit Log'],
+              ['can_reveal_payment_info', 'View decrypted banking info'], ['can_manage_users', 'Manage users (not admin promotion)'], ['can_manage_settings', 'Manage settings & service catalog'], ['can_view_reports', 'View the Reporting Center'], ['can_view_audit_log', 'View the Audit Log'], ['can_manage_communications', 'Compose & send from the Communications Center'],
             ] as const).map(([key, label]) => <label key={key} className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" disabled={!isAdmin} checked={!!u[key]} onChange={(e) => setUsers((us) => us.map((x) => x.id === u.id ? { ...x, [key]: e.target.checked ? 1 : 0 } : x))} />{label}</label>)}</div>}
             {u.role === 'admin' && <div className="mt-3 border-t border-white/10 pt-3"><label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" disabled={!isAdmin} checked={!!u.is_owner} onChange={(e) => setUsers((us) => us.map((x) => x.id === u.id ? { ...x, is_owner: e.target.checked ? 1 : 0 } : x))} />Owner — can permanently delete archived records</label></div>}
           </Panel>

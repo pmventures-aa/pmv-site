@@ -21,7 +21,7 @@ employeeRoutes.get('/staff-directory', requireStaff, async (c) => {
 employeeRoutes.get('/employees', requireAdmin, async (c) => {
   const res = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status,
-            tm.staff_role, tm.title,
+            tm.staff_role, tm.title, tm.party_type, tm.vendor_category,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id) AS tasks_assigned,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status = 'done') AS tasks_completed,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status != 'done' AND due_date IS NOT NULL AND due_date < date('now')) AS tasks_overdue,
@@ -40,7 +40,8 @@ employeeRoutes.get('/employees/:id', requireAdmin, async (c) => {
   const employee = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status, u.created_at,
             tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
-            tm.can_view_reports, tm.can_view_audit_log, tm.is_owner
+            tm.can_view_reports, tm.can_view_audit_log, tm.can_manage_communications, tm.is_owner,
+            tm.party_type, tm.vendor_category
      FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
      WHERE u.id = ?`,
   ).bind(id).first()

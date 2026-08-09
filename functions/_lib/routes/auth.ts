@@ -108,6 +108,74 @@ authRoutes.post('/signup', async (c) => {
   return c.json({ ok: true, user: su }, 201)
 })
 
+// ---------- self-service signup (vendors/providers) ----------
+// Creates a staff-role account like any employee, but party_type='vendor'
+// and status='pending' — the existing `status !== 'active'` check in the
+// login handlers below already blocks sign-in, so a pending vendor simply
+// can't log in until an admin/owner approves them from Team & Vendors
+// (which sets status='active' and assigns capabilities/role there).
+authRoutes.post('/vendor-signup', async (c) => {
+  const body = await c.req.json<{
+    email: string
+    password: string
+    full_name: string
+    phone?: string
+    company_name?: string
+    vendor_category?: string
+    notes?: string
+  }>().catch(() => null)
+  if (!body) return c.json({ error: 'invalid request body' }, 400)
+
+  const e = norm(body.email)
+  const fullName = cleanName(body.full_name)
+  const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) : ''
+  const vendorCategory = typeof body.vendor_category === 'string' ? body.vendor_category.trim().slice(0, 100) : ''
+  const companyName = typeof body.company_name === 'string' ? body.company_name.trim().slice(0, 200) : ''
+  const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 2000) : ''
+
+  if (!e || !e.includes('@')) return c.json({ error: 'a valid email is required' }, 400)
+  if (!fullName) return c.json({ error: 'your name is required' }, 400)
+  if (!vendorCategory) return c.json({ error: 'please describe what you provide' }, 400)
+  if (!body.password || body.password.length < MIN_PASSWORD) {
+    return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
+  }
+
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  if (await signupThrottled(c.env, ip)) {
+    return c.json({ error: 'too many signups from this network — try again later' }, 429)
+  }
+
+  const exists = await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(e).first()
+  if (exists) return c.json({ error: 'an account with that email already exists' }, 409)
+
+  const id = uuid()
+  const hash = await hashPassword(body.password, c.env.SESSION_SECRET)
+  const title = companyName ? `${vendorCategory} — ${companyName}` : vendorCategory
+
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, role, full_name, phone, two_factor_enabled, status)
+       VALUES (?, ?, ?, 'staff', ?, ?, 0, 'pending')`,
+    ).bind(id, e, hash, fullName, phone || null),
+    c.env.DB.prepare(
+      `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category)
+       VALUES (?, ?, 'support_specialist', ?, 'vendor', ?)`,
+    ).bind(uuid(), id, title, vendorCategory),
+    activityInsert(c.env, { actorUserId: id, kind: 'vendor_signup_submitted', detail: { email: e, full_name: fullName, vendor_category: vendorCategory, company_name: companyName || undefined } }),
+  ])
+
+  c.executionCtx.waitUntil(
+    notifyStaff(c.env, {
+      staffUserIds: [],
+      kind: 'vendor_signup_submitted',
+      subject: `New vendor/provider signup: ${fullName}`,
+      html: `<p><strong>${escapeHtml(fullName)}</strong> applied for a vendor/provider account.</p><p>Email: ${escapeHtml(e)}${phone ? `<br>Phone: ${escapeHtml(phone)}` : ''}<br>Provides: ${escapeHtml(vendorCategory)}${companyName ? `<br>Company: ${escapeHtml(companyName)}` : ''}${notes ? `<br>Notes: ${escapeHtml(notes)}` : ''}</p><p>Review and approve from Team &amp; Vendors in HQ before they can sign in.</p>`,
+    }),
+  )
+
+  return c.json({ ok: true, status: 'pending' }, 201)
+})
+
 // ---------- first-admin bootstrap (only works while there are zero users) ----------
 authRoutes.post('/bootstrap', async (c) => {
   const { email, full_name } = await c.req.json<{ email: string; full_name?: string }>()

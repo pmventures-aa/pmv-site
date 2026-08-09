@@ -8,6 +8,7 @@ export interface Capabilities {
   can_manage_settings: boolean
   can_view_reports: boolean
   can_view_audit_log: boolean
+  can_manage_communications: boolean
   // Owner is a superset of admin, not a fourth role — see requireOwner in
   // functions/_lib/mid.ts. Only ever true for an admin account.
   is_owner: boolean
@@ -19,6 +20,7 @@ const NONE: Capabilities = {
   can_manage_settings: false,
   can_view_reports: false,
   can_view_audit_log: false,
+  can_manage_communications: false,
   is_owner: false,
 }
 

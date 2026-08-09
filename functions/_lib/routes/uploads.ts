@@ -80,3 +80,22 @@ uploadRoutes.get('/avatar/:userId', async (c) => {
     },
   })
 })
+
+// Public (no auth) — inline images embedded in Communications Center
+// emails. Recipients' mail clients fetch these directly with no session,
+// same reasoning as /avatar/:userId above. Keyed by a random per-upload
+// filename (comms/<uuid>.<ext> in R2), so this one IS safe to cache
+// immutably, unlike the avatar route.
+uploadRoutes.get('/comms-images/:file', async (c) => {
+  if (!c.env.UPLOADS) return c.json({ error: 'not found' }, 404)
+  const file = c.req.param('file')
+  if (!/^[a-zA-Z0-9-]+\.(png|jpe?g|webp|gif)$/.test(file)) return c.json({ error: 'not found' }, 404)
+  const obj = await c.env.UPLOADS.get(`comms/${file}`)
+  if (!obj) return c.json({ error: 'not found' }, 404)
+  return new Response(obj.body, {
+    headers: {
+      'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
+  })
+})

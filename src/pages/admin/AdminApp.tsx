@@ -7,6 +7,7 @@ import { useCapabilities } from '../../lib/capabilities'
 import { BasePathProvider, useAppPath } from '../../lib/basePath'
 import Login from '../auth/Login'
 import SetPassword from '../auth/SetPassword'
+import VendorSignup from '../auth/VendorSignup'
 import AdminDashboard from './AdminDashboard'
 import ClientsList from './ClientsList'
 import ClientDetail from './ClientDetail'
@@ -21,6 +22,7 @@ import PipelinesAdmin from './PipelinesAdmin'
 import AuditLogAdmin from './AuditLogAdmin'
 import EmployeesAdmin from './EmployeesAdmin'
 import ReportingCenter from './ReportingCenter'
+import CommunicationsAdmin from './CommunicationsAdmin'
 
 const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity']
 
@@ -36,6 +38,7 @@ function AdminShell() {
   if (caps.can_manage_settings) visible.add('settings')
   if (caps.can_view_audit_log) visible.add('audit-log')
   if (caps.can_view_reports) visible.add('reports')
+  if (caps.can_manage_communications) visible.add('communications')
   // Employees stays out of `visible` even for a delegated can_manage_users
   // staffer — it's Admin/Owner only, no capability grant (see the nested
   // ProtectedRoute below).
@@ -54,6 +57,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
       <Routes>
         <Route path="login" element={<Login surface="staff" />} />
         <Route path="set-password" element={<SetPassword surface="staff" />} />
+        <Route path="vendor-signup" element={<VendorSignup />} />
 
         <Route element={<ProtectedRoute allow={['staff', 'admin']} />}>
           <Route element={<AdminShell />}>
@@ -66,6 +70,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="activity" element={<ActivityAdmin />} />
             <Route path="audit-log" element={<AuditLogAdmin />} />
             <Route path="reports" element={<ReportingCenter />} />
+            <Route path="communications" element={<CommunicationsAdmin />} />
             <Route path="employees" element={<ProtectedRoute allow={['admin']} />}>
               <Route index element={<EmployeesAdmin />} />
             </Route>

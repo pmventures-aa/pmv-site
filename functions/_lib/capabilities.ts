@@ -13,6 +13,7 @@ export type Capability =
   | 'can_manage_settings'
   | 'can_view_reports'
   | 'can_view_audit_log'
+  | 'can_manage_communications'
 
 export async function hasCapability(env: Env, user: SessionUser, cap: Capability): Promise<boolean> {
   if (user.role === 'admin') return true

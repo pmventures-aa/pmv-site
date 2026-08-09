@@ -31,17 +31,19 @@ adminRoutes.get('/my-capabilities', requireStaff, async (c) => {
       can_manage_settings: true,
       can_view_reports: true,
       can_view_audit_log: true,
+      can_manage_communications: true,
       is_owner: !!row?.is_owner,
     })
   }
   const row = await c.env.DB.prepare(
-    'SELECT can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, is_owner FROM team_members WHERE user_id = ?',
+    'SELECT can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, can_manage_communications, is_owner FROM team_members WHERE user_id = ?',
   ).bind(user.id).first<{
     can_reveal_payment_info: number
     can_manage_users: number
     can_manage_settings: number
     can_view_reports: number
     can_view_audit_log: number
+    can_manage_communications: number
     is_owner: number
   }>()
   return c.json({
@@ -50,6 +52,7 @@ adminRoutes.get('/my-capabilities', requireStaff, async (c) => {
     can_manage_settings: !!row?.can_manage_settings,
     can_view_reports: !!row?.can_view_reports,
     can_view_audit_log: !!row?.can_view_audit_log,
+    can_manage_communications: !!row?.can_manage_communications,
     is_owner: false,
   })
 })
@@ -456,7 +459,8 @@ adminRoutes.get('/users', requireStaff, async (c) => {
   const res = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.role, u.full_name, u.first_name, u.last_name, u.status, u.created_at, u.last_login_at,
             tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
-            tm.can_view_reports, tm.can_view_audit_log, tm.is_owner
+            tm.can_view_reports, tm.can_view_audit_log, tm.can_manage_communications, tm.is_owner,
+            tm.party_type, tm.vendor_category
      FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
      ORDER BY u.created_at DESC LIMIT 500`,
   ).all()
@@ -483,45 +487,88 @@ adminRoutes.patch('/users/:id/staff-profile', requireAdmin, async (c) => {
     can_manage_settings?: boolean
     can_view_reports?: boolean
     can_view_audit_log?: boolean
+    can_manage_communications?: boolean
     is_owner?: boolean
+    party_type?: string
+    vendor_category?: string
+    status?: string
   }>().catch(() => ({}) as any)
   const staffRole = STAFF_ROLES.includes(body.staff_role ?? '') ? body.staff_role : 'representative'
   const title = typeof body.title === 'string' ? body.title.trim().slice(0, 100) || null : null
   // Owner is a superset of admin (see requireOwner in mid.ts) — only
   // meaningful, and only settable, on an admin account.
   const isOwner = body.is_owner && target.role === 'admin' ? 1 : 0
+  const partyType = body.party_type === 'vendor' ? 'vendor' : 'employee'
+  const vendorCategory = partyType === 'vendor' && typeof body.vendor_category === 'string'
+    ? body.vendor_category.trim().slice(0, 100) || null
+    : null
+  // Approving a pending vendor/employee signup, or suspending an existing
+  // account, happens through this same form — 'pending' isn't accepted
+  // here since login is already blocked for it and re-submitting it would
+  // be a no-op.
+  const nextStatus = body.status === 'active' || body.status === 'suspended' ? body.status : null
 
-  await c.env.DB.prepare(
-    `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, is_owner)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET
-       staff_role = excluded.staff_role, title = excluded.title,
-       can_reveal_payment_info = excluded.can_reveal_payment_info,
-       can_manage_users = excluded.can_manage_users,
-       can_manage_settings = excluded.can_manage_settings,
-       can_view_reports = excluded.can_view_reports,
-       can_view_audit_log = excluded.can_view_audit_log,
-       is_owner = excluded.is_owner`,
-  ).bind(
-    uuid(),
-    id,
-    staffRole,
-    title,
-    body.can_reveal_payment_info ? 1 : 0,
-    body.can_manage_users ? 1 : 0,
-    body.can_manage_settings ? 1 : 0,
-    body.can_view_reports ? 1 : 0,
-    body.can_view_audit_log ? 1 : 0,
-    isOwner,
-  ).run()
+  const statements = [
+    c.env.DB.prepare(
+      `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, can_manage_communications, is_owner, party_type, vendor_category)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         staff_role = excluded.staff_role, title = excluded.title,
+         can_reveal_payment_info = excluded.can_reveal_payment_info,
+         can_manage_users = excluded.can_manage_users,
+         can_manage_settings = excluded.can_manage_settings,
+         can_view_reports = excluded.can_view_reports,
+         can_view_audit_log = excluded.can_view_audit_log,
+         can_manage_communications = excluded.can_manage_communications,
+         is_owner = excluded.is_owner,
+         party_type = excluded.party_type,
+         vendor_category = excluded.vendor_category`,
+    ).bind(
+      uuid(),
+      id,
+      staffRole,
+      title,
+      body.can_reveal_payment_info ? 1 : 0,
+      body.can_manage_users ? 1 : 0,
+      body.can_manage_settings ? 1 : 0,
+      body.can_view_reports ? 1 : 0,
+      body.can_view_audit_log ? 1 : 0,
+      body.can_manage_communications ? 1 : 0,
+      isOwner,
+      partyType,
+      vendorCategory,
+    ),
+  ]
+  if (nextStatus) statements.push(c.env.DB.prepare('UPDATE users SET status = ? WHERE id = ?').bind(nextStatus, id))
+  await c.env.DB.batch(statements)
 
   await logActivity(c.env, {
     actorUserId: actor.id,
     clientUserId: null,
     kind: 'staff_profile_updated',
-    detail: { name: target.full_name || target.email, staff_role: staffRole },
+    detail: { name: target.full_name || target.email, staff_role: staffRole, party_type: partyType, status: nextStatus ?? undefined },
   })
   return c.json({ ok: true })
+})
+
+// A staff/vendor account's own saved signature, appended to Communications
+// Center drafts on demand. Self-service — no capability needed to edit
+// your own signature.
+adminRoutes.patch('/my-signature', requireStaff, async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<{ signature_html?: string }>().catch(() => ({}) as any)
+  const html = typeof body.signature_html === 'string' ? body.signature_html.slice(0, 5000) : ''
+  await c.env.DB.prepare(
+    `INSERT INTO team_members (id, user_id, staff_role, signature_html) VALUES (?, ?, 'representative', ?)
+     ON CONFLICT(user_id) DO UPDATE SET signature_html = excluded.signature_html`,
+  ).bind(uuid(), user.id, html || null).run()
+  return c.json({ ok: true })
+})
+
+adminRoutes.get('/my-signature', requireStaff, async (c) => {
+  const user = c.get('user')
+  const row = await c.env.DB.prepare('SELECT signature_html FROM team_members WHERE user_id = ?').bind(user.id).first<{ signature_html: string | null }>()
+  return c.json({ signature_html: row?.signature_html ?? '' })
 })
 
 // Creates a user account AND, for clients, a real client_profile with
@@ -903,6 +950,7 @@ const NOTIFICATION_KINDS = [
   'payment_info_revealed',
   'message_received',
   'message_sent',
+  'vendor_signup_submitted',
 ]
 
 adminRoutes.get('/notification-prefs', requireStaff, async (c) => {
