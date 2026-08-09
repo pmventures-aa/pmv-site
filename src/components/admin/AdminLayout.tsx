@@ -10,11 +10,6 @@ import { MailBell } from '../kit/MailBell'
 import { Avatar } from '../kit/Avatar'
 import { btnOutline } from './ui'
 
-// Self-contained staff-console shell (sidebar + topbar). Deliberately not the
-// shared ../layout/Shell used by the client portal — same interactive
-// behavior (nav highlighting, mobile drawer) but a flat, sharp-edged look
-// instead of the glass/blur/gradient treatment, so this can evolve
-// independently of the portal.
 export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -25,6 +20,10 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
     `flex items-center gap-3 rounded-md border-l-2 px-3 py-2.5 text-sm font-medium transition ${
       isActive ? 'border-gold bg-gold/10 text-gold' : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-white'
     }`
+
+  function refreshPage() {
+    window.location.reload()
+  }
 
   const sidebarContent = (
     <>
@@ -56,17 +55,23 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
 
   return (
     <div className="min-h-screen bg-navy-950 lg:flex">
-      {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/10 bg-navy-900 p-4 lg:flex print:hidden">
         {sidebarContent}
       </aside>
 
-      {/* Mobile top bar */}
       <header className="border-b border-white/10 bg-navy-900 lg:hidden print:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <Logo />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span className="hidden text-xs text-slate-400 sm:inline">{badge}</span>
+            <button
+              onClick={refreshPage}
+              className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-slate-300 transition hover:border-gold/40 hover:text-gold"
+              aria-label="Refresh this HQ page"
+              title="Refresh page"
+            >
+              ↻
+            </button>
             <button
               onClick={() => setMobileSearchOpen((v) => !v)}
               className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-slate-300"
@@ -92,7 +97,6 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
         )}
       </header>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
@@ -112,7 +116,14 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
       <div className="flex min-h-screen flex-1 flex-col">
         <div className="hidden items-center justify-between gap-4 border-b border-white/10 bg-navy-900/60 px-8 py-3 lg:flex print:hidden">
           <GlobalSearch className="w-full max-w-sm" />
-          <div className="flex shrink-0 items-center gap-4">
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              onClick={refreshPage}
+              className={`${btnOutline} !px-3 !py-1.5 text-xs`}
+              title="Reload the current HQ page and its latest data"
+            >
+              ↻ Refresh
+            </button>
             <MailBell />
             <NotificationBell />
             <span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span>

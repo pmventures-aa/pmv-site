@@ -5,9 +5,11 @@ import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activit
 import { useAppPath } from '../../lib/basePath'
 import { playNotificationSound, soundKindFor } from '../../lib/sound'
 
-// "Auto refresh every minute or so for new things" — 30s keeps the badge and
-// activity feed feeling live without hammering the API.
-const POLL_MS = 30_000
+// D1 does not push row changes to browsers by itself. A short poll plus focus /
+// visibility refresh keeps HQ feeling live without adding Durable Objects or a
+// separate realtime service. The custom event lets same-tab mutations refresh
+// the bell immediately when a caller dispatches `pmv:activity`.
+const POLL_MS = 10_000
 
 export function NotificationBell() {
   const p = useAppPath()
@@ -32,7 +34,6 @@ export function NotificationBell() {
     try {
       const r = await api.get<{ count: number }>('/admin/activity/unread-count')
       if (r.count > prevCountRef.current && soundEnabledRef.current) {
-        // Something new landed — peek at the latest event to pick a tone.
         try {
           const latest = await api.get<{ events: ActivityEvent[] }>('/admin/activity')
           playNotificationSound(latest.events[0] ? soundKindFor(latest.events[0].kind) : 'default')
@@ -43,14 +44,30 @@ export function NotificationBell() {
       prevCountRef.current = r.count
       setCount(r.count)
     } catch {
-      // transient network error — next poll will retry
+      // transient network error — focus/poll will retry
     }
   }, [])
 
   useEffect(() => {
     loadCount()
-    const t = setInterval(loadCount, POLL_MS)
-    return () => clearInterval(t)
+    const timer = window.setInterval(loadCount, POLL_MS)
+
+    const onFocus = () => void loadCount()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void loadCount()
+    }
+    const onActivity = () => void loadCount()
+
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('pmv:activity', onActivity)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('pmv:activity', onActivity)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [loadCount])
 
   useEffect(() => {
@@ -84,6 +101,7 @@ export function NotificationBell() {
         onClick={toggle}
         className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:border-gold/40 hover:text-gold"
         aria-label="Notifications"
+        title="HQ notifications"
       >
         <span aria-hidden>🔔</span>
         {count > 0 && (
@@ -96,7 +114,10 @@ export function NotificationBell() {
       {open && (
         <div className="absolute right-0 top-11 z-30 w-80 rounded-md border border-white/10 bg-navy-900 shadow-lg sm:w-96">
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <p className="text-sm font-semibold text-white">Activity</p>
+            <div>
+              <p className="text-sm font-semibold text-white">Activity</p>
+              <p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-500">Live refresh</p>
+            </div>
             <Link to={p('activity')} onClick={() => setOpen(false)} className="text-xs font-medium text-gold hover:underline">
               View all
             </Link>

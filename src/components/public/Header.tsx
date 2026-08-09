@@ -4,11 +4,14 @@ import { Logo } from '../ui'
 import { btnOutline, btnPrimary } from './ui'
 
 const navItems = [
-  { to: '/services', label: 'Professional Services' },
+  { to: '/services', label: 'Services' },
   { to: '/about', label: 'About' },
   { to: '/service-area', label: 'Service Area' },
   { to: '/contact', label: 'Contact' },
 ]
+
+const CLIENT_LOGIN = 'https://client.pinnaclemanagementventures.com/login'
+const CLIENT_SIGNUP = 'https://client.pinnaclemanagementventures.com/signup'
 
 export function Header() {
   const [open, setOpen] = useState(false)
@@ -29,12 +32,12 @@ export function Header() {
           ))}
         </nav>
         <div className="hidden items-center gap-3 md:flex">
-          <a href="https://client.pinnaclemanagementventures.com/login" className={btnOutline}>
+          <a href={CLIENT_LOGIN} className={btnOutline}>
             Client Login
           </a>
-          <Link to="/contact" className={btnPrimary}>
-            Discuss Your Project
-          </Link>
+          <a href={CLIENT_SIGNUP} className={btnPrimary}>
+            Get Started
+          </a>
         </div>
         <button
           onClick={() => setOpen((o) => !o)}
@@ -53,12 +56,12 @@ export function Header() {
                 {item.label}
               </NavLink>
             ))}
-            <a href="https://client.pinnaclemanagementventures.com/login" className={`${btnOutline} mt-2`}>
+            <a href={CLIENT_LOGIN} className={`${btnOutline} mt-2`}>
               Client Login
             </a>
-            <Link to="/contact" className={btnPrimary} onClick={() => setOpen(false)}>
-              Discuss Your Project
-            </Link>
+            <a href={CLIENT_SIGNUP} className={btnPrimary}>
+              Get Started
+            </a>
           </nav>
         </div>
       )}

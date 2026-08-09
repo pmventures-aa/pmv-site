@@ -6,7 +6,6 @@ import type { ServiceInfo } from '../../data/services'
 // Motion helpers for the public marketing site only — deliberately not used
 // in the portal/admin apps, which favor instant, no-frills interactions.
 
-// Fades + slides a section up as it scrolls into view. Plays once.
 export function Reveal({ children, delay = 0, className = '' }: { children: ReactNode; delay?: number; className?: string }) {
   return (
     <motion.div
@@ -31,8 +30,6 @@ export const staggerItem: Variants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
 }
 
-// Container whose children (each carrying `variants={staggerItem}`) animate
-// in one after another as the group scrolls into view.
 export function StaggerGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <motion.div className={className} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} variants={staggerContainer}>
@@ -41,9 +38,6 @@ export function StaggerGroup({ children, className = '' }: { children: ReactNode
   )
 }
 
-// Same as StaggerGroup but plays immediately on mount instead of on scroll —
-// for above-the-fold content like the hero, where whileInView would fire
-// before the user ever sees the "before" state.
 export function StaggerOnMount({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <motion.div className={className} initial="hidden" animate="show" variants={staggerContainer}>
@@ -52,10 +46,6 @@ export function StaggerOnMount({ children, className = '' }: { children: ReactNo
   )
 }
 
-// Three soft, blurred gradient shapes that drift slowly and continuously —
-// ambient background motion for the hero so there's always something moving
-// on screen, not just a one-shot entrance animation. Purely decorative:
-// pointer-events-none, sits behind content via z-index in the caller.
 export function AmbientGlow({ className = '' }: { className?: string }) {
   const reduceMotion = useReducedMotion()
   return (
@@ -79,13 +69,6 @@ export function AmbientGlow({ className = '' }: { className?: string }) {
   )
 }
 
-// Auto-cycling showcase of a service catalog — a second, distinct kind of
-// motion from the marquee (content crossfades and changes, not a scrolling
-// loop), and turns the hero's "what we help with" panel from a static list
-// into something that keeps revealing real content instead of sitting
-// still. Advances every ~4.5s, pauses on hover/focus, and stays on the
-// first item (still fully interactive via the dots) when the visitor
-// prefers reduced motion.
 export function ServiceRotator({ items }: { items: ServiceInfo[] }) {
   const reduceMotion = useReducedMotion()
   const [active, setActive] = useState(0)
@@ -143,9 +126,84 @@ export function ServiceRotator({ items }: { items: ServiceInfo[] }) {
   )
 }
 
-// Infinite horizontal scroller (pure CSS animation, no JS ticking) — used
-// for the service-category strip so there's an obvious, always-moving
-// element visible the instant the page loads, no scroll/hover required.
+export interface SpecialtySpotlightItem {
+  eyebrow: string
+  title: string
+  body: string
+  to: string
+  linkLabel: string
+  chips?: string[]
+}
+
+// Medium-emphasis rotating banner used below the hero. It keeps specialty/use
+// cases visible without letting one specialty dominate the entire homepage.
+export function SpecialtyRotator({ items }: { items: SpecialtySpotlightItem[] }) {
+  const reduceMotion = useReducedMotion()
+  const [active, setActive] = useState(0)
+  const [paused, setPaused] = useState(false)
+
+  useEffect(() => {
+    if (reduceMotion || paused || items.length < 2) return
+    const t = setInterval(() => setActive((i) => (i + 1) % items.length), 5600)
+    return () => clearInterval(t)
+  }, [reduceMotion, paused, items.length])
+
+  const current = items[active]
+
+  return (
+    <div
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      className="overflow-hidden border-y border-white/10 bg-navy-900/45"
+    >
+      <div className="container-pmv py-7 sm:py-8">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-10">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={current.title}
+              initial={reduceMotion ? undefined : { opacity: 0, x: 14 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0, x: -14 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            >
+              <p className="eyebrow">{current.eyebrow}</p>
+              <h2 className="mt-2 font-display text-2xl font-medium text-white sm:text-3xl">{current.title}</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-300 sm:text-base">{current.body}</p>
+              {current.chips && current.chips.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {current.chips.map((chip) => (
+                    <span key={chip} className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1 text-xs text-slate-400">{chip}</span>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="flex items-center gap-4 lg:flex-col lg:items-end">
+            <Link to={current.to} className="shrink-0 text-sm font-semibold text-gold hover:underline">
+              {current.linkLabel} →
+            </Link>
+            <div className="flex gap-1.5" role="tablist" aria-label="Featured specialties">
+              {items.map((item, index) => (
+                <button
+                  key={item.title}
+                  role="tab"
+                  aria-selected={index === active}
+                  aria-label={item.title}
+                  onClick={() => setActive(index)}
+                  className={`h-2 w-7 rounded-full transition-colors ${index === active ? 'bg-gold' : 'bg-white/15 hover:bg-white/25'}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Marquee({ items }: { items: string[] }) {
   const doubled = [...items, ...items]
   return (

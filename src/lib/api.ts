@@ -24,6 +24,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     throw new ApiError(data?.error || `request failed (${res.status})`, res.status)
   }
+
+  const method = (init?.method || 'GET').toUpperCase()
+  if (typeof window !== 'undefined' && method !== 'GET' && method !== 'HEAD') {
+    // Let shared HQ chrome refresh notification/activity state immediately
+    // after successful local mutations instead of waiting for the next poll.
+    window.dispatchEvent(new Event('pmv:activity'))
+  }
+
   return data as T
 }
 
@@ -35,10 +43,6 @@ export const api = {
     request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
   del: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'DELETE', body: body ? JSON.stringify(body) : undefined }),
-  // Raw binary upload (e.g. an avatar image, a message attachment) —
-  // bypasses the JSON content-type default so the file's own MIME type
-  // reaches the server. X-File-Name carries the original filename (a plain
-  // Blob has no .name); routes that don't care about it just ignore the header.
   upload: <T>(path: string, file: File | Blob) =>
     request<T>(path, {
       method: 'POST',
