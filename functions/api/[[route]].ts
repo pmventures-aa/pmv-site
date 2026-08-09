@@ -16,6 +16,9 @@ import { auditRoutes } from '../_lib/routes/auditRoutes'
 import { employeeRoutes } from '../_lib/routes/employees'
 import { reportRoutes } from '../_lib/routes/reports'
 import { searchRoutes } from '../_lib/routes/search'
+import { serviceApplicationRoutes } from '../_lib/routes/serviceApplications'
+import { intakeCatalogAdminRoutes } from '../_lib/routes/intakeCatalogAdmin'
+import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -25,12 +28,13 @@ app.route('/', uploadRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
-// self-service (profile, onboarding, service catalog) — client accounts only
+app.route('/portal', intakeCopyRoutes)
+app.route('/portal', serviceApplicationRoutes)
 app.route('/portal', selfRoutes)
-// shared data modules — client (self) + staff/admin (scoped via assignments)
 app.route('/portal', portalRoutes)
 app.route('/portal', messageRoutes)
-// staff/admin console — cross-client views, user + settings management
+
+app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
@@ -43,11 +47,6 @@ app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date(
 
 app.notFound((c) => c.json({ error: 'not found' }, 404))
 
-// Global error handler — surfaces unhandled exceptions as JSON instead of
-// Cloudflare's opaque plain-text 500 page. Logs the full error (incl.
-// stack and message) server-side via console.error, but only returns a
-// generic message in the response body — the real message may contain
-// internal details (query text, file paths) that shouldn't reach callers.
 app.onError((err, c) => {
   console.error('unhandled API error', err)
   return c.json({ error: 'internal error' }, 500)
@@ -55,5 +54,4 @@ app.onError((err, c) => {
 
 export const onRequest = handle(app)
 
-// keep getUser import used (re-exported nowhere else currently referenced directly)
 void getUser

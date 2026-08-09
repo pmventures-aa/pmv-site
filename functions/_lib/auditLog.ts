@@ -2,11 +2,7 @@ import type { Env } from './types'
 import { uuid } from './crypto'
 
 // Compliance-grade audit trail — separate from activity.ts's activityInsert,
-// which feeds the staff notification bell/feed (has per-user mute prefs,
-// expected to be summarized for display). This table is append-only: no
-// route should ever UPDATE or DELETE a row here. Call sites that already
-// log an activity_event for a given action add a parallel auditInsert in
-// the same D1 batch, so the two can never drift apart.
+// which feeds the staff notification bell/feed. This table is append-only.
 export type AuditAction =
   | 'login'
   | 'logout'
@@ -22,6 +18,10 @@ export type AuditAction =
   | 'task_assigned'
   | 'file_uploaded'
   | 'client_converted'
+  | 'service_application_submitted'
+  | 'application_pdf_generated'
+  | 'internal_document_attached'
+  | 'representative_notified'
 
 export interface AuditOpts {
   actorUserId?: string | null
@@ -54,10 +54,6 @@ export async function logAudit(env: Env, opts: AuditOpts): Promise<void> {
   await auditInsert(env, opts).run()
 }
 
-// Pulls the caller's IP the same way login-throttling already does
-// (CF-Connecting-IP is set by Cloudflare's edge and isn't spoofable by the
-// client) — kept here so every route logging an audit entry gets it the
-// same way instead of re-deriving it inconsistently.
 export function actorIp(request: Request): string | null {
   return request.headers.get('CF-Connecting-IP')
 }

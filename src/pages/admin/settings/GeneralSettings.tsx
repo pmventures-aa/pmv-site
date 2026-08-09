@@ -1,0 +1,120 @@
+import { useEffect, useState } from 'react'
+import { api, ApiError } from '../../../lib/api'
+import { Panel, NoAccess, inputCls, btnPrimary } from '../../../components/admin/ui'
+import { toast } from '../../../components/kit/toast'
+
+const GENERAL_FIELDS: { key: string; label: string; type?: string; help?: string; multiline?: boolean }[] = [
+  { key: 'firm_notify_email', label: 'Notification email', type: 'email', help: 'Fallback recipient when a client has no assigned representative.' },
+  { key: 'business_name', label: 'Business name' },
+  { key: 'business_phone', label: 'Business phone', type: 'tel' },
+  { key: 'business_address', label: 'Business address' },
+  { key: 'business_hours', label: 'Business hours', help: 'e.g. “Mon–Fri, 9am–5pm ET”' },
+  {
+    key: 'service_application_contact_line',
+    label: 'Application PDF contact line',
+    help: 'Appears in the footer of every generated Application for Services PDF.',
+  },
+  {
+    key: 'service_application_disclaimer',
+    label: 'Standard service application disclaimer',
+    multiline: true,
+    help: 'Central compliance copy shown at review and printed on every generated application PDF.',
+  },
+  {
+    key: 'eviction_scope_disclaimer',
+    label: 'Eviction scope / attorney coordination disclaimer',
+    multiline: true,
+    help: 'This is the exact place to finalize PMV’s eviction scope language. It appears in the Property Management eviction module and flagged PDFs.',
+  },
+]
+
+export default function GeneralSettings() {
+  const [settings, setSettings] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [forbidden, setForbidden] = useState(false)
+
+  useEffect(() => {
+    api.get<{ settings: { key: string; value: string }[] }>('/admin/settings')
+      .then((r) => {
+        const map: Record<string, string> = {}
+        for (const row of r.settings) map[row.key] = row.value
+        setSettings(map)
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 403) setForbidden(true)
+        else toast.error(err instanceof ApiError ? err.message : 'Could not load settings.')
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api.patch('/admin/settings', settings)
+      toast.success('Settings saved.')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not save settings.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading) return <p className="text-sm text-slate-400">Loading…</p>
+  if (forbidden) return <NoAccess label="General settings" />
+
+  return (
+    <form onSubmit={save} className="space-y-5">
+      <Panel>
+        <h3 className="mb-4 text-sm font-semibold text-white">Firm details</h3>
+        <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
+          {GENERAL_FIELDS.slice(0, 5).map((f) => (
+            <label key={f.key} className={f.key === 'business_address' || f.key === 'business_hours' ? 'sm:col-span-2' : ''}>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">{f.label}</span>
+              <input
+                className={inputCls}
+                type={f.type ?? 'text'}
+                value={settings[f.key] ?? ''}
+                onChange={(e) => setSettings((s) => ({ ...s, [f.key]: e.target.value }))}
+              />
+              {f.help && <span className="mt-1 block text-xs text-slate-500">{f.help}</span>}
+            </label>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel>
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-white">Application &amp; compliance copy</h3>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500">
+            These are central template values. Change them here once and future intake screens and generated Application for Services PDFs use the new copy.
+          </p>
+        </div>
+        <div className="max-w-3xl space-y-4">
+          {GENERAL_FIELDS.slice(5).map((f) => (
+            <label key={f.key}>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">{f.label}</span>
+              {f.multiline ? (
+                <textarea
+                  className={`${inputCls} min-h-[120px] resize-y`}
+                  value={settings[f.key] ?? ''}
+                  onChange={(e) => setSettings((s) => ({ ...s, [f.key]: e.target.value }))}
+                />
+              ) : (
+                <input
+                  className={inputCls}
+                  value={settings[f.key] ?? ''}
+                  onChange={(e) => setSettings((s) => ({ ...s, [f.key]: e.target.value }))}
+                />
+              )}
+              {f.help && <span className="mt-1 block text-xs leading-relaxed text-slate-500">{f.help}</span>}
+            </label>
+          ))}
+        </div>
+      </Panel>
+
+      <button type="submit" disabled={busy} className={btnPrimary}>{busy ? 'Saving…' : 'Save settings'}</button>
+    </form>
+  )
+}

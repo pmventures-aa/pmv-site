@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { KanbanBoard, StageSelect, type KanbanColumn } from '../../components/admin/Kanban'
 import { useAppPath } from '../../lib/basePath'
@@ -24,18 +24,19 @@ interface PipelineItem {
   client_email: string
   status: string
   created_at: string
+  submitted_at?: string | null
   title?: string
   type?: string
   service_key?: string
   service_name?: string
+  assigned_rep_name?: string | null
+  assigned_rep_email?: string | null
+  is_unassigned?: number
+  may_require_attorney_coordination?: number
   amount_requested_cents?: number | null
   use_of_funds?: string | null
 }
 
-// No "Converted" column: converting a lead now creates the client account
-// atomically (see the Convert to Client button on each card below) and the
-// lead is immediately excluded from GET /admin/inquiries — it just leaves
-// the board, rather than needing a status to sit in.
 const INQUIRY_COLUMNS: KanbanColumn[] = [
   { key: 'new', label: 'New' },
   { key: 'contacted', label: 'Contacted' },
@@ -53,8 +54,7 @@ const MODULE_TABS = [
 
 type ModuleKey = (typeof MODULE_TABS)[number]['key']
 
-const PATCH_PATH: Record<Exclude<ModuleKey, 'inquiries'>, string> = {
-  service_applications: '/portal/services',
+const PATCH_PATH: Record<'matters' | 'tasks' | 'funding', string> = {
   matters: '/portal/matters',
   tasks: '/portal/tasks',
   funding: '/portal/funding',
@@ -82,7 +82,7 @@ export default function PipelinesAdmin() {
       } else {
         const res = await api.get<{ statuses: string[]; items: PipelineItem[] }>(`/admin/pipeline/${which}`)
         setItems(res.items)
-        setColumns(res.statuses.map((s) => ({ key: s, label: s.replace(/_/g, ' ') })))
+        setColumns(res.statuses.map((status) => ({ key: status, label: status.replace(/_/g, ' ') })))
       }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not load pipeline.')
@@ -91,12 +91,10 @@ export default function PipelinesAdmin() {
     }
   }, [])
 
-  useEffect(() => {
-    load(tab)
-  }, [tab, load])
+  useEffect(() => { load(tab) }, [tab, load])
 
   async function moveInquiry(item: Inquiry, status: string) {
-    setInquiries((cur) => cur.map((i) => (i.id === item.id ? { ...i, status } : i)))
+    setInquiries((cur) => cur.map((i) => i.id === item.id ? { ...i, status } : i))
     try {
       await api.patch(`/admin/inquiries/${item.id}`, { status })
     } catch {
@@ -116,11 +114,16 @@ export default function PipelinesAdmin() {
   }
 
   async function moveItem(item: PipelineItem, status: string) {
-    setItems((cur) => cur.map((i) => (i.id === item.id ? { ...i, status } : i)))
+    setItems((cur) => cur.map((i) => i.id === item.id ? { ...i, status } : i))
     try {
-      await api.patch(`${PATCH_PATH[tab as Exclude<ModuleKey, 'inquiries'>]}/${item.id}`, { status })
-    } catch {
-      toast.error('Could not update status.')
+      if (tab === 'service_applications') {
+        await api.patch(`/portal/service-applications/${item.id}/status`, { status })
+      } else {
+        const path = PATCH_PATH[tab as keyof typeof PATCH_PATH]
+        await api.patch(`${path}/${item.id}`, { status })
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update status.')
       await load(tab)
     }
   }
@@ -132,19 +135,17 @@ export default function PipelinesAdmin() {
       <PageIntro
         kicker="Workflow"
         title="Pipelines"
-        subtitle="Drag a card to move it to the next stage. Changes save immediately and staff-scoped visibility still applies."
+        subtitle="Drag a card to move it to the next stage. Service Applications now tracks submitted applications separately from ongoing service enrollment."
       />
 
-      <div className="mb-5 flex gap-1.5 border-b border-white/10">
-        {MODULE_TABS.map((t) => (
+      <div className="mb-5 flex gap-1.5 overflow-x-auto border-b border-white/10">
+        {MODULE_TABS.map((item) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
-              tab === t.key ? 'border-gold text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${tab === item.key ? 'border-gold text-white' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
           >
-            {t.label}
+            {item.label}
           </button>
         ))}
       </div>
@@ -152,11 +153,7 @@ export default function PipelinesAdmin() {
       {loading ? (
         <p className="text-sm text-slate-400">Loading…</p>
       ) : tab === 'inquiries' ? (
-        inquiries.length === 0 ? (
-          <Panel>
-            <p className="text-sm text-slate-400">No inquiries yet.</p>
-          </Panel>
-        ) : (
+        inquiries.length === 0 ? <Panel><p className="text-sm text-slate-400">No inquiries yet.</p></Panel> : (
           <KanbanBoard
             columns={inquiryColumns}
             items={inquiries}
@@ -168,21 +165,14 @@ export default function PipelinesAdmin() {
                 <p className="text-xs text-slate-400">{i.email}</p>
                 {i.service_name && <p className="mt-1 text-xs text-gold">{i.service_name}</p>}
                 <p className="mt-2 line-clamp-2 text-xs text-slate-400">{i.message}</p>
-                <button
-                  onClick={() => convertInquiry(i)}
-                  className="mt-2 block text-xs font-semibold text-gold hover:underline"
-                >
-                  Convert to Client
-                </button>
-                <StageSelect value={i.status} columns={inquiryColumns} onChange={(s) => moveInquiry(i, s)} />
+                <button onClick={() => convertInquiry(i)} className="mt-2 block text-xs font-semibold text-gold hover:underline">Convert to Client</button>
+                <StageSelect value={i.status} columns={inquiryColumns} onChange={(status) => moveInquiry(i, status)} />
               </div>
             )}
           />
         )
       ) : items.length === 0 ? (
-        <Panel>
-          <p className="text-sm text-slate-400">Nothing here yet.</p>
-        </Panel>
+        <Panel><p className="text-sm text-slate-400">Nothing here yet.</p></Panel>
       ) : (
         <KanbanBoard
           columns={columns}
@@ -191,17 +181,22 @@ export default function PipelinesAdmin() {
           onMove={moveItem}
           renderCard={(i) => (
             <div>
-              <Link to={p(`clients/${i.client_user_id}`)} className="font-medium text-white hover:text-gold">
-                {i.client_name || i.client_email}
-              </Link>
+              <Link to={p(`clients/${i.client_user_id}`)} className="font-medium text-white hover:text-gold">{i.client_name || i.client_email}</Link>
               <p className="mt-0.5 text-xs text-slate-400">
                 {tab === 'service_applications' && (i.service_name ?? i.service_key)}
                 {tab === 'matters' && (i.title ?? i.type ?? 'Matter')}
                 {tab === 'tasks' && (i.title ?? 'Task')}
                 {tab === 'funding' && `${money(i.amount_requested_cents)} requested`}
               </p>
+              {tab === 'service_applications' && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {i.is_unassigned ? <Tag tone="red">Unassigned</Tag> : <Tag tone="slate">{i.assigned_rep_name || i.assigned_rep_email || 'Assigned team'}</Tag>}
+                  {!!i.may_require_attorney_coordination && <Tag tone="gold">Attorney coordination review</Tag>}
+                </div>
+              )}
+              {tab === 'service_applications' && i.submitted_at && <p className="mt-2 text-[11px] text-slate-500">Submitted {new Date(i.submitted_at).toLocaleString()}</p>}
               {tab === 'funding' && i.use_of_funds && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{i.use_of_funds}</p>}
-              <StageSelect value={i.status} columns={columns} onChange={(s) => moveItem(i, s)} />
+              <StageSelect value={i.status} columns={columns} onChange={(status) => moveItem(i, status)} />
             </div>
           )}
         />

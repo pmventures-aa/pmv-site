@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnPrimary } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnPrimary, Tag } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { ConfirmDialog } from '../../components/kit/ConfirmDialog'
 import { useAuth } from '../../lib/auth'
@@ -19,6 +19,7 @@ interface Assignment {
   staff_email: string
   client_name: string | null
   client_email: string
+  is_primary: number
   created_at: string
 }
 
@@ -32,6 +33,7 @@ export default function AssignmentsAdmin() {
   const [clientFilter, setClientFilter] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [primaryBusy, setPrimaryBusy] = useState<string | null>(null)
   const [pendingRemove, setPendingRemove] = useState<Assignment | null>(null)
   const [removing, setRemoving] = useState(false)
   const [forbidden, setForbidden] = useState(false)
@@ -87,6 +89,19 @@ export default function AssignmentsAdmin() {
     })
   }
 
+  async function makePrimary(a: Assignment) {
+    setPrimaryBusy(a.id)
+    try {
+      await api.patch(`/admin/assignments/${a.id}/primary`)
+      toast.success(`${a.staff_name || a.staff_email} is now the primary representative for ${a.client_name || a.client_email}.`)
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update the primary representative.')
+    } finally {
+      setPrimaryBusy(null)
+    }
+  }
+
   async function confirmRemove() {
     if (!pendingRemove) return
     setRemoving(true)
@@ -116,70 +131,74 @@ export default function AssignmentsAdmin() {
       <PageIntro
         kicker="Coverage"
         title="Staff Assignments"
-        subtitle={isAdmin ? 'Control which staff can see which clients.' : 'Who can see which clients. Ask an admin to change assignments.'}
+        subtitle={
+          isAdmin
+            ? 'Control who can see each client and identify the primary representative used for new-service routing.'
+            : 'See client coverage and primary representatives. Ask an admin to make changes.'
+        }
       />
 
       {isAdmin && (
-      <Panel className="mb-6">
-        <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
-          <label>
-            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Staff member</span>
-            <select className={inputCls} value={staffId} onChange={(e) => setStaffId(e.target.value)}>
-              <option value="">Select…</option>
-              {staff.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name || s.email}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div>
-            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">
-              Clients {clientIds.size > 0 ? `(${clientIds.size} selected)` : ''}
-            </span>
-            <input
-              className={`${inputCls} mb-2`}
-              placeholder="Filter clients…"
-              value={clientFilter}
-              onChange={(e) => setClientFilter(e.target.value)}
-            />
-            <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-white/10 p-2">
-              {clients
-                .filter((c) => {
-                  const q = clientFilter.trim().toLowerCase()
-                  if (!q) return true
-                  return (c.full_name || '').toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
-                })
-                .map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm text-slate-200 hover:bg-white/5">
-                    <input type="checkbox" checked={clientIds.has(c.id)} onChange={() => toggleClient(c.id)} />
-                    {c.full_name || c.email}
-                  </label>
+        <Panel className="mb-6">
+          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Staff member</span>
+              <select className={inputCls} value={staffId} onChange={(e) => setStaffId(e.target.value)}>
+                <option value="">Select…</option>
+                {staff.map((s) => (
+                  <option key={s.id} value={s.id}>{s.full_name || s.email}</option>
                 ))}
-              {clients.length === 0 && <p className="px-2 py-1 text-sm text-slate-500">No clients yet.</p>}
+              </select>
+            </label>
+            <div>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">
+                Clients {clientIds.size > 0 ? `(${clientIds.size} selected)` : ''}
+              </span>
+              <input
+                className={`${inputCls} mb-2`}
+                placeholder="Filter clients…"
+                value={clientFilter}
+                onChange={(e) => setClientFilter(e.target.value)}
+              />
+              <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-white/10 p-2">
+                {clients
+                  .filter((c) => {
+                    const q = clientFilter.trim().toLowerCase()
+                    if (!q) return true
+                    return (c.full_name || '').toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+                  })
+                  .map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm text-slate-200 hover:bg-white/5">
+                      <input type="checkbox" checked={clientIds.has(c.id)} onChange={() => toggleClient(c.id)} />
+                      {c.full_name || c.email}
+                    </label>
+                  ))}
+                {clients.length === 0 && <p className="px-2 py-1 text-sm text-slate-500">No clients yet.</p>}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-3 sm:col-span-2">
-            <button type="submit" disabled={busy || !staffId || clientIds.size === 0} className={`${btnPrimary} disabled:opacity-60`}>
-              {busy ? 'Saving…' : clientIds.size > 1 ? `Assign ${clientIds.size} clients` : 'Assign'}
-            </button>
-            {error && <span className="text-sm text-rose-300">{error}</span>}
-          </div>
-        </form>
-      </Panel>
+            <div className="flex items-center gap-3 sm:col-span-2">
+              <button type="submit" disabled={busy || !staffId || clientIds.size === 0} className={`${btnPrimary} disabled:opacity-60`}>
+                {busy ? 'Saving…' : clientIds.size > 1 ? `Assign ${clientIds.size} clients` : 'Assign'}
+              </button>
+              {error && <span className="text-sm text-rose-300">{error}</span>}
+            </div>
+          </form>
+          <p className="mt-4 border-t border-white/10 pt-3 text-xs leading-relaxed text-slate-500">
+            If a client has one assigned staff member, that person is used automatically. For clients with multiple staff members, mark one as Primary so new service applications route to the correct representative.
+          </p>
+        </Panel>
       )}
 
       <Panel className="overflow-x-auto !p-0">
         {assignments.length === 0 ? (
-          <div className="p-6">
-            <EmptyState label="No assignments yet." />
-          </div>
+          <div className="p-6"><EmptyState label="No assignments yet." /></div>
         ) : (
-          <table className="w-full min-w-[520px] text-sm">
+          <table className="w-full min-w-[680px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-3 font-medium">Staff</th>
                 <th className="px-5 py-3 font-medium">Client</th>
+                <th className="px-5 py-3 font-medium">Routing</th>
                 {isAdmin && <th className="px-5 py-3 font-medium"></th>}
               </tr>
             </thead>
@@ -188,11 +207,24 @@ export default function AssignmentsAdmin() {
                 <tr key={a.id} className="border-b border-white/5 last:border-0">
                   <td className="px-5 py-3 text-slate-200">{a.staff_name || a.staff_email}</td>
                   <td className="px-5 py-3 text-slate-200">{a.client_name || a.client_email}</td>
-                  {isAdmin && (
-                    <td className="px-5 py-3">
-                      <button onClick={() => setPendingRemove(a)} className="text-xs font-medium text-rose-300 hover:underline">
-                        Remove
+                  <td className="px-5 py-3">
+                    {a.is_primary ? (
+                      <Tag tone="gold">Primary rep</Tag>
+                    ) : isAdmin ? (
+                      <button
+                        disabled={primaryBusy === a.id}
+                        onClick={() => makePrimary(a)}
+                        className="text-xs font-medium text-gold hover:underline disabled:opacity-50"
+                      >
+                        {primaryBusy === a.id ? 'Saving…' : 'Make primary'}
                       </button>
+                    ) : (
+                      <span className="text-xs text-slate-500">Team access</span>
+                    )}
+                  </td>
+                  {isAdmin && (
+                    <td className="px-5 py-3 text-right">
+                      <button onClick={() => setPendingRemove(a)} className="text-xs font-medium text-rose-300 hover:underline">Remove</button>
                     </td>
                   )}
                 </tr>
@@ -203,19 +235,15 @@ export default function AssignmentsAdmin() {
       </Panel>
 
       {isAdmin && (
-      <ConfirmDialog
-        open={!!pendingRemove}
-        onOpenChange={(open) => !open && setPendingRemove(null)}
-        title="Remove this assignment?"
-        description={
-          pendingRemove
-            ? `${pendingRemove.staff_name || pendingRemove.staff_email} will no longer see ${pendingRemove.client_name || pendingRemove.client_email}.`
-            : undefined
-        }
-        confirmLabel="Remove"
-        busy={removing}
-        onConfirm={confirmRemove}
-      />
+        <ConfirmDialog
+          open={!!pendingRemove}
+          onOpenChange={(open) => !open && setPendingRemove(null)}
+          title="Remove this assignment?"
+          description={pendingRemove ? `${pendingRemove.staff_name || pendingRemove.staff_email} will no longer see ${pendingRemove.client_name || pendingRemove.client_email}.` : undefined}
+          confirmLabel="Remove"
+          busy={removing}
+          onConfirm={confirmRemove}
+        />
       )}
     </div>
   )

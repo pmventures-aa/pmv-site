@@ -1,0 +1,24 @@
+name: Validate intake application wizard
+
+on:
+  push:
+    branches: [agent/intake-application-wizard]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/intake-application-wizard
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply D1 migrations locally
+        run: npm run db:migrate:local
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
