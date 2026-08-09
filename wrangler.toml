@@ -26,8 +26,8 @@ bucket_name = "pmv-uploads"
 # used if RESEND_API_KEY is set (a secret, below); must be a domain verified
 # in Resend. Uncomment and update once a sending domain is verified — until
 # then email sending no-ops.
-# [vars]
-# RESEND_FROM_EMAIL = "Pinnacle Management Ventures <notifications@pinnaclemanagementventures.com>"
+[vars]
+RESEND_FROM_EMAIL = "Pinnacle Management Ventures <notifications@pinnaclemanagementventures.com>"
 
 # --- Secrets (NOT set here — see DEPLOY.md "Environment variables" table) ---
 # Required: SESSION_SECRET, PAYMENT_ENCRYPTION_KEY
