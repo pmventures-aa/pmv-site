@@ -74,7 +74,8 @@ vendorApplicationUploadRoutes.post('/vendor-application/session/:token/finalize'
   const token = c.req.param('token')
   const raw = await c.env.SESSIONS.get(key(token))
   if (!raw) return c.json({ error: 'upload session expired' }, 410)
-  const body = await c.req.json<{ email?: string }>().catch(() => ({}))
+  let body: { email?: string } = {}
+  try { body = await c.req.json<{ email?: string }>() } catch { body = {} }
   const email = (body.email || '').trim().toLowerCase()
   if (!email) return c.json({ error: 'email required' }, 400)
   const user = await c.env.DB.prepare(`SELECT u.id FROM users u JOIN team_members tm ON tm.user_id = u.id WHERE lower(u.email) = ? AND tm.party_type = 'vendor' AND u.status = 'pending'`).bind(email).first<{ id: string }>()
