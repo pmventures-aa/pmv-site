@@ -4,7 +4,7 @@ import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { createActivationToken } from '../session'
 import { activityInsert } from '../activity'
-import { sendEmail, escapeHtml } from '../email'
+import { sendAccountWelcome } from '../accountEmails'
 
 export const conversionRoutes = new Hono<AppEnv>()
 
@@ -65,13 +65,19 @@ conversionRoutes.post('/inquiries/:id/convert', requireStaff, async (c) => {
   ])
 
   const setupToken = await createActivationToken(c.env, clientId)
+  const setupUrl = `https://client.pinnaclemanagementventures.com/set-password?token=${encodeURIComponent(setupToken)}`
 
   c.executionCtx.waitUntil(
-    sendEmail(c.env, {
-      to: inquiry.email,
-      subject: 'Welcome to Pinnacle Management Ventures',
-      html: `<p>Hi ${escapeHtml(firstName || 'there')},</p><p>Thanks for choosing Pinnacle Management Ventures — your client account is ready. A member of your team will follow up shortly with next steps.</p>`,
-    }),
+    sendAccountWelcome(c.env, {
+      userId: clientId,
+      role: 'client',
+      email: inquiry.email,
+      firstName,
+      creationType: 'lead_conversion',
+      actionLabel: 'Set Up My Pinnacle Account',
+      actionUrl: setupUrl,
+      actorUserId: user.id,
+    }).catch((err) => console.error('[account-email] converted lead invite failed', err)),
   )
 
   return c.json({ ok: true, client_user_id: clientId, setup_token: setupToken }, 201)
