@@ -12,15 +12,14 @@ CREATE TABLE permission_catalog (
 
 INSERT INTO permission_catalog(permission_key, label, description, category) VALUES
   ('reveal_payment_info', 'Reveal banking information', 'View decrypted ACH routing/account details for assigned clients.', 'Sensitive data'),
-  ('manage_users', 'Manage users', 'Create, suspend, reactivate, and manage account access for clients, employees, and vendors.', 'Administration'),
+  ('manage_users', 'Manage users', 'Create, suspend, reactivate, and manage account access for clients, employees, and vendors within existing privilege limits.', 'Administration'),
   ('manage_settings', 'Manage firm settings', 'Change firm-wide settings, service catalog configuration, and operational defaults.', 'Administration'),
-  ('view_reports', 'View reporting', 'Open the Reporting Center, run reports, and view saved report output.', 'Insights'),
+  ('view_reports', 'View reporting', 'Open the Reporting Center, run reports, and create branded report PDF exports.', 'Insights'),
   ('view_audit_log', 'View audit log', 'View the compliance-grade audit trail and security history.', 'Security'),
   ('manage_communications', 'Manage communications', 'Create, schedule, and send firm communications and campaigns.', 'Communication'),
-  ('manage_invitations', 'Manage invitations', 'Create, resend, revoke, and track vendor, client, staff, and other account invitations.', 'Administration'),
-  ('manage_roles', 'Manage roles & permissions', 'Create custom staff roles and decide which permission grants each role receives.', 'Security'),
-  ('manage_documents', 'Manage generated documents', 'View, generate, share, and organize application PDFs and report exports.', 'Documents'),
-  ('manage_team', 'Manage team & vendors', 'Approve vendors and edit employee/vendor profile, role, and access settings.', 'Administration');
+  ('manage_invitations', 'Manage invitations', 'Create, resend, revoke, and track client and professional-provider invitations. Staff invitations remain Owner-only.', 'Administration'),
+  ('manage_documents', 'Manage document center', 'Open the HQ Document Center and organize generated applications and report-export records.', 'Documents'),
+  ('manage_team', 'View team & vendor operations', 'Open Team & Vendors, review provider status, workload, performance, and operational profile information. Privilege grants remain Owner-only.', 'Administration');
 
 CREATE TABLE role_definitions (
   id TEXT PRIMARY KEY,
@@ -45,13 +44,15 @@ ALTER TABLE team_members ADD COLUMN role_definition_id TEXT REFERENCES role_defi
 
 -- Starter roles are editable templates rather than hard-coded authorization roles.
 INSERT INTO role_definitions(id, role_key, name, description, party_type, is_system) VALUES
-  ('role-support-admin', 'support_admin', 'Support Admin', 'Handles client support and account administration without Owner-only authority.', 'employee', 1),
-  ('role-client-services', 'client_services', 'Client Services', 'Day-to-day client coordination with no sensitive administrative privileges by default.', 'employee', 1),
+  ('role-support-admin', 'support_admin', 'Support Admin', 'Handles client support, invitations, documents, reporting, communications, and team operations without Owner-only authority.', 'employee', 1),
+  ('role-client-services', 'client_services', 'Client Services', 'Day-to-day client coordination with access to the shared document workspace but no security-sensitive administrative powers by default.', 'employee', 1),
   ('role-vendor-limited', 'vendor_limited', 'Vendor - Limited', 'Restricted provider role intended for assigned client work only.', 'vendor', 1);
 
 INSERT INTO role_permissions(role_id, permission_key, granted) VALUES
   ('role-support-admin', 'manage_users', 1),
   ('role-support-admin', 'view_reports', 1),
+  ('role-support-admin', 'manage_communications', 1),
+  ('role-support-admin', 'manage_invitations', 1),
   ('role-support-admin', 'manage_documents', 1),
   ('role-support-admin', 'manage_team', 1),
   ('role-client-services', 'manage_documents', 1);
