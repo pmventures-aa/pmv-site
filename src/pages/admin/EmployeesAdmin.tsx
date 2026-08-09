@@ -59,10 +59,18 @@ export default function EmployeesAdmin() {
         vendor_category: e.vendor_category,
         status: 'active',
       })
+
+      // Approval itself is authoritative. Email is a follow-up side effect, so
+      // a provider/network failure must never make the UI claim the vendor was
+      // not approved after the status write already succeeded.
       if (e.party_type === 'vendor') {
-        const result = await api.post<{ email_delivery: { status: string; error?: string } }>(`/admin/users/${e.id}/vendor-approval-email`, {})
-        if (!['sent', 'delivered'].includes(result.email_delivery.status)) {
-          window.alert(`Vendor approved, but the approval email was ${result.email_delivery.status}. ${result.email_delivery.error || 'You can send a portal reminder from Users.'}`)
+        try {
+          const result = await api.post<{ email_delivery: { status: string; error?: string } }>(`/admin/users/${e.id}/vendor-approval-email`, {})
+          if (!['sent', 'delivered'].includes(result.email_delivery.status)) {
+            window.alert(`Vendor approved. The approval email was ${result.email_delivery.status}. ${result.email_delivery.error || 'You can send a portal reminder from Users.'}`)
+          }
+        } catch {
+          window.alert('Vendor approved, but the approval email could not be sent. You can send a portal reminder from Users.')
         }
       }
       load()
