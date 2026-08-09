@@ -18,6 +18,7 @@ import { reportRoutes } from '../_lib/routes/reports'
 import { searchRoutes } from '../_lib/routes/search'
 import { commsRoutes } from '../_lib/routes/comms'
 import { crmRoutes } from '../_lib/routes/crm'
+import { crmWriteRoutes } from '../_lib/routes/crmWrites'
 import { serviceApplicationRoutes } from '../_lib/routes/serviceApplications'
 import { intakeCatalogAdminRoutes } from '../_lib/routes/intakeCatalogAdmin'
 import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
@@ -45,6 +46,7 @@ app.route('/admin', employeeRoutes)
 app.route('/admin', reportRoutes)
 app.route('/admin', searchRoutes)
 app.route('/admin', commsRoutes)
+app.route('/admin', crmWriteRoutes)
 app.route('/admin', crmRoutes)
 
 app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
