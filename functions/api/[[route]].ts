@@ -26,6 +26,7 @@ import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
 import { accountEmailsAdminRoutes } from '../_lib/routes/accountEmailsAdmin'
 import { resendWebhookRoutes } from '../_lib/routes/resendWebhooks'
 import { staffServiceAssignmentRoutes, clientApplicationSignatureRoutes } from '../_lib/routes/staffServiceAssignments'
+import { staffServicePrefillRoutes } from '../_lib/routes/staffServicePrefill'
 import { invoiceAdminRoutes } from '../_lib/routes/invoiceAdmin'
 
 const app = new Hono<AppEnv>().basePath('/api')
@@ -50,6 +51,7 @@ app.route('/portal', messageRoutes)
 app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', accountEmailsAdminRoutes)
 app.route('/admin', staffServiceAssignmentRoutes)
+app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
