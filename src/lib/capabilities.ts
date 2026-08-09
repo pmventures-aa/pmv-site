@@ -9,6 +9,9 @@ export interface Capabilities {
   can_view_reports: boolean
   can_view_audit_log: boolean
   can_manage_communications: boolean
+  can_manage_invitations: boolean
+  can_manage_documents: boolean
+  can_manage_team: boolean
   is_owner: boolean
   role_definition_id?: string | null
   role_name?: string | null
@@ -21,14 +24,14 @@ const NONE: Capabilities = {
   can_view_reports: false,
   can_view_audit_log: false,
   can_manage_communications: false,
+  can_manage_invitations: false,
+  can_manage_documents: false,
+  can_manage_team: false,
   is_owner: false,
   role_definition_id: null,
   role_name: null,
 }
 
-// Effective capabilities combine legacy per-person grants with the user's
-// database-defined role template. Role names are presentation only; routes
-// enforce the actual permission grants returned by the backend.
 export function useCapabilities(): Capabilities & { loading: boolean } {
   const { user } = useAuth()
   const [caps, setCaps] = useState<Capabilities>(NONE)
