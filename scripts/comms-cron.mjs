@@ -1,17 +1,7 @@
 #!/usr/bin/env node
-// Flushes due Communications Center sends (functions/_lib/routes/comms.ts).
-//
-// Cloudflare Pages Functions have no cron/scheduled handler (only plain
-// Workers do), so scheduled/recurring campaigns are driven from here
-// instead — a GitHub Actions `schedule:` trigger runs this on a timer
-// (.github/workflows/comms-cron.yml). It talks to D1 over Cloudflare's
-// REST API (not a binding, since this runs as a plain Node script outside
-// the Workers runtime) and to Resend directly, mirroring — deliberately
-// duplicating, since the two runtimes can't share a module — the audience
-// resolution and send logic in comms.ts.
-//
-// Env required: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
-// CLOUDFLARE_D1_DATABASE_ID, RESEND_API_KEY, RESEND_FROM_EMAIL.
+// Flushes due Communications Center sends. Scheduled/recurring delivery runs
+// outside the Pages Functions runtime, so this mirrors the same CRM audience
+// and suppression rules used by functions/_lib/routes/comms.ts.
 
 const { CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_DATABASE_ID, RESEND_API_KEY, RESEND_FROM_EMAIL } = process.env
 
@@ -23,48 +13,128 @@ for (const [name, value] of Object.entries({ CLOUDFLARE_API_TOKEN, CLOUDFLARE_AC
 }
 
 async function d1(sql, params = []) {
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database/${CLOUDFLARE_D1_DATABASE_ID}/query`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sql, params }),
-    },
-  )
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database/${CLOUDFLARE_D1_DATABASE_ID}/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sql, params }),
+  })
   const json = await res.json()
   if (!json.success) throw new Error(`D1 query failed: ${JSON.stringify(json.errors)}`)
   return json.result?.[0]?.results ?? []
 }
 
-function uuid() {
-  return crypto.randomUUID()
+function uuid() { return crypto.randomUUID() }
+
+function messageType(value) {
+  return value === 'operational' || value === 'internal' ? value : 'marketing'
 }
 
-async function resolveAudience(audience) {
-  const byId = new Map()
+function userEligible(row, type) {
+  if (row.status !== 'active') return false
+  if (type === 'internal') return row.role === 'staff' || row.role === 'admin'
+  const status = row.marketing_email_status || 'emailable'
+  if (type === 'marketing') return status === 'emailable'
+  return !['bounced', 'suppressed'].includes(status)
+}
+
+function leadEligible(row, type) {
+  if (type === 'internal' || row.client_user_id || row.archived_at) return false
+  const status = row.email_status || 'emailable'
+  if (type === 'marketing') return status === 'emailable'
+  return !['bounced', 'suppressed'].includes(status)
+}
+
+function addUser(byEmail, row, type) {
+  if (!row?.email || !userEligible(row, type)) return
+  const email = String(row.email).trim().toLowerCase()
+  byEmail.set(email, { recipient_kind: 'user', user_id: row.id, inquiry_id: null, email, full_name: row.full_name ?? null, role: row.role ?? null })
+}
+
+function addLead(byEmail, row, type) {
+  if (!row?.email || !leadEligible(row, type)) return
+  const email = String(row.email).trim().toLowerCase()
+  if (byEmail.get(email)?.recipient_kind === 'user') return
+  byEmail.set(email, { recipient_kind: 'lead', user_id: null, inquiry_id: row.id, email, full_name: row.name ?? row.company_name ?? null, role: null })
+}
+
+async function resolveDynamicList(list) {
+  let filter = {}
+  try { filter = list.filter_json ? JSON.parse(list.filter_json) : {} } catch { filter = {} }
+  const clauses = ['ci.client_user_id IS NULL', 'ci.archived_at IS NULL']
+  const params = []
+  const fields = {
+    record_type: 'ci.record_type', lifecycle_stage: 'ci.lifecycle_stage', status: 'ci.status', source: 'ci.source', service_key: 'ci.service_key', owner_staff_user_id: 'ci.owner_staff_user_id', email_status: 'ci.email_status',
+  }
+  for (const [key, column] of Object.entries(fields)) {
+    if (filter[key]) { clauses.push(`${column} = ?`); params.push(filter[key]) }
+  }
+  if (filter.search) {
+    const q = `%${String(filter.search).slice(0, 120)}%`
+    clauses.push('(ci.name LIKE ? OR ci.email LIKE ? OR ci.company_name LIKE ? OR ci.phone LIKE ?)')
+    params.push(q, q, q, q)
+  }
+  return d1(`SELECT ci.* FROM contact_inquiries ci WHERE ${clauses.join(' AND ')} LIMIT 10000`, params)
+}
+
+async function resolveAudience(audience, type) {
+  const byEmail = new Map()
   for (const segment of audience.segments ?? []) {
-    let where = ''
-    const params = []
-    if (segment === 'all_employees') {
-      where = "u.role IN ('staff','admin') AND u.status = 'active' AND (tm.party_type IS NULL OR tm.party_type = 'employee')"
-    } else if (segment === 'all_vendors') {
-      where = "u.role = 'staff' AND u.status = 'active' AND tm.party_type = 'vendor'"
-    } else if (segment.startsWith('vendor_category:')) {
-      where = "u.role = 'staff' AND u.status = 'active' AND tm.party_type = 'vendor' AND tm.vendor_category = ?"
-      params.push(segment.slice('vendor_category:'.length))
-    } else {
+    if (segment === 'all_employees' || segment === 'all_vendors' || segment.startsWith('vendor_category:')) {
+      let where = ''
+      const params = []
+      if (segment === 'all_employees') where = "u.role IN ('staff','admin') AND (tm.party_type IS NULL OR tm.party_type = 'employee')"
+      else if (segment === 'all_vendors') where = "u.role = 'staff' AND tm.party_type = 'vendor'"
+      else { where = "u.role = 'staff' AND tm.party_type = 'vendor' AND tm.vendor_category = ?"; params.push(segment.slice('vendor_category:'.length)) }
+      const rows = await d1(`SELECT u.id, u.email, u.full_name, u.role, u.status, u.marketing_email_status FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE ${where}`, params)
+      for (const row of rows) addUser(byEmail, row, type)
       continue
     }
-    const rows = await d1(`SELECT u.id, u.email, u.full_name FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE ${where}`, params)
-    for (const row of rows) byId.set(row.id, row)
+
+    if (segment === 'all_clients') {
+      const rows = await d1("SELECT id, email, full_name, role, status, marketing_email_status FROM users WHERE role = 'client'")
+      for (const row of rows) addUser(byEmail, row, type)
+      continue
+    }
+
+    let leadWhere = null
+    const params = []
+    if (segment === 'all_leads') leadWhere = 'client_user_id IS NULL AND archived_at IS NULL'
+    else if (segment.startsWith('lifecycle:')) { leadWhere = 'client_user_id IS NULL AND archived_at IS NULL AND lifecycle_stage = ?'; params.push(segment.slice('lifecycle:'.length)) }
+    else if (segment.startsWith('lead_status:')) { leadWhere = 'client_user_id IS NULL AND archived_at IS NULL AND status = ?'; params.push(segment.slice('lead_status:'.length)) }
+    else if (segment.startsWith('record_type:')) { leadWhere = 'client_user_id IS NULL AND archived_at IS NULL AND record_type = ?'; params.push(segment.slice('record_type:'.length)) }
+    if (leadWhere) {
+      const rows = await d1(`SELECT * FROM contact_inquiries WHERE ${leadWhere}`, params)
+      for (const row of rows) addLead(byEmail, row, type)
+    }
   }
-  const explicitIds = (audience.user_ids ?? []).filter((id) => !byId.has(id))
-  if (explicitIds.length > 0) {
-    const placeholders = explicitIds.map(() => '?').join(',')
-    const rows = await d1(`SELECT id, email, full_name FROM users WHERE id IN (${placeholders}) AND status = 'active'`, explicitIds)
-    for (const row of rows) byId.set(row.id, row)
+
+  const listIds = [...new Set(audience.list_ids ?? [])].slice(0, 5000)
+  if (listIds.length) {
+    const placeholders = listIds.map(() => '?').join(',')
+    const lists = await d1(`SELECT * FROM crm_lists WHERE id IN (${placeholders}) AND archived_at IS NULL`, listIds)
+    for (const list of lists) {
+      const rows = list.list_type === 'dynamic'
+        ? await resolveDynamicList(list)
+        : await d1('SELECT ci.* FROM crm_list_members lm JOIN contact_inquiries ci ON ci.id = lm.inquiry_id WHERE lm.list_id = ? AND ci.archived_at IS NULL', [list.id])
+      for (const row of rows) addLead(byEmail, row, type)
+    }
   }
-  return [...byId.values()]
+
+  const userIds = [...new Set(audience.user_ids ?? [])].slice(0, 5000)
+  if (userIds.length) {
+    const placeholders = userIds.map(() => '?').join(',')
+    const rows = await d1(`SELECT id, email, full_name, role, status, marketing_email_status FROM users WHERE id IN (${placeholders})`, userIds)
+    for (const row of rows) addUser(byEmail, row, type)
+  }
+
+  const inquiryIds = [...new Set(audience.inquiry_ids ?? [])].slice(0, 5000)
+  if (inquiryIds.length) {
+    const placeholders = inquiryIds.map(() => '?').join(',')
+    const rows = await d1(`SELECT * FROM contact_inquiries WHERE id IN (${placeholders})`, inquiryIds)
+    for (const row of rows) addLead(byEmail, row, type)
+  }
+
+  return [...byEmail.values()]
 }
 
 async function sendViaResend(to, subject, html) {
@@ -88,38 +158,33 @@ function nextOccurrence(fromIso, recurrence) {
 
 async function main() {
   const due = await d1("SELECT * FROM comms_messages WHERE status = 'queued' AND next_run_at IS NOT NULL AND next_run_at <= datetime('now')")
-  if (due.length === 0) {
-    console.log('no due comms messages')
-    return
-  }
+  if (!due.length) { console.log('no due comms messages'); return }
   console.log(`${due.length} due message(s)`)
 
   for (const message of due) {
     const audience = JSON.parse(message.audience_json || '{}')
-    const recipients = await resolveAudience(audience)
-    console.log(`message ${message.id} (${message.subject}) — ${recipients.length} recipient(s)`)
+    const type = messageType(message.message_type)
+    const recipients = await resolveAudience(audience, type)
+    console.log(`message ${message.id} (${message.subject}) — ${recipients.length} eligible recipient(s)`)
 
-    if (recipients.length > 0) {
-      for (const r of recipients) {
-        await d1(
-          'INSERT INTO comms_recipients (id, message_id, user_id, email, full_name) VALUES (?, ?, ?, ?, ?)',
-          [uuid(), message.id, r.id, r.email, r.full_name],
-        )
-      }
-      for (const r of recipients) {
-        try {
-          const providerMessageId = await sendViaResend(r.email, message.subject, message.body_html)
-          await d1(
-            "UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE message_id = ? AND user_id = ?",
-            [providerMessageId, message.id, r.id],
-          )
-        } catch (err) {
-          console.error(`send failed for ${r.email}:`, err.message)
-          await d1(
-            "UPDATE comms_recipients SET status = 'failed', error = ? WHERE message_id = ? AND user_id = ?",
-            [String(err.message).slice(0, 500), message.id, r.id],
-          )
+    for (const recipient of recipients) {
+      const recipientId = uuid()
+      await d1(
+        'INSERT INTO comms_recipients (id, message_id, user_id, inquiry_id, recipient_kind, email, full_name) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [recipientId, message.id, recipient.user_id, recipient.inquiry_id, recipient.recipient_kind, recipient.email, recipient.full_name],
+      )
+      try {
+        const providerMessageId = await sendViaResend(recipient.email, message.subject, message.body_html)
+        await d1("UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE id = ?", [providerMessageId, recipientId])
+        if (recipient.recipient_kind === 'lead' && recipient.inquiry_id) {
+          await d1('INSERT INTO email_log (id, inquiry_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)', [uuid(), recipient.inquiry_id, message.created_by_user_id, recipient.email, message.subject, message.body_html])
+          await d1("UPDATE contact_inquiries SET last_contacted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", [recipient.inquiry_id])
+        } else if (recipient.user_id && recipient.role === 'client') {
+          await d1('INSERT INTO email_log (id, client_user_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)', [uuid(), recipient.user_id, message.created_by_user_id, recipient.email, message.subject, message.body_html])
         }
+      } catch (err) {
+        console.error(`send failed for ${recipient.email}:`, err.message)
+        await d1("UPDATE comms_recipients SET status = 'failed', error = ? WHERE id = ?", [String(err.message).slice(0, 500), recipientId])
       }
     }
 
@@ -134,7 +199,4 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+main().catch((err) => { console.error(err); process.exit(1) })
