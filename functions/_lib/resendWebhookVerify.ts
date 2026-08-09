@@ -15,6 +15,10 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(raw)
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+}
+
 function timingSafeEqualString(a: string, b: string): boolean {
   const aa = new TextEncoder().encode(a)
   const bb = new TextEncoder().encode(b)
@@ -44,9 +48,10 @@ export async function verifyResendWebhookSignature(input: {
   try {
     const encodedSecret = input.secret.startsWith('whsec_') ? input.secret.slice('whsec_'.length) : input.secret
     const secretBytes = base64ToBytes(encodedSecret)
-    const key = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+    const key = await crypto.subtle.importKey('raw', toArrayBuffer(secretBytes), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
     const signedContent = `${input.id}.${input.timestamp}.${input.payload}`
-    const signed = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signedContent))
+    const messageBytes = new TextEncoder().encode(signedContent)
+    const signed = await crypto.subtle.sign('HMAC', key, toArrayBuffer(messageBytes))
     const expected = bytesToBase64(new Uint8Array(signed))
 
     const candidates = input.signature
