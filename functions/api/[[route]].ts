@@ -30,7 +30,9 @@ import { staffServiceAssignmentRoutes, clientApplicationSignatureRoutes } from '
 import { staffServicePrefillRoutes } from '../_lib/routes/staffServicePrefill'
 import { invoiceAdminRoutes } from '../_lib/routes/invoiceAdmin'
 import { signaturePortalSyncRoutes, signatureAdminSyncRoutes } from '../_lib/routes/signaturePdfSync'
-import { invitationPublicRoutes, trustedContactRoutes, invitationAdminRoutes } from '../_lib/routes/accessInvites'
+import { invitationPublicRoutes } from '../_lib/routes/invitationPublic'
+import { trustedContactRoutes } from '../_lib/routes/trustedContacts'
+import { invitationAdminRoutes, roleAdminRoutes } from '../_lib/routes/invitationAdmin'
 import { roleCapabilityRoutes } from '../_lib/routes/roleCapabilities'
 import { inviteCompletionRoutes } from '../_lib/routes/inviteCompletion'
 
@@ -63,6 +65,7 @@ app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)
 app.route('/admin', roleCapabilityRoutes)
 app.route('/admin', invitationAdminRoutes)
+app.route('/admin', roleAdminRoutes)
 app.route('/admin', reportExportRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
