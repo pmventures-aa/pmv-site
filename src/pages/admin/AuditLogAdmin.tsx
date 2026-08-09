@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnOutline, SkeletonTable } from '../../components/admin/ui'
 import { useCapabilities } from '../../lib/capabilities'
 import { timeAgo } from '../../lib/activity'
 
@@ -10,6 +10,7 @@ interface AuditEntry {
   actor_name: string | null
   actor_email: string | null
   actor_ip: string | null
+  actor_user_agent: string | null
   action: string
   entity_type: string | null
   entity_id: string | null
@@ -169,7 +170,9 @@ export default function AuditLogAdmin() {
       </Panel>
 
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <Panel>
+          <SkeletonTable rows={6} cols={1} />
+        </Panel>
       ) : loadError ? (
         <div className="space-y-2 text-sm text-slate-400">
           <p>Couldn't load the audit log.</p>
@@ -186,11 +189,12 @@ export default function AuditLogAdmin() {
           <Panel className="divide-y divide-white/5 !p-0">
             {entries.map((e) => (
               <div key={e.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm text-slate-200">{describeAction(e)}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="mt-0.5 truncate text-xs text-slate-500" title={e.actor_user_agent ?? undefined}>
                     {timeAgo(e.created_at)}
                     {e.actor_ip ? ` · ${e.actor_ip}` : ''}
+                    {e.actor_user_agent ? ` · ${e.actor_user_agent}` : ''}
                   </p>
                 </div>
               </div>

@@ -26,6 +26,7 @@ export type AuditAction =
 export interface AuditOpts {
   actorUserId?: string | null
   actorIp?: string | null
+  actorUserAgent?: string | null
   action: AuditAction
   entityType?: string | null
   entityId?: string | null
@@ -35,11 +36,12 @@ export interface AuditOpts {
 
 export function auditInsert(env: Env, opts: AuditOpts): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO audit_log (id, actor_user_id, actor_ip, action, entity_type, entity_id, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO audit_log (id, actor_user_id, actor_ip, actor_user_agent, action, entity_type, entity_id, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     uuid(),
     opts.actorUserId ?? null,
     opts.actorIp ?? null,
+    opts.actorUserAgent ?? null,
     opts.action,
     opts.entityType ?? null,
     opts.entityId ?? null,
@@ -58,4 +60,8 @@ export async function logAudit(env: Env, opts: AuditOpts): Promise<void> {
 // same way instead of re-deriving it inconsistently.
 export function actorIp(request: Request): string | null {
   return request.headers.get('CF-Connecting-IP')
+}
+
+export function actorUserAgent(request: Request): string | null {
+  return request.headers.get('User-Agent')
 }

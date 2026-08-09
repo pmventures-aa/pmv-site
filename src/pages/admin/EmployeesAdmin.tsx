@@ -139,7 +139,7 @@ export default function EmployeesAdmin() {
 
 interface EmployeeDetailData {
   employee: Employee & { created_at: string; can_reveal_payment_info: number; can_manage_users: number; can_manage_settings: number; can_view_reports: number; can_view_audit_log: number; is_owner: number }
-  login_history: { created_at: string; actor_ip: string | null }[]
+  login_history: { created_at: string; actor_ip: string | null; actor_user_agent: string | null }[]
   tasks: { id: string; title: string; status: string; due_date: string | null; client_name: string | null; client_email: string }[]
   notes: { id: string; body: string; created_at: string; client_name: string | null; client_email: string | null }[]
   avg_response_hours: number | null
@@ -205,8 +205,8 @@ function EmployeeDetail({ id, name, onClose }: { id: string; name: string; onClo
               ) : (
                 <ul className="space-y-1 text-xs text-slate-400">
                   {data.login_history.slice(0, 8).map((l, i) => (
-                    <li key={i}>
-                      {timeAgo(l.created_at)} {l.actor_ip ? `· ${l.actor_ip}` : ''}
+                    <li key={i} className="truncate" title={l.actor_user_agent ?? undefined}>
+                      {timeAgo(l.created_at)} {l.actor_ip ? `· ${l.actor_ip}` : ''} {l.actor_user_agent ? `· ${l.actor_user_agent}` : ''}
                     </li>
                   ))}
                 </ul>

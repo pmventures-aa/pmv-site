@@ -3,7 +3,7 @@ import type { AppEnv } from '../types'
 import { requireStaff, requireOwner } from '../mid'
 import { uuid, verifyPassword } from '../crypto'
 import { canAccessClient, scopeFilter } from '../scope'
-import { auditInsert, actorIp } from '../auditLog'
+import { auditInsert, actorIp, actorUserAgent } from '../auditLog'
 
 export const deletionRoutes = new Hono<AppEnv>()
 
@@ -55,7 +55,7 @@ deletionRoutes.patch('/records/:entity/:id/archive', requireStaff, async (c) => 
 
   await c.env.DB.batch([
     c.env.DB.prepare(`UPDATE ${table} SET archived_at = datetime('now'), archived_by = ?, archived_reason = ? WHERE id = ?`).bind(user.id, reason, id),
-    auditInsert(c.env, { actorUserId: user.id, actorIp: actorIp(c.req.raw), action: 'record_archived', entityType: entity, entityId: id, before: row }),
+    auditInsert(c.env, { actorUserId: user.id, actorIp: actorIp(c.req.raw), actorUserAgent: actorUserAgent(c.req.raw), action: 'record_archived', entityType: entity, entityId: id, before: row }),
   ])
   return c.json({ ok: true })
 })
@@ -77,7 +77,7 @@ deletionRoutes.patch('/records/:entity/:id/restore', requireStaff, async (c) => 
 
   await c.env.DB.batch([
     c.env.DB.prepare(`UPDATE ${table} SET archived_at = NULL, archived_by = NULL, archived_reason = NULL WHERE id = ?`).bind(id),
-    auditInsert(c.env, { actorUserId: user.id, actorIp: actorIp(c.req.raw), action: 'record_restored', entityType: entity, entityId: id, before: row }),
+    auditInsert(c.env, { actorUserId: user.id, actorIp: actorIp(c.req.raw), actorUserAgent: actorUserAgent(c.req.raw), action: 'record_restored', entityType: entity, entityId: id, before: row }),
   ])
   return c.json({ ok: true })
 })
@@ -131,7 +131,7 @@ deletionRoutes.delete('/records/:entity/:id/permanent', requireOwner, async (c) 
     c.env.DB.prepare(
       'INSERT INTO permanent_deletions (id, entity_type, entity_id, snapshot_json, deleted_by, reason, actor_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
     ).bind(permId, entity, id, JSON.stringify(row), user.id, reason.slice(0, 500), ip),
-    auditInsert(c.env, { actorUserId: user.id, actorIp: ip, action: 'record_permanently_deleted', entityType: entity, entityId: id, before: row }),
+    auditInsert(c.env, { actorUserId: user.id, actorIp: ip, actorUserAgent: actorUserAgent(c.req.raw), action: 'record_permanently_deleted', entityType: entity, entityId: id, before: row }),
     c.env.DB.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(id),
   ])
   return c.json({ ok: true })

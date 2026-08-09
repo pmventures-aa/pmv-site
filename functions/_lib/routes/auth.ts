@@ -3,7 +3,7 @@ import type { AppEnv, SessionUser } from '../types'
 import { uuid, hashPassword, verifyPassword } from '../crypto'
 import { createSession, sessionCookie, clearCookie, destroySession, createActivationToken, consumeActivationToken, getUser } from '../session'
 import { activityInsert } from '../activity'
-import { logAudit, actorIp } from '../auditLog'
+import { logAudit, actorIp, actorUserAgent } from '../auditLog'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -197,7 +197,7 @@ authRoutes.post('/login', async (c) => {
   }
   const token = await createSession(c.env, su)
   c.header('Set-Cookie', sessionCookie(token))
-  await logAudit(c.env, { actorUserId: user.id, actorIp: ip, action: 'login' })
+  await logAudit(c.env, { actorUserId: user.id, actorIp: ip, actorUserAgent: actorUserAgent(c.req.raw), action: 'login' })
   return c.json({ ok: true, user: su })
 })
 
@@ -205,6 +205,6 @@ authRoutes.post('/logout', async (c) => {
   const user = await getUser(c.env, c.req.raw)
   await destroySession(c.env, c.req.raw)
   c.header('Set-Cookie', clearCookie())
-  if (user) await logAudit(c.env, { actorUserId: user.id, actorIp: actorIp(c.req.raw), action: 'logout' })
+  if (user) await logAudit(c.env, { actorUserId: user.id, actorIp: actorIp(c.req.raw), actorUserAgent: actorUserAgent(c.req.raw), action: 'logout' })
   return c.json({ ok: true })
 })
