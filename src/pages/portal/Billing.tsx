@@ -1,95 +1,45 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useAuth } from '../../lib/auth'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../../lib/api'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
+import { Icon } from '../../components/kit/Icon'
 
 interface Invoice {
-  id: string
-  amount_cents: number
-  currency: string
-  status: string
-  due_date: string | null
-  created_at: string
+  id:string
+  invoice_number:string|null
+  customer_number:string|null
+  title:string|null
+  amount_cents:number
+  subtotal_cents?:number
+  discount_cents?:number
+  tax_cents?:number
+  shipping_cents?:number
+  currency:string
+  status:string
+  due_date:string|null
+  issue_date?:string|null
+  message?:string|null
+  payment_methods_json?:string|null
+  partial_payment_type?:string|null
+  sent_at?:string|null
+  created_at:string
 }
 
-export default function Billing() {
-  const { user } = useAuth()
-  const isStaff = user?.role === 'staff' || user?.role === 'admin'
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [loading, setLoading] = useState(true)
+function money(cents:number,currency='USD'){return new Intl.NumberFormat('en-US',{style:'currency',currency:String(currency||'USD').toUpperCase()}).format((Number(cents)||0)/100)}
+function methods(raw:string|null|undefined){try{const v=JSON.parse(raw||'[]');return Array.isArray(v)?v:[]}catch{return[]}}
+const methodLabel:Record<string,string>={card:'Card',apple_pay:'Apple Pay',google_pay:'Google Pay',ach:'ACH',mail:'Mail'}
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await api.get<{ invoices: Invoice[] }>('/portal/billing')
-      setInvoices(res.invoices)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+export default function Billing(){
+  const [invoices,setInvoices]=useState<Invoice[]>([]);const[loading,setLoading]=useState(true)
+  const load=useCallback(async()=>{setLoading(true);try{const res=await api.get<{invoices:Invoice[]}>('/portal/billing');setInvoices(res.invoices)}finally{setLoading(false)}},[])
+  useEffect(()=>{load()},[load])
+  const openTotal=useMemo(()=>invoices.filter((i)=>i.status==='open').reduce((s,i)=>s+i.amount_cents,0),[invoices])
+  const openCount=invoices.filter((i)=>i.status==='open').length
 
-  useEffect(() => {
-    load()
-  }, [load])
+  return <div><PageHeader eyebrow="Billing" title="Invoices" subtitle="Review invoices, due dates, and the payment methods listed by your Pinnacle team."/>
+    <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:max-w-2xl"><Card className="group relative overflow-hidden p-5 transition hover:-translate-y-1 hover:border-gold/20"><div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/50 to-transparent"/><p className="text-xs font-medium uppercase tracking-wide text-slate-400">Open balance</p><p className="mt-2 text-3xl font-bold text-white">{money(openTotal)}</p><p className="mt-1 text-xs text-slate-500">Across {openCount} open invoice{openCount===1?'':'s'}</p></Card><Card className="p-5"><p className="text-xs font-medium uppercase tracking-wide text-slate-400">Payment status</p><p className="mt-2 text-lg font-semibold text-white">{openCount?'Action may be needed':'Current'}</p><p className="mt-1 text-xs text-slate-500">Payment processing is coordinated separately unless your Pinnacle team provides a payment link.</p></Card></div>
 
-  async function markPaid(id: string) {
-    await api.patch(`/portal/billing/${id}`, { status: 'paid' })
-    await load()
-  }
-
-  const openTotal = invoices.filter((i) => i.status === 'open').reduce((s, i) => s + i.amount_cents, 0)
-
-  return (
-    <div>
-      <PageHeader eyebrow="Billing" title="Invoices" subtitle="Your billing history with Pinnacle Management Ventures." />
-
-      <div className="mb-6 grid max-w-xs">
-        <Card className="p-5">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Open balance</p>
-          <p className="mt-2 text-3xl font-bold text-white">${(openTotal / 100).toLocaleString()}</p>
-        </Card>
-      </div>
-
-      <Card className="overflow-x-auto !p-0">
-        {loading ? (
-          <div className="p-6 text-sm text-slate-400">Loading…</div>
-        ) : invoices.length === 0 ? (
-          <div className="p-6">
-            <EmptyState label="No invoices yet." />
-          </div>
-        ) : (
-          <table className="w-full min-w-[520px] text-sm">
-            <thead>
-              <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-5 py-3 font-medium">Amount</th>
-                <th className="px-5 py-3 font-medium">Due</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-                {isStaff && <th className="px-5 py-3 font-medium">Action</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b border-white/5 last:border-0">
-                  <td className="px-5 py-3 text-slate-200">${(inv.amount_cents / 100).toLocaleString()}</td>
-                  <td className="px-5 py-3 text-slate-200">{inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'}</td>
-                  <td className="px-5 py-3">
-                    <StatusBadge tone={inv.status === 'paid' ? 'green' : inv.status === 'void' ? 'slate' : 'gold'}>{inv.status}</StatusBadge>
-                  </td>
-                  {isStaff && (
-                    <td className="px-5 py-3">
-                      {inv.status === 'open' && (
-                        <button onClick={() => markPaid(inv.id)} className="text-xs font-medium text-gold hover:underline">
-                          Mark paid
-                        </button>
-                      )}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
-    </div>
-  )
+    {loading?<Card><p className="text-sm text-slate-400">Loading…</p></Card>:invoices.length===0?<Card><EmptyState label="No invoices yet."/></Card>:<div className="space-y-3">{invoices.map((inv)=>{const accepted=methods(inv.payment_methods_json);return <Card key={inv.id} className="!p-0 overflow-hidden"><div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-white">{inv.title||'Pinnacle invoice'}</h2><StatusBadge tone={inv.status==='paid'?'green':inv.status==='void'?'slate':'gold'}>{inv.status}</StatusBadge></div><p className="mt-1 text-xs text-slate-500">{inv.invoice_number||`Invoice ${inv.id.slice(0,8)}`}{inv.customer_number?` · Customer ${inv.customer_number}`:''}</p><p className="mt-3 text-3xl font-semibold text-white">{money(inv.amount_cents,inv.currency)}</p><div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500"><span>Issued {inv.issue_date?new Date(`${inv.issue_date}T12:00:00`).toLocaleDateString():new Date(inv.created_at).toLocaleDateString()}</span><span>Due {inv.due_date?new Date(`${inv.due_date}T12:00:00`).toLocaleDateString():'upon receipt'}</span></div></div>{inv.status==='open'&&<div className="rounded-xl border border-gold/15 bg-gold/[.05] px-4 py-3 text-sm text-slate-300"><p className="font-medium text-gold">Payment due</p><p className="mt-1 text-xs leading-5 text-slate-400">Contact your Pinnacle team if you need payment instructions or have a billing question.</p></div>}</div>
+      <details className="border-t border-white/10"><summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3 text-sm font-medium text-slate-300 hover:bg-white/[.025]"><span>Invoice details</span><Icon name="chevronRight" size={16} className="transition group-open:rotate-90"/></summary><div className="grid gap-5 border-t border-white/5 p-5 md:grid-cols-2"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Summary</p><dl className="mt-3 space-y-2 text-sm"><div className="flex justify-between"><dt className="text-slate-500">Subtotal</dt><dd>{money(inv.subtotal_cents??inv.amount_cents,inv.currency)}</dd></div>{Number(inv.discount_cents)>0&&<div className="flex justify-between"><dt className="text-slate-500">Discount</dt><dd>-{money(inv.discount_cents||0,inv.currency)}</dd></div>}{Number(inv.tax_cents)>0&&<div className="flex justify-between"><dt className="text-slate-500">Tax</dt><dd>{money(inv.tax_cents||0,inv.currency)}</dd></div>}{Number(inv.shipping_cents)>0&&<div className="flex justify-between"><dt className="text-slate-500">Shipping / additional</dt><dd>{money(inv.shipping_cents||0,inv.currency)}</dd></div>}<div className="flex justify-between border-t border-white/10 pt-2 font-semibold"><dt>Total</dt><dd className="text-gold">{money(inv.amount_cents,inv.currency)}</dd></div></dl></div><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Available payment methods</p>{accepted.length?<div className="mt-3 flex flex-wrap gap-2">{accepted.map((m)=><span key={m} className="rounded-full border border-white/10 bg-white/[.03] px-3 py-1.5 text-xs text-slate-300">{methodLabel[m]||m}</span>)}</div>:<p className="mt-3 text-sm text-slate-500">Contact Pinnacle for payment instructions.</p>}{inv.message&&<div className="mt-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Message</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{inv.message}</p></div>}</div></div></details>
+    </Card>})}</div>}
+  </div>
 }
