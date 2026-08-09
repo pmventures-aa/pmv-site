@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { AppEnv } from '../types'
+import type { AppEnv, SessionUser } from '../types'
 import { requireOwner, requireStaff } from '../mid'
 import { requireNamedPermission } from '../capabilities'
 import { createInvite, rotateInviteToken, sendInviteEmail, type InviteType } from '../invites'
@@ -14,6 +14,11 @@ function clean(value: unknown, max = 200): string {
 }
 function normEmail(value: unknown): string {
   return clean(value, 254).toLowerCase()
+}
+async function isOwner(c: { env: AppEnv['Bindings'] }, user: SessionUser): Promise<boolean> {
+  if (user.role !== 'admin') return false
+  const row = await c.env.DB.prepare('SELECT is_owner FROM team_members WHERE user_id = ?').bind(user.id).first<{ is_owner: number }>()
+  return !!row?.is_owner
 }
 
 invitationAdminRoutes.get('/invitations', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
@@ -31,7 +36,17 @@ invitationAdminRoutes.get('/invitations', requireStaff, requireNamedPermission('
      LEFT JOIN client_profiles cp ON cp.user_id = ai.client_user_id
      ORDER BY ai.created_at DESC LIMIT 500`,
   ).all()
-  return c.json({ invitations: rows.results || [] })
+  return c.json({ invitations: rows.results || [], can_invite_staff: await isOwner(c, c.get('user')) })
+})
+
+// Role names are safe for an invitation manager to see, but only the Owner can
+// create/edit roles or use one to provision a new staff identity.
+invitationAdminRoutes.get('/invitation-role-options', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
+  if (!(await isOwner(c, c.get('user')))) return c.json({ roles: [] })
+  const rows = await c.env.DB.prepare(
+    `SELECT id,name,party_type FROM role_definitions WHERE party_type IN ('employee','either') ORDER BY name`,
+  ).all()
+  return c.json({ roles: rows.results || [] })
 })
 
 invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
@@ -48,15 +63,17 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
   const body = await c.req.json<Body>().catch(() => ({} as Body))
   const inviteType = body.invite_type as InviteType
   if (!['vendor', 'client', 'staff'].includes(inviteType)) return c.json({ error: 'invite_type must be vendor, client, or staff' }, 400)
+  if (inviteType === 'staff' && !(await isOwner(c, actor))) return c.json({ error: 'only the Pinnacle Owner can invite staff accounts' }, 403)
+
   const email = normEmail(body.email)
   if (!email || !email.includes('@')) return c.json({ error: 'valid email required' }, 400)
-
   const fullName = clean(body.full_name, 160)
   const roleDefinitionId = clean(body.role_definition_id, 80) || null
   if (inviteType === 'staff' && !roleDefinitionId) return c.json({ error: 'staff invitations require a role template' }, 400)
   if (roleDefinitionId) {
     const role = await c.env.DB.prepare('SELECT id,party_type FROM role_definitions WHERE id = ?').bind(roleDefinitionId).first<{ id: string; party_type: string }>()
     if (!role) return c.json({ error: 'role template not found' }, 404)
+    if (inviteType === 'staff' && !['employee', 'either'].includes(role.party_type)) return c.json({ error: 'choose an employee role for a staff invitation' }, 400)
   }
 
   const metadata = {
@@ -97,6 +114,7 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
 invitationAdminRoutes.post('/invitations/:id/resend', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM access_invites WHERE id = ?').bind(c.req.param('id') || '').first<any>()
   if (!row) return c.json({ error: 'invitation not found' }, 404)
+  if (row.invite_type === 'staff' && !(await isOwner(c, c.get('user')))) return c.json({ error: 'only the Pinnacle Owner can manage staff invitations' }, 403)
   if (row.status === 'accepted') return c.json({ error: 'accepted invitations cannot be resent' }, 400)
   const rotated = await rotateInviteToken(c.env, row.id)
   await sendInviteEmail(c.env, row, rotated.token, rotated.expiresAt)
@@ -104,6 +122,9 @@ invitationAdminRoutes.post('/invitations/:id/resend', requireStaff, requireNamed
 })
 
 invitationAdminRoutes.post('/invitations/:id/revoke', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
+  const row = await c.env.DB.prepare('SELECT invite_type FROM access_invites WHERE id = ?').bind(c.req.param('id') || '').first<{ invite_type: string }>()
+  if (!row) return c.json({ error: 'invitation not found' }, 404)
+  if (row.invite_type === 'staff' && !(await isOwner(c, c.get('user')))) return c.json({ error: 'only the Pinnacle Owner can manage staff invitations' }, 403)
   await c.env.DB.prepare(
     `UPDATE access_invites SET status = 'revoked', revoked_at = datetime('now'), updated_at = datetime('now')
      WHERE id = ? AND status != 'accepted'`,
