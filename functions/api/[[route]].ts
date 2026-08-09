@@ -36,6 +36,7 @@ import { invitationAdminRoutes, roleAdminRoutes } from '../_lib/routes/invitatio
 import { roleCapabilityRoutes } from '../_lib/routes/roleCapabilities'
 import { inviteCompletionRoutes } from '../_lib/routes/inviteCompletion'
 import { teamManagementRoutes } from '../_lib/routes/teamManagement'
+import { vendorApplicationUploadRoutes } from '../_lib/routes/vendorApplicationUploads'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -46,6 +47,7 @@ app.route('/', unsubscribeRoutes)
 app.route('/', resendWebhookRoutes)
 app.route('/', invitationPublicRoutes)
 app.route('/', inviteCompletionRoutes)
+app.route('/', vendorApplicationUploadRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
