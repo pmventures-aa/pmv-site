@@ -14,7 +14,19 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.localStorage.getItem('pmv_hq_sidebar_open') !== '0'
+  })
   const p = useAppPath()
+
+  function toggleSidebar() {
+    setSidebarOpen((open) => {
+      const next = !open
+      window.localStorage.setItem('pmv_hq_sidebar_open', next ? '1' : '0')
+      return next
+    })
+  }
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 rounded-md border-l-2 px-3 py-2.5 text-sm font-medium transition ${
@@ -55,8 +67,12 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
 
   return (
     <div className="min-h-screen bg-navy-950 lg:flex">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/10 bg-navy-900 p-4 lg:flex print:hidden">
-        {sidebarContent}
+      <aside
+        className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/10 bg-navy-900 transition-[width,padding] duration-200 lg:flex print:hidden ${
+          sidebarOpen ? 'w-64 border-r p-4' : 'w-0 p-0'
+        }`}
+      >
+        <div className="flex w-64 shrink-0 flex-1 flex-col">{sidebarContent}</div>
       </aside>
 
       <header className="border-b border-white/10 bg-navy-900 lg:hidden print:hidden">
@@ -115,7 +131,17 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
 
       <div className="flex min-h-screen flex-1 flex-col">
         <div className="hidden items-center justify-between gap-4 border-b border-white/10 bg-navy-900/60 px-8 py-3 lg:flex print:hidden">
-          <GlobalSearch className="w-full max-w-sm" />
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <button
+              onClick={toggleSidebar}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/10 text-slate-300 transition hover:border-gold/40 hover:text-gold"
+              aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+              title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            >
+              {sidebarOpen ? '⟨' : '⟩'}
+            </button>
+            <GlobalSearch className="w-full max-w-sm" />
+          </div>
           <div className="flex shrink-0 items-center gap-3">
             <button
               onClick={refreshPage}
