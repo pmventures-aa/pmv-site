@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
 
+# Temporary branch-only release gate. Removed before the PR is opened.
 jobs:
   validate:
     runs-on: ubuntu-latest
