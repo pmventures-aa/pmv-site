@@ -8,6 +8,7 @@ import { NotificationBell } from './NotificationBell'
 import { GlobalSearch } from './GlobalSearch'
 import { MailBell } from '../kit/MailBell'
 import { Avatar } from '../kit/Avatar'
+import { Icon } from '../kit/Icon'
 import { btnOutline } from './ui'
 
 export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
@@ -50,12 +51,12 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   }, [location.pathname, nav])
 
   const linkCls = (compact: boolean) => ({ isActive }: { isActive: boolean }) =>
-    `group relative flex items-center rounded-md border-l-2 py-2.5 text-sm font-medium transition ${
+    `group relative flex items-center rounded-lg border-l-2 py-2.5 text-sm font-medium transition-all duration-200 ${
       compact ? 'justify-center px-2' : 'gap-3 px-3'
     } ${
       isActive
-        ? 'border-gold bg-gold/10 text-gold'
-        : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-white'
+        ? 'border-gold bg-gradient-to-r from-gold/12 to-transparent text-gold shadow-[inset_0_0_18px_rgba(212,175,55,.035)]'
+        : 'border-transparent text-slate-300 hover:translate-x-0.5 hover:bg-white/5 hover:text-white'
     }`
 
   function refreshPage() {
@@ -89,8 +90,8 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
                     title={compact ? item.label : undefined}
                     aria-label={compact ? item.label : undefined}
                   >
-                    <span className="grid h-6 w-6 shrink-0 place-items-center text-[15px] leading-none text-gold/90">
-                      {item.icon}
+                    <span className="grid h-6 w-6 shrink-0 place-items-center text-gold/90 transition-transform duration-200 group-hover:scale-105">
+                      <Icon name={item.icon} size={18} />
                     </span>
                     {!compact && <span className="min-w-0 truncate">{item.label}</span>}
                     {compact && (
@@ -118,7 +119,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
             </button>
           </div>
         ) : (
-          <div className="mt-5 rounded-md border border-white/10 bg-white/[0.025] p-3">
+          <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.025] p-3 transition hover:border-white/15 hover:bg-white/[0.035]">
             <div className="flex items-center gap-3">
               {user && <Avatar userId={user.id} name={user.full_name} size={36} editable uploadPath="/me/avatar" />}
               <div className="min-w-0">
@@ -135,6 +136,8 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
     )
   }
 
+  const iconButton = 'grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 transition-all duration-200 hover:-translate-y-px hover:border-gold/40 hover:bg-gold/5 hover:text-gold focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60'
+
   return (
     <div className="min-h-screen bg-navy-950 lg:flex">
       <aside
@@ -150,29 +153,16 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
           <Logo />
           <div className="flex items-center gap-2">
             <span className="hidden text-xs text-slate-400 sm:inline">{activeLabel}</span>
-            <button
-              onClick={refreshPage}
-              className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-slate-300 transition hover:border-gold/40 hover:text-gold"
-              aria-label="Refresh this HQ page"
-              title="Refresh page"
-            >
-              ↻
+            <button onClick={refreshPage} className={iconButton} aria-label="Refresh this HQ page" title="Refresh page">
+              <Icon name="refresh" size={17} />
             </button>
-            <button
-              onClick={() => setMobileSearchOpen((v) => !v)}
-              className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-slate-300"
-              aria-label="Search"
-            >
-              ⌕
+            <button onClick={() => setMobileSearchOpen((v) => !v)} className={iconButton} aria-label="Search">
+              <Icon name="search" size={17} />
             </button>
             <MailBell />
             <NotificationBell />
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-white"
-              aria-label="Open menu"
-            >
-              ☰
+            <button onClick={() => setMobileOpen(true)} className={iconButton} aria-label="Open menu">
+              <Icon name="menu" size={19} />
             </button>
           </div>
         </div>
@@ -185,14 +175,10 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <div className="absolute left-0 top-0 flex h-full w-72 flex-col bg-navy-950 p-4 shadow-2xl">
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="mb-4 self-end grid h-8 w-8 place-items-center rounded-md border border-white/10 text-white"
-              aria-label="Close menu"
-            >
-              ✕
+            <button onClick={() => setMobileOpen(false)} className={`${iconButton} mb-4 self-end`} aria-label="Close menu">
+              <Icon name="close" size={18} />
             </button>
             <SidebarContent mobile />
           </div>
@@ -202,13 +188,8 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <div className="hidden items-center justify-between gap-4 border-b border-white/10 bg-navy-900/70 px-6 py-3 lg:flex xl:px-8 print:hidden">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <button
-              onClick={toggleSidebar}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/10 text-slate-300 transition hover:border-gold/40 hover:text-gold"
-              aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-              title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            >
-              {sidebarOpen ? '⟨' : '⟩'}
+            <button onClick={toggleSidebar} className={iconButton} aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
+              <Icon name={sidebarOpen ? 'chevronLeft' : 'chevronRight'} size={17} />
             </button>
             <div className="hidden min-w-28 xl:block">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">{badge}</p>
@@ -217,12 +198,8 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
             <GlobalSearch className="w-full max-w-sm" />
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            <button
-              onClick={refreshPage}
-              className={`${btnOutline} !px-3 !py-1.5 text-xs`}
-              title="Reload the current HQ page and its latest data"
-            >
-              ↻ Refresh
+            <button onClick={refreshPage} className={`${btnOutline} !inline-flex !items-center !gap-2 !px-3 !py-1.5 text-xs`} title="Reload the current HQ page and its latest data">
+              <Icon name="refresh" size={14} /> Refresh
             </button>
             <MailBell />
             <NotificationBell />
