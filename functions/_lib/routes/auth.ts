@@ -4,6 +4,7 @@ import { uuid, hashPassword, verifyPassword } from '../crypto'
 import { createSession, sessionCookie, clearCookie, destroySession, createActivationToken, consumeActivationToken, getUser } from '../session'
 import { activityInsert } from '../activity'
 import { logAudit, actorIp, actorUserAgent } from '../auditLog'
+import { notifyStaff, escapeHtml } from '../email'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -13,10 +14,6 @@ const SIGNUP_MAX_PER_HOUR = 8
 const norm = (e: string) => (e || '').trim().toLowerCase()
 const cleanName = (s: unknown) => (typeof s === 'string' ? s.trim().slice(0, 120) : '')
 
-// Keyed by email+IP (not email alone) so an attacker who only knows a
-// victim's email can't lock that account out from every IP indefinitely —
-// each IP gets its own attempt budget, matching the brute-force protection
-// this is meant to provide without being usable as a targeted DoS.
 function throttleKey(email: string, ip: string) {
   return `fail:${email}:${ip}`
 }
@@ -96,6 +93,15 @@ authRoutes.post('/signup', async (c) => {
     activityInsert(c.env, { clientUserId: id, kind: 'client_signed_up', detail: { email: e, business_name: businessName } }),
   ])
 
+  c.executionCtx.waitUntil(
+    notifyStaff(c.env, {
+      staffUserIds: [],
+      kind: 'client_signed_up',
+      subject: `New client signup: ${fullName}`,
+      html: `<p><strong>${escapeHtml(fullName)}</strong> created a new Pinnacle client account.</p><p>Email: ${escapeHtml(e)}<br>Phone: ${escapeHtml(phone)}${businessName ? `<br>Business: ${escapeHtml(businessName)}` : ''}</p><p>The client can now continue through portal onboarding and service intake.</p>`,
+    }),
+  )
+
   const su: SessionUser = { id, email: e, role: 'client', full_name: fullName, first_name: firstName, last_name: lastName }
   const token = await createSession(c.env, su)
   c.header('Set-Cookie', sessionCookie(token))
@@ -103,11 +109,6 @@ authRoutes.post('/signup', async (c) => {
 })
 
 // ---------- first-admin bootstrap (only works while there are zero users) ----------
-// No password is accepted here — the account is created with no usable
-// password_hash, and a one-time, single-use activation token is returned
-// instead. The caller must hit POST /auth/set-password with that token to
-// choose the actual password. This avoids ever having a system-generated
-// or hardcoded password exist anywhere (in code, logs, or responses).
 authRoutes.post('/bootstrap', async (c) => {
   const { email, full_name } = await c.req.json<{ email: string; full_name?: string }>()
     .catch(() => ({ email: '', full_name: '' }))
@@ -128,9 +129,6 @@ authRoutes.post('/bootstrap', async (c) => {
 })
 
 // ---------- set-password (consumes a one-time activation token) ----------
-// Used both for the bootstrap admin's first password and, going forward,
-// for any account created without a password (e.g. admin-created staff
-// invited via a setup link instead of a temporary password).
 authRoutes.post('/set-password', async (c) => {
   const { token, password } = await c.req.json<{ token: string; password: string }>()
     .catch(() => ({ token: '', password: '' }))
@@ -176,7 +174,6 @@ authRoutes.post('/login', async (c) => {
   if (user && user.status === 'active' && user.password_hash) {
     ok = await verifyPassword(password, user.password_hash, c.env.SESSION_SECRET)
   } else {
-    // dummy verify to equalize timing and reduce user enumeration
     await verifyPassword(password, 'pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', c.env.SESSION_SECRET)
   }
 
