@@ -36,6 +36,7 @@ export const adminNav: NavItem[] = [
   { key: 'communications', label: 'Communications', to: 'communications', icon: 'communications', section: 'Communication' },
 
   { key: 'activity', label: 'Activity', to: 'activity', icon: 'activity', section: 'Operations' },
+  { key: 'service-assignments', label: 'Service Assignments', to: 'service-assignments', icon: 'services', section: 'Operations' },
   { key: 'employees', label: 'Team & Vendors', to: 'employees', icon: 'team', section: 'Operations' },
   { key: 'assignments', label: 'Assignments', to: 'assignments', icon: 'assignments', section: 'Operations' },
   { key: 'invoices', label: 'Invoices', to: 'invoices', icon: 'billing', section: 'Operations' },
