@@ -16,20 +16,33 @@ jobs:
 
       - run: npm ci
 
-      - name: Verify target account exists in team_members
+      - name: Verify target account exists in users (LEFT JOIN team_members)
         run: |
           npx wrangler d1 execute pmv --remote --command "
-            SELECT u.id, u.email, tm.id AS team_member_id, tm.is_owner
-            FROM users u JOIN team_members tm ON tm.user_id = u.id
+            SELECT u.id, u.email, u.role, tm.id AS team_member_id, tm.is_owner
+            FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
             WHERE u.email = 'cjenkins@pinnaclemanagementventures.com';
           "
         env: { CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}", CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" }
 
-      - name: Set is_owner = 1
+      # The bootstrap admin flow (auth.ts POST /auth/bootstrap) only inserts
+      # into `users`, never `team_members` -- so this account has no row to
+      # UPDATE. INSERT ... ON CONFLICT DO UPDATE, matching the exact pattern
+      # admin.ts uses for staff-profile writes (functions/_lib/routes/admin.ts:390-398).
+      # staff_role 'pinnacle_admin' matches the value used elsewhere in
+      # admin.ts for top-tier admin accounts (see 0001_init.sql's column
+      # comment for the full staff_role enum).
+      - name: Insert/update team_members row with is_owner = 1
         run: |
           npx wrangler d1 execute pmv --remote --command "
-            UPDATE team_members SET is_owner = 1
-            WHERE user_id = (SELECT id FROM users WHERE email = 'cjenkins@pinnaclemanagementventures.com');
+            INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, is_owner)
+            SELECT lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-'||hex(randomblob(2))||'-'||hex(randomblob(2))||'-'||hex(randomblob(6))),
+                   id, 'pinnacle_admin', 'Owner', 1, 1, 1, 1, 1, 1
+            FROM users WHERE email = 'cjenkins@pinnaclemanagementventures.com'
+            ON CONFLICT(user_id) DO UPDATE SET
+              staff_role = 'pinnacle_admin', title = 'Owner',
+              can_reveal_payment_info = 1, can_manage_users = 1, can_manage_settings = 1,
+              can_view_reports = 1, can_view_audit_log = 1, is_owner = 1;
           "
         env: { CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}", CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" }
 
