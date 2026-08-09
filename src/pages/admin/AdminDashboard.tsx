@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-import { PageIntro, Panel, EmptyState, StatCard } from '../../components/admin/ui'
+import { Panel, EmptyState, StatCard } from '../../components/admin/ui'
+import { DashboardWelcome } from '../../components/DashboardWelcome'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
 
@@ -72,7 +73,7 @@ function money(cents: number): string {
 function StatLink({ label, value, to }: { label: string; value: number | string; to?: string }) {
   const content = <StatCard label={label} value={value} />
   return to ? (
-    <Link to={to} className="block transition hover:border-gold/40 [&>div]:hover:border-gold/40">
+    <Link to={to} className="block [&>div]:transition [&>div]:hover:border-gold/35 [&>div]:hover:bg-white/[0.035]">
       {content}
     </Link>
   ) : (
@@ -100,44 +101,58 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <PageIntro
-        kicker="Staff console"
-        title={`Welcome, ${user?.first_name || user?.full_name || 'team'}`}
-        subtitle={user?.role === 'admin' ? 'Full access across all clients.' : 'Showing clients assigned to you.'}
+      <DashboardWelcome
+        name={user?.first_name || user?.full_name}
+        userId={user?.id}
+        variant="admin"
+        subtitle={user?.role === 'admin' ? 'Here’s the firm-wide picture and the work that needs attention next.' : 'Here’s your assigned client work and the next items that need attention.'}
+        className="mb-7"
       />
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <StatLink label="Clients" value={stats?.clients ?? '—'} to={p('clients')} />
-        <StatLink label="Open Tickets" value={stats?.open_tickets ?? '—'} to={p('open-items/tickets')} />
-        <StatLink label="Open Matters" value={stats?.open_matters ?? '—'} to={p('open-items/matters')} />
-        <StatLink label="Pending Tasks" value={stats?.pending_tasks ?? '—'} to={p('open-items/tasks')} />
-        <StatLink label="Calls Pending" value={stats?.pending_calls ?? '—'} to={p('open-items/calls')} />
-        <StatLink label="Open Invoices" value={stats?.open_invoices ?? '—'} to={p('open-items/invoices')} />
-      </div>
 
-      <div className="mt-8 flex flex-wrap gap-2">
-        <Link to={p('inquiries')} className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-gold/40 hover:text-gold">
-          + Add a lead
-        </Link>
-        <Link to={p('clients')} className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-gold/40 hover:text-gold">
-          View clients
-        </Link>
-        <Link to={p('assignments')} className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-gold/40 hover:text-gold">
-          Assign staff
-        </Link>
-        <Link to={p('reports')} className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-gold/40 hover:text-gold">
-          Reporting Center
-        </Link>
-      </div>
+      <section aria-labelledby="workspace-heading">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">Operational pulse</p>
+            <h2 id="workspace-heading" className="mt-1 font-display text-xl font-medium text-white">Today’s workspace</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link to={p('inquiries')} className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-gold/40 hover:text-gold">
+              + Add lead
+            </Link>
+            <Link to={p('clients')} className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-gold/40 hover:text-gold">
+              Clients
+            </Link>
+            <Link to={p('pipelines')} className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-gold/40 hover:text-gold">
+              Pipelines
+            </Link>
+            <Link to={p('reports')} className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-gold/40 hover:text-gold">
+              Reports
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          <StatLink label="Clients" value={stats?.clients ?? '—'} to={p('clients')} />
+          <StatLink label="Open Tickets" value={stats?.open_tickets ?? '—'} to={p('open-items/tickets')} />
+          <StatLink label="Open Matters" value={stats?.open_matters ?? '—'} to={p('open-items/matters')} />
+          <StatLink label="Pending Tasks" value={stats?.pending_tasks ?? '—'} to={p('open-items/tasks')} />
+          <StatLink label="Calls Pending" value={stats?.pending_calls ?? '—'} to={p('open-items/calls')} />
+          <StatLink label="Open Invoices" value={stats?.open_invoices ?? '—'} to={p('open-items/invoices')} />
+        </div>
+      </section>
 
       {data && attentionCount > 0 && (
-        <Panel className="mt-8 !p-0 !border-gold/25">
-          <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-            <h2 className="text-sm font-semibold text-white">Needs attention</h2>
-            <span className="rounded-full bg-gold/10 px-2 py-0.5 text-xs font-medium text-gold">{attentionCount}</span>
+        <Panel className="mt-7 !border-gold/25 !p-0">
+          <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold/70">Priority queue</p>
+              <h2 className="mt-0.5 text-sm font-semibold text-white">Needs attention</h2>
+            </div>
+            <span className="rounded-full bg-gold/10 px-2.5 py-1 text-xs font-medium text-gold">{attentionCount}</span>
           </div>
           <ul className="divide-y divide-white/5">
             {na!.overdue_tasks.map((t) => (
-              <li key={`task-${t.id}`} className="px-5 py-3 text-sm">
+              <li key={`task-${t.id}`} className="px-5 py-3.5 text-sm transition hover:bg-white/[0.02]">
                 <Link to={p(`clients/${t.client_user_id}`)} className="font-medium text-white hover:text-gold">
                   Overdue task: {t.title}
                 </Link>
@@ -147,7 +162,7 @@ export default function AdminDashboard() {
               </li>
             ))}
             {na!.overdue_invoices.map((inv) => (
-              <li key={`inv-${inv.id}`} className="px-5 py-3 text-sm">
+              <li key={`inv-${inv.id}`} className="px-5 py-3.5 text-sm transition hover:bg-white/[0.02]">
                 <Link to={p(`clients/${inv.client_user_id}`)} className="font-medium text-white hover:text-gold">
                   Overdue invoice: {money(inv.amount_cents)}
                 </Link>
@@ -157,7 +172,7 @@ export default function AdminDashboard() {
               </li>
             ))}
             {na!.stale_tickets.map((tk) => (
-              <li key={`tk-${tk.id}`} className="px-5 py-3 text-sm">
+              <li key={`tk-${tk.id}`} className="px-5 py-3.5 text-sm transition hover:bg-white/[0.02]">
                 <Link to={p(`clients/${tk.client_user_id}`)} className="font-medium text-white hover:text-gold">
                   No response yet: {tk.subject}
                 </Link>
@@ -167,7 +182,7 @@ export default function AdminDashboard() {
               </li>
             ))}
             {na!.stale_inquiries.map((i) => (
-              <li key={`inq-${i.id}`} className="px-5 py-3 text-sm">
+              <li key={`inq-${i.id}`} className="px-5 py-3.5 text-sm transition hover:bg-white/[0.02]">
                 <Link to={p('inquiries')} className="font-medium text-white hover:text-gold">
                   Uncontacted lead: {i.name}
                 </Link>
@@ -180,10 +195,13 @@ export default function AdminDashboard() {
         </Panel>
       )}
 
-      <div className="mt-8 grid gap-5 lg:grid-cols-2">
+      <div className="mt-7 grid gap-5 lg:grid-cols-2">
         <Panel className="!p-0">
-          <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-            <h2 className="text-sm font-semibold text-white">Upcoming appointments</h2>
+          <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">Schedule</p>
+              <h2 className="mt-0.5 text-sm font-semibold text-white">Upcoming appointments</h2>
+            </div>
           </div>
           {!data ? (
             <p className="px-5 py-6 text-sm text-slate-400">Loading…</p>
@@ -194,7 +212,7 @@ export default function AdminDashboard() {
           ) : (
             <ul className="divide-y divide-white/5">
               {data.upcoming_appointments.map((a) => (
-                <li key={a.id} className="px-5 py-3 text-sm">
+                <li key={a.id} className="px-5 py-3.5 text-sm transition hover:bg-white/[0.02]">
                   <Link to={p(`clients/${a.client_user_id}`)} className="font-medium text-white hover:text-gold">
                     {a.title || 'Appointment'}
                   </Link>
@@ -208,8 +226,11 @@ export default function AdminDashboard() {
         </Panel>
 
         <Panel className="!p-0">
-          <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-            <h2 className="text-sm font-semibold text-white">Recent activity</h2>
+          <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">Firm activity</p>
+              <h2 className="mt-0.5 text-sm font-semibold text-white">Recent activity</h2>
+            </div>
             <Link to={p('activity')} className="text-xs font-medium text-gold hover:underline">
               View all
             </Link>
@@ -223,7 +244,7 @@ export default function AdminDashboard() {
           ) : (
             <ul className="divide-y divide-white/5">
               {data.recent_activity.slice(0, 8).map((e) => (
-                <li key={e.id} className="px-5 py-3 text-sm">
+                <li key={e.id} className="px-5 py-3.5 text-sm transition hover:bg-white/[0.02]">
                   <p className="text-slate-200">{describeActivity(e)}</p>
                   <p className="mt-1 text-xs text-slate-500">{timeAgo(e.created_at)}</p>
                 </li>
