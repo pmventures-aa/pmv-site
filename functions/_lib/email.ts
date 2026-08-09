@@ -1,20 +1,9 @@
 import type { Env } from './types'
 
-// Outbound notification emails interpolate user-supplied text (contact-form
-// fields, a client's display name) directly into an HTML body — escape it
-// first so a submitter can't inject markup/links into what staff see.
 export function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
-// Thin wrapper over the Resend REST API.
-// No-ops (logs, doesn't throw) when RESEND_API_KEY isn't set — dev/preview
-// environments and any deploy before the secret is provisioned keep working.
 export async function sendEmail(env: Env, opts: { to: string; subject: string; html: string }): Promise<void> {
   if (!env.RESEND_API_KEY) {
     console.log('[email] RESEND_API_KEY not set — skipping send', { to: opts.to, subject: opts.subject })
@@ -24,10 +13,7 @@ export async function sendEmail(env: Env, opts: { to: string; subject: string; h
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
     })
     if (!res.ok) console.error('[email] Resend send failed', res.status, await res.text().catch(() => ''))
@@ -38,19 +24,20 @@ export async function sendEmail(env: Env, opts: { to: string; subject: string; h
 
 export type NotificationFallbackMode = 'no_recipients' | 'no_staff'
 
+export function shouldUseNotificationFallback(
+  staffUserIds: string[],
+  recipients: string[],
+  mode: NotificationFallbackMode,
+): boolean {
+  return mode === 'no_staff' ? staffUserIds.length === 0 : recipients.length === 0
+}
+
 // Best-effort notify. Individual staff notification preferences remain the
-// source of truth. `no_staff` is used for service applications: an assigned
-// rep who has email disabled must stay disabled; only a genuinely unassigned
-// client routes to the firm fallback address.
+// source of truth. Service applications use `no_staff`: an assigned rep who
+// disabled email stays disabled; only a genuinely unassigned client falls back.
 export async function notifyStaff(
   env: Env,
-  opts: {
-    staffUserIds: string[]
-    kind: string
-    subject: string
-    html: string
-    fallbackMode?: NotificationFallbackMode
-  },
+  opts: { staffUserIds: string[]; kind: string; subject: string; html: string; fallbackMode?: NotificationFallbackMode },
 ): Promise<{ recipients: string[]; usedFallback: boolean }> {
   const { staffUserIds, kind, subject, html } = opts
   const fallbackMode = opts.fallbackMode ?? 'no_recipients'
@@ -64,17 +51,14 @@ export async function notifyStaff(
        FROM users u LEFT JOIN notification_prefs np ON np.user_id = u.id
        WHERE u.id IN (${placeholders})`,
     ).bind(...staffUserIds).all<{ email: string; muted_kinds: string | null; email_enabled: number | null }>()
-    recipients = (res.results ?? [])
-      .filter((r) => {
-        let muted: string[] = []
-        try { muted = JSON.parse(r.muted_kinds || '[]') as string[] } catch { muted = [] }
-        return r.email_enabled === 1 && !muted.includes(kind)
-      })
-      .map((r) => r.email)
+    recipients = (res.results ?? []).filter((row) => {
+      let muted: string[] = []
+      try { muted = JSON.parse(row.muted_kinds || '[]') as string[] } catch { muted = [] }
+      return row.email_enabled === 1 && !muted.includes(kind)
+    }).map((row) => row.email)
   }
 
-  const shouldFallback = fallbackMode === 'no_staff' ? staffUserIds.length === 0 : recipients.length === 0
-  if (shouldFallback) {
+  if (shouldUseNotificationFallback(staffUserIds, recipients, fallbackMode)) {
     const setting = await env.DB.prepare("SELECT value FROM app_settings WHERE key = 'firm_notify_email'").first<{ value: string }>()
     if (setting?.value) {
       recipients = [setting.value]
