@@ -25,6 +25,8 @@ import { intakeCatalogAdminRoutes } from '../_lib/routes/intakeCatalogAdmin'
 import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
 import { accountEmailsAdminRoutes } from '../_lib/routes/accountEmailsAdmin'
 import { resendWebhookRoutes } from '../_lib/routes/resendWebhooks'
+import { staffServiceAssignmentRoutes, clientApplicationSignatureRoutes } from '../_lib/routes/staffServiceAssignments'
+import { invoiceAdminRoutes } from '../_lib/routes/invoiceAdmin'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -37,6 +39,9 @@ app.route('/', resendWebhookRoutes)
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
 app.route('/portal', intakeCopyRoutes)
+// Signature middleware is mounted before the application routes so submit,
+// answer edits, and file edits can enforce/clear the client acceptance state.
+app.route('/portal', clientApplicationSignatureRoutes)
 app.route('/portal', serviceApplicationRoutes)
 app.route('/portal', selfRoutes)
 app.route('/portal', portalRoutes)
@@ -44,6 +49,8 @@ app.route('/portal', messageRoutes)
 
 app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', accountEmailsAdminRoutes)
+app.route('/admin', staffServiceAssignmentRoutes)
+app.route('/admin', invoiceAdminRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
