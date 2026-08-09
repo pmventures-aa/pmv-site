@@ -30,6 +30,7 @@ import { staffServicePrefillRoutes } from '../_lib/routes/staffServicePrefill'
 import { invoiceAdminRoutes } from '../_lib/routes/invoiceAdmin'
 import { signaturePortalSyncRoutes, signatureAdminSyncRoutes } from '../_lib/routes/signaturePdfSync'
 import { invitationPublicRoutes, trustedContactRoutes, invitationAdminRoutes } from '../_lib/routes/accessInvites'
+import { roleCapabilityRoutes } from '../_lib/routes/roleCapabilities'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -58,6 +59,7 @@ app.route('/admin', signatureAdminSyncRoutes)
 app.route('/admin', staffServiceAssignmentRoutes)
 app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)
+app.route('/admin', roleCapabilityRoutes)
 app.route('/admin', invitationAdminRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
