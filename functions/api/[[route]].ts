@@ -23,6 +23,8 @@ import { crmWriteRoutes } from '../_lib/routes/crmWrites'
 import { serviceApplicationRoutes } from '../_lib/routes/serviceApplications'
 import { intakeCatalogAdminRoutes } from '../_lib/routes/intakeCatalogAdmin'
 import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
+import { accountEmailsAdminRoutes } from '../_lib/routes/accountEmailsAdmin'
+import { resendWebhookRoutes } from '../_lib/routes/resendWebhooks'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -30,6 +32,7 @@ app.route('/auth', authRoutes)
 app.route('/', publicRoutes)
 app.route('/', uploadRoutes)
 app.route('/', unsubscribeRoutes)
+app.route('/', resendWebhookRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
@@ -40,6 +43,7 @@ app.route('/portal', portalRoutes)
 app.route('/portal', messageRoutes)
 
 app.route('/admin', intakeCatalogAdminRoutes)
+app.route('/admin', accountEmailsAdminRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
