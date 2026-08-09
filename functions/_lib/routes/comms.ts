@@ -3,7 +3,7 @@ import type { AppEnv, Env } from '../types'
 import { requireStaff } from '../mid'
 import { requireCapability } from '../capabilities'
 import { uuid } from '../crypto'
-import { sendEmail } from '../email'
+import { sendEmailStrict } from '../email'
 import { logActivity } from '../activity'
 
 export const commsRoutes = new Hono<AppEnv>()
@@ -258,9 +258,9 @@ async function insertRecipients(env: Env, messageId: string, recipients: Recipie
 async function dispatchNow(env: Env, actorUserId: string, messageId: string, subject: string, bodyHtml: string, recipients: Awaited<ReturnType<typeof insertRecipients>>) {
   await Promise.all(recipients.map(async (r) => {
     try {
-      await sendEmail(env, { to: r.email, subject, html: bodyHtml })
+      const providerMessageId = await sendEmailStrict(env, { to: r.email, subject, html: bodyHtml })
       const statements = [
-        env.DB.prepare("UPDATE comms_recipients SET status = 'sent', sent_at = datetime('now') WHERE id = ?").bind(r.row_id),
+        env.DB.prepare("UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE id = ?").bind(providerMessageId, r.row_id),
       ]
       if (r.recipient_kind === 'lead' && r.inquiry_id) {
         statements.push(
