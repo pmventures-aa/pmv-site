@@ -303,7 +303,7 @@ async function storeBankingIfProvided(env: Env, clientId: string, serviceKey: st
 // Start or resume the one active draft for a service.
 serviceApplicationRoutes.post('/service-applications/:serviceKey/start', requireClient, async (c) => {
   const user = c.get('user')
-  const serviceKey = c.req.param('serviceKey')
+  const serviceKey = c.req.param('serviceKey') ?? ''
   const service = await getService(c.env, serviceKey)
   if (!service) return c.json({ error: 'unknown service' }, 404)
 
@@ -344,9 +344,9 @@ serviceApplicationRoutes.post('/service-applications/:serviceKey/start', require
 // Autosave answers + progress for an existing draft.
 serviceApplicationRoutes.patch('/service-applications/:id', requireClient, async (c) => {
   const user = c.get('user')
-  const application = await ownedDraft(c.env, user.id, c.req.param('id'))
+  const application = await ownedDraft(c.env, user.id, c.req.param('id') ?? '')
   if (!application) return c.json({ error: 'draft application not found' }, 404)
-  const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number }>().catch(() => ({}))
+  const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number }>().catch(() => ({} as { answers?: Record<string, unknown>; current_step?: number }))
   const questions = await getQuestions(c.env, application.service_key)
   await persistAnswers(c.env, application, questions, body.answers ?? {}, body.current_step)
   return c.json({ ok: true, saved_at: new Date().toISOString() })
@@ -357,9 +357,9 @@ serviceApplicationRoutes.patch('/service-applications/:id', requireClient, async
 serviceApplicationRoutes.post('/service-applications/:id/files/:questionKey', requireClient, async (c) => {
   const user = c.get('user')
   if (!c.env.UPLOADS) return c.json({ error: 'secure file storage is not configured' }, 503)
-  const application = await ownedDraft(c.env, user.id, c.req.param('id'))
+  const application = await ownedDraft(c.env, user.id, c.req.param('id') ?? '')
   if (!application) return c.json({ error: 'draft application not found' }, 404)
-  const questionKey = c.req.param('questionKey')
+  const questionKey = c.req.param('questionKey') ?? ''
   const question = await c.env.DB.prepare(
     `SELECT * FROM onboarding_questions WHERE service_key = ? AND question_key = ? AND input_type = 'file'`,
   ).bind(application.service_key, questionKey).first<IntakeQuestion>()
@@ -434,14 +434,14 @@ serviceApplicationRoutes.post('/service-applications/:id/files/:questionKey', re
 
 serviceApplicationRoutes.delete('/service-applications/:id/files/:documentId', requireClient, async (c) => {
   const user = c.get('user')
-  const application = await ownedDraft(c.env, user.id, c.req.param('id'))
+  const application = await ownedDraft(c.env, user.id, c.req.param('id') ?? '')
   if (!application) return c.json({ error: 'draft application not found' }, 404)
   const row = await c.env.DB.prepare(
     `SELECT d.id, d.r2_key, saa.question_key
      FROM service_application_attachments saa
      JOIN client_documents d ON d.id = saa.document_id
      WHERE saa.application_id = ? AND d.id = ? AND d.client_user_id = ? AND d.visibility != 'internal'`,
-  ).bind(application.id, c.req.param('documentId'), user.id).first<{ id: string; r2_key: string | null; question_key: string | null }>()
+  ).bind(application.id, c.req.param('documentId') ?? '', user.id).first<{ id: string; r2_key: string | null; question_key: string | null }>()
   if (!row) return c.json({ error: 'file not found' }, 404)
   if (row.r2_key && c.env.UPLOADS) await c.env.UPLOADS.delete(row.r2_key).catch(() => {})
   await c.env.DB.prepare('DELETE FROM client_documents WHERE id = ?').bind(row.id).run()
@@ -461,11 +461,11 @@ serviceApplicationRoutes.delete('/service-applications/:id/files/:documentId', r
 serviceApplicationRoutes.post('/service-applications/:id/submit', requireClient, async (c) => {
   const user = c.get('user')
   if (!c.env.UPLOADS) return c.json({ error: 'secure file storage is not configured' }, 503)
-  const application = await ownedDraft(c.env, user.id, c.req.param('id'))
+  const application = await ownedDraft(c.env, user.id, c.req.param('id') ?? '')
   if (!application) return c.json({ error: 'draft application not found' }, 404)
   const service = await getService(c.env, application.service_key)
   if (!service) return c.json({ error: 'service is unavailable' }, 404)
-  const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number; banking?: unknown }>().catch(() => ({}))
+  const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number; banking?: unknown }>().catch(() => ({} as { answers?: Record<string, unknown>; current_step?: number; banking?: unknown }))
   const questions = await getQuestions(c.env, application.service_key)
   if (body.answers) await persistAnswers(c.env, application, questions, body.answers, body.current_step)
 
@@ -683,7 +683,7 @@ serviceApplicationRoutes.get('/service-applications/:id', requireUser, async (c)
   const app = await c.env.DB.prepare(
     `SELECT sa.*, s.name AS service_name, s.description AS service_description
      FROM service_applications sa JOIN services s ON s.key = sa.service_key WHERE sa.id = ?`,
-  ).bind(c.req.param('id')).first<any>()
+  ).bind(c.req.param('id') ?? '').first<any>()
   if (!app) return c.json({ error: 'not found' }, 404)
   if (user.role === 'client') {
     if (app.client_user_id !== user.id) return c.json({ error: 'forbidden' }, 403)
@@ -709,10 +709,10 @@ serviceApplicationRoutes.get('/service-applications/:id', requireUser, async (c)
 serviceApplicationRoutes.patch('/service-applications/:id/status', requireUser, async (c) => {
   const user = c.get('user')
   if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
-  const app = await c.env.DB.prepare('SELECT * FROM service_applications WHERE id = ?').bind(c.req.param('id')).first<ApplicationRow>()
+  const app = await c.env.DB.prepare('SELECT * FROM service_applications WHERE id = ?').bind(c.req.param('id') ?? '').first<ApplicationRow>()
   if (!app) return c.json({ error: 'not found' }, 404)
   if (!(await canAccessClient(c.env, user, app.client_user_id))) return c.json({ error: 'forbidden' }, 403)
-  const body = await c.req.json<{ status?: string }>().catch(() => ({}))
+  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
   if (!body.status || !APPLICATION_STATUSES.includes(body.status)) return c.json({ error: 'invalid status' }, 400)
   await c.env.DB.batch([
     c.env.DB.prepare(`UPDATE service_applications SET status = ?, updated_at = datetime('now') WHERE id = ?`).bind(body.status, app.id),
@@ -751,7 +751,7 @@ serviceApplicationRoutes.get('/documents/:id/file', requireUser, async (c) => {
   const user = c.get('user')
   const doc = await c.env.DB.prepare(
     `SELECT id, client_user_id, file_name, r2_key, content_type, visibility FROM client_documents WHERE id = ?`,
-  ).bind(c.req.param('id')).first<{ id: string; client_user_id: string; file_name: string | null; r2_key: string | null; content_type: string | null; visibility: string }>()
+  ).bind(c.req.param('id') ?? '').first<{ id: string; client_user_id: string; file_name: string | null; r2_key: string | null; content_type: string | null; visibility: string }>()
   if (!doc || !doc.r2_key || !c.env.UPLOADS) return c.json({ error: 'file not found' }, 404)
   if (user.role === 'client') {
     if (doc.client_user_id !== user.id || doc.visibility === 'internal') return c.json({ error: 'file not found' }, 404)
