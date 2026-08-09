@@ -30,6 +30,7 @@ export default function InvitationsAdmin() {
   }), [params])
   const [rows, setRows] = useState<Invite[]>([])
   const [roles, setRoles] = useState<RoleDef[]>([])
+  const [canInviteStaff, setCanInviteStaff] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(() => !!(prefill.email || prefill.full_name))
   const [busy, setBusy] = useState(false)
@@ -39,11 +40,13 @@ export default function InvitationsAdmin() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [invites, roleData] = await Promise.all([
-        api.get<{ invitations: Invite[] }>('/admin/invitations'),
-        api.get<{ roles: RoleDef[] }>('/admin/roles'),
-      ])
-      setRows(invites.invitations); setRoles(roleData.roles)
+      const invites = await api.get<{ invitations: Invite[]; can_invite_staff: boolean }>('/admin/invitations')
+      setRows(invites.invitations)
+      setCanInviteStaff(invites.can_invite_staff)
+      if (invites.can_invite_staff) {
+        const roleData = await api.get<{ roles: RoleDef[] }>('/admin/invitation-role-options')
+        setRoles(roleData.roles)
+      } else setRoles([])
     } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Could not load invitations.') }
     finally { setLoading(false) }
   }, [])
@@ -79,11 +82,11 @@ export default function InvitationsAdmin() {
 
     {showForm && <Panel className="mb-6 !border-gold/20"><form onSubmit={send} className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <label><span className="mb-1 block text-xs text-slate-400">Invite type</span><select className={inputCls} value={form.invite_type} onChange={(e)=>setForm((f)=>({...f,invite_type:e.target.value,role_definition_id:''}))}><option value="vendor">Professional vendor/provider</option><option value="client">Prospective client</option><option value="staff">Employee / staff</option></select></label>
+        <label><span className="mb-1 block text-xs text-slate-400">Invite type</span><select className={inputCls} value={form.invite_type} onChange={(e)=>setForm((f)=>({...f,invite_type:e.target.value,role_definition_id:''}))}><option value="vendor">Professional vendor/provider</option><option value="client">Prospective client</option>{canInviteStaff && <option value="staff">Employee / staff</option>}</select></label>
         <label><span className="mb-1 block text-xs text-slate-400">Full name</span><input className={inputCls} value={form.full_name} onChange={(e)=>setForm((f)=>({...f,full_name:e.target.value}))}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Email</span><input className={inputCls} type="email" required value={form.email} onChange={(e)=>setForm((f)=>({...f,email:e.target.value}))}/></label>
         {form.invite_type==='vendor' && <><label><span className="mb-1 block text-xs text-slate-400">Professional specialty</span><input className={inputCls} placeholder="Attorney, contractor, bookkeeper…" value={form.vendor_category} onChange={(e)=>setForm((f)=>({...f,vendor_category:e.target.value}))}/></label><label><span className="mb-1 block text-xs text-slate-400">Company</span><input className={inputCls} value={form.company_name} onChange={(e)=>setForm((f)=>({...f,company_name:e.target.value}))}/></label></>}
-        {form.invite_type==='staff' && <label><span className="mb-1 block text-xs text-slate-400">Role template</span><select className={inputCls} required value={form.role_definition_id} onChange={(e)=>setForm((f)=>({...f,role_definition_id:e.target.value}))}><option value="">Choose role</option>{roles.filter((r)=>r.party_type!=='vendor').map((r)=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>}
+        {form.invite_type==='staff' && canInviteStaff && <label><span className="mb-1 block text-xs text-slate-400">Role template</span><select className={inputCls} required value={form.role_definition_id} onChange={(e)=>setForm((f)=>({...f,role_definition_id:e.target.value}))}><option value="">Choose role</option>{roles.map((r)=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>}
       </div>
       {form.lead_id && <p className="text-xs text-slate-500">Connected CRM lead: {form.lead_id}</p>}
       <div className="flex gap-3"><button className={btnPrimary} disabled={busy}>{busy?'Sending…':'Send invitation'}</button><button type="button" className={btnOutline} onClick={()=>setShowForm(false)}>Cancel</button></div>
