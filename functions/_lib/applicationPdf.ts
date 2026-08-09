@@ -34,6 +34,11 @@ export interface ApplicationPdfInput {
   contactLine: string
   evictionDisclaimer?: string | null
   mayRequireAttorneyCoordination?: boolean
+  signature?: {
+    name: string
+    signedAt: string
+    electronicIntent: boolean
+  } | null
   logoBytes?: ArrayBuffer | Uint8Array | null
 }
 
@@ -53,22 +58,13 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): 
   let line = ''
   for (const word of words) {
     const next = line ? `${line} ${word}` : word
-    if (font.widthOfTextAtSize(next, size) <= maxWidth) {
-      line = next
-      continue
-    }
+    if (font.widthOfTextAtSize(next, size) <= maxWidth) { line = next; continue }
     if (line) lines.push(line)
-    if (font.widthOfTextAtSize(word, size) <= maxWidth) {
-      line = word
-      continue
-    }
+    if (font.widthOfTextAtSize(word, size) <= maxWidth) { line = word; continue }
     let chunk = ''
     for (const ch of word) {
       const candidate = chunk + ch
-      if (font.widthOfTextAtSize(candidate, size) > maxWidth && chunk) {
-        lines.push(chunk)
-        chunk = ch
-      } else chunk = candidate
+      if (font.widthOfTextAtSize(candidate, size) > maxWidth && chunk) { lines.push(chunk); chunk = ch } else chunk = candidate
     }
     line = chunk
   }
@@ -97,16 +93,11 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold)
   let logo: Awaited<ReturnType<PDFDocument['embedPng']>> | null = null
   if (input.logoBytes) {
-    try {
-      logo = await pdf.embedPng(input.logoBytes)
-    } catch {
-      try { logo = await pdf.embedJpg(input.logoBytes) } catch { logo = null }
-    }
+    try { logo = await pdf.embedPng(input.logoBytes) } catch { try { logo = await pdf.embedJpg(input.logoBytes) } catch { logo = null } }
   }
 
   let page!: PDFPage
   let y!: number
-
   const newPage = () => {
     page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
     page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 8, width: PAGE_WIDTH, height: 8, color: GOLD })
@@ -114,41 +105,23 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
     page.drawText(input.contactLine, { x: MARGIN, y: 12, size: 7, font: regular, color: SLATE })
     y = PAGE_HEIGHT - MARGIN
   }
-
   const ensure = (height: number) => { if (y - height < 48) newPage() }
-
   const line = (text: string, opts: { size?: number; font?: PDFFont; color?: ReturnType<typeof rgb>; indent?: number; gap?: number } = {}) => {
-    const size = opts.size ?? 10
-    const font = opts.font ?? regular
-    const indent = opts.indent ?? 0
+    const size = opts.size ?? 10, font = opts.font ?? regular, indent = opts.indent ?? 0
     const lines = wrapText(text, font, size, CONTENT_WIDTH - indent)
     ensure(lines.length * (size + 3) + (opts.gap ?? 2))
-    for (const textLine of lines) {
-      page.drawText(textLine, { x: MARGIN + indent, y, size, font, color: opts.color ?? NAVY })
-      y -= size + 3
-    }
+    for (const textLine of lines) { page.drawText(textLine, { x: MARGIN + indent, y, size, font, color: opts.color ?? NAVY }); y -= size + 3 }
     y -= opts.gap ?? 2
   }
-
   const section = (title: string) => {
-    ensure(32)
-    y -= 6
+    ensure(32); y -= 6
     page.drawRectangle({ x: MARGIN, y: y - 2, width: CONTENT_WIDTH, height: 22, color: LIGHT })
-    page.drawText(title.toUpperCase(), { x: MARGIN + 9, y: y + 5, size: 9, font: bold, color: NAVY })
-    y -= 28
+    page.drawText(title.toUpperCase(), { x: MARGIN + 9, y: y + 5, size: 9, font: bold, color: NAVY }); y -= 28
   }
-
-  const labelValue = (label: string, value: string) => {
-    ensure(30)
-    line(label, { size: 8, font: bold, color: SLATE, gap: 0 })
-    line(value || '—', { size: 10, gap: 5 })
-  }
+  const labelValue = (label: string, value: string) => { ensure(30); line(label, { size: 8, font: bold, color: SLATE, gap: 0 }); line(value || '—', { size: 10, gap: 5 }) }
 
   newPage()
-  if (logo) {
-    const scaled = logo.scaleToFit(42, 42)
-    page.drawImage(logo, { x: MARGIN, y: y - 38, width: scaled.width, height: scaled.height })
-  }
+  if (logo) { const scaled = logo.scaleToFit(42, 42); page.drawImage(logo, { x: MARGIN, y: y - 38, width: scaled.width, height: scaled.height }) }
   const headerX = logo ? MARGIN + 54 : MARGIN
   page.drawText('PINNACLE', { x: headerX, y: y - 4, size: 18, font: bold, color: NAVY })
   page.drawText('MANAGEMENT VENTURES', { x: headerX, y: y - 18, size: 7, font: bold, color: GOLD })
@@ -167,16 +140,21 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
 
   for (const [stepLabel, answers] of groupAnswers(input.answers)) {
     section(stepLabel)
-    for (const answer of answers) {
-      const value = displayAnswer(answer.value)
-      if (value === '—' || value.trim() === '') continue
-      labelValue(answer.question_label, value)
-    }
+    for (const answer of answers) { const value = displayAnswer(answer.value); if (value === '—' || value.trim() === '') continue; labelValue(answer.question_label, value) }
   }
 
   section('Attachments')
   if (input.attachments.length === 0) line('No client-uploaded attachments.', { color: SLATE })
   else input.attachments.forEach((attachment, index) => line(`${index + 1}. ${attachment.file_name || 'Uploaded file'}`, { indent: 6 }))
+
+  section('Client electronic signature')
+  if (input.signature?.electronicIntent) {
+    labelValue('Signed by', input.signature.name)
+    labelValue('Signed at', input.signature.signedAt)
+    line('The client affirmatively agreed to use the typed name above as an electronic signature for this application and submitted the signed application through the authenticated Pinnacle Client Portal.', { size: 8, color: SLATE, gap: 5 })
+  } else {
+    line('No electronic signature recorded.', { color: rgb(0.65, 0.16, 0.16) })
+  }
 
   section('Internal staff block')
   labelValue('Assigned representative', input.assignedRep || 'Unassigned')
