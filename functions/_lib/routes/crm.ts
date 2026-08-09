@@ -231,6 +231,13 @@ crmRoutes.post('/crm/records/:id/notes', async (c) => {
   return c.json({ ok: true, id: noteId }, 201)
 })
 
+crmRoutes.get('/crm/staff-directory', async (c) => {
+  const res = await c.env.DB.prepare(
+    `SELECT id, full_name, email FROM users WHERE role IN ('staff','admin') AND status = 'active' ORDER BY COALESCE(full_name, email)`,
+  ).all()
+  return c.json({ staff: res.results ?? [] })
+})
+
 crmRoutes.get('/crm/lists', async (c) => {
   const res = await c.env.DB.prepare(
     `SELECT l.*, u.full_name AS created_by_name,
@@ -286,7 +293,7 @@ crmRoutes.post('/crm/lists/:id/members', async (c) => {
   if (!list) return c.json({ error: 'not found' }, 404)
   if (list.list_type !== 'static') return c.json({ error: 'dynamic segments are controlled by their filter rules' }, 400)
   const body = await c.req.json<{ inquiry_ids?: string[] }>().catch(() => ({} as any))
-  const ids = Array.isArray(body.inquiry_ids) ? [...new Set(body.inquiry_ids.filter((v) => typeof v === 'string'))].slice(0, 5000) : []
+  const ids = Array.isArray(body.inquiry_ids) ? [...new Set(body.inquiry_ids.filter((v: unknown) => typeof v === 'string'))].slice(0, 5000) : []
   if (ids.length === 0) return c.json({ error: 'pick at least one record' }, 400)
   await c.env.DB.batch(ids.map((recordId) => c.env.DB.prepare(
     `INSERT INTO crm_list_members (list_id, inquiry_id, added_by_user_id) VALUES (?, ?, ?)

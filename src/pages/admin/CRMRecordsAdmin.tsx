@@ -198,19 +198,17 @@ export default function CRMRecordsAdmin() {
     e.preventDefault()
     setBusy(true)
     try {
-      const name = draft.record_type === 'business' ? draft.company_name : `${draft.first_name} ${draft.last_name}`.trim()
-      await api.post('/admin/inquiries', {
-        name,
-        email: draft.email,
+      const result = await api.post<{ id: string }>('/admin/crm/records', {
+        ...draft,
+        company_name: draft.company_name || undefined,
         phone: draft.phone || undefined,
-        message: draft.message,
+        job_title: draft.job_title || undefined,
+        source: draft.source || 'Manual entry',
       })
-      // The legacy creation endpoint establishes the compatible row; enrich it
-      // after reload from the record page. CSV imports can populate every CRM field.
-      toast.success('Lead added. Open the profile to add business details and ownership.')
+      toast.success('CRM record created.')
       setDraft(emptyRecord)
       setShowCreate(false)
-      await load()
+      window.location.href = p(`leads/${result.id}`)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not create lead.')
     } finally { setBusy(false) }

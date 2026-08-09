@@ -23,7 +23,7 @@ import PipelinesAdmin from './PipelinesAdmin'
 import AuditLogAdmin from './AuditLogAdmin'
 import EmployeesAdmin from './EmployeesAdmin'
 import ReportingCenter from './ReportingCenter'
-import CommunicationsAdmin from './CommunicationsAdmin'
+import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
 
 const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity']
 
@@ -69,7 +69,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="activity" element={<ActivityAdmin />} />
             <Route path="audit-log" element={<AuditLogAdmin />} />
             <Route path="reports" element={<ReportingCenter />} />
-            <Route path="communications" element={<CommunicationsAdmin />} />
+            <Route path="communications" element={<CommunicationsCRMAdmin />} />
             <Route path="employees" element={<ProtectedRoute allow={['admin']} />}>
               <Route index element={<EmployeesAdmin />} />
             </Route>

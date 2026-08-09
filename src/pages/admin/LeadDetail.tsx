@@ -82,7 +82,7 @@ export default function LeadDetail() {
     if (!id) return
     const [bundle, staffRes, listsRes] = await Promise.all([
       api.get<Bundle>(`/admin/crm/records/${id}`),
-      api.get<{ staff: StaffMember[] }>('/admin/staff-directory').catch(() => ({ staff: [] })),
+      api.get<{ staff: StaffMember[] }>('/admin/crm/staff-directory').catch(() => ({ staff: [] })),
       api.get<{ lists: CRMList[] }>('/admin/crm/lists').catch(() => ({ lists: [] })),
     ])
     setData(bundle); setStaff(staffRes.staff); setAllLists(listsRes.lists)
