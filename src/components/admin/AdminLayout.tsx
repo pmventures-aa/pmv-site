@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import type { NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
+import { MailBell } from '../kit/MailBell'
 import { Avatar } from '../kit/Avatar'
 import { btnOutline } from './ui'
 
@@ -63,6 +64,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
         <Logo />
         <div className="flex items-center gap-3">
           <span className="hidden text-xs text-slate-400 sm:inline">{badge}</span>
+          <MailBell />
           <NotificationBell />
           <button
             onClick={() => setMobileOpen(true)}
@@ -93,6 +95,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
 
       <div className="flex min-h-screen flex-1 flex-col">
         <div className="hidden items-center justify-end gap-4 border-b border-white/10 bg-navy-900/60 px-8 py-3 lg:flex print:hidden">
+          <MailBell />
           <NotificationBell />
           <span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span>
         </div>

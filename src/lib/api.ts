@@ -35,8 +35,14 @@ export const api = {
     request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
   del: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'DELETE', body: body ? JSON.stringify(body) : undefined }),
-  // Raw binary upload (e.g. an avatar image) — bypasses the JSON content-type
-  // default so the file's own MIME type reaches the server.
+  // Raw binary upload (e.g. an avatar image, a message attachment) —
+  // bypasses the JSON content-type default so the file's own MIME type
+  // reaches the server. X-File-Name carries the original filename (a plain
+  // Blob has no .name); routes that don't care about it just ignore the header.
   upload: <T>(path: string, file: File | Blob) =>
-    request<T>(path, { method: 'POST', body: file, headers: { 'Content-Type': file.type } }),
+    request<T>(path, {
+      method: 'POST',
+      body: file,
+      headers: { 'Content-Type': file.type, ...(file instanceof File ? { 'X-File-Name': file.name } : {}) },
+    }),
 }
