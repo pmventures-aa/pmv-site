@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth, isApiError } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
@@ -8,6 +8,8 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const { login } = useAuth()
   const navigate = useNavigate()
   const p = useAppPath()
+  const [params] = useSearchParams()
+  const serviceKey = params.get('service') || ''
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -31,6 +33,10 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
         setError('This portal is for client and Trusted Contact accounts. Use Pinnacle HQ to sign in.')
         return
       }
+      if (surface === 'client' && serviceKey) {
+        navigate(p(`services/${encodeURIComponent(serviceKey)}/apply`), { replace: true })
+        return
+      }
       navigate(p(), { replace: true })
     } catch (err) {
       setError(isApiError(err) ? err.message : 'Something went wrong. Try again.')
@@ -41,10 +47,10 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
 
   return (
     <AuthLayout
-      eyebrow={surface === 'staff' ? 'Staff console' : 'Client portal'}
+      eyebrow={surface === 'staff' ? 'Staff console' : serviceKey ? 'Continue your Pinnacle journey' : 'Client portal'}
       title="Sign in"
-      subtitle={surface === 'staff' ? 'Access for Pinnacle team members only.' : 'Welcome back. Sign in to your Pinnacle account.'}
-      footer={surface === 'client' ? <>New to Pinnacle? <Link to="../signup" className="font-medium text-gold hover:underline">Create an account</Link></> : <span className="text-slate-500">Staff and admin accounts are provisioned by Pinnacle.</span>}
+      subtitle={surface === 'staff' ? 'Access for Pinnacle team members only.' : serviceKey ? 'Sign in and we’ll take you back to the service you were exploring.' : 'Welcome back. Sign in to your Pinnacle account.'}
+      footer={surface === 'client' ? <>New to Pinnacle? <Link to={`../signup${serviceKey ? `?service=${encodeURIComponent(serviceKey)}` : ''}`} className="font-medium text-gold hover:underline">Create an account</Link></> : <span className="text-slate-500">Staff and admin accounts are provisioned by Pinnacle.</span>}
     >
       <ErrorBanner message={error} />
       <form onSubmit={onSubmit} className="space-y-4">
