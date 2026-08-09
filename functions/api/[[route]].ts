@@ -6,6 +6,7 @@ import { requireUser } from '../_lib/mid'
 import { authRoutes } from '../_lib/routes/auth'
 import { selfRoutes } from '../_lib/routes/self'
 import { portalRoutes } from '../_lib/routes/portal'
+import { messageRoutes } from '../_lib/routes/messages'
 import { adminRoutes } from '../_lib/routes/admin'
 import { publicRoutes } from '../_lib/routes/public'
 import { uploadRoutes } from '../_lib/routes/uploads'
@@ -27,6 +28,7 @@ app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 app.route('/portal', selfRoutes)
 // shared data modules — client (self) + staff/admin (scoped via assignments)
 app.route('/portal', portalRoutes)
+app.route('/portal', messageRoutes)
 // staff/admin console — cross-client views, user + settings management
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
