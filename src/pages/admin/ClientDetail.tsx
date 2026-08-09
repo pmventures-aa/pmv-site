@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useAppPath } from '../../lib/basePath'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
@@ -588,6 +589,7 @@ interface StaffMember {
 }
 
 export default function ClientDetail() {
+  const p = useAppPath()
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
   const [loading, setLoading] = useState(true)
@@ -662,12 +664,15 @@ export default function ClientDetail() {
           />
         }
         action={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {data.services.map((s) => (
               <Tag key={s.service_key} tone="gold">
                 {s.name}
               </Tag>
             ))}
+            <Link to={`${p('messages')}?client=${clientId}`} className={btnPrimary}>
+              ✉ Message
+            </Link>
           </div>
         }
       />

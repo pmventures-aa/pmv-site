@@ -14,6 +14,7 @@ import UsersAdmin from './UsersAdmin'
 import AssignmentsAdmin from './AssignmentsAdmin'
 import SettingsAdmin from './SettingsAdmin'
 import InquiriesAdmin from './InquiriesAdmin'
+import MessagesAdmin from './MessagesAdmin'
 import ActivityAdmin from './ActivityAdmin'
 import OpenItemsAdmin from './OpenItemsAdmin'
 import PipelinesAdmin from './PipelinesAdmin'
@@ -21,7 +22,7 @@ import AuditLogAdmin from './AuditLogAdmin'
 import EmployeesAdmin from './EmployeesAdmin'
 import ReportingCenter from './ReportingCenter'
 
-const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'activity']
+const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity']
 
 function AdminShell() {
   const { user } = useAuth()
@@ -61,6 +62,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="clients" element={<ClientsList />} />
             <Route path="clients/:id" element={<ClientDetail />} />
             <Route path="inquiries" element={<InquiriesAdmin />} />
+            <Route path="messages" element={<MessagesAdmin />} />
             <Route path="activity" element={<ActivityAdmin />} />
             <Route path="audit-log" element={<AuditLogAdmin />} />
             <Route path="reports" element={<ReportingCenter />} />

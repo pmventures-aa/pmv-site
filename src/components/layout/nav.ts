@@ -31,6 +31,7 @@ export const adminNav: NavItem[] = [
   { key: 'pipelines', label: 'Pipelines', to: 'pipelines', icon: '▤' },
   { key: 'clients', label: 'Clients', to: 'clients', icon: '☺' },
   { key: 'inquiries', label: 'Inquiries', to: 'inquiries', icon: '✉' },
+  { key: 'messages', label: 'Messages', to: 'messages', icon: '💬' },
   { key: 'activity', label: 'Activity', to: 'activity', icon: '🔔' },
   { key: 'audit-log', label: 'Audit Log', to: 'audit-log', icon: '⧉' },
   { key: 'reports', label: 'Reporting Center', to: 'reports', icon: '▥' },
