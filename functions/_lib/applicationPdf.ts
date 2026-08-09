@@ -100,44 +100,31 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
     try {
       logo = await pdf.embedPng(input.logoBytes)
     } catch {
-      try {
-        logo = await pdf.embedJpg(input.logoBytes)
-      } catch {
-        logo = null
-      }
+      try { logo = await pdf.embedJpg(input.logoBytes) } catch { logo = null }
     }
   }
 
-  let page: PDFPage
-  let y: number
+  let page!: PDFPage
+  let y!: number
 
   const newPage = () => {
     page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
     page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 8, width: PAGE_WIDTH, height: 8, color: GOLD })
-    page.drawText('INTERNAL DOCUMENT — NOT FOR CLIENT DISTRIBUTION', {
-      x: MARGIN,
-      y: 24,
-      size: 8,
-      font: bold,
-      color: rgb(0.65, 0.16, 0.16),
-    })
+    page.drawText('INTERNAL DOCUMENT — NOT FOR CLIENT DISTRIBUTION', { x: MARGIN, y: 24, size: 8, font: bold, color: rgb(0.65, 0.16, 0.16) })
     page.drawText(input.contactLine, { x: MARGIN, y: 12, size: 7, font: regular, color: SLATE })
     y = PAGE_HEIGHT - MARGIN
   }
 
-  const ensure = (height: number) => {
-    if (y - height < 48) newPage()
-  }
+  const ensure = (height: number) => { if (y - height < 48) newPage() }
 
   const line = (text: string, opts: { size?: number; font?: PDFFont; color?: ReturnType<typeof rgb>; indent?: number; gap?: number } = {}) => {
     const size = opts.size ?? 10
-    const f = opts.font ?? regular
+    const font = opts.font ?? regular
     const indent = opts.indent ?? 0
-    const lines = wrapText(text, f, size, CONTENT_WIDTH - indent)
-    const height = lines.length * (size + 3) + (opts.gap ?? 2)
-    ensure(height)
-    for (const l of lines) {
-      page.drawText(l, { x: MARGIN + indent, y, size, font: f, color: opts.color ?? NAVY })
+    const lines = wrapText(text, font, size, CONTENT_WIDTH - indent)
+    ensure(lines.length * (size + 3) + (opts.gap ?? 2))
+    for (const textLine of lines) {
+      page.drawText(textLine, { x: MARGIN + indent, y, size, font, color: opts.color ?? NAVY })
       y -= size + 3
     }
     y -= opts.gap ?? 2
@@ -158,7 +145,6 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
   }
 
   newPage()
-
   if (logo) {
     const scaled = logo.scaleToFit(42, 42)
     page.drawImage(logo, { x: MARGIN, y: y - 38, width: scaled.width, height: scaled.height })
@@ -189,26 +175,19 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
   }
 
   section('Attachments')
-  if (input.attachments.length === 0) {
-    line('No client-uploaded attachments.', { color: SLATE })
-  } else {
-    input.attachments.forEach((attachment, i) => line(`${i + 1}. ${attachment.file_name || 'Uploaded file'}`, { indent: 6 }))
-  }
+  if (input.attachments.length === 0) line('No client-uploaded attachments.', { color: SLATE })
+  else input.attachments.forEach((attachment, index) => line(`${index + 1}. ${attachment.file_name || 'Uploaded file'}`, { indent: 6 }))
 
   section('Internal staff block')
   labelValue('Assigned representative', input.assignedRep || 'Unassigned')
   labelValue('Pipeline stage', input.pipelineStage)
   labelValue('Submission source', input.submissionSource)
-  if (input.mayRequireAttorneyCoordination) {
-    labelValue('Attorney coordination', 'MAY REQUIRE ATTORNEY COORDINATION — REVIEW BEFORE COMMITTING SCOPE')
-  }
+  if (input.mayRequireAttorneyCoordination) labelValue('Attorney coordination', 'MAY REQUIRE ATTORNEY COORDINATION — REVIEW BEFORE COMMITTING SCOPE')
   labelValue('Staff notes', '________________________________________________________________________\n________________________________________________________________________')
 
   section('Compliance')
   line(input.disclaimer, { size: 8, color: SLATE, gap: 5 })
-  if (input.evictionDisclaimer && input.mayRequireAttorneyCoordination) {
-    line(input.evictionDisclaimer, { size: 8, color: rgb(0.55, 0.17, 0.12), gap: 5 })
-  }
+  if (input.evictionDisclaimer && input.mayRequireAttorneyCoordination) line(input.evictionDisclaimer, { size: 8, color: rgb(0.55, 0.17, 0.12), gap: 5 })
 
   return pdf.save()
 }
