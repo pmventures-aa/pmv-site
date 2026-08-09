@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv, SessionUser } from '../types'
 import { requireStaff } from '../mid'
-import { requireCapability } from '../capabilities'
+import { requireCapability, requireNamedPermission } from '../capabilities'
 import { visibleClientIds } from '../access'
 import { REPORTS_BY_KEY, type ReportCtx, type ReportDef } from '../reportRegistry'
 import { renderReportPdf } from '../reportPdf'
@@ -84,7 +84,7 @@ reportExportRoutes.get('/report-exports/:id/file', requireStaff, requireCapabili
   return c.body(object.body)
 })
 
-reportExportRoutes.get('/document-center', requireStaff, async (c) => {
+reportExportRoutes.get('/document-center', requireStaff, requireNamedPermission('manage_documents'), async (c) => {
   const user = c.get('user')
   const clientIds = await visibleClientIds(c.env, user)
   const where = clientIds === null ? '1=1' : clientIds.length ? `d.client_user_id IN (${clientIds.map(()=>'?').join(',')})` : '1=0'
