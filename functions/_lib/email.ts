@@ -4,23 +4,37 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
+export async function sendEmailStrict(env: Env, opts: { to: string; subject: string; html: string }): Promise<string | null> {
+  if (!env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured')
+  }
+  // Replies can continue landing in the Apple-hosted orders@ inbox. Resend is
+  // only the authenticated sender for application-generated mail.
+  const from = env.RESEND_FROM_EMAIL || 'Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>'
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
+  })
+  const payload = await res.json<any>().catch(() => ({}))
+  if (!res.ok || !payload?.id) {
+    throw new Error(payload?.message || `Resend send failed (${res.status})`)
+  }
+  return payload.id as string
+}
+
+// Notification emails remain best-effort: a provider outage should never make
+// the underlying client/application action fail. The Communications Center uses
+// sendEmailStrict instead so campaign history never claims a failed delivery was sent.
 export async function sendEmail(env: Env, opts: { to: string; subject: string; html: string }): Promise<void> {
   if (!env.RESEND_API_KEY) {
     console.log('[email] RESEND_API_KEY not set — skipping send', { to: opts.to, subject: opts.subject })
     return
   }
-  // Replies can continue landing in the Apple-hosted orders@ inbox. Resend is
-  // only the authenticated transactional sender for application-generated mail.
-  const from = env.RESEND_FROM_EMAIL || 'Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>'
   try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
-    })
-    if (!res.ok) console.error('[email] Resend send failed', res.status, await res.text().catch(() => ''))
+    await sendEmailStrict(env, opts)
   } catch (err) {
-    console.error('[email] Resend send threw', err)
+    console.error('[email] send failed', err)
   }
 }
 
