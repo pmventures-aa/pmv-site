@@ -6,6 +6,7 @@ import { Card, EmptyState } from '../../components/ui'
 import { useAppPath } from '../../lib/basePath'
 import { DashboardWelcome } from '../../components/DashboardWelcome'
 import { ClientJourney } from '../../components/portal/ClientJourney'
+import { PortalTour } from '../../components/portal/PortalTour'
 
 interface DashboardData {
   stats: {
@@ -38,6 +39,7 @@ export default function Dashboard() {
 
   return (
     <div>
+      <PortalTour />
       <DashboardWelcome
         name={user?.first_name || user?.full_name}
         userId={user?.id}
