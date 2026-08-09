@@ -9,9 +9,9 @@ export interface Capabilities {
   can_view_reports: boolean
   can_view_audit_log: boolean
   can_manage_communications: boolean
-  // Owner is a superset of admin, not a fourth role — see requireOwner in
-  // functions/_lib/mid.ts. Only ever true for an admin account.
   is_owner: boolean
+  role_definition_id?: string | null
+  role_name?: string | null
 }
 
 const NONE: Capabilities = {
@@ -22,25 +22,29 @@ const NONE: Capabilities = {
   can_view_audit_log: false,
   can_manage_communications: false,
   is_owner: false,
+  role_definition_id: null,
+  role_name: null,
 }
 
-// Every role fetches from /admin/my-capabilities — admin still needs the
-// round-trip because is_owner varies per admin account even though the
-// other five capabilities are always true for admin (the backend fills
-// those in without a query; only is_owner needs one). Used both to decide
-// what the nav shows and, on the gated pages themselves, to render a clear
-// "you don't have access" state instead of a blank page when a direct link
-// is hit without the grant.
+// Effective capabilities combine legacy per-person grants with the user's
+// database-defined role template. Role names are presentation only; routes
+// enforce the actual permission grants returned by the backend.
 export function useCapabilities(): Capabilities & { loading: boolean } {
   const { user } = useAuth()
   const [caps, setCaps] = useState<Capabilities>(NONE)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!user) return
+    if (!user || (user.role !== 'staff' && user.role !== 'admin')) {
+      setCaps(NONE)
+      setLoading(false)
+      return
+    }
+    setLoading(true)
     api
-      .get<Capabilities>('/admin/my-capabilities')
+      .get<Capabilities>('/admin/effective-capabilities')
       .then(setCaps)
+      .catch(() => setCaps(NONE))
       .finally(() => setLoading(false))
   }, [user])
 
