@@ -196,6 +196,21 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
 
   if (!account) return c.json({ error: 'not found' }, 404)
 
+  // Onboarding progress — required questions across the client's selected
+  // services vs. how many they've actually answered. Distinct from the
+  // completed flag: a client can be mid-wizard (some answers saved, flag
+  // still 0) or have answered nothing yet if they haven't picked services.
+  const onboardingTotals = await c.env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(DISTINCT q.question_key || '::' || q.service_key)
+        FROM onboarding_questions q JOIN client_services cs ON cs.service_key = q.service_key
+        WHERE cs.client_user_id = ? AND q.required = 1) AS total,
+       (SELECT COUNT(DISTINCT r.question_key || '::' || r.service_key)
+        FROM client_onboarding_responses r
+        JOIN onboarding_questions q ON q.service_key = r.service_key AND q.question_key = r.question_key
+        WHERE r.client_user_id = ? AND q.required = 1 AND r.value IS NOT NULL AND r.value != '') AS answered`,
+  ).bind(id, id).first<{ total: number; answered: number }>()
+
   return c.json({
     account,
     profile,
@@ -215,6 +230,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
     notes: notes.results ?? [],
     assigned_staff: assignedStaff.results ?? [],
     recent_activity: recentActivity.results ?? [],
+    onboarding_progress: { answered: onboardingTotals?.answered ?? 0, total: onboardingTotals?.total ?? 0 },
   })
 })
 

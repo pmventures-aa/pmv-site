@@ -37,6 +37,7 @@ interface Bundle {
     created_at: string
   }[]
   notes: NoteRow[]
+  onboarding_progress: { answered: number; total: number }
 }
 
 interface NoteRow {
@@ -724,6 +725,19 @@ function ProfileTab({
           <Tag tone={data.profile?.onboarding_completed ? 'green' : 'gold'}>
             {data.profile?.onboarding_completed ? 'Complete' : 'Pending'}
           </Tag>
+          {!data.profile?.onboarding_completed && data.onboarding_progress.total > 0 && (
+            <div className="mt-3">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gold"
+                  style={{ width: `${Math.round((data.onboarding_progress.answered / data.onboarding_progress.total) * 100)}%` }}
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-slate-500">
+                {data.onboarding_progress.answered} of {data.onboarding_progress.total} required questions answered
+              </p>
+            </div>
+          )}
         </Panel>
         <AssignedStaffPanel staff={data.assigned_staff} />
         <Panel>
