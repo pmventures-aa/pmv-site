@@ -28,6 +28,7 @@ import { resendWebhookRoutes } from '../_lib/routes/resendWebhooks'
 import { staffServiceAssignmentRoutes, clientApplicationSignatureRoutes } from '../_lib/routes/staffServiceAssignments'
 import { staffServicePrefillRoutes } from '../_lib/routes/staffServicePrefill'
 import { invoiceAdminRoutes } from '../_lib/routes/invoiceAdmin'
+import { signaturePortalSyncRoutes, signatureAdminSyncRoutes } from '../_lib/routes/signaturePdfSync'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -40,8 +41,8 @@ app.route('/', resendWebhookRoutes)
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
 app.route('/portal', intakeCopyRoutes)
-// Signature middleware is mounted before the application routes so submit,
-// answer edits, and file edits can enforce/clear the client acceptance state.
+// Signature sync wraps signing/edit calls; signature enforcement wraps submit.
+app.route('/portal', signaturePortalSyncRoutes)
 app.route('/portal', clientApplicationSignatureRoutes)
 app.route('/portal', serviceApplicationRoutes)
 app.route('/portal', selfRoutes)
@@ -50,6 +51,7 @@ app.route('/portal', messageRoutes)
 
 app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', accountEmailsAdminRoutes)
+app.route('/admin', signatureAdminSyncRoutes)
 app.route('/admin', staffServiceAssignmentRoutes)
 app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)
