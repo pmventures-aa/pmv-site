@@ -10,6 +10,7 @@ import { messageRoutes } from '../_lib/routes/messages'
 import { adminRoutes } from '../_lib/routes/admin'
 import { publicRoutes } from '../_lib/routes/public'
 import { uploadRoutes } from '../_lib/routes/uploads'
+import { unsubscribeRoutes } from '../_lib/routes/unsubscribe'
 import { deletionRoutes } from '../_lib/routes/deletion'
 import { conversionRoutes } from '../_lib/routes/conversion'
 import { auditRoutes } from '../_lib/routes/auditRoutes'
@@ -28,6 +29,7 @@ const app = new Hono<AppEnv>().basePath('/api')
 app.route('/auth', authRoutes)
 app.route('/', publicRoutes)
 app.route('/', uploadRoutes)
+app.route('/', unsubscribeRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
