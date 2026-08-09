@@ -30,6 +30,18 @@ interface AuthState {
 }
 
 const AuthContext = createContext<AuthState | null>(null)
+export const WELCOME_SESSION_KEY = 'pmv_welcome_session'
+
+function newWelcomeSession() {
+  if (typeof window === 'undefined') return
+  const nonce = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
+  window.sessionStorage.setItem(WELCOME_SESSION_KEY, nonce)
+}
+
+function ensureWelcomeSession() {
+  if (typeof window === 'undefined') return
+  if (!window.sessionStorage.getItem(WELCOME_SESSION_KEY)) newWelcomeSession()
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
@@ -39,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await api.get<{ user: SessionUser }>('/me')
       setUser(data.user)
+      ensureWelcomeSession()
     } catch {
       setUser(null)
     } finally {
@@ -52,18 +65,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await api.post<{ ok: boolean; user: SessionUser }>('/auth/login', { email, password })
+    newWelcomeSession()
     setUser(data.user)
     return data.user
   }, [])
 
   const signup = useCallback(async (input: Parameters<AuthState['signup']>[0]) => {
     const data = await api.post<{ ok: boolean; user: SessionUser }>('/auth/signup', input)
+    newWelcomeSession()
     setUser(data.user)
     return data.user
   }, [])
 
   const logout = useCallback(async () => {
     await api.post('/auth/logout')
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem(WELCOME_SESSION_KEY)
     setUser(null)
   }, [])
 
