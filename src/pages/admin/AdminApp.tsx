@@ -11,6 +11,7 @@ import VendorSignup from '../auth/VendorSignup'
 import AdminDashboard from './AdminDashboard'
 import ClientsList from './ClientsList'
 import ClientDetail from './ClientDetail'
+import ClientDetailModern from './ClientDetailModern'
 import UsersAdmin from './UsersAdmin'
 import AssignmentsAdmin from './AssignmentsAdmin'
 import SettingsAdmin from './SettingsAdmin'
@@ -62,7 +63,8 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route index element={<AdminDashboard />} />
             <Route path="pipelines" element={<PipelinesAdmin />} />
             <Route path="clients" element={<ClientsList />} />
-            <Route path="clients/:id" element={<ClientDetail />} />
+            <Route path="clients/:id" element={<ClientDetailModern />} />
+            <Route path="clients/:id/manage" element={<ClientDetail />} />
             <Route path="inquiries" element={<CRMRecordsAdmin />} />
             <Route path="leads/:id" element={<LeadDetail />} />
             <Route path="messages" element={<MessagesAdmin />} />
