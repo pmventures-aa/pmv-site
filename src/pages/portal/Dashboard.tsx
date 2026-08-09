@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth'
 import { Card, PageHeader, StatCard, EmptyState } from '../../components/ui'
 import { useAppPath } from '../../lib/basePath'
 import { QuoteOfTheDay } from '../../components/portal/QuoteOfTheDay'
+import { GetStartedPrompt } from '../../components/portal/GetStartedPrompt'
 
 interface DashboardData {
   stats: {
@@ -36,6 +37,7 @@ export default function Dashboard() {
         subtitle="Here's what's happening across your account."
       />
 
+      <GetStartedPrompt className="mb-8" />
       <QuoteOfTheDay className="mb-8" />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
