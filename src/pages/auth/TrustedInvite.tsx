@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
+import { useAppPath } from '../../lib/basePath'
 import { AuthLayout, ErrorBanner, Field, inputCls } from './AuthLayout'
 
 interface InviteResponse {
@@ -24,6 +25,7 @@ const labels: Record<string, string> = {
 export default function TrustedInvite() {
   const { token = '' } = useParams()
   const navigate = useNavigate()
+  const p = useAppPath()
   const { refresh } = useAuth()
   const [invite, setInvite] = useState<InviteResponse['invite'] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,7 +55,7 @@ export default function TrustedInvite() {
     try {
       await api.post(`/invite/${encodeURIComponent(token)}/accept-trusted`, { full_name: fullName, password })
       await refresh()
-      navigate('../trusted', { relative: 'path', replace: true })
+      navigate(p('trusted'), { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not accept this invitation.')
     } finally { setBusy(false) }
