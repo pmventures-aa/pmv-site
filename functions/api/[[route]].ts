@@ -35,6 +35,7 @@ import { trustedContactRoutes } from '../_lib/routes/trustedContacts'
 import { invitationAdminRoutes, roleAdminRoutes } from '../_lib/routes/invitationAdmin'
 import { roleCapabilityRoutes } from '../_lib/routes/roleCapabilities'
 import { inviteCompletionRoutes } from '../_lib/routes/inviteCompletion'
+import { teamManagementRoutes } from '../_lib/routes/teamManagement'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -66,6 +67,7 @@ app.route('/admin', invoiceAdminRoutes)
 app.route('/admin', roleCapabilityRoutes)
 app.route('/admin', invitationAdminRoutes)
 app.route('/admin', roleAdminRoutes)
+app.route('/admin', teamManagementRoutes)
 app.route('/admin', reportExportRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
