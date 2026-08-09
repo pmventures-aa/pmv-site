@@ -29,6 +29,7 @@ import { staffServiceAssignmentRoutes, clientApplicationSignatureRoutes } from '
 import { staffServicePrefillRoutes } from '../_lib/routes/staffServicePrefill'
 import { invoiceAdminRoutes } from '../_lib/routes/invoiceAdmin'
 import { signaturePortalSyncRoutes, signatureAdminSyncRoutes } from '../_lib/routes/signaturePdfSync'
+import { invitationPublicRoutes, trustedContactRoutes, invitationAdminRoutes } from '../_lib/routes/accessInvites'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -37,6 +38,7 @@ app.route('/', publicRoutes)
 app.route('/', uploadRoutes)
 app.route('/', unsubscribeRoutes)
 app.route('/', resendWebhookRoutes)
+app.route('/', invitationPublicRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
@@ -45,6 +47,7 @@ app.route('/portal', intakeCopyRoutes)
 app.route('/portal', signaturePortalSyncRoutes)
 app.route('/portal', clientApplicationSignatureRoutes)
 app.route('/portal', serviceApplicationRoutes)
+app.route('/portal', trustedContactRoutes)
 app.route('/portal', selfRoutes)
 app.route('/portal', portalRoutes)
 app.route('/portal', messageRoutes)
@@ -55,6 +58,7 @@ app.route('/admin', signatureAdminSyncRoutes)
 app.route('/admin', staffServiceAssignmentRoutes)
 app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)
+app.route('/admin', invitationAdminRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
