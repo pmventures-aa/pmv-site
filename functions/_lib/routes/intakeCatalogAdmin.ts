@@ -13,6 +13,16 @@ const INPUT_TYPES = new Set(['text','textarea','single_select','multi_select','t
 const CONDITION_OPERATORS = new Set(['==','!=','contains','not_contains','truthy','falsy'])
 const APPLICATION_STATUSES = ['submitted','in_review','approved','declined','closed']
 
+type CreateServiceBody = {
+  key?: string
+  name?: string
+  description?: string
+  category?: string
+  sort_order?: number
+  intake_intro?: string
+  estimated_minutes?: number
+}
+
 function normalizedOptions(raw: unknown): string | null {
   if (raw === null || raw === undefined || raw === '') return null
   if (typeof raw !== 'string') throw new Error('INVALID_OPTIONS')
@@ -27,7 +37,7 @@ intakeCatalogAdminRoutes.get('/services', requireStaff, requireCapability('can_m
 })
 
 intakeCatalogAdminRoutes.post('/services', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  const body = await c.req.json<{ key?: string; name?: string; description?: string; category?: string; sort_order?: number; intake_intro?: string; estimated_minutes?: number }>().catch(() => ({}))
+  const body = await c.req.json<CreateServiceBody>().catch(() => ({} as CreateServiceBody))
   const key = (body.key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
   const name = (body.name || '').trim()
   if (!key || !name) return c.json({ error: 'key and name are required' }, 400)
@@ -39,7 +49,7 @@ intakeCatalogAdminRoutes.post('/services', requireStaff, requireCapability('can_
 })
 
 intakeCatalogAdminRoutes.patch('/services/:key', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}))
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
   const sets: string[] = []
   const values: unknown[] = []
   const add = (column: string, value: unknown) => { sets.push(`${column} = ?`); values.push(value) }
@@ -51,17 +61,17 @@ intakeCatalogAdminRoutes.patch('/services/:key', requireStaff, requireCapability
   if (typeof body.estimated_minutes === 'number') add('estimated_minutes', Math.max(1, Math.min(body.estimated_minutes, 30)))
   if (typeof body.active === 'boolean') add('active', body.active ? 1 : 0)
   if (!sets.length) return c.json({ error: 'nothing to update' }, 400)
-  await c.env.DB.prepare(`UPDATE services SET ${sets.join(', ')} WHERE key = ?`).bind(...values, c.req.param('key')).run()
+  await c.env.DB.prepare(`UPDATE services SET ${sets.join(', ')} WHERE key = ?`).bind(...values, c.req.param('key') ?? '').run()
   return c.json({ ok: true })
 })
 
 intakeCatalogAdminRoutes.get('/services/:key/questions', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  const res = await c.env.DB.prepare('SELECT * FROM onboarding_questions WHERE service_key = ? ORDER BY step_order, sort_order').bind(c.req.param('key')).all()
+  const res = await c.env.DB.prepare('SELECT * FROM onboarding_questions WHERE service_key = ? ORDER BY step_order, sort_order').bind(c.req.param('key') ?? '').all()
   return c.json({ questions: res.results ?? [] })
 })
 
 intakeCatalogAdminRoutes.post('/services/:key/questions', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  const body = await c.req.json<any>().catch(() => ({}))
+  const body = await c.req.json<Record<string, any>>().catch(() => ({} as Record<string, any>))
   const questionKey = String(body.question_key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
   const label = String(body.label || '').trim()
   if (!questionKey || !label) return c.json({ error: 'question_key and label are required' }, 400)
@@ -74,13 +84,13 @@ intakeCatalogAdminRoutes.post('/services/:key/questions', requireStaff, requireC
   await c.env.DB.prepare(`INSERT INTO onboarding_questions
     (id,service_key,question_key,label,help_text,input_type,options,required,sort_order,step_label,step_order,condition_question_key,condition_operator,condition_value,allow_multiple)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
-      id,c.req.param('key'),questionKey,label,body.help_text?.trim() || null,inputType,options,body.required === false ? 0 : 1,body.sort_order ?? 0,body.step_label?.trim() || null,body.step_order ?? 1,body.condition_question_key?.trim() || null,operator,body.condition_value ?? null,body.allow_multiple ? 1 : 0,
+      id,c.req.param('key') ?? '',questionKey,label,typeof body.help_text === 'string' ? body.help_text.trim() || null : null,inputType,options,body.required === false ? 0 : 1,typeof body.sort_order === 'number' ? body.sort_order : 0,typeof body.step_label === 'string' ? body.step_label.trim() || null : null,typeof body.step_order === 'number' ? body.step_order : 1,typeof body.condition_question_key === 'string' ? body.condition_question_key.trim() || null : null,operator,typeof body.condition_value === 'string' ? body.condition_value : null,body.allow_multiple ? 1 : 0,
     ).run()
   return c.json({ ok: true, id }, 201)
 })
 
 intakeCatalogAdminRoutes.patch('/services/questions/:id', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}))
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
   const sets: string[] = []
   const values: unknown[] = []
   const add = (column: string, value: unknown) => { sets.push(`${column} = ?`); values.push(value) }
@@ -97,12 +107,12 @@ intakeCatalogAdminRoutes.patch('/services/questions/:id', requireStaff, requireC
   if (body.condition_value === null || typeof body.condition_value === 'string') add('condition_value', body.condition_value ?? null)
   if (typeof body.allow_multiple === 'boolean') add('allow_multiple', body.allow_multiple ? 1 : 0)
   if (!sets.length) return c.json({ error: 'nothing to update' }, 400)
-  await c.env.DB.prepare(`UPDATE onboarding_questions SET ${sets.join(', ')} WHERE id = ?`).bind(...values, c.req.param('id')).run()
+  await c.env.DB.prepare(`UPDATE onboarding_questions SET ${sets.join(', ')} WHERE id = ?`).bind(...values, c.req.param('id') ?? '').run()
   return c.json({ ok: true })
 })
 
 intakeCatalogAdminRoutes.delete('/services/questions/:id', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  await c.env.DB.prepare('DELETE FROM onboarding_questions WHERE id = ?').bind(c.req.param('id')).run()
+  await c.env.DB.prepare('DELETE FROM onboarding_questions WHERE id = ?').bind(c.req.param('id') ?? '').run()
   return c.json({ ok: true })
 })
 
@@ -115,12 +125,12 @@ intakeCatalogAdminRoutes.get('/pipeline/service_applications', requireStaff, asy
 
 intakeCatalogAdminRoutes.get('/clients/:id/service-applications', requireStaff, async (c) => {
   const user = c.get('user')
-  const clientId = c.req.param('id')
+  const clientId = c.req.param('id') ?? ''
   if (!(await canAccessClient(c.env,user,clientId))) return c.json({ error: 'forbidden' }, 403)
   const apps = await c.env.DB.prepare(`SELECT sa.*,s.name AS service_name,rep.full_name AS assigned_rep_name,rep.email AS assigned_rep_email FROM service_applications sa JOIN services s ON s.key=sa.service_key LEFT JOIN users rep ON rep.id=sa.assigned_rep_user_id WHERE sa.client_user_id=? ORDER BY sa.created_at DESC`).bind(clientId).all<any>()
   const rows = apps.results ?? []
   if (!rows.length) return c.json({ applications: [] })
-  const ids = rows.map((r) => r.id)
+  const ids = rows.map((r) => r.id as string)
   const ph = ids.map(() => '?').join(',')
   const ans = await c.env.DB.prepare(`SELECT * FROM service_application_answers WHERE application_id IN (${ph}) ORDER BY step_order,sort_order`).bind(...ids).all<any>()
   const byApp = new Map<string, any[]>()
@@ -130,7 +140,7 @@ intakeCatalogAdminRoutes.get('/clients/:id/service-applications', requireStaff, 
 
 intakeCatalogAdminRoutes.patch('/assignments/:id/primary', requireAdmin, async (c) => {
   const actor = c.get('user')
-  const assignment = await c.env.DB.prepare(`SELECT sa.id,sa.client_user_id,sa.staff_user_id,u.full_name,u.email FROM staff_assignments sa JOIN users u ON u.id=sa.staff_user_id WHERE sa.id=?`).bind(c.req.param('id')).first<{ id:string;client_user_id:string;staff_user_id:string;full_name:string|null;email:string }>()
+  const assignment = await c.env.DB.prepare(`SELECT sa.id,sa.client_user_id,sa.staff_user_id,u.full_name,u.email FROM staff_assignments sa JOIN users u ON u.id=sa.staff_user_id WHERE sa.id=?`).bind(c.req.param('id') ?? '').first<{ id:string;client_user_id:string;staff_user_id:string;full_name:string|null;email:string }>()
   if (!assignment) return c.json({ error: 'assignment not found' }, 404)
   await c.env.DB.batch([
     c.env.DB.prepare('UPDATE staff_assignments SET is_primary=0 WHERE client_user_id=?').bind(assignment.client_user_id),
