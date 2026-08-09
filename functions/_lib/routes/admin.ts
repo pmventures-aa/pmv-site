@@ -655,6 +655,30 @@ adminRoutes.post('/assignments', requireAdmin, async (c) => {
   return c.json({ ok: true, id }, 201)
 })
 
+// Same access-granting concern as the single-assignment route above —
+// admin-only. Ignores duplicates the same way (ON CONFLICT DO NOTHING) so
+// re-running a bulk assign over an overlapping client set is a no-op for
+// pairs that already exist rather than an error.
+adminRoutes.post('/assignments/bulk', requireAdmin, async (c) => {
+  const user = c.get('user')
+  const { staff_user_id, client_user_ids } = await c.req
+    .json<{ staff_user_id: string; client_user_ids: string[] }>()
+    .catch(() => ({ staff_user_id: '', client_user_ids: [] as string[] }))
+  if (!staff_user_id || !Array.isArray(client_user_ids) || client_user_ids.length === 0) {
+    return c.json({ error: 'staff_user_id and at least one client_user_id are required' }, 400)
+  }
+  const ids = [...new Set(client_user_ids)].slice(0, 500)
+  const stmts = ids.map((clientId) =>
+    c.env.DB.prepare(
+      `INSERT INTO staff_assignments (id, staff_user_id, client_user_id) VALUES (?, ?, ?)
+       ON CONFLICT(staff_user_id, client_user_id) DO NOTHING`,
+    ).bind(uuid(), staff_user_id, clientId),
+  )
+  stmts.push(activityInsert(c.env, { actorUserId: user.id, kind: 'bulk_assignment_created', detail: { staff_user_id, client_count: ids.length } }))
+  await c.env.DB.batch(stmts)
+  return c.json({ ok: true, count: ids.length }, 201)
+})
+
 adminRoutes.delete('/assignments/:id', requireAdmin, async (c) => {
   await c.env.DB.prepare('DELETE FROM staff_assignments WHERE id = ?').bind(c.req.param('id')).run()
   return c.json({ ok: true })
