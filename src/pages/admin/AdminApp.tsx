@@ -8,6 +8,7 @@ import { BasePathProvider, useAppPath } from '../../lib/basePath'
 import Login from '../auth/Login'
 import SetPassword from '../auth/SetPassword'
 import VendorSignup from '../auth/VendorSignup'
+import StaffInvite from '../auth/StaffInvite'
 import AdminDashboard from './AdminDashboard'
 import ClientsList from './ClientsList'
 import ClientDetail from './ClientDetail'
@@ -61,6 +62,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
         <Route path="login" element={<Login surface="staff" />} />
         <Route path="set-password" element={<SetPassword surface="staff" />} />
         <Route path="vendor-signup" element={<VendorSignup />} />
+        <Route path="invite/:token" element={<StaffInvite />} />
 
         <Route element={<ProtectedRoute allow={['staff', 'admin']} />}>
           <Route element={<AdminShell />}>
