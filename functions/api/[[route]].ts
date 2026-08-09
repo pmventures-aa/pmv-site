@@ -16,6 +16,7 @@ import { conversionRoutes } from '../_lib/routes/conversion'
 import { auditRoutes } from '../_lib/routes/auditRoutes'
 import { employeeRoutes } from '../_lib/routes/employees'
 import { reportRoutes } from '../_lib/routes/reports'
+import { reportExportRoutes } from '../_lib/routes/reportExports'
 import { searchRoutes } from '../_lib/routes/search'
 import { commsRoutes } from '../_lib/routes/comms'
 import { crmRoutes } from '../_lib/routes/crm'
@@ -46,7 +47,6 @@ app.route('/', inviteCompletionRoutes)
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
 app.route('/portal', intakeCopyRoutes)
-// Signature sync wraps signing/edit calls; signature enforcement wraps submit.
 app.route('/portal', signaturePortalSyncRoutes)
 app.route('/portal', clientApplicationSignatureRoutes)
 app.route('/portal', serviceApplicationRoutes)
@@ -63,6 +63,7 @@ app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)
 app.route('/admin', roleCapabilityRoutes)
 app.route('/admin', invitationAdminRoutes)
+app.route('/admin', reportExportRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
