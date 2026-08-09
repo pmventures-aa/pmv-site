@@ -20,6 +20,8 @@ interface TrustedContact {
   invited_at: string | null
 }
 
+const EDITABLE_SECTIONS = new Set(['business_profile', 'tasks'])
+
 function statusTone(status: string | null): 'green' | 'red' | 'gold' | 'slate' {
   if (status === 'accepted' || status === 'active') return 'green'
   if (status === 'expired' || status === 'revoked') return 'red'
@@ -122,7 +124,7 @@ export default function TrustedContacts() {
       <PageHeader
         eyebrow="Delegated account access"
         title="Trusted Contacts"
-        subtitle="Invite someone you trust and decide exactly which parts of your Pinnacle account they may view or edit. You can change or revoke access at any time."
+        subtitle="Invite someone you trust and decide exactly which parts of your Pinnacle account they may view. Where delegated editing is supported, you can grant that separately."
         action={<button className="btn-gold" onClick={startInvite}>+ Invite trusted contact</button>}
       />
 
@@ -151,16 +153,17 @@ export default function TrustedContacts() {
               <div className="grid grid-cols-[1fr_82px_82px] border-b border-white/10 bg-white/[0.025] px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><span>Portal section</span><span className="text-center">View</span><span className="text-center">Edit</span></div>
               {sections.map((s) => {
                 const mode = form.permissions[s.key] || 'none'
+                const editable = EDITABLE_SECTIONS.has(s.key)
                 return (
                   <div key={s.key} className="grid grid-cols-[1fr_82px_82px] items-center border-b border-white/5 px-4 py-3 last:border-0">
                     <span className="text-sm text-slate-200">{s.label}</span>
                     <label className="grid place-items-center"><input type="checkbox" aria-label={`View ${s.label}`} checked={mode === 'view' || mode === 'edit'} onChange={(e) => setForm((f) => ({ ...f, permissions: { ...f.permissions, [s.key]: e.target.checked ? 'view' : 'none' } }))} /></label>
-                    <label className="grid place-items-center"><input type="checkbox" aria-label={`Edit ${s.label}`} checked={mode === 'edit'} onChange={(e) => setForm((f) => ({ ...f, permissions: { ...f.permissions, [s.key]: e.target.checked ? 'edit' : (mode === 'edit' ? 'view' : mode) } }))} /></label>
+                    {editable ? <label className="grid place-items-center"><input type="checkbox" aria-label={`Edit ${s.label}`} checked={mode === 'edit'} onChange={(e) => setForm((f) => ({ ...f, permissions: { ...f.permissions, [s.key]: e.target.checked ? 'edit' : (mode === 'edit' ? 'view' : mode) } }))} /></label> : <span className="text-center text-xs text-slate-600" title="This section is currently delegated view-only">View only</span>}
                   </div>
                 )
               })}
             </div>
-            <p className="mt-3 text-xs leading-relaxed text-slate-500">Edit access also includes viewing that section. Trusted Contacts never receive internal Pinnacle staff notes, audit information, banking details, or sections you do not explicitly grant.</p>
+            <p className="mt-3 text-xs leading-relaxed text-slate-500">Edit access currently supports Business Profile and Tasks. Other sections are delegated view-only until a scoped write workflow is added. Trusted Contacts never receive internal staff notes, audit information, banking details, or sections you do not explicitly grant.</p>
             <button type="submit" disabled={busy} className="btn-gold mt-5 disabled:opacity-60">{busy ? 'Saving…' : editing ? 'Save access' : 'Send 24-hour invitation'}</button>
           </form>
         </Card>
