@@ -1,0 +1,56 @@
+name: Fix intake strict typing
+
+on:
+  push:
+    branches: [agent/intake-application-wizard]
+    paths:
+      - .github/workflows/fix-intake-strict-types.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/intake-application-wizard
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply mechanical strict-typing fixes
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const path = 'functions/_lib/routes/serviceApplications.ts'
+          let s = fs.readFileSync(path, 'utf8')
+          s = s.replaceAll("c.req.param('serviceKey')", "c.req.param('serviceKey') ?? ''")
+          s = s.replaceAll("c.req.param('questionKey')", "c.req.param('questionKey') ?? ''")
+          s = s.replaceAll("c.req.param('documentId')", "c.req.param('documentId') ?? ''")
+          s = s.replaceAll("c.req.param('id')", "c.req.param('id') ?? ''")
+          s = s.replace(
+            "const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number }>().catch(() => ({}))",
+            "const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number }>().catch(() => ({} as { answers?: Record<string, unknown>; current_step?: number }))",
+          )
+          s = s.replace(
+            "const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number; banking?: unknown }>().catch(() => ({}))",
+            "const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number; banking?: unknown }>().catch(() => ({} as { answers?: Record<string, unknown>; current_step?: number; banking?: unknown }))",
+          )
+          s = s.replace(
+            "const body = await c.req.json<{ status?: string }>().catch(() => ({}))",
+            "const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))",
+          )
+          fs.writeFileSync(path, s)
+          NODE
+      - name: Remove one-shot workflow and commit
+        run: |
+          rm .github/workflows/fix-intake-strict-types.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/_lib/routes/serviceApplications.ts .github/workflows/fix-intake-strict-types.yml
+          git commit -m "Fix service application strict typing"
+          git fetch origin agent/intake-application-wizard
+          git rebase origin/agent/intake-application-wizard
+          git push origin HEAD:agent/intake-application-wizard
