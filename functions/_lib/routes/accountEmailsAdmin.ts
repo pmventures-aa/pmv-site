@@ -28,6 +28,15 @@ async function canManageUsers(c: any): Promise<boolean> {
   return hasCapability(c.env, user, 'can_manage_users')
 }
 
+function emailFailure(err: unknown) {
+  return {
+    deliveryId: '',
+    status: 'failed' as const,
+    providerId: null,
+    error: err instanceof Error ? err.message : 'Email delivery could not be completed.',
+  }
+}
+
 // Enhanced user list for the Users screen. Password hashes never leave the
 // backend; password_set is the only credential state exposed to HQ.
 accountEmailsAdminRoutes.get('/account-users', requireStaff, async (c) => {
@@ -45,6 +54,9 @@ accountEmailsAdminRoutes.get('/account-users', requireStaff, async (c) => {
 
 // New account provisioning path used by HQ. It preserves the existing
 // no-generated-password model but automatically sends the one-time setup link.
+// The account write commits before email delivery; a provider/tracking outage
+// is reported separately and never turns a successfully created user into an
+// apparent creation failure that an admin might accidentally retry.
 accountEmailsAdminRoutes.post('/account-users', requireStaff, async (c) => {
   const actor = c.get('user')
   if (!(await canManageUsers(c))) return c.json({ error: 'forbidden' }, 403)
@@ -112,17 +124,23 @@ accountEmailsAdminRoutes.post('/account-users', requireStaff, async (c) => {
 
   const token = await createActivationToken(c.env, id)
   const actionUrl = setupUrl(role, token)
-  const emailDelivery = await sendAccountWelcome(c.env, {
-    userId: id,
-    role,
-    email,
-    firstName: first || fullName,
-    businessName: role === 'client' ? clean(body.business_name) || null : null,
-    creationType: 'admin_invite',
-    actionLabel: role === 'client' ? 'Set Up My Pinnacle Account' : 'Set Up My HQ Account',
-    actionUrl,
-    actorUserId: actor.id,
-  })
+  let emailDelivery
+  try {
+    emailDelivery = await sendAccountWelcome(c.env, {
+      userId: id,
+      role,
+      email,
+      firstName: first || fullName,
+      businessName: role === 'client' ? clean(body.business_name) || null : null,
+      creationType: 'admin_invite',
+      actionLabel: role === 'client' ? 'Set Up My Pinnacle Account' : 'Set Up My HQ Account',
+      actionUrl,
+      actorUserId: actor.id,
+    })
+  } catch (err) {
+    console.error('[account-email] HQ account invitation failed after account creation', err)
+    emailDelivery = emailFailure(err)
+  }
 
   return c.json({
     ok: true,
@@ -148,28 +166,40 @@ accountEmailsAdminRoutes.post('/users/:id/setup-email', requireStaff, async (c) 
   if (!user.password_hash) {
     const token = await createActivationToken(c.env, id)
     const actionUrl = setupUrl(user.role, token)
-    const result = await sendAccountWelcome(c.env, {
+    let result
+    try {
+      result = await sendAccountWelcome(c.env, {
+        userId: id,
+        role: user.role,
+        email: user.email,
+        firstName: firstName(user),
+        creationType: 'admin_invite',
+        actionLabel: user.role === 'client' ? 'Set Up My Pinnacle Account' : 'Set Up My HQ Account',
+        actionUrl,
+        actorUserId: actor.id,
+        idempotencyKey: `setup-resend/${id}/${uuid()}`,
+      })
+    } catch (err) {
+      console.error('[account-email] setup resend failed', err)
+      result = emailFailure(err)
+    }
+    return c.json({ ok: true, mode: 'setup', setup_token: token, email_delivery: result })
+  }
+
+  let result
+  try {
+    result = await sendPortalReminder(c.env, {
       userId: id,
       role: user.role,
       email: user.email,
       firstName: firstName(user),
-      creationType: 'admin_invite',
-      actionLabel: user.role === 'client' ? 'Set Up My Pinnacle Account' : 'Set Up My HQ Account',
-      actionUrl,
       actorUserId: actor.id,
-      idempotencyKey: `setup-resend/${id}/${uuid()}`,
+      idempotencyKey: `portal-reminder/${id}/${uuid()}`,
     })
-    return c.json({ ok: true, mode: 'setup', setup_token: token, email_delivery: result })
+  } catch (err) {
+    console.error('[account-email] portal reminder failed', err)
+    result = emailFailure(err)
   }
-
-  const result = await sendPortalReminder(c.env, {
-    userId: id,
-    role: user.role,
-    email: user.email,
-    firstName: firstName(user),
-    actorUserId: actor.id,
-    idempotencyKey: `portal-reminder/${id}/${uuid()}`,
-  })
   return c.json({ ok: true, mode: 'reminder', email_delivery: result })
 })
 
@@ -198,11 +228,17 @@ accountEmailsAdminRoutes.post('/users/:id/vendor-approval-email', requireAdmin, 
   if (row.party_type !== 'vendor') return c.json({ error: 'this account is not a vendor' }, 400)
   if (row.status !== 'active') return c.json({ error: 'approve this vendor before sending the approval email' }, 409)
 
-  const result = await sendVendorApproved(c.env, {
-    userId: id,
-    email: row.email,
-    firstName: firstName(row),
-    actorUserId: actor.id,
-  })
+  let result
+  try {
+    result = await sendVendorApproved(c.env, {
+      userId: id,
+      email: row.email,
+      firstName: firstName(row),
+      actorUserId: actor.id,
+    })
+  } catch (err) {
+    console.error('[account-email] vendor approval email failed after approval', err)
+    result = emailFailure(err)
+  }
   return c.json({ ok: true, email_delivery: result })
 })
