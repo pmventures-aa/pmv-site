@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 
-# Temporary branch-only release gate. Removed before the PR is opened.
+# Temporary branch-only release gate. Final consolidated validation pass.
 jobs:
   validate:
     runs-on: ubuntu-latest
