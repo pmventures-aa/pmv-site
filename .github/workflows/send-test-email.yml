@@ -1,0 +1,34 @@
+name: Send test email via Resend
+
+on:
+  workflow_dispatch:
+    inputs:
+      to_email:
+        description: "Recipient address for the test email"
+        required: true
+
+jobs:
+  send-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send test email
+        run: |
+          curl -sS -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "from": "Pinnacle Management Ventures <notifications@pinnaclemanagementventures.com>",
+              "to": "'"$TO_EMAIL"'",
+              "subject": "PMV email pipeline test",
+              "html": "<p>This is a test send confirming Resend + the pinnaclemanagementventures.com sending domain are wired up correctly.</p>"
+            }' | tee /tmp/resend-response.json
+          echo
+          if grep -q '"id"' /tmp/resend-response.json; then
+            echo "Send accepted by Resend."
+          else
+            echo "::error::Resend did not return a message id — see response above."
+            exit 1
+          fi
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TO_EMAIL: ${{ inputs.to_email }}
