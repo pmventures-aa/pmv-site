@@ -12,7 +12,7 @@ export interface ActivityEvent {
 }
 
 function fmtStatus(s?: string): string { return s ? s.replace(/_/g, ' ') : '—' }
-function money(cents?: number | null): string { return typeof cents === 'number' ? `$${(cents / 100).toLocaleString()}` : 'a' }
+function money(cents?: number | null): string { return typeof cents === 'number' ? `$${(cents / 100).toLocaleString()}` : 'an amount' }
 
 export function describeActivity(e: ActivityEvent): string {
   let d: any = {}
@@ -48,7 +48,8 @@ export function describeActivity(e: ActivityEvent): string {
     case 'call_status_changed': return `${actor} set call “${d.topic}” (${client}) to ${fmtStatus(d.to)}`
     case 'appointment_created': return `${actor} scheduled “${d.title}” for ${client}`
     case 'appointment_status_changed': return `${actor} set appointment “${d.title}” (${client}) to ${fmtStatus(d.to)}`
-    case 'invoice_created': return `${actor} created a ${money(d.amount_cents)} invoice for ${client}`
+    case 'invoice_created': return `${actor} created an invoice for ${money(d.amount_cents)} for ${client}${d.invoice_number ? ` · ${d.invoice_number}` : ''}`
+    case 'invoice_sent': return `${actor} sent ${d.invoice_number || 'an invoice'} to ${d.recipients ?? 1} recipient${d.recipients === 1 ? '' : 's'} for ${client}`
     case 'invoice_status_changed': return `${actor} marked ${client}’s invoice as ${fmtStatus(d.to)}`
     case 'funding_created': return `${actor} opened a funding application for ${client}`
     case 'funding_status_changed': return `${actor} set ${client}’s funding application to ${fmtStatus(d.to)}`
@@ -56,6 +57,10 @@ export function describeActivity(e: ActivityEvent): string {
     case 'property_status_changed': return `${actor} set “${d.address}” (${client}) to ${fmtStatus(d.to)}`
     case 'tax_filing_created': return `${actor} opened a ${d.tax_year ?? ''} tax filing for ${client}`
     case 'tax_filing_status_changed': return `${actor} set ${client}’s ${d.tax_year ?? ''} tax filing to ${fmtStatus(d.to)}`
+    case 'service_assigned_by_staff': return `${actor} added ${d.service_name || fmtStatus(d.service_key)} for ${client}`
+    case 'service_application_assigned': return `${actor} started ${client}’s ${d.service_name || fmtStatus(d.service_key)} application${typeof d.prefilled_answers === 'number' ? ` · ${d.prefilled_answers} answers prefilled` : ''}`
+    case 'service_application_prefilled': return `${actor} updated a service application draft for ${client}`
+    case 'service_application_signed': return `${client} electronically signed a service application`
     case 'service_application_submitted': return `${client} submitted an application for ${d.service_name || fmtStatus(d.service_key)}`
     case 'service_status_changed': return `${actor} set ${client}’s ${fmtStatus(d.service_key)} application to ${fmtStatus(d.to)}`
     case 'payment_info_revealed': return `${actor} viewed banking details for ${client} (account ending ${d.account_last4 ?? '····'})`

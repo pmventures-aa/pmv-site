@@ -25,8 +25,10 @@ import AuditLogAdmin from './AuditLogAdmin'
 import EmployeesAdmin from './EmployeesAdmin'
 import ReportingCenter from './ReportingCenter'
 import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
+import InvoicesAdmin from './InvoicesAdmin'
+import ServiceAssignmentsAdmin from './ServiceAssignmentsAdmin'
 
-const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity']
+const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity', 'service-assignments', 'invoices']
 
 function AdminShell() {
   const { user } = useAuth()
@@ -69,6 +71,8 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="leads/:id" element={<LeadDetail />} />
             <Route path="messages" element={<MessagesAdmin />} />
             <Route path="activity" element={<ActivityAdmin />} />
+            <Route path="service-assignments" element={<ServiceAssignmentsAdmin />} />
+            <Route path="invoices" element={<InvoicesAdmin />} />
             <Route path="audit-log" element={<AuditLogAdmin />} />
             <Route path="reports" element={<ReportingCenter />} />
             <Route path="communications" element={<CommunicationsCRMAdmin />} />
