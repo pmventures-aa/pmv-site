@@ -6,6 +6,7 @@ import { useAppPath } from '../../lib/basePath'
 import { Avatar } from '../kit/Avatar'
 import { MailBell } from '../kit/MailBell'
 import { Icon } from '../kit/Icon'
+import { ThemeToggle } from '../ThemeToggle'
 import type { NavItem } from './nav'
 
 export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
@@ -51,6 +52,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
                 <p className="truncate text-xs text-slate-500">{user?.email}</p>
               </div>
             </div>
+            <div className="mt-3"><ThemeToggle /></div>
             <button onClick={() => logout()} className="btn-outline mt-3 w-full !py-1.5 text-xs">Sign out</button>
           </div>
         ) : (
@@ -74,8 +76,9 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
 
       <header className="flex items-center justify-between border-b border-white/5 bg-navy-950/80 px-4 py-3 backdrop-blur lg:hidden">
         <Logo />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span className="hidden text-xs text-slate-400 sm:inline">{badge}</span>
+          <ThemeToggle compact />
           <MailBell />
           <button onClick={() => setMobileOpen(true)} className={iconButton} aria-label="Open menu"><Icon name="menu" size={19} /></button>
         </div>
@@ -96,7 +99,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
           <button onClick={toggleSidebar} className={iconButton} aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
             <Icon name={sidebarOpen ? 'chevronLeft' : 'chevronRight'} size={17} />
           </button>
-          <div className="flex items-center gap-4"><MailBell /><span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span></div>
+          <div className="flex items-center gap-3"><ThemeToggle compact /><MailBell /><span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span></div>
         </div>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8"><Outlet /></main>
       </div>
