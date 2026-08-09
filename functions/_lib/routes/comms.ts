@@ -5,6 +5,7 @@ import { requireCapability } from '../capabilities'
 import { uuid } from '../crypto'
 import { sendEmailStrict } from '../email'
 import { logActivity } from '../activity'
+import { getMarketingComplianceConfig, createUnsubscribeToken, appendMarketingFooter } from '../marketingCompliance'
 
 export const commsRoutes = new Hono<AppEnv>()
 
@@ -255,10 +256,22 @@ async function insertRecipients(env: Env, messageId: string, recipients: Recipie
   return rows
 }
 
-async function dispatchNow(env: Env, actorUserId: string, messageId: string, subject: string, bodyHtml: string, recipients: Awaited<ReturnType<typeof insertRecipients>>) {
+async function dispatchNow(
+  env: Env,
+  actorUserId: string,
+  messageId: string,
+  subject: string,
+  bodyHtml: string,
+  recipients: Awaited<ReturnType<typeof insertRecipients>>,
+  messageType: MessageType,
+) {
+  const marketingConfig = messageType === 'marketing' ? await getMarketingComplianceConfig(env) : null
   await Promise.all(recipients.map(async (r) => {
     try {
-      const providerMessageId = await sendEmailStrict(env, { to: r.email, subject, html: bodyHtml })
+      const deliveryHtml = marketingConfig
+        ? appendMarketingFooter(bodyHtml, marketingConfig, await createUnsubscribeToken(env, r.email))
+        : bodyHtml
+      const providerMessageId = await sendEmailStrict(env, { to: r.email, subject, html: deliveryHtml })
       const statements = [
         env.DB.prepare("UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE id = ?").bind(providerMessageId, r.row_id),
       ]
@@ -266,13 +279,13 @@ async function dispatchNow(env: Env, actorUserId: string, messageId: string, sub
         statements.push(
           env.DB.prepare(
             `INSERT INTO email_log (id, inquiry_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)`,
-          ).bind(uuid(), r.inquiry_id, actorUserId, r.email, subject, bodyHtml),
+          ).bind(uuid(), r.inquiry_id, actorUserId, r.email, subject, deliveryHtml),
           env.DB.prepare("UPDATE contact_inquiries SET last_contacted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").bind(r.inquiry_id),
         )
       } else if (r.user_id && r.role === 'client') {
         statements.push(env.DB.prepare(
           `INSERT INTO email_log (id, client_user_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)`,
-        ).bind(uuid(), r.user_id, actorUserId, r.email, subject, bodyHtml))
+        ).bind(uuid(), r.user_id, actorUserId, r.email, subject, deliveryHtml))
       }
       await env.DB.batch(statements)
     } catch (err) {
@@ -299,6 +312,10 @@ commsRoutes.post('/comms/messages', requireStaff, requireCapability('can_manage_
   }
   const messageType = parseMessageType(body.message_type)
   const action = body.action === 'send_now' || body.action === 'schedule' ? body.action : 'draft'
+  if (messageType === 'marketing' && action !== 'draft') {
+    try { await getMarketingComplianceConfig(c.env) }
+    catch (err) { return c.json({ error: err instanceof Error ? err.message : 'Marketing compliance settings are incomplete.' }, 400) }
+  }
   const recurrence = body.recurrence === 'daily' || body.recurrence === 'weekly' || body.recurrence === 'monthly' ? body.recurrence : null
   const sendMode = action === 'schedule' ? 'scheduled' : 'manual'
   let scheduledAt: string | null = null
@@ -323,7 +340,7 @@ commsRoutes.post('/comms/messages', requireStaff, requireCapability('can_manage_
   if (action === 'send_now') {
     const recipientRows = await insertRecipients(c.env, id, recipientsPreview)
     await c.env.DB.prepare("UPDATE comms_messages SET status = 'sending', updated_at = datetime('now') WHERE id = ?").bind(id).run()
-    c.executionCtx.waitUntil(dispatchNow(c.env, user.id, id, subject, bodyHtml, recipientRows))
+    c.executionCtx.waitUntil(dispatchNow(c.env, user.id, id, subject, bodyHtml, recipientRows, messageType))
   }
 
   await logActivity(c.env, { actorUserId: user.id, kind: 'comms_message_created', detail: { subject, action, message_type: messageType, eligible_recipients: recipientsPreview.length } })
@@ -345,11 +362,16 @@ commsRoutes.post('/comms/messages/:id/send', requireStaff, requireCapability('ca
   if (!message) return c.json({ error: 'not found' }, 404)
   if (message.status !== 'draft') return c.json({ error: 'only drafts can be sent this way' }, 400)
   const audience: Audience = JSON.parse(message.audience_json || '{}')
-  const recipients = await resolveAudience(c.env, audience, parseMessageType(message.message_type))
+  const draftMessageType = parseMessageType(message.message_type)
+  if (draftMessageType === 'marketing') {
+    try { await getMarketingComplianceConfig(c.env) }
+    catch (err) { return c.json({ error: err instanceof Error ? err.message : 'Marketing compliance settings are incomplete.' }, 400) }
+  }
+  const recipients = await resolveAudience(c.env, audience, draftMessageType)
   if (recipients.length === 0) return c.json({ error: 'no eligible recipients matched that audience' }, 400)
   const recipientRows = await insertRecipients(c.env, id, recipients)
   await c.env.DB.prepare("UPDATE comms_messages SET status = 'sending', updated_at = datetime('now') WHERE id = ?").bind(id).run()
-  c.executionCtx.waitUntil(dispatchNow(c.env, user.id, id, message.subject, message.body_html, recipientRows))
+  c.executionCtx.waitUntil(dispatchNow(c.env, user.id, id, message.subject, message.body_html, recipientRows, draftMessageType))
   await logActivity(c.env, { actorUserId: user.id, kind: 'comms_message_sent', detail: { subject: message.subject, recipients: recipients.length } })
   return c.json({ ok: true, recipients: recipients.length })
 })

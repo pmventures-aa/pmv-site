@@ -137,6 +137,28 @@ async function resolveAudience(audience, type) {
   return [...byEmail.values()]
 }
 
+function escapeHtml(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
+async function getMarketingConfig() {
+  const rows = await d1("SELECT key, value FROM app_settings WHERE key IN ('business_address', 'marketing_public_base_url')")
+  const values = new Map(rows.map((row) => [row.key, String(row.value || '').trim()]))
+  const businessAddress = values.get('business_address') || ''
+  if (!businessAddress) throw new Error('Marketing email blocked: HQ Settings → General → Business address is empty.')
+  const publicBaseUrl = (values.get('marketing_public_base_url') || 'https://www.pinnaclemanagementventures.com').replace(/\/$/, '')
+  return { businessAddress, publicBaseUrl }
+}
+
+async function marketingHtml(html, email, config) {
+  const token = uuid()
+  await d1('INSERT INTO email_unsubscribe_tokens (token, email) VALUES (?, ?)', [token, String(email).trim().toLowerCase()])
+  const url = `${config.publicBaseUrl}/api/unsubscribe/${encodeURIComponent(token)}`
+  return `${html}
+<hr style="margin:32px 0 18px;border:0;border-top:1px solid #d9d9d9">
+<p style="font-size:12px;line-height:1.6;color:#666;margin:0">Business/marketing communication from Pinnacle Management Ventures.<br>${escapeHtml(config.businessAddress)}<br><a href="${escapeHtml(url)}" style="color:#666;text-decoration:underline">Unsubscribe from future marketing emails</a></p>`
+}
+
 async function sendViaResend(to, subject, html) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -164,6 +186,15 @@ async function main() {
   for (const message of due) {
     const audience = JSON.parse(message.audience_json || '{}')
     const type = messageType(message.message_type)
+    let compliance = null
+    if (type === 'marketing') {
+      try { compliance = await getMarketingConfig() }
+      catch (err) {
+        console.error(`message ${message.id} blocked:`, err.message)
+        await d1("UPDATE comms_messages SET status = 'failed', next_run_at = NULL, updated_at = datetime('now') WHERE id = ?", [message.id])
+        continue
+      }
+    }
     const recipients = await resolveAudience(audience, type)
     console.log(`message ${message.id} (${message.subject}) — ${recipients.length} eligible recipient(s)`)
 
@@ -174,13 +205,14 @@ async function main() {
         [recipientId, message.id, recipient.user_id, recipient.inquiry_id, recipient.recipient_kind, recipient.email, recipient.full_name],
       )
       try {
-        const providerMessageId = await sendViaResend(recipient.email, message.subject, message.body_html)
+        const deliveryHtml = compliance ? await marketingHtml(message.body_html, recipient.email, compliance) : message.body_html
+        const providerMessageId = await sendViaResend(recipient.email, message.subject, deliveryHtml)
         await d1("UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE id = ?", [providerMessageId, recipientId])
         if (recipient.recipient_kind === 'lead' && recipient.inquiry_id) {
-          await d1('INSERT INTO email_log (id, inquiry_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)', [uuid(), recipient.inquiry_id, message.created_by_user_id, recipient.email, message.subject, message.body_html])
+          await d1('INSERT INTO email_log (id, inquiry_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)', [uuid(), recipient.inquiry_id, message.created_by_user_id, recipient.email, message.subject, deliveryHtml])
           await d1("UPDATE contact_inquiries SET last_contacted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", [recipient.inquiry_id])
         } else if (recipient.user_id && recipient.role === 'client') {
-          await d1('INSERT INTO email_log (id, client_user_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)', [uuid(), recipient.user_id, message.created_by_user_id, recipient.email, message.subject, message.body_html])
+          await d1('INSERT INTO email_log (id, client_user_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)', [uuid(), recipient.user_id, message.created_by_user_id, recipient.email, message.subject, deliveryHtml])
         }
       } catch (err) {
         console.error(`send failed for ${recipient.email}:`, err.message)
