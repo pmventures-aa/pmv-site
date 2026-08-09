@@ -15,6 +15,17 @@ interface UserRow {
   full_name: string | null
   status: string
   created_at: string
+  password_set: number
+  welcome_email_sent_at: string | null
+  welcome_email_status: string | null
+  welcome_email_last_event_at: string | null
+}
+
+interface EmailDelivery {
+  deliveryId: string
+  status: string
+  providerId: string | null
+  error?: string
 }
 
 const emptyForm = {
@@ -46,6 +57,18 @@ function prefillFromParams(params: URLSearchParams): typeof emptyForm | null {
   }
 }
 
+function setupUrl(role: UserRow['role'] | string, token: string) {
+  const host = role === 'client' ? 'client.pinnaclemanagementventures.com' : 'hq.pinnaclemanagementventures.com'
+  return `https://${host}/set-password?token=${encodeURIComponent(token)}`
+}
+
+function emailTone(status: string | null): 'green' | 'red' | 'gold' | 'slate' {
+  if (status === 'delivered' || status === 'sent') return 'green'
+  if (status === 'failed' || status === 'bounced' || status === 'suppressed' || status === 'complained') return 'red'
+  if (status === 'delayed' || status === 'skipped') return 'gold'
+  return 'slate'
+}
+
 export default function UsersAdmin() {
   const [searchParams] = useSearchParams()
   const [users, setUsers] = useState<UserRow[]>([])
@@ -55,8 +78,9 @@ export default function UsersAdmin() {
   const [showForm, setShowForm] = useState(() => prefill !== null)
   const [form, setForm] = useState(prefill ?? emptyForm)
   const [busy, setBusy] = useState(false)
+  const [sendingId, setSendingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [setupLink, setSetupLink] = useState<{ email: string; url: string } | null>(null)
+  const [setupLink, setSetupLink] = useState<{ email: string; url: string; delivery?: EmailDelivery | null } | null>(null)
   const [q, setQ] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -64,7 +88,7 @@ export default function UsersAdmin() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.get<{ users: UserRow[] }>('/admin/users')
+      const res = await api.get<{ users: UserRow[] }>('/admin/account-users')
       setUsers(res.users)
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
@@ -105,10 +129,22 @@ export default function UsersAdmin() {
         payload.state = form.state || undefined
         payload.services_enrolled = form.services_enrolled
       }
-      const res = await api.post<{ ok: boolean; user: { email: string }; setup_token: string }>('/admin/users', payload)
-      const surface = form.role === 'client' ? 'client' : 'hq'
-      const host = surface === 'client' ? 'client.pinnaclemanagementventures.com' : 'hq.pinnaclemanagementventures.com'
-      setSetupLink({ email: res.user.email, url: `https://${host}/set-password?token=${res.setup_token}` })
+      const res = await api.post<{
+        ok: boolean
+        user: { email: string; role: UserRow['role'] }
+        setup_token: string
+        email_delivery: EmailDelivery
+      }>('/admin/account-users', payload)
+      setSetupLink({
+        email: res.user.email,
+        url: setupUrl(res.user.role, res.setup_token),
+        delivery: res.email_delivery,
+      })
+      if (res.email_delivery.status === 'sent' || res.email_delivery.status === 'delivered') {
+        toast.success(`Account created and setup email sent to ${res.user.email}.`)
+      } else {
+        toast.error(`Account created, but the setup email was ${res.email_delivery.status}. Use the fallback link shown below.`)
+      }
       setForm(emptyForm)
       setShowForm(false)
       await load()
@@ -116,6 +152,31 @@ export default function UsersAdmin() {
       setError(err instanceof ApiError ? err.message : 'Could not create user.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function sendAccessEmail(u: UserRow) {
+    setSendingId(u.id)
+    try {
+      const res = await api.post<{
+        ok: boolean
+        mode: 'setup' | 'reminder'
+        setup_token?: string
+        email_delivery: EmailDelivery
+      }>(`/admin/users/${u.id}/setup-email`, {})
+      if (res.mode === 'setup' && res.setup_token) {
+        setSetupLink({ email: u.email, url: setupUrl(u.role, res.setup_token), delivery: res.email_delivery })
+      }
+      if (res.email_delivery.status === 'sent' || res.email_delivery.status === 'delivered') {
+        toast.success(res.mode === 'setup' ? `New setup email sent to ${u.email}.` : `Portal reminder sent to ${u.email}.`)
+      } else {
+        toast.error(`Email ${res.email_delivery.status}. ${res.email_delivery.error || 'Use the manual fallback if needed.'}`)
+      }
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not send account email.')
+    } finally {
+      setSendingId(null)
     }
   }
 
@@ -153,7 +214,7 @@ export default function UsersAdmin() {
       <PageIntro
         kicker="Access"
         title="Users"
-        subtitle="Provision staff, admin, and client accounts — including full client business profiles."
+        subtitle="Provision client and HQ accounts, track invitation delivery, and resend access when needed."
         action={
           <button
             className={btnPrimary}
@@ -168,10 +229,14 @@ export default function UsersAdmin() {
       />
 
       {setupLink && (
-        <Panel className="mb-6 border-emerald-400/30 bg-emerald-400/[0.06]">
-          <p className="text-sm font-medium text-emerald-200">
-            Account created for {setupLink.email}. Send them this one-time setup link — it lets them choose their own
-            password and expires in 24 hours (no password was generated or stored by the system):
+        <Panel className={`mb-6 ${setupLink.delivery?.status === 'failed' || setupLink.delivery?.status === 'skipped' ? 'border-amber-400/30 bg-amber-400/[0.05]' : 'border-emerald-400/30 bg-emerald-400/[0.06]'}`}>
+          <p className="text-sm font-medium text-white">
+            Account access for {setupLink.email}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            {setupLink.delivery?.status === 'sent' || setupLink.delivery?.status === 'delivered'
+              ? 'The automated setup email was sent. Keep this one-time link as a fallback; it expires in 24 hours.'
+              : `The automated email is ${setupLink.delivery?.status || 'unconfirmed'}. Send this one-time setup link manually if needed. Creating another setup link will invalidate this one.`}
           </p>
           <div className="mt-3 flex items-center gap-2">
             <code className="flex-1 overflow-x-auto rounded-md bg-black/30 px-3 py-2 text-xs text-emerald-100">
@@ -260,7 +325,7 @@ export default function UsersAdmin() {
 
             <div className="flex items-center gap-3 sm:col-span-3">
               <button type="submit" disabled={busy} className={btnPrimary}>
-                {busy ? 'Creating…' : 'Create user'}
+                {busy ? 'Creating & sending…' : 'Create user & send setup'}
               </button>
               {error && <span className="text-sm text-rose-300">{error}</span>}
             </div>
@@ -299,13 +364,14 @@ export default function UsersAdmin() {
             <EmptyState label={users.length === 0 ? 'No users yet.' : 'No users match your search.'} />
           </div>
         ) : (
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">Role</th>
                 <th className="px-5 py-3 font-medium">Status</th>
-                <th className="px-5 py-3 font-medium">Action</th>
+                <th className="px-5 py-3 font-medium">Account email</th>
+                <th className="px-5 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -320,9 +386,28 @@ export default function UsersAdmin() {
                     <Tag tone={u.status === 'active' ? 'green' : 'red'}>{u.status}</Tag>
                   </td>
                   <td className="px-5 py-3">
-                    <button onClick={() => toggleStatus(u)} className="text-xs font-medium text-gold hover:underline">
-                      {u.status === 'active' ? 'Suspend' : 'Reactivate'}
-                    </button>
+                    {u.welcome_email_status ? (
+                      <div>
+                        <Tag tone={emailTone(u.welcome_email_status)}>{u.welcome_email_status.replace(/_/g, ' ')}</Tag>
+                        {u.welcome_email_last_event_at && <p className="mt-1 text-[11px] text-slate-500">Last update {new Date(`${u.welcome_email_last_event_at.replace(' ', 'T')}Z`).toLocaleString()}</p>}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-500">Not sent</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => sendAccessEmail(u)}
+                        disabled={sendingId === u.id || u.status !== 'active'}
+                        className="text-xs font-medium text-gold hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {sendingId === u.id ? 'Sending…' : u.password_set ? 'Send portal reminder' : u.welcome_email_sent_at ? 'Resend setup' : 'Send setup'}
+                      </button>
+                      <button onClick={() => toggleStatus(u)} className="text-xs font-medium text-gold hover:underline">
+                        {u.status === 'active' ? 'Suspend' : 'Reactivate'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
