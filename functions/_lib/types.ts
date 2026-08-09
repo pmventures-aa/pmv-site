@@ -20,7 +20,7 @@ export interface Env {
   RESEND_WEBHOOK_SECRET?: string
 }
 
-export type Role = 'client' | 'staff' | 'admin'
+export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
 
 export interface SessionUser {
   id: string

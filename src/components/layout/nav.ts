@@ -19,7 +19,8 @@ export const portalNav: NavItem[] = [
   { key: 'billing', label: 'Billing', to: 'billing', icon: 'billing' },
   { key: 'support', label: 'Support', to: 'support', icon: 'support' },
   { key: 'business-profile', label: 'Business Profile', to: 'business-profile', icon: 'building' },
-  { key: 'my-team', label: 'My Team', to: 'my-team', icon: 'team' },
+  { key: 'my-team', label: 'My Pinnacle Team', to: 'my-team', icon: 'team' },
+  { key: 'trusted-contacts', label: 'Trusted Contacts', to: 'trusted-contacts', icon: 'users' },
   { key: 'notifications', label: 'Notifications', to: 'notifications', icon: 'bell' },
   { key: 'security', label: 'Security', to: 'security', icon: 'shield' },
 ]
@@ -40,10 +41,13 @@ export const adminNav: NavItem[] = [
   { key: 'employees', label: 'Team & Vendors', to: 'employees', icon: 'team', section: 'Operations' },
   { key: 'assignments', label: 'Assignments', to: 'assignments', icon: 'assignments', section: 'Operations' },
   { key: 'invoices', label: 'Invoices', to: 'invoices', icon: 'billing', section: 'Operations' },
+  { key: 'document-center', label: 'Document Center', to: 'document-center', icon: 'file', section: 'Operations' },
 
   { key: 'reports', label: 'Reporting Center', to: 'reports', icon: 'reports', section: 'Insights' },
   { key: 'audit-log', label: 'Audit Log', to: 'audit-log', icon: 'audit', section: 'Insights' },
 
+  { key: 'invitations', label: 'Invitation Center', to: 'invitations', icon: 'send', section: 'Administration' },
+  { key: 'roles', label: 'Roles & Permissions', to: 'roles', icon: 'shield', section: 'Administration' },
   { key: 'users', label: 'Users', to: 'users', icon: 'users', section: 'Administration' },
   { key: 'settings', label: 'Settings', to: 'settings', icon: 'settings', section: 'Administration' },
 ]

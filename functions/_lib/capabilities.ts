@@ -1,12 +1,6 @@
 import type { Context, Next } from 'hono'
 import type { AppEnv, Env, SessionUser } from './types'
 
-// Admins always pass; a staff member passes only with the named grant on
-// their team_members row (see PATCH /admin/users/:id/staff-profile). Lets
-// an admin hand out specific admin-adjacent powers without promoting
-// someone to full admin. Shared across route files (admin.ts and the
-// newer deletion/conversion/audit/reports/employees route files) so the
-// capability list lives in exactly one place.
 export type Capability =
   | 'can_reveal_payment_info'
   | 'can_manage_users'
@@ -15,18 +9,67 @@ export type Capability =
   | 'can_view_audit_log'
   | 'can_manage_communications'
 
-export async function hasCapability(env: Env, user: SessionUser, cap: Capability): Promise<boolean> {
-  if (user.role === 'admin') return true
-  if (user.role !== 'staff') return false
-  const row = await env.DB.prepare(`SELECT ${cap} AS v FROM team_members WHERE user_id = ?`).bind(user.id).first<{ v: number }>()
-  return !!row?.v
+export type NamedPermission =
+  | 'reveal_payment_info'
+  | 'manage_users'
+  | 'manage_settings'
+  | 'view_reports'
+  | 'view_audit_log'
+  | 'manage_communications'
+  | 'manage_invitations'
+  | 'manage_documents'
+  | 'manage_team'
+
+const permissionKey: Record<Capability, NamedPermission> = {
+  can_reveal_payment_info: 'reveal_payment_info',
+  can_manage_users: 'manage_users',
+  can_manage_settings: 'manage_settings',
+  can_view_reports: 'view_reports',
+  can_view_audit_log: 'view_audit_log',
+  can_manage_communications: 'manage_communications',
 }
 
-// Chain after requireStaff. Assumes c.get('user') is already set.
+const directColumn: Partial<Record<NamedPermission, Capability>> = {
+  reveal_payment_info: 'can_reveal_payment_info',
+  manage_users: 'can_manage_users',
+  manage_settings: 'can_manage_settings',
+  view_reports: 'can_view_reports',
+  view_audit_log: 'can_view_audit_log',
+  manage_communications: 'can_manage_communications',
+}
+
+export async function hasNamedPermission(env: Env, user: SessionUser, permission: NamedPermission): Promise<boolean> {
+  if (user.role === 'admin') return true
+  if (user.role !== 'staff') return false
+  const legacy = directColumn[permission]
+  const selectLegacy = legacy ? `tm.${legacy}` : '0'
+  const row = await env.DB.prepare(
+    `SELECT ${selectLegacy} AS direct_grant,
+            CASE WHEN EXISTS (
+              SELECT 1 FROM role_permissions rp
+              WHERE rp.role_id = tm.role_definition_id AND rp.permission_key = ? AND rp.granted = 1
+            ) THEN 1 ELSE 0 END AS role_grant
+     FROM team_members tm WHERE tm.user_id = ?`,
+  ).bind(permission, user.id).first<{ direct_grant: number; role_grant: number }>()
+  return !!row?.direct_grant || !!row?.role_grant
+}
+
+export async function hasCapability(env: Env, user: SessionUser, cap: Capability): Promise<boolean> {
+  return hasNamedPermission(env, user, permissionKey[cap])
+}
+
 export function requireCapability(cap: Capability) {
   return async (c: Context<AppEnv>, next: Next) => {
     const user = c.get('user')
     if (!(await hasCapability(c.env, user, cap))) return c.json({ error: 'forbidden' }, 403)
+    await next()
+  }
+}
+
+export function requireNamedPermission(permission: NamedPermission) {
+  return async (c: Context<AppEnv>, next: Next) => {
+    const user = c.get('user')
+    if (!(await hasNamedPermission(c.env, user, permission))) return c.json({ error: 'forbidden' }, 403)
     await next()
   }
 }

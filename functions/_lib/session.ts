@@ -8,8 +8,6 @@ export async function createSession(env: Env, user: SessionUser): Promise<string
   const token = uuid()
   await Promise.all([
     env.SESSIONS.put(`sess:${token}`, JSON.stringify(user), { expirationTtl: TTL_SECONDS }),
-    // Reverse index so a status/role change can find and kill this user's
-    // live sessions immediately instead of waiting out the 12h TTL.
     env.SESSIONS.put(`usess:${user.id}:${token}`, '1', { expirationTtl: TTL_SECONDS }),
   ])
   return token
@@ -27,17 +25,43 @@ export async function getUser(env: Env, request: Request): Promise<SessionUser |
   const cookie = request.headers.get('Cookie') ?? ''
   const m = cookie.match(new RegExp(`${COOKIE}=([^;]+)`))
   if (!m) return null
-  const raw = await env.SESSIONS.get(`sess:${m[1]}`)
+  const token = m[1]
+  const raw = await env.SESSIONS.get(`sess:${token}`)
   if (!raw) return null
-  const user = JSON.parse(raw) as SessionUser
+
+  let cached: SessionUser
+  try { cached = JSON.parse(raw) as SessionUser } catch {
+    await env.SESSIONS.delete(`sess:${token}`)
+    return null
+  }
+
+  // KV is only the session carrier. D1 remains authoritative for whether the
+  // identity still exists, is active, and still has the same account role.
+  // This closes the stale-session gap after an account is deleted even if an
+  // external cleanup process cannot directly enumerate/delete KV keys.
+  const live = await env.DB.prepare(
+    `SELECT id,email,role,full_name,first_name,last_name,status FROM users WHERE id=?`,
+  ).bind(cached.id).first<any>()
+  if (!live || live.status !== 'active' || live.role !== cached.role || live.email !== cached.email) {
+    await Promise.all([
+      env.SESSIONS.delete(`sess:${token}`),
+      env.SESSIONS.delete(`usess:${cached.id}:${token}`),
+    ])
+    return null
+  }
+
+  const user: SessionUser = {
+    id: live.id,
+    email: live.email,
+    role: live.role,
+    full_name: live.full_name ?? null,
+    first_name: live.first_name ?? null,
+    last_name: live.last_name ?? null,
+  }
   await touchLastSeen(env, user.id)
   return user
 }
 
-// "Last activity" for the Employee Management Center — throttled via a KV
-// marker so this costs one D1 write per user per 5 minutes, not one per
-// request. Cheaper at read time than deriving it from a MAX(created_at)
-// scan over audit_log per employee on every roster load.
 const LAST_SEEN_THROTTLE_SECONDS = 5 * 60
 async function touchLastSeen(env: Env, userId: string): Promise<void> {
   const key = `lastseen:${userId}`
@@ -62,9 +86,6 @@ export async function destroySession(env: Env, request: Request): Promise<void> 
   ])
 }
 
-// Kills every live session for a user immediately — used when an admin
-// suspends an account or changes its role, so the change takes effect
-// right away instead of after the session's 12h TTL expires.
 export async function revokeUserSessions(env: Env, userId: string): Promise<void> {
   const prefix = `usess:${userId}:`
   const list = await env.SESSIONS.list({ prefix })
@@ -76,18 +97,12 @@ export async function revokeUserSessions(env: Env, userId: string): Promise<void
   )
 }
 
-// ---------- one-time account-activation tokens (KV-backed) ----------
-// Used to let a newly created account set its own password instead of the
-// system generating/emailing a password. Tokens are random, single-use, and
-// expire after 24 hours. A reverse key tracks the newest token for a user so
-// resending setup automatically invalidates the prior activation URL.
 const ACTIVATION_TTL_SECONDS = 60 * 60 * 24 // 24h
 
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
   let s = ''
   for (const b of bytes) s += String.fromCharCode(b)
-  // base64url, no padding — safe to put directly in a URL query string
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 

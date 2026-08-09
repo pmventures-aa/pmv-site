@@ -1,16 +1,11 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { requireAdmin, requireStaff } from '../mid'
+import { requireStaff } from '../mid'
+import { requireNamedPermission } from '../capabilities'
 
-// Employee Management Center — deliberately Admin/Owner only, no
-// delegable capability. It exposes every staff member's activity and
-// performance data across the whole firm, unlike the other new
-// capabilities (reports, audit log) which are meant to be delegable.
 export const employeeRoutes = new Hono<AppEnv>()
 
-// Any staff member (not just can_manage_users) needs this for assignee
-// pickers on tasks/matters/tickets — deliberately open to requireStaff,
-// unlike everything else in this file. Minimal fields only.
+// Minimal directory remains available to all staff for assignment pickers.
 employeeRoutes.get('/staff-directory', requireStaff, async (c) => {
   const res = await c.env.DB.prepare(
     "SELECT id, full_name, email FROM users WHERE role IN ('staff', 'admin') AND status = 'active' ORDER BY full_name",
@@ -18,31 +13,35 @@ employeeRoutes.get('/staff-directory', requireStaff, async (c) => {
   return c.json({ staff: res.results ?? [] })
 })
 
-employeeRoutes.get('/employees', requireAdmin, async (c) => {
+employeeRoutes.get('/employees', requireStaff, requireNamedPermission('manage_team'), async (c) => {
   const res = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status,
-            tm.staff_role, tm.title, tm.party_type, tm.vendor_category,
+            tm.staff_role, tm.title, tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id) AS tasks_assigned,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status = 'done') AS tasks_completed,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status != 'done' AND due_date IS NOT NULL AND due_date < date('now')) AS tasks_overdue,
             (SELECT COUNT(*) FROM internal_notes WHERE author_user_id = u.id) AS notes_added,
             (SELECT COUNT(*) FROM email_log WHERE sent_by_user_id = u.id) AS emails_sent,
             (SELECT COUNT(*) FROM activity_events WHERE actor_user_id = u.id) AS client_interactions
-     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
+     FROM users u
+     LEFT JOIN team_members tm ON tm.user_id = u.id
+     LEFT JOIN role_definitions rd ON rd.id = tm.role_definition_id
      WHERE u.role IN ('staff', 'admin')
      ORDER BY u.full_name`,
   ).all()
   return c.json({ employees: res.results ?? [] })
 })
 
-employeeRoutes.get('/employees/:id', requireAdmin, async (c) => {
-  const id = c.req.param('id')!
+employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  const id = c.req.param('id') || ''
   const employee = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status, u.created_at,
             tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
             tm.can_view_reports, tm.can_view_audit_log, tm.can_manage_communications, tm.is_owner,
-            tm.party_type, tm.vendor_category
-     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
+            tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name
+     FROM users u
+     LEFT JOIN team_members tm ON tm.user_id = u.id
+     LEFT JOIN role_definitions rd ON rd.id = tm.role_definition_id
      WHERE u.id = ?`,
   ).bind(id).first()
   if (!employee) return c.json({ error: 'not found' }, 404)
@@ -50,17 +49,17 @@ employeeRoutes.get('/employees/:id', requireAdmin, async (c) => {
   const [logins, tasks, notes, avgResponse] = await Promise.all([
     c.env.DB.prepare("SELECT created_at, actor_ip, actor_user_agent FROM audit_log WHERE actor_user_id = ? AND action = 'login' ORDER BY created_at DESC LIMIT 20").bind(id).all(),
     c.env.DB.prepare(
-      `SELECT t.id, t.title, t.status, t.due_date, t.created_at, u.full_name AS client_name, u.email AS client_email
+      `SELECT t.id,t.title,t.status,t.due_date,t.created_at,u.full_name client_name,u.email client_email
        FROM client_tasks t JOIN users u ON u.id = t.client_user_id
        WHERE t.assigned_staff_user_id = ? ORDER BY t.created_at DESC LIMIT 50`,
     ).bind(id).all(),
     c.env.DB.prepare(
-      `SELECT n.id, n.body, n.created_at, u.full_name AS client_name, u.email AS client_email
+      `SELECT n.id,n.body,n.created_at,u.full_name client_name,u.email client_email
        FROM internal_notes n LEFT JOIN users u ON u.id = n.client_user_id
        WHERE n.author_user_id = ? ORDER BY n.created_at DESC LIMIT 20`,
     ).bind(id).all(),
     c.env.DB.prepare(
-      `SELECT AVG((julianday(first_response_at) - julianday(created_at)) * 24) AS avg_hours
+      `SELECT AVG((julianday(first_response_at) - julianday(created_at)) * 24) avg_hours
        FROM support_tickets WHERE assigned_staff_user_id = ? AND first_response_at IS NOT NULL`,
     ).bind(id).first<{ avg_hours: number | null }>(),
   ])

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { api, ApiError } from './api'
 
-export type Role = 'client' | 'staff' | 'admin'
+export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
 
 export interface SessionUser {
   id: string
@@ -90,12 +90,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function useAuth(): AuthState {
+export function useAuth() {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
   return ctx
 }
 
-export function isApiError(err: unknown): err is ApiError {
-  return err instanceof ApiError
+export function isApiError(e: unknown): e is ApiError {
+  return e instanceof ApiError
 }

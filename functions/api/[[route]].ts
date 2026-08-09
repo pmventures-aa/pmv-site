@@ -16,6 +16,7 @@ import { conversionRoutes } from '../_lib/routes/conversion'
 import { auditRoutes } from '../_lib/routes/auditRoutes'
 import { employeeRoutes } from '../_lib/routes/employees'
 import { reportRoutes } from '../_lib/routes/reports'
+import { reportExportRoutes } from '../_lib/routes/reportExports'
 import { searchRoutes } from '../_lib/routes/search'
 import { commsRoutes } from '../_lib/routes/comms'
 import { crmRoutes } from '../_lib/routes/crm'
@@ -29,6 +30,12 @@ import { staffServiceAssignmentRoutes, clientApplicationSignatureRoutes } from '
 import { staffServicePrefillRoutes } from '../_lib/routes/staffServicePrefill'
 import { invoiceAdminRoutes } from '../_lib/routes/invoiceAdmin'
 import { signaturePortalSyncRoutes, signatureAdminSyncRoutes } from '../_lib/routes/signaturePdfSync'
+import { invitationPublicRoutes } from '../_lib/routes/invitationPublic'
+import { trustedContactRoutes } from '../_lib/routes/trustedContacts'
+import { invitationAdminRoutes, roleAdminRoutes } from '../_lib/routes/invitationAdmin'
+import { roleCapabilityRoutes } from '../_lib/routes/roleCapabilities'
+import { inviteCompletionRoutes } from '../_lib/routes/inviteCompletion'
+import { teamManagementRoutes } from '../_lib/routes/teamManagement'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -37,14 +44,16 @@ app.route('/', publicRoutes)
 app.route('/', uploadRoutes)
 app.route('/', unsubscribeRoutes)
 app.route('/', resendWebhookRoutes)
+app.route('/', invitationPublicRoutes)
+app.route('/', inviteCompletionRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
 app.route('/portal', intakeCopyRoutes)
-// Signature sync wraps signing/edit calls; signature enforcement wraps submit.
 app.route('/portal', signaturePortalSyncRoutes)
 app.route('/portal', clientApplicationSignatureRoutes)
 app.route('/portal', serviceApplicationRoutes)
+app.route('/portal', trustedContactRoutes)
 app.route('/portal', selfRoutes)
 app.route('/portal', portalRoutes)
 app.route('/portal', messageRoutes)
@@ -55,6 +64,11 @@ app.route('/admin', signatureAdminSyncRoutes)
 app.route('/admin', staffServiceAssignmentRoutes)
 app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)
+app.route('/admin', roleCapabilityRoutes)
+app.route('/admin', invitationAdminRoutes)
+app.route('/admin', roleAdminRoutes)
+app.route('/admin', teamManagementRoutes)
+app.route('/admin', reportExportRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
