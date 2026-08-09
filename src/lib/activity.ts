@@ -31,6 +31,12 @@ export function describeActivity(e: ActivityEvent): string {
     case 'client_signed_up': return `${client} signed up${d.business_name ? ` (${d.business_name})` : ''}`
     case 'user_created': return `${actor} created a${d.role === 'admin' ? 'n' : ''} ${d.role} account for ${d.full_name || d.email}`
     case 'user_status_changed': return `${actor} updated ${d.name || 'a user'} — ${d.to?.status ?? ''} · ${d.to?.role ?? ''}`.trim()
+    case 'account_welcome_sent': return `Welcome email sent to ${d.email || client}`
+    case 'account_invite_sent': return `Account setup invitation sent to ${d.email || client}`
+    case 'portal_reminder_sent': return `Portal access reminder sent to ${d.email || client}`
+    case 'vendor_application_email_sent': return `Vendor application receipt sent to ${d.email || 'the applicant'}`
+    case 'vendor_approval_email_sent': return `Vendor approval email sent to ${d.email || 'the vendor'}`
+    case 'account_email_failed': return `Account email ${fmtStatus(d.status)} for ${d.email || client}${d.error ? ` · ${d.error}` : ''}`
     case 'onboarding_completed': return `${client} completed onboarding`
     case 'matter_created': return `${actor} opened matter “${d.title}” for ${client}`
     case 'matter_status_changed': return `${actor} moved “${d.title}” (${client}) to ${fmtStatus(d.to)}`

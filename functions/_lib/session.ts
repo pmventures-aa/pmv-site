@@ -77,17 +77,10 @@ export async function revokeUserSessions(env: Env, userId: string): Promise<void
 }
 
 // ---------- one-time account-activation tokens (KV-backed) ----------
-// Used to let a newly created account (bootstrap admin, or any future
-// admin-invited user with no initial password) set its own password via a
-// link, instead of the system generating/emailing a password. Single-use:
-// consumeActivationToken deletes the KV entry on first successful read.
-//
-// The raw token is returned directly in the API response body (to the
-// authenticated admin/bootstrap caller, not the invitee) rather than emailed,
-// so it can end up in HTTP logs/monitoring the way a password normally
-// wouldn't. It's kept short-lived (24h, down from 48h) to limit that window,
-// and is deleted on first use — but avoid any logging/analytics tooling that
-// persists response bodies for POST /auth/bootstrap or POST /admin/users.
+// Used to let a newly created account set its own password instead of the
+// system generating/emailing a password. Tokens are random, single-use, and
+// expire after 24 hours. A reverse key tracks the newest token for a user so
+// resending setup automatically invalidates the prior activation URL.
 const ACTIVATION_TTL_SECONDS = 60 * 60 * 24 // 24h
 
 function randomToken(): string {
@@ -99,14 +92,26 @@ function randomToken(): string {
 }
 
 export async function createActivationToken(env: Env, userId: string): Promise<string> {
+  const reverseKey = `activate-user:${userId}`
+  const previous = await env.SESSIONS.get(reverseKey)
+  if (previous) await env.SESSIONS.delete(`activate:${previous}`)
+
   const token = randomToken()
-  await env.SESSIONS.put(`activate:${token}`, userId, { expirationTtl: ACTIVATION_TTL_SECONDS })
+  await Promise.all([
+    env.SESSIONS.put(`activate:${token}`, userId, { expirationTtl: ACTIVATION_TTL_SECONDS }),
+    env.SESSIONS.put(reverseKey, token, { expirationTtl: ACTIVATION_TTL_SECONDS }),
+  ])
   return token
 }
 
 export async function consumeActivationToken(env: Env, token: string): Promise<string | null> {
   const userId = await env.SESSIONS.get(`activate:${token}`)
   if (!userId) return null
-  await env.SESSIONS.delete(`activate:${token}`)
+  const reverseKey = `activate-user:${userId}`
+  const current = await env.SESSIONS.get(reverseKey)
+  await Promise.all([
+    env.SESSIONS.delete(`activate:${token}`),
+    current === token ? env.SESSIONS.delete(reverseKey) : Promise.resolve(),
+  ])
   return userId
 }

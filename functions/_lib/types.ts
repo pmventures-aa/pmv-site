@@ -11,9 +11,13 @@ export interface Env {
   // encryptSensitive/decryptSensitive). Separate from SESSION_SECRET on purpose.
   PAYMENT_ENCRYPTION_KEY: string
   // Optional: email delivery via Resend (functions/_lib/email.ts). Unset in
-  // dev/preview is fine — sendEmail no-ops and logs instead of throwing.
+  // dev/preview is fine — best-effort notifications no-op and tracked account
+  // email attempts are recorded as skipped instead of breaking account actions.
   RESEND_API_KEY?: string
   RESEND_FROM_EMAIL?: string
+  // Signing secret for POST /api/webhooks/resend. Required only once that
+  // production webhook is registered in Resend.
+  RESEND_WEBHOOK_SECRET?: string
 }
 
 export type Role = 'client' | 'staff' | 'admin'

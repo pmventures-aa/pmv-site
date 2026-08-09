@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth'
 import { Card, StatCard, EmptyState } from '../../components/ui'
 import { useAppPath } from '../../lib/basePath'
 import { DashboardWelcome } from '../../components/DashboardWelcome'
+import { GetStartedPrompt } from '../../components/portal/GetStartedPrompt'
 
 interface DashboardData {
   stats: {
@@ -35,8 +36,10 @@ export default function Dashboard() {
         userId={user?.id}
         variant="portal"
         subtitle="Here’s a clear view of what’s happening across your Pinnacle account and what comes next."
-        className="mb-8"
+        className="mb-5"
       />
+
+      <GetStartedPrompt className="mb-8" />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Open Matters" value={data?.stats.open_matters ?? '—'} />

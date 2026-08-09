@@ -4,17 +4,48 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
-export async function sendEmailStrict(env: Env, opts: { to: string; subject: string; html: string }): Promise<string | null> {
+export interface EmailTag {
+  name: string
+  value: string
+}
+
+export interface SendEmailOptions {
+  to: string
+  subject: string
+  html: string
+  text?: string
+  replyTo?: string
+  idempotencyKey?: string
+  tags?: EmailTag[]
+}
+
+export async function sendEmailStrict(env: Env, opts: SendEmailOptions): Promise<string> {
   if (!env.RESEND_API_KEY) {
     throw new Error('RESEND_API_KEY is not configured')
   }
   // Replies can continue landing in the Apple-hosted orders@ inbox. Resend is
   // only the authenticated sender for application-generated mail.
   const from = env.RESEND_FROM_EMAIL || 'Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>'
+  const body: Record<string, unknown> = {
+    from,
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+  }
+  if (typeof opts.text === 'string') body.text = opts.text
+  if (opts.replyTo) body.reply_to = opts.replyTo
+  if (opts.tags?.length) body.tags = opts.tags.slice(0, 10).map((tag) => ({ name: tag.name, value: tag.value }))
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${env.RESEND_API_KEY}`,
+    'Content-Type': 'application/json',
+  }
+  if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey.slice(0, 256)
+
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: opts.to, subject: opts.subject, html: opts.html }),
+    headers,
+    body: JSON.stringify(body),
   })
   const payload = await res.json<any>().catch(() => ({}))
   if (!res.ok || !payload?.id) {
@@ -24,9 +55,10 @@ export async function sendEmailStrict(env: Env, opts: { to: string; subject: str
 }
 
 // Notification emails remain best-effort: a provider outage should never make
-// the underlying client/application action fail. The Communications Center uses
-// sendEmailStrict instead so campaign history never claims a failed delivery was sent.
-export async function sendEmail(env: Env, opts: { to: string; subject: string; html: string }): Promise<void> {
+// the underlying client/application action fail. The Communications Center and
+// tracked account-email service use sendEmailStrict so their own history can
+// accurately record provider acceptance/failure.
+export async function sendEmail(env: Env, opts: SendEmailOptions): Promise<void> {
   if (!env.RESEND_API_KEY) {
     console.log('[email] RESEND_API_KEY not set — skipping send', { to: opts.to, subject: opts.subject })
     return

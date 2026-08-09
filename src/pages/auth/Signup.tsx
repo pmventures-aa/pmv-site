@@ -55,7 +55,10 @@ export default function Signup() {
         business_name: form.business_name || undefined,
         tos_accepted: true,
       })
-      navigate('../onboarding', { relative: 'path', replace: true })
+      // The account is already authenticated. Send the client to their home
+      // dashboard so they can explore first; guided onboarding remains available
+      // as an optional next step from the dashboard and Services area.
+      navigate('..', { relative: 'path', replace: true })
     } catch (err) {
       setError(isApiError(err) ? err.message : 'Something went wrong. Try again.')
     } finally {
@@ -67,7 +70,7 @@ export default function Signup() {
     <AuthLayout
       eyebrow="Client portal"
       title="Create your account"
-      subtitle="Basic info to get started — you'll pick your services next."
+      subtitle="Basic info to get started — you can explore services and add details once you're in."
       footer={
         <>
           Already have an account?{' '}

@@ -19,8 +19,8 @@ export function LoadingGlyph({ size = 68 }: { size?: number }) {
 }
 
 // Full-viewport loading state — before any app chrome has mounted yet
-// (initial session check, a lazy-loaded app chunk still downloading, the
-// onboarding gate). Owns the whole screen, radial-gradient background.
+// (initial session check, a lazy-loaded app chunk still downloading).
+// Owns the whole screen, radial-gradient background.
 export function LoadingScreen({ label = 'Loading…' }: { label?: string }) {
   return (
     <div className="grid min-h-screen place-items-center bg-navy-radial">
