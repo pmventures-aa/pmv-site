@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-import { Card, PageHeader, StatCard, EmptyState } from '../../components/ui'
+import { Card, StatCard, EmptyState } from '../../components/ui'
 import { useAppPath } from '../../lib/basePath'
-import { QuoteOfTheDay } from '../../components/portal/QuoteOfTheDay'
+import { DashboardWelcome } from '../../components/DashboardWelcome'
 
 interface DashboardData {
   stats: {
@@ -30,13 +30,13 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Overview"
-        title={`Welcome back${user?.first_name ? `, ${user.first_name}` : ''}! :)`}
-        subtitle="Here's what's happening across your account."
+      <DashboardWelcome
+        name={user?.first_name || user?.full_name}
+        userId={user?.id}
+        variant="portal"
+        subtitle="Here’s a clear view of what’s happening across your Pinnacle account and what comes next."
+        className="mb-8"
       />
-
-      <QuoteOfTheDay className="mb-8" />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Open Matters" value={data?.stats.open_matters ?? '—'} />
