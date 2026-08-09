@@ -773,6 +773,8 @@ const NOTIFICATION_KINDS = [
   'service_application_submitted',
   'service_status_changed',
   'payment_info_revealed',
+  'message_received',
+  'message_sent',
 ]
 
 adminRoutes.get('/notification-prefs', requireStaff, async (c) => {
