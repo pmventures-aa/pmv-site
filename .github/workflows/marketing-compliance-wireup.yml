@@ -1,0 +1,148 @@
+name: One-shot marketing compliance wiring
+
+on:
+  push:
+    branches: [agent/crm-records-communications]
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/crm-records-communications
+          fetch-depth: 0
+      - name: Wire unsubscribe footer into immediate and scheduled sends
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # Pages Functions / immediate sends.
+          p = Path('functions/_lib/routes/comms.ts')
+          text = p.read_text()
+          marker = "import { logActivity } from '../activity'\n"
+          addition = "import { getMarketingComplianceConfig, createUnsubscribeToken, appendMarketingFooter } from '../marketingCompliance'\n"
+          if addition not in text:
+              text = text.replace(marker, marker + addition)
+
+          start = text.index('async function dispatchNow(')
+          end = text.index("\ncommsRoutes.post('/comms/messages'", start)
+          dispatch = '''async function dispatchNow(
+            env: Env,
+            actorUserId: string,
+            messageId: string,
+            subject: string,
+            bodyHtml: string,
+            recipients: Awaited<ReturnType<typeof insertRecipients>>,
+            messageType: MessageType,
+          ) {
+            const marketingConfig = messageType === 'marketing' ? await getMarketingComplianceConfig(env) : null
+            await Promise.all(recipients.map(async (r) => {
+              try {
+                const deliveryHtml = marketingConfig
+                  ? appendMarketingFooter(bodyHtml, marketingConfig, await createUnsubscribeToken(env, r.email))
+                  : bodyHtml
+                const providerMessageId = await sendEmailStrict(env, { to: r.email, subject, html: deliveryHtml })
+                const statements = [
+                  env.DB.prepare("UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE id = ?").bind(providerMessageId, r.row_id),
+                ]
+                if (r.recipient_kind === 'lead' && r.inquiry_id) {
+                  statements.push(
+                    env.DB.prepare(
+                      `INSERT INTO email_log (id, inquiry_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)`,
+                    ).bind(uuid(), r.inquiry_id, actorUserId, r.email, subject, deliveryHtml),
+                    env.DB.prepare("UPDATE contact_inquiries SET last_contacted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").bind(r.inquiry_id),
+                  )
+                } else if (r.user_id && r.role === 'client') {
+                  statements.push(env.DB.prepare(
+                    `INSERT INTO email_log (id, client_user_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)`,
+                  ).bind(uuid(), r.user_id, actorUserId, r.email, subject, deliveryHtml))
+                }
+                await env.DB.batch(statements)
+              } catch (err) {
+                await env.DB.prepare("UPDATE comms_recipients SET status = 'failed', error = ? WHERE id = ?")
+                  .bind(String(err).slice(0, 500), r.row_id).run()
+              }
+            }))
+            await env.DB.prepare(
+              "UPDATE comms_messages SET status = 'sent', sent_at = datetime('now'), last_sent_at = datetime('now'), next_run_at = NULL, updated_at = datetime('now') WHERE id = ?",
+            ).bind(messageId).run()
+          }
+          '''
+          text = text[:start] + dispatch + text[end:]
+
+          needle = "  const messageType = parseMessageType(body.message_type)\n  const action = body.action === 'send_now' || body.action === 'schedule' ? body.action : 'draft'\n"
+          replacement = needle + "  if (messageType === 'marketing' && action !== 'draft') {\n    try { await getMarketingComplianceConfig(c.env) }\n    catch (err) { return c.json({ error: err instanceof Error ? err.message : 'Marketing compliance settings are incomplete.' }, 400) }\n  }\n"
+          if replacement not in text:
+              text = text.replace(needle, replacement)
+
+          text = text.replace(
+            "c.executionCtx.waitUntil(dispatchNow(c.env, user.id, id, subject, bodyHtml, recipientRows))",
+            "c.executionCtx.waitUntil(dispatchNow(c.env, user.id, id, subject, bodyHtml, recipientRows, messageType))",
+          )
+
+          old = "  const audience: Audience = JSON.parse(message.audience_json || '{}')\n  const recipients = await resolveAudience(c.env, audience, parseMessageType(message.message_type))\n"
+          new = "  const audience: Audience = JSON.parse(message.audience_json || '{}')\n  const draftMessageType = parseMessageType(message.message_type)\n  if (draftMessageType === 'marketing') {\n    try { await getMarketingComplianceConfig(c.env) }\n    catch (err) { return c.json({ error: err instanceof Error ? err.message : 'Marketing compliance settings are incomplete.' }, 400) }\n  }\n  const recipients = await resolveAudience(c.env, audience, draftMessageType)\n"
+          text = text.replace(old, new)
+          text = text.replace(
+            "c.executionCtx.waitUntil(dispatchNow(c.env, user.id, id, message.subject, message.body_html, recipientRows))",
+            "c.executionCtx.waitUntil(dispatchNow(c.env, user.id, id, message.subject, message.body_html, recipientRows, draftMessageType))",
+          )
+          p.write_text(text)
+
+          # GitHub scheduled/recurring sender.
+          p = Path('scripts/comms-cron.mjs')
+          text = p.read_text()
+          insert_before = 'async function sendViaResend(to, subject, html) {'
+          helpers = '''function escapeHtml(value) {
+            return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+          }
+
+          async function getMarketingConfig() {
+            const rows = await d1("SELECT key, value FROM app_settings WHERE key IN ('business_address', 'marketing_public_base_url')")
+            const values = new Map(rows.map((row) => [row.key, String(row.value || '').trim()]))
+            const businessAddress = values.get('business_address') || ''
+            if (!businessAddress) throw new Error('Marketing email blocked: HQ Settings → General → Business address is empty.')
+            const publicBaseUrl = (values.get('marketing_public_base_url') || 'https://www.pinnaclemanagementventures.com').replace(/\/$/, '')
+            return { businessAddress, publicBaseUrl }
+          }
+
+          async function marketingHtml(html, email, config) {
+            const token = uuid()
+            await d1('INSERT INTO email_unsubscribe_tokens (token, email) VALUES (?, ?)', [token, String(email).trim().toLowerCase()])
+            const url = `${config.publicBaseUrl}/api/unsubscribe/${encodeURIComponent(token)}`
+            return `${html}\n<hr style="margin:32px 0 18px;border:0;border-top:1px solid #d9d9d9">\n<p style="font-size:12px;line-height:1.6;color:#666;margin:0">Business/marketing communication from Pinnacle Management Ventures.<br>${escapeHtml(config.businessAddress)}<br><a href="${escapeHtml(url)}" style="color:#666;text-decoration:underline">Unsubscribe from future marketing emails</a></p>`
+          }
+
+          '''
+          if helpers not in text:
+              text = text.replace(insert_before, helpers + insert_before)
+
+          old = "    const type = messageType(message.message_type)\n    const recipients = await resolveAudience(audience, type)\n"
+          new = "    const type = messageType(message.message_type)\n    let compliance = null\n    if (type === 'marketing') {\n      try { compliance = await getMarketingConfig() }\n      catch (err) {\n        console.error(`message ${message.id} blocked:`, err.message)\n        await d1(\"UPDATE comms_messages SET status = 'failed', next_run_at = NULL, updated_at = datetime('now') WHERE id = ?\", [message.id])\n        continue\n      }\n    }\n    const recipients = await resolveAudience(audience, type)\n"
+          text = text.replace(old, new)
+          text = text.replace(
+            "        const providerMessageId = await sendViaResend(recipient.email, message.subject, message.body_html)",
+            "        const deliveryHtml = compliance ? await marketingHtml(message.body_html, recipient.email, compliance) : message.body_html\n        const providerMessageId = await sendViaResend(recipient.email, message.subject, deliveryHtml)",
+          )
+          text = text.replace(
+            "[uuid(), recipient.inquiry_id, message.created_by_user_id, recipient.email, message.subject, message.body_html]",
+            "[uuid(), recipient.inquiry_id, message.created_by_user_id, recipient.email, message.subject, deliveryHtml]",
+          )
+          text = text.replace(
+            "[uuid(), recipient.user_id, message.created_by_user_id, recipient.email, message.subject, message.body_html]",
+            "[uuid(), recipient.user_id, message.created_by_user_id, recipient.email, message.subject, deliveryHtml]",
+          )
+          p.write_text(text)
+          PY
+          rm .github/workflows/marketing-compliance-wireup.yml
+      - name: Commit compliance wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add functions/_lib/routes/comms.ts scripts/comms-cron.mjs .github/workflows/marketing-compliance-wireup.yml
+          git commit -m "Enforce unsubscribe footer on CRM marketing sends"
+          git push origin HEAD:agent/crm-records-communications
