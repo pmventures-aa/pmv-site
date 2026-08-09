@@ -9,7 +9,9 @@ export async function sendEmail(env: Env, opts: { to: string; subject: string; h
     console.log('[email] RESEND_API_KEY not set — skipping send', { to: opts.to, subject: opts.subject })
     return
   }
-  const from = env.RESEND_FROM_EMAIL || 'Pinnacle Management Ventures <notifications@pinnaclemanagementventures.com>'
+  // Replies can continue landing in the Apple-hosted orders@ inbox. Resend is
+  // only the authenticated transactional sender for application-generated mail.
+  const from = env.RESEND_FROM_EMAIL || 'Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>'
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -32,9 +34,6 @@ export function shouldUseNotificationFallback(
   return mode === 'no_staff' ? staffUserIds.length === 0 : recipients.length === 0
 }
 
-// Best-effort notify. Individual staff notification preferences remain the
-// source of truth. Service applications use `no_staff`: an assigned rep who
-// disabled email stays disabled; only a genuinely unassigned client falls back.
 export async function notifyStaff(
   env: Env,
   opts: { staffUserIds: string[]; kind: string; subject: string; html: string; fallbackMode?: NotificationFallbackMode },
