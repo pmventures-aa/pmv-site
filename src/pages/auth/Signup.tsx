@@ -92,9 +92,9 @@ export default function Signup() {
 
   return (
     <AuthLayout
-      eyebrow={inviteToken ? 'Pinnacle invitation' : requestedService ? 'Your Pinnacle journey' : 'Client portal'}
-      title={step === 'contact' ? 'Start with you' : step === 'business' ? 'A little context' : 'Secure your account'}
-      subtitle={step === 'contact' ? 'Just the basics. We’ll learn about the actual work after you’re inside.' : step === 'business' ? 'One quick choice helps us make the portal feel relevant from the start.' : 'Last step. Then we’ll pick up the service or situation that brought you here.'}
+      eyebrow={inviteToken ? ‘Pinnacle invitation’ : requestedService ? ‘Your Pinnacle journey’ : ‘Client portal’}
+      title={step === ‘contact’ ? ‘Start with you’ : step === ‘business’ ? ‘A little context’ : ‘Secure your account’}
+      subtitle={step === ‘contact’ ? ‘Just the basics. We’ll learn about the actual work after you’re inside.’ : step === ‘business’ ? ‘One quick choice helps us make the portal feel relevant from the start.’ : ‘Last step. Then we’ll pick up the service or situation that brought you here.’}
       footer={<>Already have an account? <Link to={`../login${loginQuery}`} className="font-medium text-gold hover:underline">Sign in</Link></>}
     >
       <div className="mb-6">
