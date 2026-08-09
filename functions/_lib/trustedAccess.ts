@@ -14,6 +14,11 @@ export type TrustedSection = (typeof TRUSTED_SECTIONS)[number]
 export type TrustedMode = 'none' | 'view' | 'edit'
 export type TrustedPermissions = Record<TrustedSection, TrustedMode>
 
+// Only sections with a deliberately scoped delegated-write API may receive an
+// edit grant. Everything else is view-only until its write workflow is built.
+export const TRUSTED_EDITABLE_SECTIONS = ['business_profile', 'tasks'] as const satisfies readonly TrustedSection[]
+const EDITABLE = new Set<TrustedSection>(TRUSTED_EDITABLE_SECTIONS)
+
 export const TRUSTED_SECTION_LABELS: Record<TrustedSection, string> = {
   business_profile: 'Business Profile',
   services: 'Services & Applications',
@@ -30,7 +35,8 @@ export function normalizeTrustedPermissions(value: unknown): TrustedPermissions 
   const out = {} as TrustedPermissions
   for (const key of TRUSTED_SECTIONS) {
     const mode = source[key]
-    out[key] = mode === 'edit' || mode === 'view' ? mode : 'none'
+    if (mode === 'edit') out[key] = EDITABLE.has(key) ? 'edit' : 'view'
+    else out[key] = mode === 'view' ? 'view' : 'none'
   }
   return out
 }
@@ -73,7 +79,7 @@ export async function trustedAccess(
   required: 'view' | 'edit' = 'view',
 ): Promise<TrustedContext | null> {
   const contexts = await trustedContexts(env, user)
-  const context = contexts.find((c) => c.client_user_id === clientUserId)
+  const context = contexts.find((item) => item.client_user_id === clientUserId)
   if (!context) return null
   const mode = context.permissions[section]
   if (mode === 'none') return null
