@@ -3,11 +3,9 @@ import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
 import { scopeFilter } from '../scope'
 
-// Global search across the entities staff look up most often. Each section
-// runs its own small, indexed-friendly query rather than one giant UNION —
-// simpler to scope per-entity (clients/matters/invoices are staff-visibility
-// scoped via scopeFilter; inquiries aren't client-scoped, same as the
-// existing /admin/inquiries list) and to reason about independently.
+// Global search across durable relationship/work records. Lead/prospect CRM
+// records are not client-assignment scoped until conversion; client/work
+// records keep the existing assignment scope.
 export const searchRoutes = new Hono<AppEnv>()
 
 const RESULT_LIMIT = 8
@@ -31,10 +29,12 @@ searchRoutes.get('/search', requireStaff, async (c) => {
        ORDER BY u.full_name LIMIT ?`,
     ).bind(...clientScope.params, like, like, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
-      `SELECT id, name, email, status FROM contact_inquiries
-       WHERE archived_at IS NULL AND (name LIKE ? OR email LIKE ?)
-       ORDER BY created_at DESC LIMIT ?`,
-    ).bind(like, like, RESULT_LIMIT).all(),
+      `SELECT id, name, email, phone, company_name, record_type, lifecycle_stage, status
+       FROM contact_inquiries
+       WHERE client_user_id IS NULL AND archived_at IS NULL
+         AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR company_name LIKE ?)
+       ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ?`,
+    ).bind(like, like, like, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
       `SELECT m.id, m.title, m.status, m.client_user_id, u.full_name AS client_name, u.email AS client_email
        FROM matters m JOIN users u ON u.id = m.client_user_id
@@ -49,10 +49,5 @@ searchRoutes.get('/search', requireStaff, async (c) => {
     ).bind(...invoiceScope.params, like, like, like, RESULT_LIMIT).all(),
   ])
 
-  return c.json({
-    clients: clients.results ?? [],
-    inquiries: inquiries.results ?? [],
-    matters: matters.results ?? [],
-    invoices: invoices.results ?? [],
-  })
+  return c.json({ clients: clients.results ?? [], inquiries: inquiries.results ?? [], matters: matters.results ?? [], invoices: invoices.results ?? [] })
 })

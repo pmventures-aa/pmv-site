@@ -11,10 +11,12 @@ import VendorSignup from '../auth/VendorSignup'
 import AdminDashboard from './AdminDashboard'
 import ClientsList from './ClientsList'
 import ClientDetail from './ClientDetail'
+import ClientDetailModern from './ClientDetailModern'
 import UsersAdmin from './UsersAdmin'
 import AssignmentsAdmin from './AssignmentsAdmin'
 import SettingsAdmin from './SettingsAdmin'
-import InquiriesAdmin from './InquiriesAdmin'
+import CRMRecordsAdmin from './CRMRecordsAdmin'
+import LeadDetail from './LeadDetail'
 import MessagesAdmin from './MessagesAdmin'
 import ActivityAdmin from './ActivityAdmin'
 import OpenItemsAdmin from './OpenItemsAdmin'
@@ -22,7 +24,7 @@ import PipelinesAdmin from './PipelinesAdmin'
 import AuditLogAdmin from './AuditLogAdmin'
 import EmployeesAdmin from './EmployeesAdmin'
 import ReportingCenter from './ReportingCenter'
-import CommunicationsAdmin from './CommunicationsAdmin'
+import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
 
 const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity']
 
@@ -33,15 +35,12 @@ function AdminShell() {
   if (caps.can_manage_users) {
     visible.add('users')
     visible.add('assignments')
-    visible.add('settings') // Staff & Permissions tab lives inside Settings
+    visible.add('settings')
   }
   if (caps.can_manage_settings) visible.add('settings')
   if (caps.can_view_audit_log) visible.add('audit-log')
   if (caps.can_view_reports) visible.add('reports')
   if (caps.can_manage_communications) visible.add('communications')
-  // Employees stays out of `visible` even for a delegated can_manage_users
-  // staffer — it's Admin/Owner only, no capability grant (see the nested
-  // ProtectedRoute below).
   const nav = user?.role === 'admin' ? adminNav : adminNav.filter((n) => visible.has(n.key))
   return <AdminLayout nav={nav} badge="Staff Console" />
 }
@@ -64,18 +63,19 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route index element={<AdminDashboard />} />
             <Route path="pipelines" element={<PipelinesAdmin />} />
             <Route path="clients" element={<ClientsList />} />
-            <Route path="clients/:id" element={<ClientDetail />} />
-            <Route path="inquiries" element={<InquiriesAdmin />} />
+            <Route path="clients/:id" element={<ClientDetailModern />} />
+            <Route path="clients/:id/manage" element={<ClientDetail />} />
+            <Route path="inquiries" element={<CRMRecordsAdmin />} />
+            <Route path="leads/:id" element={<LeadDetail />} />
             <Route path="messages" element={<MessagesAdmin />} />
             <Route path="activity" element={<ActivityAdmin />} />
             <Route path="audit-log" element={<AuditLogAdmin />} />
             <Route path="reports" element={<ReportingCenter />} />
-            <Route path="communications" element={<CommunicationsAdmin />} />
+            <Route path="communications" element={<CommunicationsCRMAdmin />} />
             <Route path="employees" element={<ProtectedRoute allow={['admin']} />}>
               <Route index element={<EmployeesAdmin />} />
             </Route>
             <Route path="open-items/:type" element={<OpenItemsAdmin />} />
-            {/* Old shape (?type=...) — OpenItemsAdmin falls back to the query param when there's no :type segment. */}
             <Route path="open-items" element={<OpenItemsAdmin />} />
             <Route path="users" element={<UsersAdmin />} />
             <Route path="assignments" element={<AssignmentsAdmin />} />
