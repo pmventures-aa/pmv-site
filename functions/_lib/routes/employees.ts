@@ -39,7 +39,14 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
     `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status, u.created_at,
             tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
             tm.can_view_reports, tm.can_view_audit_log, tm.can_manage_communications, tm.is_owner,
-            tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name
+            tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name,
+            (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id) AS tasks_assigned,
+            (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status = 'done') AS tasks_completed,
+            (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status != 'done' AND due_date IS NOT NULL AND due_date < date('now')) AS tasks_overdue,
+            (SELECT COUNT(*) FROM internal_notes WHERE author_user_id = u.id) AS notes_added,
+            (SELECT COUNT(*) FROM email_log WHERE sent_by_user_id = u.id) AS emails_sent,
+            (SELECT COUNT(*) FROM activity_events WHERE actor_user_id = u.id) AS client_interactions,
+            (SELECT COUNT(*) FROM vendor_application_documents WHERE user_id = u.id) AS application_documents
      FROM users u
      LEFT JOIN team_members tm ON tm.user_id = u.id
      LEFT JOIN role_definitions rd ON rd.id = tm.role_definition_id
