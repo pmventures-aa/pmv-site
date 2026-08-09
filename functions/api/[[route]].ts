@@ -17,7 +17,7 @@ import { employeeRoutes } from '../_lib/routes/employees'
 import { reportRoutes } from '../_lib/routes/reports'
 import { searchRoutes } from '../_lib/routes/search'
 import { serviceApplicationRoutes } from '../_lib/routes/serviceApplications'
-import { intakeAdminRoutes } from '../_lib/routes/intakeAdmin'
+import { intakeCatalogAdminRoutes } from '../_lib/routes/intakeCatalogAdmin'
 import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
 
 const app = new Hono<AppEnv>().basePath('/api')
@@ -34,7 +34,7 @@ app.route('/portal', selfRoutes)
 app.route('/portal', portalRoutes)
 app.route('/portal', messageRoutes)
 
-app.route('/admin', intakeAdminRoutes)
+app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
