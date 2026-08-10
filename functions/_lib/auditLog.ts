@@ -43,6 +43,22 @@ export interface AuditOpts {
   after?: unknown
 }
 
+function legacyAuditInsert(env: Env, opts: AuditOpts): D1PreparedStatement {
+  return env.DB.prepare(
+    `INSERT INTO audit_log (id, actor_user_id, actor_ip, actor_user_agent, action, entity_type, entity_id, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    uuid(),
+    opts.actorUserId ?? null,
+    opts.actorIp ?? null,
+    opts.actorUserAgent ?? null,
+    opts.action,
+    opts.entityType ?? null,
+    opts.entityId ?? null,
+    opts.before !== undefined ? JSON.stringify(opts.before) : null,
+    opts.after !== undefined ? JSON.stringify(opts.after) : null,
+  )
+}
+
 export function auditInsert(env: Env, opts: AuditOpts): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO audit_log (id, actor_user_id, actor_ip, actor_user_agent, actor_city, actor_region, actor_country, action, entity_type, entity_id, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -63,7 +79,17 @@ export function auditInsert(env: Env, opts: AuditOpts): D1PreparedStatement {
 }
 
 export async function logAudit(env: Env, opts: AuditOpts): Promise<void> {
-  await auditInsert(env, opts).run()
+  try {
+    await auditInsert(env, opts).run()
+  } catch (error) {
+    // Production deploys can briefly lead D1 migrations. Preserve authentication
+    // and other critical user flows by falling back to the pre-0039 audit schema
+    // when the new geo columns are not available yet.
+    const message = error instanceof Error ? error.message : String(error)
+    const missingGeoColumns = /actor_(city|region|country)|no such column|has no column named/i.test(message)
+    if (!missingGeoColumns) throw error
+    await legacyAuditInsert(env, opts).run()
+  }
 }
 
 export function actorIp(request: Request): string | null {
