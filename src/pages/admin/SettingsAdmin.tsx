@@ -4,12 +4,14 @@ import { useCapabilities } from '../../lib/capabilities'
 import PermanentDeletions from './PermanentDeletions'
 import GeneralSettings from './settings/GeneralSettings'
 import ServiceCatalogSettings from './settings/ServiceCatalogSettings'
+import ServiceOfferingsSettings from './settings/ServiceOfferingsSettings'
 import StaffSettings from './settings/StaffSettings'
 import NotificationSettings from './settings/NotificationSettings'
 
 const TABS = [
   { key: 'general', label: 'General' },
   { key: 'catalog', label: 'Service Catalog' },
+  { key: 'offerings', label: 'Service Offerings' },
   { key: 'staff', label: 'Staff & Permissions' },
   { key: 'notifications', label: 'Notifications' },
   { key: 'deletions', label: 'Permanent Deletions' },
@@ -27,7 +29,7 @@ export default function SettingsAdmin() {
       <PageIntro
         kicker="Firm settings"
         title="Settings"
-        subtitle="Global configuration for Pinnacle, including the client intake builder and application template copy."
+        subtitle="Global configuration for Pinnacle, including client intake, service offerings, pricing, and application template copy."
       />
       <div className="mb-5 flex gap-1.5 overflow-x-auto border-b border-white/10">
         {visibleTabs.map((item) => (
@@ -45,6 +47,7 @@ export default function SettingsAdmin() {
 
       {tab === 'general' && <GeneralSettings />}
       {tab === 'catalog' && <ServiceCatalogSettings />}
+      {tab === 'offerings' && <ServiceOfferingsSettings />}
       {tab === 'staff' && <StaffSettings />}
       {tab === 'notifications' && <NotificationSettings />}
       {tab === 'deletions' && (caps.is_owner ? <PermanentDeletions /> : <NoAccess label="Permanent Deletions" />)}
