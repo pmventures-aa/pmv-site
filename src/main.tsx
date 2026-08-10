@@ -12,6 +12,7 @@ import Contact from './pages/public/Contact'
 import Professionals from './pages/public/Professionals'
 import Terms from './pages/public/Terms'
 import VerifyDocument from './pages/public/VerifyDocument'
+import SignerExperience from './pages/public/SignerExperience'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
 import { AppToaster } from './components/kit/Toaster'
@@ -56,6 +57,7 @@ function App() {
       <Route path="/contact" element={<Contact />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/verify" element={<VerifyDocument />} />
+      <Route path="/sign/:token" element={<SignerExperience />} />
       <Route path="/portal/*" element={<Suspense fallback={<SurfaceFallback />}><PortalApp basePath="/portal" /></Suspense>} />
       <Route path="/admin/*" element={<Suspense fallback={<SurfaceFallback />}><AdminApp basePath="/admin" /></Suspense>} />
       <Route path="*" element={<Navigate to="/" replace />} />
