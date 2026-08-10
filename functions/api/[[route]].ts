@@ -45,6 +45,7 @@ import { fieldWorkRoutes } from '../_lib/routes/fieldWork'
 import { documentVerificationRoutes } from '../_lib/routes/documentVerification'
 import { documentLifecycleAdminRoutes, documentLifecyclePublicRoutes } from '../_lib/routes/documentLifecycle'
 import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_lib/routes/internalDocuments'
+import { documentWorkspaceExtraRoutes } from '../_lib/routes/documentWorkspaceExtras'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -88,6 +89,7 @@ app.route('/admin', bulkInvitationRoutes)
 app.route('/admin', roleAdminRoutes)
 app.route('/admin', teamManagementRoutes)
 app.route('/admin', reportExportRoutes)
+app.route('/admin', documentWorkspaceExtraRoutes)
 app.route('/admin', documentLifecycleAdminRoutes)
 app.route('/admin', internalDocumentAdminRoutes)
 app.route('/admin', adminRoutes)
