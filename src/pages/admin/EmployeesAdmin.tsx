@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MailPlus, ShieldCheck } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag } from '../../components/admin/ui'
@@ -6,6 +6,7 @@ import { Dialog, DialogContent } from '../../components/kit/Dialog'
 import { timeAgo } from '../../lib/activity'
 import { toast } from '../../components/kit/toast'
 import { useCapabilities } from '../../lib/capabilities'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 
 interface Employee {
   id:string; email:string; full_name:string|null; last_seen_at:string|null; last_login_at:string|null; status:string;
@@ -33,10 +34,11 @@ export default function EmployeesAdmin(){
   const caps=useCapabilities()
   const[employees,setEmployees]=useState<Employee[]>([]); const[loading,setLoading]=useState(true); const[filter,setFilter]=useState<FilterKey>('all')
   const[selected,setSelected]=useState<Employee|null>(null); const[approving,setApproving]=useState<string|null>(null); const[inviteOpen,setInviteOpen]=useState(false)
-  const load=()=>{setLoading(true);api.get<{employees:Employee[]}>('/admin/employees').then(r=>setEmployees(r.employees)).catch(()=>toast.error('Could not load Team & Vendors.')).finally(()=>setLoading(false))}
-  useEffect(load,[])
+  const load=useCallback(async()=>{setLoading(true);try{const r=await api.get<{employees:Employee[]}>('/admin/employees');setEmployees(r.employees)}catch{toast.error('Could not load Team & Vendors.')}finally{setLoading(false)}},[])
+  useEffect(()=>{void load()},[load])
+  useLiveRefresh(load)
   const filtered=useMemo(()=>employees.filter(e=>filter==='employees'?e.party_type!=='vendor':filter==='vendors'?e.party_type==='vendor':filter==='pending'?e.status==='pending':true),[employees,filter])
-  async function approve(employee:Employee){setApproving(employee.id);try{await api.post(`/admin/team-members/${employee.id}/approve`,{});toast.success(employee.party_type==='vendor'?'Vendor approved.':'Team member approved.');setSelected(null);load()}catch(err){toast.error(err instanceof ApiError?err.message:'Could not approve this account.')}finally{setApproving(null)}}
+  async function approve(employee:Employee){setApproving(employee.id);try{await api.post(`/admin/team-members/${employee.id}/approve`,{});toast.success(employee.party_type==='vendor'?'Vendor approved.':'Team member approved.');setSelected(null);await load()}catch(err){toast.error(err instanceof ApiError?err.message:'Could not approve this account.')}finally{setApproving(null)}}
 
   return <div>
     <PageIntro kicker="Access & provider network" title="Team & Vendors" subtitle="Invite providers, review conditional applications and verification documents, then approve access when vetting is complete." action={caps.can_manage_invitations?<button onClick={()=>setInviteOpen(true)} className="btn-gold"><MailPlus size={15}/>Invite Vendor</button>:undefined}/>
