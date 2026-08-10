@@ -4,6 +4,8 @@ export interface Env {
   // Optional: profile picture and private document storage.
   UPLOADS?: R2Bucket
   SESSION_SECRET: string
+  // Shared secret used only by trusted scheduled automation callers.
+  AUTOMATION_CRON_SECRET?: string
   // Encrypts ACH routing/account numbers at rest.
   PAYMENT_ENCRYPTION_KEY: string
   // Optional dedicated PKCS#8 P-256 private key (base64 DER) used to
