@@ -4,6 +4,7 @@ import { requireUser } from '../mid'
 import { uuid } from '../crypto'
 import { resolveClientId, loadScopedRow, scopeFilter, ScopeError } from '../scope'
 import { activityInsert, logActivity } from '../activity'
+import { sendEmail, escapeHtml } from '../email'
 
 export const portalRoutes = new Hono<AppEnv>()
 portalRoutes.use('*', requireUser)
@@ -258,24 +259,131 @@ portalRoutes.patch('/calendar/:id', async (c) => {
 })
 
 // ---------------- Billing (invoices — read only for clients) ----------------
+interface BillToInput {
+  name?: string
+  company?: string
+  email?: string
+  phone?: string
+  address_line1?: string
+  city?: string
+  state?: string
+  postal_code?: string
+}
+interface LineItemInput {
+  name?: string
+  description?: string
+  quantity?: number
+  unit_price_cents?: number
+  discount_cents?: number
+  taxable?: boolean
+}
+
+function genInvoiceNumber(): string {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  return `INV-${date}-${uuid().slice(0, 4).toUpperCase()}`
+}
+
 portalRoutes.get('/billing', async (c) => c.json({ invoices: await listScoped(c, 'invoices') }))
+
+portalRoutes.get('/billing/:id', async (c) => {
+  const user = c.get('user')
+  const invoice = await loadScopedRow<any>(c.env, user, 'invoices', c.req.param('id'))
+  const items = await c.env.DB.prepare(
+    'SELECT * FROM invoice_line_items WHERE invoice_id = ? ORDER BY sort_order, created_at',
+  ).bind(invoice.id).all()
+  return c.json({ invoice, line_items: items.results ?? [] })
+})
 
 portalRoutes.post('/billing', async (c) => {
   const user = c.get('user')
   if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
-  const body = await c.req.json<{ amount_cents: number; due_date?: string; client_user_id: string }>().catch(() => null)
-  if (typeof body?.amount_cents !== 'number' || !Number.isInteger(body.amount_cents) || body.amount_cents < 0) {
-    return c.json({ error: 'amount_cents must be a non-negative integer' }, 400)
-  }
-  if (!body.client_user_id) return c.json({ error: 'client_user_id is required' }, 400)
+  const body = await c.req.json<{
+    amount_cents?: number
+    due_date?: string
+    client_user_id: string
+    invoice_number?: string
+    title?: string
+    message?: string
+    currency?: string
+    tax_rate_percent?: number
+    bill_to?: BillToInput
+    line_items?: LineItemInput[]
+  }>().catch(() => null)
+  if (!body?.client_user_id) return c.json({ error: 'client_user_id is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
+
+  const client = await c.env.DB.prepare(
+    `SELECT u.full_name, u.email, u.phone, cp.business_name, cp.state
+     FROM users u LEFT JOIN client_profiles cp ON cp.user_id = u.id WHERE u.id = ?`,
+  ).bind(clientId).first<{ full_name: string | null; email: string; phone: string | null; business_name: string | null; state: string | null }>()
+
+  const items = Array.isArray(body.line_items) ? body.line_items : []
+  let subtotalCents = 0
+  let discountCents = 0
+  let taxableBaseCents = 0
+  const normalizedItems: { name: string; description: string | null; quantity: number; unit_price_cents: number; discount_cents: number; taxable: number }[] = []
+
+  if (items.length > 0) {
+    for (const raw of items.slice(0, 100)) {
+      const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+      if (!name) return c.json({ error: 'each line item needs a name' }, 400)
+      const quantity = typeof raw.quantity === 'number' && raw.quantity > 0 ? raw.quantity : 1
+      const unitPrice = typeof raw.unit_price_cents === 'number' && Number.isInteger(raw.unit_price_cents) && raw.unit_price_cents >= 0 ? raw.unit_price_cents : 0
+      const lineGross = Math.round(quantity * unitPrice)
+      const discount = typeof raw.discount_cents === 'number' && Number.isInteger(raw.discount_cents) && raw.discount_cents >= 0 ? Math.min(raw.discount_cents, lineGross) : 0
+      const taxable = raw.taxable === true
+      subtotalCents += lineGross
+      discountCents += discount
+      if (taxable) taxableBaseCents += lineGross - discount
+      normalizedItems.push({ name: name.slice(0, 200), description: raw.description ? String(raw.description).trim().slice(0, 1000) || null : null, quantity, unit_price_cents: unitPrice, discount_cents: discount, taxable: taxable ? 1 : 0 })
+    }
+  } else {
+    if (typeof body.amount_cents !== 'number' || !Number.isInteger(body.amount_cents) || body.amount_cents < 0) {
+      return c.json({ error: 'amount_cents must be a non-negative integer, or provide line_items' }, 400)
+    }
+    subtotalCents = body.amount_cents
+  }
+
+  const taxRatePercent = typeof body.tax_rate_percent === 'number' && body.tax_rate_percent >= 0 && body.tax_rate_percent <= 100 ? body.tax_rate_percent : 0
+  const taxRateBps = Math.round(taxRatePercent * 100)
+  const taxCents = Math.round((taxableBaseCents * taxRateBps) / 10000)
+  const amountCents = subtotalCents - discountCents + taxCents
+
+  const billTo = body.bill_to ?? {}
   const id = uuid()
-  await c.env.DB.batch([
+  const stmts = [
     c.env.DB.prepare(
-      `INSERT INTO invoices (id, client_user_id, amount_cents, due_date, status) VALUES (?, ?, ?, ?, 'open')`,
-    ).bind(id, clientId, body.amount_cents, body.due_date ?? null),
-    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'invoice_created', detail: { amount_cents: body.amount_cents } }),
-  ])
+      `INSERT INTO invoices (
+        id, client_user_id, amount_cents, currency, due_date, status,
+        invoice_number, title, message, subtotal_cents, discount_cents, tax_rate_bps, tax_cents,
+        bill_to_name, bill_to_company, bill_to_email, bill_to_phone, bill_to_address_line1, bill_to_city, bill_to_state, bill_to_postal_code,
+        created_by_user_id
+      ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      id, clientId, amountCents, (body.currency || 'usd').toLowerCase().slice(0, 10), body.due_date ?? null,
+      (body.invoice_number || genInvoiceNumber()).slice(0, 60),
+      body.title ? body.title.slice(0, 200) : null,
+      body.message ? body.message.slice(0, 2000) : null,
+      subtotalCents, discountCents, taxRateBps, taxCents,
+      (billTo.name || client?.full_name || null),
+      (billTo.company || client?.business_name || null),
+      (billTo.email || client?.email || null),
+      (billTo.phone || client?.phone || null),
+      billTo.address_line1 || null,
+      billTo.city || null,
+      (billTo.state || client?.state || null),
+      billTo.postal_code || null,
+      user.id,
+    ),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'invoice_created', detail: { amount_cents: amountCents, title: body.title } }),
+    ...normalizedItems.map((item, index) =>
+      c.env.DB.prepare(
+        `INSERT INTO invoice_line_items (id, invoice_id, name, description, quantity, unit_price_cents, discount_cents, taxable, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(uuid(), id, item.name, item.description, item.quantity, item.unit_price_cents, item.discount_cents, item.taxable, index),
+    ),
+  ]
+  await c.env.DB.batch(stmts)
   return c.json({ ok: true, id }, 201)
 })
 
@@ -291,6 +399,30 @@ portalRoutes.patch('/billing/:id', async (c) => {
       await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'invoice_status_changed', detail: { amount_cents: row.amount_cents, from: row.status, to: status } })
     }
   }
+  return c.json({ ok: true })
+})
+
+// One-off "send now" reminder email — there's no cron/scheduler in this
+// deployment, so this is a manual action rather than the automatic
+// schedule a full invoicing platform would run.
+portalRoutes.post('/billing/:id/remind', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
+  const row = await loadScopedRow<any>(c.env, user, 'invoices', c.req.param('id'))
+  if (row.status !== 'open') return c.json({ error: 'only open invoices can be reminded' }, 400)
+  const to = row.bill_to_email
+  if (!to) return c.json({ error: 'this invoice has no billing email on file' }, 400)
+  const amount = `$${(row.amount_cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const due = row.due_date ? new Date(row.due_date).toLocaleDateString() : 'as soon as possible'
+  await sendEmail(c.env, {
+    to,
+    subject: `Payment reminder${row.invoice_number ? ` — ${escapeHtml(row.invoice_number)}` : ''}`,
+    html: `<p>Hi ${escapeHtml(row.bill_to_name || 'there')},</p><p>This is a reminder that ${escapeHtml(row.title || 'your invoice')} for <strong>${amount}</strong> is due ${escapeHtml(due)}.</p>${row.message ? `<p>${escapeHtml(row.message)}</p>` : ''}<p>If you've already paid this, please disregard.</p>`,
+  })
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE invoices SET last_reminded_at = datetime('now') WHERE id = ?`).bind(row.id),
+    activityInsert(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'invoice_reminder_sent', detail: { amount_cents: row.amount_cents, invoice_number: row.invoice_number } }),
+  ])
   return c.json({ ok: true })
 })
 

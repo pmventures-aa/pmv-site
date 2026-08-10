@@ -51,6 +51,8 @@ export function describeActivity(e: ActivityEvent): string {
     case 'invoice_created': return `${actor} created an invoice for ${money(d.amount_cents)} for ${client}${d.invoice_number ? ` · ${d.invoice_number}` : ''}`
     case 'invoice_sent': return `${actor} sent ${d.invoice_number || 'an invoice'} to ${d.recipients ?? 1} recipient${d.recipients === 1 ? '' : 's'} for ${client}`
     case 'invoice_status_changed': return `${actor} marked ${client}’s invoice as ${fmtStatus(d.to)}`
+    case 'invoice_reminder_sent': return `${actor} sent a payment reminder to ${client}${d.invoice_number ? ` for ${d.invoice_number}` : ''}`
+    case 'service_assigned_by_staff': return `${actor} assigned ${d.service_name || fmtStatus(d.service_key)} to ${client} — awaiting their signature`
     case 'funding_created': return `${actor} opened a funding application for ${client}`
     case 'funding_status_changed': return `${actor} set ${client}’s funding application to ${fmtStatus(d.to)}`
     case 'property_created': return `${actor} added property “${d.address}” for ${client}`

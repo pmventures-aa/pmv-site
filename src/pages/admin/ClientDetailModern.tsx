@@ -36,6 +36,18 @@ interface Bundle {
   payment_methods: { id: string; service_key: string | null; method_type: string; account_holder_name: string; bank_name: string | null; account_type: string | null; account_last4: string; created_at: string }[]
   notes: NoteRow[]
   onboarding_progress: { answered: number; total: number }
+  service_catalog: { key: string; name: string }[]
+  service_applications: {
+    id: string
+    service_key: string
+    service_name: string
+    status: string
+    submission_source: string
+    signed_name: string | null
+    submitted_at: string | null
+    created_at: string
+    created_by_name: string | null
+  }[]
 }
 
 type Tab = 'overview' | 'activity' | 'services' | 'work' | 'documents' | 'billing' | 'details'
@@ -69,6 +81,39 @@ function SectionTitle({ eyebrow, title, action }: { eyebrow?: string; title: str
 function SimpleTable({ columns, rows, empty }: { columns: { key: string; label: string; render?: (row: any) => React.ReactNode }[]; rows: any[]; empty: string }) {
   if (!rows.length) return <EmptyState label={empty} />
   return <div className="overflow-x-auto border-y border-white/10"><table className="w-full min-w-[640px] text-left text-sm"><thead><tr className="text-[11px] uppercase tracking-wide text-slate-500">{columns.map((c) => <th key={c.key} className="px-3 py-2.5 font-medium">{c.label}</th>)}</tr></thead><tbody>{rows.map((row, idx) => <tr key={row.id ?? idx} className="border-t border-white/5"><>{columns.map((c) => <td key={c.key} className="px-3 py-3 text-slate-300">{c.render ? c.render(row) : String(row[c.key] ?? '—')}</td>)}</></tr>)}</tbody></table></div>
+}
+
+function AssignServiceForm({ clientId, catalog, taken, onAssigned }: { clientId: string; catalog: { key: string; name: string }[]; taken: Set<string>; onAssigned: () => void }) {
+  const available = catalog.filter((s) => !taken.has(s.key))
+  const [serviceKey, setServiceKey] = useState(available[0]?.key || '')
+  const [busy, setBusy] = useState(false)
+
+  if (available.length === 0) return <p className="text-xs text-slate-500">Every catalog service is already assigned or applied for.</p>
+
+  async function assign() {
+    if (!serviceKey) return
+    setBusy(true)
+    try {
+      await api.post(`/admin/clients/${clientId}/services`, { service_key: serviceKey })
+      toast.success('Service assigned — the client can review and sign it in their portal.')
+      onAssigned()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not assign this service.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <select className={`${inputCls} max-w-xs`} value={serviceKey} onChange={(e) => setServiceKey(e.target.value)}>
+        {available.map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
+      </select>
+      <button onClick={() => void assign()} disabled={busy} className={`${btnOutline} disabled:opacity-60`}>
+        {busy ? 'Assigning…' : 'Assign service'}
+      </button>
+    </div>
+  )
 }
 
 export default function ClientDetailModern() {
@@ -212,7 +257,37 @@ export default function ClientDetailModern() {
       <aside className="xl:border-l xl:border-white/10 xl:pl-7"><SectionTitle title="Add internal note" /><p className="mb-4 text-xs leading-5 text-slate-500">Staff-only. Notes are never visible in the client portal.</p><form onSubmit={addNote}><textarea className={inputCls} rows={7} placeholder="Call notes, context, follow-up, next steps…" value={note} onChange={(e) => setNote(e.target.value)} /><button className={`${btnPrimary} mt-3 w-full`} disabled={noteBusy || !note.trim()}>{noteBusy ? 'Saving…' : 'Save note'}</button></form><Link to={`${p('communications')}?client=${encodeURIComponent(account.id)}`} className={`${btnOutline} mt-3 w-full`}>Compose email</Link></aside>
     </div>}
 
-    {tab === 'services' && <div className="mt-7"><SectionTitle eyebrow="Engagement" title="Services & applications" action={<Link to={p(`clients/${account.id}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage service records →</Link>} />{!data.services.length ? <EmptyState label="No services yet." /> : <div className="divide-y divide-white/5 border-y border-white/10">{data.services.map((service) => { const answers = data.application_answers.filter((a) => a.service_key === service.service_key); return <div key={service.id} className="py-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold text-white">{service.name}</h3><p className="mt-1 text-xs text-slate-500">{service.service_key.replace(/_/g, ' ')}</p></div><Tag tone={statusTone(service.status)}>{service.status.replace(/_/g, ' ')}</Tag></div>{answers.length > 0 && <dl className="mt-4 grid gap-x-8 md:grid-cols-2">{answers.slice(0, 12).map((answer) => <DetailRow key={`${service.id}-${answer.question_key}`} label={answer.label || answer.question_key.replace(/_/g, ' ')} value={answer.value} />)}</dl>}</div>})}</div>}</div>}
+    {tab === 'services' && <div className="mt-7 space-y-9">
+      <section>
+        <SectionTitle eyebrow="Engagement" title="Assign a service" />
+        <AssignServiceForm
+          clientId={account.id}
+          catalog={data.service_catalog}
+          taken={new Set([...data.services.map((s) => s.service_key), ...data.service_applications.filter((a) => a.status !== 'declined' && a.status !== 'closed').map((a) => a.service_key)])}
+          onAssigned={load}
+        />
+        {data.service_applications.filter((a) => a.submission_source === 'staff_assigned').length > 0 && (
+          <div className="mt-5 divide-y divide-white/5 border-y border-white/10">
+            {data.service_applications.filter((a) => a.submission_source === 'staff_assigned').map((app) => (
+              <div key={app.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div>
+                  <p className="text-sm font-medium text-white">{app.service_name}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {app.status === 'draft' ? 'Awaiting client signature' : app.signed_name ? `Signed by ${app.signed_name}` : 'Submitted'}
+                    {app.created_by_name ? ` · assigned by ${app.created_by_name}` : ''}
+                  </p>
+                </div>
+                <Tag tone={statusTone(app.status)}>{app.status.replace(/_/g, ' ')}</Tag>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      <section>
+        <SectionTitle eyebrow="Engagement" title="Services & applications" action={<Link to={p(`clients/${account.id}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage service records →</Link>} />
+        {!data.services.length ? <EmptyState label="No services yet." /> : <div className="divide-y divide-white/5 border-y border-white/10">{data.services.map((service) => { const answers = data.application_answers.filter((a) => a.service_key === service.service_key); return <div key={service.id} className="py-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold text-white">{service.name}</h3><p className="mt-1 text-xs text-slate-500">{service.service_key.replace(/_/g, ' ')}</p></div><Tag tone={statusTone(service.status)}>{service.status.replace(/_/g, ' ')}</Tag></div>{answers.length > 0 && <dl className="mt-4 grid gap-x-8 md:grid-cols-2">{answers.slice(0, 12).map((answer) => <DetailRow key={`${service.id}-${answer.question_key}`} label={answer.label || answer.question_key.replace(/_/g, ' ')} value={answer.value} />)}</dl>}</div>})}</div>}
+      </section>
+    </div>}
 
     {tab === 'work' && <div className="mt-7 space-y-9"><section><SectionTitle eyebrow="Execution" title="Tasks" action={<Link to={p(`clients/${account.id}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage work →</Link>} /><SimpleTable rows={data.tasks} empty="No tasks." columns={[{ key: 'title', label: 'Task' }, { key: 'due_date', label: 'Due', render: (r) => r.due_date ? new Date(r.due_date).toLocaleDateString() : '—' }, { key: 'status', label: 'Status', render: (r) => <Tag tone={statusTone(r.status)}>{r.status?.replace(/_/g, ' ')}</Tag> }]} /></section><section><SectionTitle title="Projects & matters" /><SimpleTable rows={data.matters} empty="No projects or matters." columns={[{ key: 'title', label: 'Matter' }, { key: 'type', label: 'Type' }, { key: 'due_date', label: 'Due' }, { key: 'status', label: 'Status', render: (r) => <Tag tone={statusTone(r.status)}>{r.status?.replace(/_/g, ' ')}</Tag> }]} /></section><section><SectionTitle title="Calls & appointments" /><SimpleTable rows={[...data.calls.map((x) => ({ ...x, row_type: 'Call', when: x.scheduled_at })), ...data.appointments.map((x) => ({ ...x, row_type: 'Appointment', when: x.starts_at }))].sort((a, b) => new Date(b.when || 0).getTime() - new Date(a.when || 0).getTime())} empty="No calls or appointments." columns={[{ key: 'row_type', label: 'Type' }, { key: 'title', label: 'Topic', render: (r) => r.title || r.topic || '—' }, { key: 'when', label: 'When', render: (r) => displayDate(r.when) }, { key: 'status', label: 'Status', render: (r) => r.status ? <Tag tone={statusTone(r.status)}>{r.status.replace(/_/g, ' ')}</Tag> : '—' }]} /></section></div>}
 

@@ -75,6 +75,7 @@ export default function PortalApp({ basePath }: { basePath: string }) {
             <Route path="notifications" element={<Notifications />} />
             <Route path="security" element={<Security />} />
 
+            {/* Old slugs — redirect so existing bookmarks/links keep working. */}
             <Route path="calls" element={<Navigate to="../planned-calls" replace />} />
             <Route path="property" element={<Navigate to="../property-management" replace />} />
             <Route path="tax" element={<Navigate to="../tax-filings" replace />} />

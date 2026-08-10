@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { AppEnv, Env } from '../types'
+import type { AppEnv, Env, SessionUser } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
 import { uuid, decryptSensitive } from '../crypto'
 import { scopeFilter, canAccessClient, ScopeError } from '../scope'
@@ -7,6 +7,8 @@ import { visibleClientIds } from '../access'
 import { createActivationToken, revokeUserSessions } from '../session'
 import { activityInsert, logActivity } from '../activity'
 import { hasCapability, requireCapability } from '../capabilities'
+import { sendEmail, escapeHtml } from '../email'
+import { getService, getQuestions, prefillForQuestions, persistAnswers } from './serviceApplications'
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -154,7 +156,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   const ok = await canAccessClient(c.env, user, id)
   if (!ok) return c.json({ error: 'forbidden' }, 403)
 
-  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes, assignedStaff, recentActivity] = await Promise.all([
+  const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes, assignedStaff, recentActivity, catalog, applications] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT cs.*, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE client_user_id = ?').bind(id).all(),
@@ -195,6 +197,15 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
        FROM activity_events ae LEFT JOIN users actor ON actor.id = ae.actor_user_id
        WHERE ae.client_user_id = ? ORDER BY ae.created_at DESC LIMIT 10`,
     ).bind(id).all(),
+    c.env.DB.prepare('SELECT key, name FROM services WHERE active = 1 ORDER BY name').all(),
+    c.env.DB.prepare(
+      `SELECT sa.id, sa.service_key, sa.status, sa.submission_source, sa.signed_name, sa.submitted_at, sa.created_at,
+              s.name AS service_name, creator.full_name AS created_by_name
+       FROM service_applications sa
+       JOIN services s ON s.key = sa.service_key
+       LEFT JOIN users creator ON creator.id = sa.created_by_user_id
+       WHERE sa.client_user_id = ? ORDER BY sa.created_at DESC`,
+    ).bind(id).all(),
   ])
 
   if (!account) return c.json({ error: 'not found' }, 404)
@@ -234,7 +245,69 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
     assigned_staff: assignedStaff.results ?? [],
     recent_activity: recentActivity.results ?? [],
     onboarding_progress: { answered: onboardingTotals?.answered ?? 0, total: onboardingTotals?.total ?? 0 },
+    service_catalog: catalog.results ?? [],
+    service_applications: applications.results ?? [],
   })
+})
+
+// Staff/vendor-initiated service assignment: opens a draft application on the
+// client's behalf, prefilled from whatever's already on file (name, email,
+// phone, business name, state), and notifies the client. The client still
+// has to log in, review, and electronically sign it in
+// POST /portal/service-applications/:id/submit before it counts as
+// submitted — this only gets it started for them.
+adminRoutes.post('/clients/:id/services', requireStaff, async (c) => {
+  const user = c.get('user')
+  const clientId = c.req.param('id')!
+  const ok = await canAccessClient(c.env, user, clientId)
+  if (!ok) return c.json({ error: 'forbidden' }, 403)
+
+  const client = await c.env.DB.prepare(
+    `SELECT u.id, u.email, u.full_name, u.first_name, u.last_name, u.phone
+     FROM users u WHERE u.id = ? AND u.role = 'client'`,
+  ).bind(clientId).first<{ id: string; email: string; full_name: string | null; first_name: string | null; last_name: string | null; phone: string | null }>()
+  if (!client) return c.json({ error: 'client not found' }, 404)
+
+  const body = await c.req.json<{ service_key?: string }>().catch(() => ({} as { service_key?: string }))
+  const serviceKey = body.service_key ?? ''
+  const service = await getService(c.env, serviceKey)
+  if (!service) return c.json({ error: 'unknown service' }, 404)
+
+  const existing = await c.env.DB.prepare(
+    `SELECT id, status FROM service_applications WHERE client_user_id = ? AND service_key = ?
+     AND status != 'closed' ORDER BY created_at DESC LIMIT 1`,
+  ).bind(clientId, serviceKey).first<{ id: string; status: string }>()
+  if (existing) return c.json({ error: `this client already has a ${existing.status} application for this service` }, 409)
+
+  const profile = await c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(clientId).first<any>()
+  const questions = await getQuestions(c.env, serviceKey)
+  const applicationId = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO service_applications (id, client_user_id, service_key, status, current_step, submission_source, created_by_user_id)
+     VALUES (?, ?, ?, 'draft', 0, 'staff_assigned', ?)`,
+  ).bind(applicationId, clientId, serviceKey, user.id).run()
+  const application = await c.env.DB.prepare('SELECT * FROM service_applications WHERE id = ?').bind(applicationId).first<any>()
+
+  const clientAsSessionUser: SessionUser = { id: client.id, email: client.email, full_name: client.full_name, first_name: client.first_name, last_name: client.last_name, role: 'client' }
+  const prefill = prefillForQuestions(clientAsSessionUser, { ...profile, phone: client.phone }, questions)
+  if (Object.keys(prefill).length > 0) await persistAnswers(c.env, application, questions, prefill)
+
+  await logActivity(c.env, {
+    actorUserId: user.id,
+    clientUserId: clientId,
+    kind: 'service_assigned_by_staff',
+    detail: { application_id: applicationId, service_key: serviceKey, service_name: service.name },
+  })
+
+  c.executionCtx.waitUntil(
+    sendEmail(c.env, {
+      to: client.email,
+      subject: `A new service is ready in your Pinnacle portal — ${service.name}`,
+      html: `<p>Hi ${escapeHtml(client.first_name || 'there')},</p><p>${escapeHtml(user.full_name || 'Your Pinnacle representative')} started a <strong>${escapeHtml(service.name)}</strong> application for you. We've pre-filled what we already have on file — log in to review, finish any remaining details, and sign to submit it.</p>`,
+    }),
+  )
+
+  return c.json({ ok: true, application_id: applicationId }, 201)
 })
 
 // Staff/admin editable client contact + business profile -- scoped like
