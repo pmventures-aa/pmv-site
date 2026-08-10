@@ -64,12 +64,12 @@ async function getOffering(c:any,id:string,serviceKey?:string,activeOnly=false):
   const values:any[]=[id]
   if(serviceKey){conditions.push('service_key = ?');values.push(serviceKey)}
   if(activeOnly)conditions.push('active = 1')
-  return c.env.DB.prepare(`SELECT * FROM service_offerings WHERE ${conditions.join(' AND ')}`).bind(...values).first<OfferingRow>()
+  return await c.env.DB.prepare(`SELECT * FROM service_offerings WHERE ${conditions.join(' AND ')}`).bind(...values).first() as OfferingRow|null
 }
 
 async function getDraft(c:any,applicationId:string):Promise<ApplicationRow|null>{
   const user=c.get('user')
-  return c.env.DB.prepare(`SELECT id,client_user_id,service_key,status,requested_offering_id FROM service_applications WHERE id=? AND client_user_id=? AND status='draft'`).bind(applicationId,user.id).first<ApplicationRow>()
+  return await c.env.DB.prepare(`SELECT id,client_user_id,service_key,status,requested_offering_id FROM service_applications WHERE id=? AND client_user_id=? AND status='draft'`).bind(applicationId,user.id).first() as ApplicationRow|null
 }
 
 function syntheticQuestions(offering:OfferingRow):IntakeQuestion[]{
@@ -132,7 +132,6 @@ async function persistSyntheticAnswers(c:any,application:ApplicationRow,offering
   if(statements.length)await c.env.DB.batch(statements)
 }
 
-// Augment the existing start/resume endpoint without duplicating the core application engine.
 serviceOfferingApplicationRoutes.use('/service-applications/:serviceKey/start',requireClient,async(c,next)=>{
   if(c.req.method!=='POST')return next()
   const requested=offeringFromReferer(c)
@@ -156,7 +155,6 @@ serviceOfferingApplicationRoutes.use('/service-applications/:serviceKey/start',r
   c.res=new Response(JSON.stringify(data),{status:original.status,headers})
 })
 
-// Let the existing autosave persist normal questions, then persist offering-specific prompts.
 serviceOfferingApplicationRoutes.use('/service-applications/:id',requireClient,async(c,next)=>{
   if(c.req.method!=='PATCH')return next()
   const cloned=c.req.raw.clone()
@@ -169,7 +167,6 @@ serviceOfferingApplicationRoutes.use('/service-applications/:id',requireClient,a
   if(offering)await persistSyntheticAnswers(c,application,offering,body.answers)
 })
 
-// Handle offering-specific required-document slots before the parent upload route.
 serviceOfferingApplicationRoutes.post('/service-applications/:id/files/:questionKey',requireClient,async(c,next)=>{
   const questionKey=c.req.param('questionKey')||''
   if(!questionKey.startsWith('__offering_doc_'))return next()
@@ -181,7 +178,7 @@ serviceOfferingApplicationRoutes.post('/service-applications/:id/files/:question
   if(!offering)return c.json({error:'service option not found'},404)
   const question=syntheticQuestions(offering).find(q=>q.question_key===questionKey&&q.input_type==='file')
   if(!question)return c.json({error:'file upload is not valid for this service option'},400)
-  const existing=await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM service_application_attachments WHERE application_id=? AND question_key=?`).bind(application.id,questionKey).first<{n:number}>()
+  const existing=await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM service_application_attachments WHERE application_id=? AND question_key=?`).bind(application.id,questionKey).first() as {n:number}|null
   if((existing?.n??0)>0)return c.json({error:'this document slot already has a file; remove it before replacing'},400)
   const contentType=(c.req.header('Content-Type')||'application/octet-stream').split(';')[0].trim().toLowerCase()
   if(!ALLOWED_UPLOAD_TYPES.has(contentType))return c.json({error:'unsupported file type'},400)
@@ -208,7 +205,6 @@ serviceOfferingApplicationRoutes.post('/service-applications/:id/files/:question
   return c.json({ok:true,document:{id:linkId,document_id:docId,question_key:questionKey,file_name:originalName,content_type:contentType,size_bytes:body.byteLength,visibility:'client',created_at:new Date().toISOString()}},201)
 })
 
-// Server-side enforcement: HQ-configured offering prompts and documents cannot be bypassed by the client UI.
 serviceOfferingApplicationRoutes.use('/service-applications/:id/submit',requireClient,async(c,next)=>{
   if(c.req.method!=='POST')return next()
   const application=await getDraft(c,c.req.param('id')||'')
@@ -216,10 +212,12 @@ serviceOfferingApplicationRoutes.use('/service-applications/:id/submit',requireC
   const offering=await getOffering(c,application.requested_offering_id,application.service_key,false)
   if(!offering)return c.json({error:'selected service option is unavailable'},400)
   const questions=syntheticQuestions(offering)
-  const answers=await c.env.DB.prepare(`SELECT question_key,value_json FROM service_application_answers WHERE application_id=? AND question_key LIKE '__offering_prompt_%'`).bind(application.id).all<{question_key:string;value_json:string}>()
-  const answerMap=new Map((answers.results??[]).map(row=>[row.question_key,row.value_json]))
-  const files=await c.env.DB.prepare(`SELECT question_key,COUNT(*) AS n FROM service_application_attachments WHERE application_id=? AND question_key LIKE '__offering_doc_%' GROUP BY question_key`).bind(application.id).all<{question_key:string;n:number}>()
-  const fileMap=new Map((files.results??[]).map(row=>[row.question_key,row.n]))
+  const answerResult=await c.env.DB.prepare(`SELECT question_key,value_json FROM service_application_answers WHERE application_id=? AND question_key LIKE '__offering_prompt_%'`).bind(application.id).all()
+  const answerRows=(answerResult.results??[]) as Array<{question_key:string;value_json:string}>
+  const answerMap=new Map(answerRows.map(row=>[row.question_key,row.value_json]))
+  const fileResult=await c.env.DB.prepare(`SELECT question_key,COUNT(*) AS n FROM service_application_attachments WHERE application_id=? AND question_key LIKE '__offering_doc_%' GROUP BY question_key`).bind(application.id).all()
+  const fileRows=(fileResult.results??[]) as Array<{question_key:string;n:number}>
+  const fileMap=new Map(fileRows.map(row=>[row.question_key,row.n]))
   const missing:string[]=[]
   for(const q of questions){
     if(q.input_type==='file'){if((fileMap.get(q.question_key)??0)<1)missing.push(q.label)}
