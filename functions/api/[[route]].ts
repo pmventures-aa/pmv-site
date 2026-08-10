@@ -22,6 +22,7 @@ import { commsRoutes } from '../_lib/routes/comms'
 import { crmRoutes } from '../_lib/routes/crm'
 import { crmWriteRoutes } from '../_lib/routes/crmWrites'
 import { serviceApplicationRoutes } from '../_lib/routes/serviceApplications'
+import { serviceOfferingApplicationRoutes } from '../_lib/routes/serviceOfferingApplications'
 import { intakeCatalogAdminRoutes } from '../_lib/routes/intakeCatalogAdmin'
 import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
 import { accountEmailsAdminRoutes } from '../_lib/routes/accountEmailsAdmin'
@@ -56,6 +57,7 @@ app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 app.route('/portal', intakeCopyRoutes)
 app.route('/portal', signaturePortalSyncRoutes)
 app.route('/portal', clientApplicationSignatureRoutes)
+app.route('/portal', serviceOfferingApplicationRoutes)
 app.route('/portal', serviceApplicationRoutes)
 app.route('/portal', trustedContactRoutes)
 app.route('/portal', selfRoutes)
