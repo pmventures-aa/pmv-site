@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 
@@ -40,17 +41,19 @@ export default function InvitationsAdmin() {
   const [filter, setFilter] = useState('all')
   const [form, setForm] = useState(prefill)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const invites = await api.get<{ invitations: Invite[]; can_invite_staff: boolean }>('/admin/invitations')
       setRows(invites.invitations);setCanInviteStaff(invites.can_invite_staff)
       if (invites.can_invite_staff) setRoles((await api.get<{ roles: RoleDef[] }>('/admin/invitation-role-options')).roles)
       else setRoles([])
-    } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Could not load invitations.') }
-    finally { setLoading(false) }
+    } catch (err) { if (!silent) toast.error(err instanceof ApiError ? err.message : 'Could not load invitations.') }
+    finally { if (!silent) setLoading(false) }
   }, [])
   useEffect(() => { void load() }, [load])
+  const backgroundLoad=useCallback(()=>load(true),[load])
+  useLiveRefresh(backgroundLoad)
 
   async function send(e: React.FormEvent) {
     e.preventDefault(); setBusy(true)
