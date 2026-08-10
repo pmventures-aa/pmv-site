@@ -17,7 +17,6 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [refreshTick, setRefreshTick] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.localStorage.getItem('pmv_hq_sidebar_open') !== '0'
@@ -35,20 +34,21 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   useEffect(() => {
     const pulse = () => {
       if (document.visibilityState !== 'visible') return
-      window.dispatchEvent(new Event('pmv:refresh'))
-
-      // Re-mount the active route so its normal load effects fetch fresh data.
-      // Do not do this while an employee is typing, choosing a field, or using
-      // a dialog. That keeps the three-second live behavior from wiping work.
-      const active = document.activeElement as HTMLElement | null
-      const tag = active?.tagName?.toLowerCase()
-      const editing = tag === 'input' || tag === 'textarea' || tag === 'select' || !!active?.isContentEditable
-      const dialogOpen = !!document.querySelector('[role="dialog"]')
-      if (!editing && !dialogOpen) setRefreshTick((tick) => tick + 1)
+      // Non-destructive refresh signal only. Consumers refetch their own data
+      // without unmounting routes, resetting component state, moving scroll,
+      // closing drawers, or touching an employee's in-progress form values.
+      window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'live' } }))
     }
-    pulse()
     const timer = window.setInterval(pulse, LIVE_REFRESH_MS)
-    return () => window.clearInterval(timer)
+    const onFocus = () => pulse()
+    const onVisibility = () => { if (document.visibilityState === 'visible') pulse() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
   function toggleSidebar() {
@@ -75,8 +75,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
     }`
 
   function refreshPage() {
-    window.dispatchEvent(new Event('pmv:refresh'))
-    window.location.reload()
+    window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } }))
   }
 
   const grouped: { section: string | null; items: NavItem[] }[] = []
@@ -174,13 +173,13 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
             <GlobalSearch className="w-full max-w-md" />
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <span className="mr-2 hidden text-[10px] font-medium uppercase tracking-[.12em] text-slate-600 xl:inline">Live data · 3s</span>
+            <span className="mr-2 hidden text-[10px] font-medium uppercase tracking-[.12em] text-slate-600 xl:inline">Background sync · 3s</span>
             <button onClick={refreshPage} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-gold" title="Refresh this page" aria-label="Refresh this HQ page"><RotateCw size={14} /></button>
             <MailBell />
             <NotificationBell />
           </div>
         </div>
-        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><Outlet key={refreshTick} /></main>
+        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><Outlet /></main>
       </div>
     </div>
   )
