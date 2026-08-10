@@ -12,6 +12,15 @@ SESSION_SECRET=local-dev-testing-secret-not-real
 # service application 500s without this set.
 PAYMENT_ENCRYPTION_KEY=local-dev-payment-key-not-real-either
 
+# Optional but strongly recommended for production document envelopes.
+# Base64-encoded DER PKCS#8 P-256 EC private key. When configured, completed
+# envelopes are sealed with ECDSA-P256-SHA256. Keep the private key only in
+# Cloudflare secrets; never commit it. Without this key, the app falls back to
+# an HMAC-SHA256 server seal using SESSION_SECRET (tamper-evident but not
+# independently public-key verifiable).
+# DOCUMENT_SIGNING_PRIVATE_KEY=
+# DOCUMENT_SIGNING_KEY_ID=pmv-document-key-2026-01
+
 # Optional — email delivery via Resend. Leave unset to develop with ordinary
 # notification email as a safe no-op. Account-email attempts are stored as
 # "skipped" so HQ can distinguish provider configuration from delivery.
