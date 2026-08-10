@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 
@@ -13,8 +14,9 @@ function today(offset=0){ return new Date(Date.now()+offset*86400000).toISOStrin
 
 export default function DocumentCenter(){
   const p=useAppPath(); const [docs,setDocs]=useState<ClientDoc[]>([]); const [exports,setExports]=useState<ReportExport[]>([]); const [catalog,setCatalog]=useState<CatalogEntry[]>([]); const [loading,setLoading]=useState(true); const [tab,setTab]=useState<'client'|'reports'>('client'); const [q,setQ]=useState(''); const [reportKey,setReportKey]=useState(''); const [from,setFrom]=useState(today(-30)); const [to,setTo]=useState(today()); const [generating,setGenerating]=useState(false)
-  const load=useCallback(async()=>{setLoading(true);try{const [center,reports]=await Promise.all([api.get<{documents:ClientDoc[];report_exports:ReportExport[]}>('/admin/document-center'),api.get<{reports:CatalogEntry[]}>('/admin/reports/catalog').catch(()=>({reports:[]}))]);setDocs(center.documents);setExports(center.report_exports);setCatalog(reports.reports);if(!reportKey&&reports.reports[0])setReportKey(reports.reports[0].key)}catch(e){toast.error(e instanceof ApiError?e.message:'Could not load Document Center.')}finally{setLoading(false)}},[reportKey])
-  useEffect(()=>{load()},[load])
+  const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);try{const [center,reports]=await Promise.all([api.get<{documents:ClientDoc[];report_exports:ReportExport[]}>('/admin/document-center'),api.get<{reports:CatalogEntry[]}>('/admin/reports/catalog').catch(()=>({reports:[]}))]);setDocs(center.documents);setExports(center.report_exports);setCatalog(reports.reports);setReportKey(current=>current||reports.reports[0]?.key||'')}catch(e){if(!silent)toast.error(e instanceof ApiError?e.message:'Could not load Document Center.')}finally{if(!silent)setLoading(false)}},[])
+  useEffect(()=>{void load()},[load])
+  const backgroundLoad=useCallback(()=>load(true),[load]); useLiveRefresh(backgroundLoad)
   const clientRows=useMemo(()=>docs.filter(d=>!q.trim()||`${d.client_name} ${d.file_name||''} ${d.category||''}`.toLowerCase().includes(q.toLowerCase())),[docs,q])
   const reportRows=useMemo(()=>exports.filter(r=>!q.trim()||`${r.report_label} ${r.file_name}`.toLowerCase().includes(q.toLowerCase())),[exports,q])
   async function generate(){if(!reportKey)return;setGenerating(true);try{const r=await api.post<{export:{id:string;file_name:string}}>(`/admin/reports/${reportKey}/export.pdf?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,{});toast.success(`${r.export.file_name} created.`);setTab('reports');await load()}catch(e){toast.error(e instanceof ApiError?e.message:'Could not generate report PDF.')}finally{setGenerating(false)}}
