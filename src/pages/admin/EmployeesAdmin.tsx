@@ -1,158 +1,72 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { MailPlus, ShieldCheck } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag } from '../../components/admin/ui'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
 import { timeAgo } from '../../lib/activity'
 import { toast } from '../../components/kit/toast'
+import { useCapabilities } from '../../lib/capabilities'
 
 interface Employee {
-  id: string
-  email: string
-  full_name: string | null
-  last_seen_at: string | null
-  last_login_at: string | null
-  status: string
-  staff_role: string | null
-  title: string | null
-  party_type: string | null
-  vendor_category: string | null
-  role_definition_id?: string | null
-  role_name?: string | null
-  tasks_assigned: number
-  tasks_completed: number
-  tasks_overdue: number
-  notes_added: number
-  emails_sent: number
-  client_interactions: number
-  application_documents?: number
+  id:string; email:string; full_name:string|null; last_seen_at:string|null; last_login_at:string|null; status:string;
+  staff_role:string|null; title:string|null; party_type:string|null; vendor_category:string|null; role_name?:string|null;
+  tasks_assigned:number; tasks_completed:number; tasks_overdue:number; application_documents?:number;
 }
-
-type SortKey = 'name' | 'tasks_assigned' | 'tasks_completed' | 'tasks_overdue' | 'last_seen_at'
-type FilterKey = 'all' | 'employees' | 'vendors' | 'pending'
-
-export default function EmployeesAdmin() {
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
-  const [sort, setSort] = useState<SortKey>('name')
-  const [filter, setFilter] = useState<FilterKey>('all')
-  const [selected, setSelected] = useState<Employee | null>(null)
-  const [approving, setApproving] = useState<string | null>(null)
-
-  const load = () => {
-    setLoading(true)
-    api.get<{ employees: Employee[] }>('/admin/employees')
-      .then((r) => { setEmployees(r.employees); setLoadError(false) })
-      .catch(() => setLoadError(true))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(load, [])
-
-  async function approve(employee: Employee) {
-    setApproving(employee.id)
-    try {
-      const result = await api.post<{ email_delivery?: { status: string; error?: string } | null }>(`/admin/team-members/${employee.id}/approve`, {})
-      if (result.email_delivery && !['sent', 'delivered'].includes(result.email_delivery.status)) {
-        toast.error(`Account approved, but the approval email was ${result.email_delivery.status}. ${result.email_delivery.error || ''}`)
-      } else {
-        toast.success(employee.party_type === 'vendor' ? 'Vendor approved.' : 'Team member approved.')
-      }
-      load()
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Could not approve this account.')
-    } finally {
-      setApproving(null)
-    }
-  }
-
-  const filtered = employees.filter((employee) => {
-    if (filter === 'employees') return employee.party_type !== 'vendor'
-    if (filter === 'vendors') return employee.party_type === 'vendor'
-    if (filter === 'pending') return employee.status === 'pending'
-    return true
-  })
-
-  const sorted = [...filtered].sort((a, b) => {
-    switch (sort) {
-      case 'tasks_assigned': return b.tasks_assigned - a.tasks_assigned
-      case 'tasks_completed': return b.tasks_completed - a.tasks_completed
-      case 'tasks_overdue': return b.tasks_overdue - a.tasks_overdue
-      case 'last_seen_at': return (b.last_seen_at ?? '').localeCompare(a.last_seen_at ?? '')
-      default: return (a.full_name || a.email).localeCompare(b.full_name || b.email)
-    }
-  })
-
-  return (
-    <div>
-      <PageIntro kicker="Team performance" title="Team & Vendors" subtitle="Review employees and professional providers, pending onboarding, vetting documents, login activity, workload, and response history." />
-
-      <div className="mb-4 flex gap-2">
-        {(['all', 'employees', 'vendors', 'pending'] as FilterKey[]).map((item) => (
-          <button key={item} onClick={() => setFilter(item)} className={`rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition ${filter === item ? 'border-gold bg-gold/10 text-gold' : 'border-white/10 text-slate-400 hover:text-white'}`}>
-            {item}
-            {item === 'pending' && employees.some((employee) => employee.status === 'pending') && <span className="ml-1.5 rounded-full bg-rose-400/20 px-1.5 text-rose-300">{employees.filter((employee) => employee.status === 'pending').length}</span>}
-          </button>
-        ))}
-      </div>
-
-      {loading ? <p className="text-sm text-slate-400">Loading…</p> : loadError ? (
-        <div className="space-y-2 text-sm text-slate-400"><p>Couldn't load the team roster.</p><button onClick={load} className="text-gold hover:underline">Try again</button></div>
-      ) : employees.length === 0 ? <Panel><EmptyState label="No staff or vendor accounts yet." /></Panel> : (
-        <Panel className="overflow-x-auto !p-0">
-          <table className="w-full min-w-[800px] text-sm">
-            <thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="cursor-pointer px-5 py-3 font-medium" onClick={() => setSort('name')}>Name</th><th className="px-5 py-3 font-medium">Type</th><th className="px-5 py-3 font-medium">Role</th><th className="px-5 py-3 font-medium">Vetting</th><th className="cursor-pointer px-5 py-3 font-medium" onClick={() => setSort('last_seen_at')}>Last active</th><th className="cursor-pointer px-5 py-3 font-medium" onClick={() => setSort('tasks_assigned')}>Assigned</th><th className="cursor-pointer px-5 py-3 font-medium" onClick={() => setSort('tasks_completed')}>Completed</th><th className="cursor-pointer px-5 py-3 font-medium" onClick={() => setSort('tasks_overdue')}>Overdue</th><th className="px-5 py-3 font-medium" />
-            </tr></thead>
-            <tbody>{sorted.map((employee) => (
-              <tr key={employee.id} className="border-t border-white/5 hover:bg-white/[0.02]">
-                <td className="cursor-pointer px-5 py-3 text-slate-200" onClick={() => setSelected(employee)}>{employee.full_name || employee.email}{employee.status === 'suspended' && <Tag tone="red"><span className="ml-1">suspended</span></Tag>}{employee.status === 'pending' && <Tag tone="gold"><span className="ml-1">pending</span></Tag>}</td>
-                <td className="px-5 py-3 text-slate-400">{employee.party_type === 'vendor' ? <Tag tone="blue">Vendor{employee.vendor_category ? ` · ${employee.vendor_category}` : ''}</Tag> : <Tag>Employee</Tag>}</td>
-                <td className="px-5 py-3 text-slate-400">{employee.role_name || employee.title || employee.staff_role?.replace(/_/g, ' ') || '—'}</td>
-                <td className="px-5 py-3 text-slate-400">{employee.party_type === 'vendor' ? <button className="text-gold hover:underline" onClick={() => setSelected(employee)}>{employee.application_documents || 0} doc{employee.application_documents === 1 ? '' : 's'}</button> : '—'}</td>
-                <td className="px-5 py-3 text-slate-400">{employee.last_seen_at ? timeAgo(employee.last_seen_at) : 'never'}</td>
-                <td className="px-5 py-3 text-slate-200 tabular-nums">{employee.tasks_assigned}</td><td className="px-5 py-3 text-slate-200 tabular-nums">{employee.tasks_completed}</td><td className="px-5 py-3 tabular-nums"><span className={employee.tasks_overdue > 0 ? 'font-semibold text-rose-300' : 'text-slate-200'}>{employee.tasks_overdue}</span></td>
-                <td className="px-5 py-3 text-right">{employee.status === 'pending' && <button className="rounded-md border border-emerald-400/30 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-400/10 disabled:opacity-60" disabled={approving === employee.id} onClick={(event) => { event.stopPropagation(); setSelected(employee) }}>{approving === employee.id ? 'Approving…' : 'Review'}</button>}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </Panel>
-      )}
-
-      {selected && <EmployeeDetail id={selected.id} name={selected.full_name || selected.email} canApprove={selected.status === 'pending'} approving={approving === selected.id} onApprove={() => approve(selected)} onClose={() => setSelected(null)} />}
-    </div>
-  )
-}
-
 interface VendorDocument { id:string; document_type:string; file_name:string; content_type:string|null; size_bytes:number|null; created_at:string }
+interface VendorApplication {
+  entity_type?:string; has_ein?:string; company_name?:string|null; enrollments?:string[]; service_area?:string[]; years_experience?:string;
+  travel_radius?:string|null; license_status?:string; insurance_status?:string; commission_state?:string|null; commission_number?:string|null;
+  commission_expiration?:string|null; ron_provider?:string|null; technology_platforms?:string|null; accounting_credentials?:string|null;
+  other_service?:string|null; notes?:string|null; submitted_at?:string;
+}
 interface EmployeeDetailData {
   employee: Employee & { created_at:string; can_reveal_payment_info:number; can_manage_users:number; can_manage_settings:number; can_view_reports:number; can_view_audit_log:number; can_manage_communications:number; is_owner:number }
-  login_history: { created_at:string; actor_ip:string|null; actor_user_agent:string|null }[]
-  tasks: { id:string; title:string; status:string; due_date:string|null; client_name:string|null; client_email:string }[]
-  notes: { id:string; body:string; created_at:string; client_name:string|null; client_email:string|null }[]
-  vendor_documents: VendorDocument[]
-  avg_response_hours: number | null
+  login_history:{created_at:string;actor_ip:string|null;actor_user_agent:string|null}[]
+  tasks:{id:string;title:string;status:string;due_date:string|null;client_name:string|null;client_email:string}[]
+  notes:{id:string;body:string;created_at:string;client_name:string|null;client_email:string|null}[]
+  vendor_documents:VendorDocument[]; vendor_application:VendorApplication|null; avg_response_hours:number|null
 }
 
-function EmployeeDetail({ id, name, canApprove, approving, onApprove, onClose }: { id:string; name:string; canApprove:boolean; approving:boolean; onApprove:()=>void; onClose:()=>void }) {
-  const [data, setData] = useState<EmployeeDetailData | null>(null)
-  const [loading, setLoading] = useState(true)
-  useEffect(() => { api.get<EmployeeDetailData>(`/admin/employees/${id}`).then(setData).finally(() => setLoading(false)) }, [id])
-  const docLabel = (value:string) => ({government_id:'Government ID',professional_license:'Professional license / credential',insurance:'Proof of insurance',w9:'W-9',supporting:'Supporting document'}[value] || value.replace(/_/g,' '))
-  const size = (bytes:number|null) => !bytes ? '' : bytes < 1024*1024 ? `${Math.max(1,Math.round(bytes/1024))} KB` : `${(bytes/(1024*1024)).toFixed(1)} MB`
+type FilterKey='all'|'employees'|'vendors'|'pending'
 
-  return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent title={name} description={data?.employee.party_type === 'vendor' ? 'Review provider identity, qualifications, and application documents before approval.' : 'Login history, workload, role, and recent activity.'} className="max-w-2xl">
-    {loading || !data ? <p className="text-sm text-slate-400">Loading…</p> : <div className="max-h-[72vh] space-y-6 overflow-y-auto">
-      {data.employee.party_type === 'vendor' && <div><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold text-white">Provider vetting documents</h3><Tag tone={data.vendor_documents.length ? 'green' : 'red'}>{data.vendor_documents.length} received</Tag></div><p className="mt-1 text-xs leading-5 text-slate-500">Open each document and confirm it supports the provider profile before approving access.</p>{data.vendor_documents.length === 0 ? <div className="mt-3 rounded-md border border-rose-400/20 bg-rose-400/[.05] p-3 text-xs text-rose-200">No provider documents are attached. Do not approve until required vetting is complete.</div> : <div className="mt-3 divide-y divide-white/10 border-y border-white/10">{data.vendor_documents.map((doc) => <div key={doc.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium text-white">{docLabel(doc.document_type)}</p><p className="truncate text-xs text-slate-500">{doc.file_name}{size(doc.size_bytes) ? ` · ${size(doc.size_bytes)}` : ''}</p></div><a href={`/api/admin/employees/${id}/vendor-documents/${doc.id}/download`} className="btn-outline !px-3 !py-1.5 text-xs">Open</a></div>)}</div>}</div>}
+export default function EmployeesAdmin(){
+  const caps=useCapabilities()
+  const[employees,setEmployees]=useState<Employee[]>([]); const[loading,setLoading]=useState(true); const[filter,setFilter]=useState<FilterKey>('all')
+  const[selected,setSelected]=useState<Employee|null>(null); const[approving,setApproving]=useState<string|null>(null); const[inviteOpen,setInviteOpen]=useState(false)
+  const load=()=>{setLoading(true);api.get<{employees:Employee[]}>('/admin/employees').then(r=>setEmployees(r.employees)).catch(()=>toast.error('Could not load Team & Vendors.')).finally(()=>setLoading(false))}
+  useEffect(load,[])
+  const filtered=useMemo(()=>employees.filter(e=>filter==='employees'?e.party_type!=='vendor':filter==='vendors'?e.party_type==='vendor':filter==='pending'?e.status==='pending':true),[employees,filter])
+  async function approve(employee:Employee){setApproving(employee.id);try{await api.post(`/admin/team-members/${employee.id}/approve`,{});toast.success(employee.party_type==='vendor'?'Vendor approved.':'Team member approved.');setSelected(null);load()}catch(err){toast.error(err instanceof ApiError?err.message:'Could not approve this account.')}finally{setApproving(null)}}
 
-      <div className="grid grid-cols-3 gap-3 text-center"><div className="rounded-md border border-white/10 p-3"><p className="text-xl font-semibold text-white tabular-nums">{data.employee.tasks_assigned}</p><p className="text-xs text-slate-500">Assigned</p></div><div className="rounded-md border border-white/10 p-3"><p className="text-xl font-semibold text-white tabular-nums">{data.employee.tasks_completed}</p><p className="text-xs text-slate-500">Completed</p></div><div className="rounded-md border border-white/10 p-3"><p className="text-xl font-semibold text-white tabular-nums">{data.avg_response_hours !== null ? `${data.avg_response_hours.toFixed(1)}h` : '—'}</p><p className="text-xs text-slate-500">Avg. response</p></div></div>
+  return <div>
+    <PageIntro kicker="Access & provider network" title="Team & Vendors" subtitle="Invite providers, review conditional applications and verification documents, then approve access when vetting is complete." action={caps.can_manage_invitations?<button onClick={()=>setInviteOpen(true)} className="btn-gold"><MailPlus size={15}/>Invite Vendor</button>:undefined}/>
 
-      <div><h3 className="mb-2 text-sm font-semibold text-white">Role & direct grants</h3><div className="flex flex-wrap gap-2">{data.employee.role_name ? <Tag tone="blue">{data.employee.role_name}</Tag> : null}{data.employee.is_owner ? <Tag tone="gold">Owner</Tag> : null}{data.employee.can_reveal_payment_info ? <Tag>Banking</Tag> : null}{data.employee.can_manage_users ? <Tag>Users</Tag> : null}{data.employee.can_manage_settings ? <Tag>Settings</Tag> : null}{data.employee.can_view_reports ? <Tag>Reports</Tag> : null}{data.employee.can_view_audit_log ? <Tag>Audit log</Tag> : null}{data.employee.can_manage_communications ? <Tag>Communications</Tag> : null}</div></div>
+    <div className="mb-4 flex flex-wrap gap-2">{(['all','employees','vendors','pending'] as FilterKey[]).map(item=><button key={item} onClick={()=>setFilter(item)} className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize ${filter===item?'border-gold/35 bg-gold/[.06] text-gold':'border-white/[.08] text-slate-400 hover:text-white'}`}>{item}{item==='pending'&&employees.some(e=>e.status==='pending')&&<span className="ml-1.5 rounded-full bg-rose-400/15 px-1.5 text-rose-300">{employees.filter(e=>e.status==='pending').length}</span>}</button>)}</div>
 
-      <div><h3 className="mb-2 text-sm font-semibold text-white">Recent logins</h3>{data.login_history.length === 0 ? <p className="text-xs text-slate-500">No login history recorded yet.</p> : <ul className="space-y-1 text-xs text-slate-400">{data.login_history.slice(0,8).map((login,index)=><li key={index} className="truncate" title={login.actor_user_agent ?? undefined}>{timeAgo(login.created_at)} {login.actor_ip ? `· ${login.actor_ip}` : ''} {login.actor_user_agent ? `· ${login.actor_user_agent}` : ''}</li>)}</ul>}</div>
-      <div><h3 className="mb-2 text-sm font-semibold text-white">Assigned tasks</h3>{data.tasks.length === 0 ? <p className="text-xs text-slate-500">Nothing assigned.</p> : <ul className="space-y-1.5 text-xs">{data.tasks.slice(0,10).map((task)=><li key={task.id} className="flex items-center justify-between text-slate-300"><span>{task.title} <span className="text-slate-500">— {task.client_name || task.client_email}</span></span><Tag tone={task.status === 'done' ? 'green' : 'slate'}>{task.status.replace(/_/g,' ')}</Tag></li>)}</ul>}</div>
+    {loading?<p className="text-sm text-slate-400">Loading…</p>:filtered.length===0?<Panel><EmptyState label="No matching team or vendor accounts."/></Panel>:<Panel className="overflow-x-auto !p-0"><table className="w-full min-w-[820px] text-sm"><thead><tr className="border-b border-white/[.08] text-left text-[11px] uppercase tracking-[.12em] text-slate-600"><th className="px-5 py-3 font-medium">Name</th><th className="px-5 py-3 font-medium">Type</th><th className="px-5 py-3 font-medium">Enrollment / role</th><th className="px-5 py-3 font-medium">Vetting</th><th className="px-5 py-3 font-medium">Last active</th><th className="px-5 py-3 font-medium">Assigned</th><th className="px-5 py-3 font-medium">Overdue</th><th/></tr></thead><tbody>{filtered.map(e=><tr key={e.id} className="border-t border-white/[.05] hover:bg-white/[.018]"><td className="cursor-pointer px-5 py-3" onClick={()=>setSelected(e)}><p className="font-medium text-white">{e.full_name||e.email}</p><p className="text-xs text-slate-500">{e.email}</p></td><td className="px-5 py-3">{e.party_type==='vendor'?<Tag tone="blue">Vendor</Tag>:<Tag>Employee</Tag>}</td><td className="max-w-[260px] px-5 py-3 text-slate-400">{e.vendor_category||e.role_name||e.title||e.staff_role?.replace(/_/g,' ')||'—'}</td><td className="px-5 py-3">{e.party_type==='vendor'?<button onClick={()=>setSelected(e)} className="text-gold hover:underline">{e.application_documents||0} secure doc{e.application_documents===1?'':'s'}</button>:'—'}</td><td className="px-5 py-3 text-slate-500">{e.last_seen_at?timeAgo(e.last_seen_at):'never'}</td><td className="px-5 py-3 tabular-nums text-slate-300">{e.tasks_assigned}</td><td className={`px-5 py-3 tabular-nums ${e.tasks_overdue?'text-rose-300':'text-slate-400'}`}>{e.tasks_overdue}</td><td className="px-5 py-3 text-right">{e.status==='pending'?<button onClick={()=>setSelected(e)} className="rounded-lg border border-gold/25 px-3 py-1.5 text-xs font-medium text-gold hover:bg-gold/[.05]">Review</button>:<Tag tone="green">Active</Tag>}</td></tr>)}</tbody></table></Panel>}
 
-      {canApprove && <div className="sticky bottom-0 border-t border-white/10 bg-navy-950 pt-4"><button type="button" disabled={approving || (data.employee.party_type === 'vendor' && data.vendor_documents.length === 0)} onClick={onApprove} className="btn-gold w-full disabled:cursor-not-allowed disabled:opacity-40">{approving ? 'Approving…' : data.employee.party_type === 'vendor' ? 'Approve provider' : 'Approve account'}</button>{data.employee.party_type === 'vendor' && data.vendor_documents.length === 0 && <p className="mt-2 text-center text-xs text-rose-300">Required provider documents must be attached before approval.</p>}</div>}
-    </div>}
-  </DialogContent></Dialog>
+    {inviteOpen&&<InviteVendorDialog onClose={()=>setInviteOpen(false)}/>} 
+    {selected&&<EmployeeDetail id={selected.id} name={selected.full_name||selected.email} canApprove={selected.status==='pending'} approving={approving===selected.id} onApprove={()=>approve(selected)} onClose={()=>setSelected(null)}/>} 
+  </div>
 }
+
+function InviteVendorDialog({onClose}:{onClose:()=>void}){
+  const[form,setForm]=useState({full_name:'',email:'',company_name:'',vendor_category:''}); const[busy,setBusy]=useState(false)
+  async function send(){if(!form.email.includes('@'))return toast.error('Enter a valid vendor email.');setBusy(true);try{const r=await api.post<{email_status:string;email_error?:string|null}>('/admin/invitations',{invite_type:'vendor',...form});if(r.email_status==='failed')toast.error(`Invitation created, but email failed: ${r.email_error||'delivery error'}`);else toast.success('Vendor invitation sent.');onClose()}catch(err){toast.error(err instanceof ApiError?err.message:'Could not send vendor invitation.')}finally{setBusy(false)}}
+  return <Dialog open onOpenChange={open=>!open&&onClose()}><DialogContent title="Invite Vendor" description="Send a private provider application link. The vendor will complete enrollment-specific questions and secure identity/business verification before approval." className="max-w-lg"><div className="space-y-4"><div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-4"><div className="flex gap-3"><ShieldCheck size={18} className="mt-0.5 text-emerald-300"/><div><p className="text-sm font-semibold text-white">Secure provider intake</p><p className="mt-1 text-xs leading-5 text-slate-500">The invitation email opens a private application with conditional requirements, ID front/back, EIN verification when applicable, and credential uploads.</p></div></div></div><label className="block text-xs text-slate-400">Vendor name<input className="input mt-1 w-full" value={form.full_name} onChange={e=>setForm({...form,full_name:e.target.value})}/></label><label className="block text-xs text-slate-400">Email *<input className="input mt-1 w-full" type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label><label className="block text-xs text-slate-400">Company / practice<input className="input mt-1 w-full" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})}/></label><label className="block text-xs text-slate-400">Initial category / note<input className="input mt-1 w-full" placeholder="Optional — vendor chooses actual enrollments in application" value={form.vendor_category} onChange={e=>setForm({...form,vendor_category:e.target.value})}/></label><div className="flex justify-end gap-2 pt-2"><button onClick={onClose} className="btn-outline">Cancel</button><button disabled={busy} onClick={()=>void send()} className="btn-gold disabled:opacity-60">{busy?'Sending…':'Send Invitation'}</button></div></div></DialogContent></Dialog>
+}
+
+function EmployeeDetail({id,name,canApprove,approving,onApprove,onClose}:{id:string;name:string;canApprove:boolean;approving:boolean;onApprove:()=>void;onClose:()=>void}){
+  const[data,setData]=useState<EmployeeDetailData|null>(null); const[loading,setLoading]=useState(true)
+  useEffect(()=>{api.get<EmployeeDetailData>(`/admin/employees/${id}`).then(setData).catch(()=>toast.error('Could not load provider review.')).finally(()=>setLoading(false))},[id])
+  const docLabel=(v:string)=>({government_id_front:'Government ID — Front',government_id_back:'Government ID — Back',ein_letter:'IRS EIN Letter',professional_license:'Professional license / credential',insurance:'Proof of insurance',w9:'W-9',supporting:'Supporting document'}[v]||v.replace(/_/g,' '))
+  const requiredDocsReady=(d:EmployeeDetailData)=>{if(d.employee.party_type!=='vendor')return true;const types=new Set(d.vendor_documents.map(x=>x.document_type));if(!types.has('government_id_front')||!types.has('government_id_back'))return false;const app=d.vendor_application;if(app&&((app.entity_type&&app.entity_type!=='Individual / Sole Proprietor')||app.has_ein==='yes')&&!types.has('ein_letter'))return false;if(app?.license_status==='yes'&&!types.has('professional_license'))return false;return true}
+  return <Dialog open onOpenChange={open=>!open&&onClose()}><DialogContent title={name} description={data?.employee.party_type==='vendor'?'Review application answers and private verification documents before approving provider access.':'Team member activity and access.'} className="max-w-3xl">{loading||!data?<p className="text-sm text-slate-400">Loading…</p>:<div className="max-h-[74vh] space-y-6 overflow-y-auto pr-1">
+    {data.employee.party_type==='vendor'&&<><section><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-white">Enrollment application</h3>{data.vendor_application?<Tag tone="green">Submitted</Tag>:<Tag tone="gold">Legacy / basic application</Tag>}</div>{data.vendor_application?<ApplicationReview app={data.vendor_application}/>:<p className="rounded-lg border border-white/[.08] p-3 text-xs text-slate-500">This provider applied before structured vendor enrollment was enabled.</p>}</section><section><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-white">Verification documents</h3><Tag tone={requiredDocsReady(data)?'green':'red'}>{requiredDocsReady(data)?'Core docs ready':'Requirements incomplete'}</Tag></div>{data.vendor_documents.length===0?<div className="rounded-lg border border-rose-400/20 bg-rose-400/[.04] p-3 text-xs text-rose-200">No verification documents received.</div>:<div className="divide-y divide-white/[.07] border-y border-white/[.07]">{data.vendor_documents.map(doc=><div key={doc.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-medium text-white">{docLabel(doc.document_type)}</p><p className="text-xs text-slate-500">{doc.file_name}</p></div><a href={`/api/admin/employees/${id}/vendor-documents/${doc.id}/download`} className="btn-outline !px-3 !py-1.5 text-xs">Open securely</a></div>)}</div>}</section></>}
+    <div className="grid grid-cols-3 gap-3 text-center"><Metric value={data.employee.tasks_assigned} label="Assigned"/><Metric value={data.employee.tasks_completed} label="Completed"/><Metric value={data.avg_response_hours!==null?`${data.avg_response_hours.toFixed(1)}h`:'—'} label="Avg. response"/></div>
+    {canApprove&&<div className="sticky bottom-0 border-t border-white/[.08] bg-navy-950/95 pt-4 backdrop-blur"><button disabled={approving||!requiredDocsReady(data)} onClick={onApprove} className="btn-gold w-full disabled:cursor-not-allowed disabled:opacity-40">{approving?'Approving…':'Approve provider access'}</button>{!requiredDocsReady(data)&&<p className="mt-2 text-center text-xs text-rose-300">Core identity/business document requirements must be satisfied first.</p>}</div>}
+  </div>}</DialogContent></Dialog>
+}
+
+function ApplicationReview({app}:{app:VendorApplication}){const rows:[string,unknown][]=[['Entity',app.entity_type],['Company',app.company_name],['Uses EIN',app.has_ein],['Enrollments',app.enrollments?.join(', ')],['Service area',app.service_area?.join(', ')],['Experience',app.years_experience?`${app.years_experience} years`:null],['Travel radius',app.travel_radius],['License required',app.license_status],['Insurance',app.insurance_status],['Notary commission',app.commission_number?`${app.commission_state||''} ${app.commission_number} · exp ${app.commission_expiration||'—'}`:null],['RON provider',app.ron_provider],['Technology experience',app.technology_platforms],['Accounting credentials',app.accounting_credentials],['Other service',app.other_service],['Notes',app.notes]];return <div className="grid gap-px overflow-hidden rounded-xl border border-white/[.08] bg-white/[.08] sm:grid-cols-2">{rows.filter(([,v])=>v).map(([label,value])=><div key={label} className="bg-navy-900 px-4 py-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-600">{label}</p><p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{String(value)}</p></div>)}</div>}
+function Metric({value,label}:{value:string|number;label:string}){return <div className="rounded-xl border border-white/[.08] p-3"><p className="text-xl font-semibold text-white tabular-nums">{value}</p><p className="text-xs text-slate-500">{label}</p></div>}
