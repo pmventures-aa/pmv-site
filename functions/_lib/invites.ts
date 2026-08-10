@@ -1,6 +1,7 @@
 import type { Env } from './types'
-import { sendEmailStrict, escapeHtml } from './email'
+import { sendEmailStrict } from './email'
 import { uuid } from './crypto'
+import { renderRelationshipEvent } from './emailTemplates/relationship'
 
 export type InviteType = 'vendor' | 'client' | 'staff' | 'trusted_contact'
 
@@ -103,11 +104,35 @@ export async function rotateInviteToken(env: Env, inviteId: string): Promise<{ t
   return { token, expiresAt }
 }
 
-function inviteLabel(type: InviteType): string {
-  if (type === 'vendor') return 'professional provider onboarding'
-  if (type === 'trusted_contact') return 'Trusted Contact access'
-  if (type === 'client') return 'Pinnacle client onboarding'
-  return 'Pinnacle team onboarding'
+function inviteCopy(type: InviteType, clientName?: string | null): { subject:string; eyebrow:string; title:string; body:string; cta:string } {
+  if (type === 'vendor') return {
+    subject: 'You’re invited to join the Pinnacle Professional Network',
+    eyebrow: 'Pinnacle Professional Network',
+    title: 'Your professional network invitation is ready.',
+    body: 'Pinnacle would like to learn more about your services and qualifications for our vetted professional network. Approved providers may be invited to assignment-specific opportunities when their expertise, location, availability, and credentials fit a client need.\n\nThis is not an employment offer and joining the network does not guarantee work volume. Your application helps us understand where you fit and what assignments we should — and should not — send your way.',
+    cta: 'Begin Provider Application',
+  }
+  if (type === 'trusted_contact') return {
+    subject: `${clientName || 'A Pinnacle client'} invited you as a Trusted Contact`,
+    eyebrow: 'Trusted Contact access',
+    title: 'You’ve been invited into a Pinnacle client workspace.',
+    body: `${clientName || 'A Pinnacle client'} has chosen to give you secure access to specific parts of their Pinnacle Client Portal. The client controls exactly what you can view or edit, and they can change or revoke that access at any time.\n\nAccept the invitation to create your own secure login. You will never need to share the client’s password or use their account.`,
+    cta: 'Review My Access',
+  }
+  if (type === 'client') return {
+    subject: 'You’re invited to start your Pinnacle journey',
+    eyebrow: 'Pinnacle client invitation',
+    title: 'Let’s make the next step easier.',
+    body: 'Pinnacle has created a private invitation for you to begin your Client Portal experience. Start with the situation or service that brought you here — you do not need to have every detail figured out before creating your account.\n\nYour portal becomes the home base for services, applications, documents, messages, appointments, billing, and the people helping coordinate the work.',
+    cta: 'Start My Pinnacle Account',
+  }
+  return {
+    subject: 'You’ve been invited to Pinnacle HQ',
+    eyebrow: 'Pinnacle HQ',
+    title: 'Your Pinnacle team invitation is ready.',
+    body: 'You have been invited to join Pinnacle Management Ventures with a role and permission set defined by the firm. Your HQ experience will show only the tools and client information your account is authorized to access.\n\nUse your private setup link to create your secure account.',
+    cta: 'Set Up My HQ Access',
+  }
 }
 
 export async function sendInviteEmail(
@@ -117,18 +142,25 @@ export async function sendInviteEmail(
   expiresAt: string,
 ): Promise<string> {
   const url = inviteUrl(row.invite_type, token)
-  const first = (row.full_name || '').trim().split(/\s+/)[0] || 'there'
-  const context = row.invite_type === 'trusted_contact' && row.client_name
-    ? `${escapeHtml(row.client_name)} invited you to become a Trusted Contact in their Pinnacle Client Portal.`
-    : `You have been invited to complete ${inviteLabel(row.invite_type)} with Pinnacle Management Ventures.`
-  const subject = row.invite_type === 'trusted_contact'
-    ? `Trusted Contact invitation from ${row.client_name || 'a Pinnacle client'}`
-    : `You're invited to Pinnacle — ${inviteLabel(row.invite_type)}`
+  const copy = inviteCopy(row.invite_type, row.client_name)
+  const firstName = (row.full_name || '').trim().split(/\s+/)[0] || 'there'
+  const rendered = renderRelationshipEvent({
+    eventKey: `invite_${row.invite_type}`,
+    firstName,
+    subject: copy.subject,
+    preheader: 'Your private Pinnacle invitation expires in 24 hours.',
+    eyebrow: copy.eyebrow,
+    title: copy.title,
+    body: `${copy.body}\n\nThis private, one-time invitation expires in 24 hours. If you were not expecting it, you can ignore this message or reply to Pinnacle before creating an account.`,
+    ctaLabel: copy.cta,
+    ctaUrl: url,
+  })
   return sendEmailStrict(env, {
     to: row.email,
-    subject,
-    html: `<div style="font-family:Arial,sans-serif;color:#15243b;line-height:1.6"><div style="border-top:6px solid #c59b45;padding-top:22px"><p>Hi ${escapeHtml(first)},</p><p>${context}</p><p><a href="${escapeHtml(url)}" style="display:inline-block;background:#c59b45;color:#091525;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:8px">Open invitation</a></p><p style="font-size:13px;color:#5e6877">This private one-time invitation expires in 24 hours (${escapeHtml(expiresAt)}). If you were not expecting it, you can ignore this email.</p><p>Pinnacle Management Ventures</p></div></div>`,
-    text: `Hi ${first},\n\n${row.invite_type === 'trusted_contact' && row.client_name ? `${row.client_name} invited you to become a Trusted Contact.` : `You have been invited to complete ${inviteLabel(row.invite_type)} with Pinnacle Management Ventures.`}\n\nOpen: ${url}\n\nThis private one-time invitation expires in 24 hours (${expiresAt}).`,
+    subject: rendered.subject,
+    html: rendered.html,
+    text: `${rendered.text}\n\nInvitation expiration: ${expiresAt}`,
+    replyTo: 'orders@pinnaclemanagementventures.com',
     idempotencyKey: `invite-${row.id}-${expiresAt}`,
     tags: [{ name: 'category', value: 'access_invite' }, { name: 'invite_type', value: row.invite_type }],
   })
