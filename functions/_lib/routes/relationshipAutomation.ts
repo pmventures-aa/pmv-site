@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireOwner, requireUser } from '../mid'
 import { runDueClientNurture } from '../relationshipAutomation'
+import { runClientNotificationOutbox } from '../clientNotificationOutbox'
 
 export const relationshipAutomationRoutes = new Hono<AppEnv>()
 export const relationshipAutomationAdminRoutes = new Hono<AppEnv>()
@@ -90,17 +91,24 @@ relationshipAutomationAdminRoutes.patch('/notification-center/templates/:eventKe
 })
 
 relationshipAutomationAdminRoutes.get('/nurture-campaign', requireOwner, async (c) => {
-  const summary=await c.env.DB.prepare(
-    `SELECT status,COUNT(*) count FROM client_nurture_enrollments GROUP BY status`,
-  ).all()
+  const summary=await c.env.DB.prepare(`SELECT status,COUNT(*) count FROM client_nurture_enrollments GROUP BY status`).all()
   const deliveries=await c.env.DB.prepare(
     `SELECT d.*,u.email,u.full_name FROM client_nurture_deliveries d JOIN users u ON u.id=d.user_id ORDER BY d.sent_at DESC LIMIT 100`,
   ).all()
-  return c.json({summary:summary.results||[],deliveries:deliveries.results||[]})
+  const outbox=await c.env.DB.prepare(
+    `SELECT status,COUNT(*) count FROM client_notification_outbox GROUP BY status`,
+  ).all()
+  return c.json({summary:summary.results||[],deliveries:deliveries.results||[],notification_outbox:outbox.results||[]})
 })
 
-// Deliberately idempotent and due-date constrained so the scheduled caller cannot send early or duplicate steps.
+// These scheduled handlers are deliberately idempotent. The nurture runner enforces
+// each campaign step's due date and unique delivery, while the event outbox changes
+// each queued record to sent/skipped once processed.
 relationshipAutomationRoutes.post('/automation/nurture/run', async (c) => {
   const result=await runDueClientNurture(c.env,50)
+  return c.json({ok:true,...result})
+})
+relationshipAutomationRoutes.post('/automation/client-notifications/run', async (c) => {
+  const result=await runClientNotificationOutbox(c.env,75)
   return c.json({ok:true,...result})
 })
