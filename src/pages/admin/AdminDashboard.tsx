@@ -29,18 +29,18 @@ function StatLink({label,value,to}:{label:string;value:number|string;to?:string}
 const POLL_MS=60_000
 
 export default function AdminDashboard(){
-  const {user}=useAuth(); const p=useAppPath(); const[data,setData]=useState<DashboardResponse|null>(null)
+  const {user}=useAuth(); const p=useAppPath(); const[data,setData]=useState<DashboardResponse|null>(null); const[createOpen,setCreateOpen]=useState(false)
   useEffect(()=>{const load=()=>api.get<DashboardResponse>('/admin/dashboard').then(setData).catch(()=>{});load();const t=setInterval(load,POLL_MS);return()=>clearInterval(t)},[])
   const stats=data?.stats; const na=data?.needs_attention; const attentionCount=na?na.overdue_tasks.length+na.overdue_invoices.length+na.stale_tickets.length+na.stale_inquiries.length:0
-  const quick='group inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-slate-200 transition-all duration-200 hover:-translate-y-px hover:border-gold/40 hover:bg-gold/[.035] hover:text-gold'
+  const quick='group inline-flex shrink-0 items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-xs font-medium text-slate-200 transition-all duration-200 hover:-translate-y-px hover:border-gold/40 hover:bg-gold/[.035] hover:text-gold'
 
-  return <div>
+  return <div className="pb-20 lg:pb-0">
     <DashboardWelcome name={user?.first_name||user?.full_name} userId={user?.id} variant="admin" subtitle={user?.role==='admin'?'Here’s the firm-wide picture and the work that needs attention next.':'Here’s your assigned client work and the next items that need attention.'} className="mb-7"/>
 
     <section aria-labelledby="workspace-heading">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-3">
         <div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">Operational pulse</p><h2 id="workspace-heading" className="mt-1 font-display text-xl font-medium text-white">Today’s workspace</h2></div>
-        <div className="flex flex-wrap gap-2">
+        <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           <Link to={p('inquiries')} className={quick}><Icon name="plus" size={13}/>Add lead</Link>
           <Link to={p('service-assignments')} className={quick}><Icon name="services" size={13}/>Assign service</Link>
           <Link to={p('invoices')} className={quick}><Icon name="billing" size={13}/>New invoice</Link>
@@ -69,6 +69,15 @@ export default function AdminDashboard(){
     <div className="mt-7 grid gap-5 lg:grid-cols-2">
       <Panel className="!p-0"><div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">Schedule</p><h2 className="mt-0.5 text-sm font-semibold text-white">Upcoming appointments</h2></div></div>{!data?<p className="px-5 py-6 text-sm text-slate-400">Loading…</p>:data.upcoming_appointments.length===0?<div className="p-5"><EmptyState label="Nothing scheduled."/></div>:<ul className="divide-y divide-white/5">{data.upcoming_appointments.map((a)=><li key={a.id} className="px-5 py-3.5 text-sm transition hover:bg-white/[0.02]"><Link to={p(`clients/${a.client_user_id}`)} className="font-medium text-white hover:text-gold">{a.title||'Appointment'}</Link><p className="mt-1 text-xs text-slate-400">{a.client_name||a.client_email} · {new Date(a.starts_at).toLocaleString()}</p></li>)}</ul>}</Panel>
       <Panel className="!p-0"><div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">Firm activity</p><h2 className="mt-0.5 text-sm font-semibold text-white">Recent activity</h2></div><Link to={p('activity')} className="text-xs font-medium text-gold hover:underline">View all</Link></div>{!data?<p className="px-5 py-6 text-sm text-slate-400">Loading…</p>:data.recent_activity.length===0?<div className="p-5"><EmptyState label="No activity yet."/></div>:<ul className="divide-y divide-white/5">{data.recent_activity.slice(0,8).map((e)=><li key={e.id} className="px-5 py-3.5 text-sm transition hover:bg-white/[0.02]"><p className="text-slate-200">{describeActivity(e)}</p><p className="mt-1 text-xs text-slate-500">{timeAgo(e.created_at)}</p></li>)}</ul>}</Panel>
+    </div>
+
+    <div className="fixed right-4 z-40 lg:hidden" style={{bottom:'calc(env(safe-area-inset-bottom) + 1rem)'}}>
+      {createOpen&&<div className="mb-3 w-52 overflow-hidden rounded-xl border border-white/10 bg-navy-900 shadow-2xl">
+        <Link to={p('inquiries')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 border-b border-white/10 px-4 py-3 text-sm text-slate-200 hover:bg-white/[.04] hover:text-gold"><Icon name="plus" size={15}/>Add lead</Link>
+        <Link to={p('service-assignments')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 border-b border-white/10 px-4 py-3 text-sm text-slate-200 hover:bg-white/[.04] hover:text-gold"><Icon name="services" size={15}/>Assign service</Link>
+        <Link to={p('invoices')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-white/[.04] hover:text-gold"><Icon name="billing" size={15}/>New invoice</Link>
+      </div>}
+      <button type="button" onClick={()=>setCreateOpen(v=>!v)} className="ml-auto flex h-12 items-center gap-2 rounded-full border border-gold/30 bg-gold px-4 text-sm font-semibold text-navy-950 shadow-2xl shadow-black/30 transition active:scale-[.98]" aria-expanded={createOpen} aria-label="Create new item"><Icon name={createOpen?'close':'plus'} size={17}/><span>{createOpen?'Close':'Create'}</span></button>
     </div>
   </div>
 }
