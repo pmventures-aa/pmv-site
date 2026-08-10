@@ -4,7 +4,7 @@ export type IconName =
   | 'home' | 'services' | 'briefcase' | 'check' | 'file' | 'mail' | 'calendar' | 'billing' | 'support'
   | 'building' | 'team' | 'bell' | 'shield' | 'pipeline' | 'leads' | 'clients' | 'messages' | 'communications'
   | 'activity' | 'assignments' | 'reports' | 'audit' | 'users' | 'settings' | 'refresh' | 'search' | 'menu'
-  | 'close' | 'chevronLeft' | 'chevronRight' | 'plus' | 'send' | 'edit' | 'arrowRight' | 'sparkles'
+  | 'close' | 'chevronLeft' | 'chevronRight' | 'chevronDown' | 'plus' | 'send' | 'edit' | 'arrowRight' | 'sparkles'
 
 const paths: Record<IconName, JSX.Element> = {
   home: <><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9.5 20v-6h5v6"/></>,
@@ -37,6 +37,7 @@ const paths: Record<IconName, JSX.Element> = {
   close: <path d="m6 6 12 12M18 6 6 18"/>,
   chevronLeft: <path d="m15 18-6-6 6-6"/>,
   chevronRight: <path d="m9 18 6-6-6-6"/>,
+  chevronDown: <path d="m6 9 6 6 6-6"/>,
   plus: <path d="M12 5v14M5 12h14"/>,
   send: <><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></>,
   edit: <><path d="M4 20h4L20 8l-4-4L4 16z"/><path d="m14 6 4 4"/></>,
