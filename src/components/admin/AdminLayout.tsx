@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, Link } from 'react-router-dom'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
@@ -16,7 +16,6 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.localStorage.getItem('pmv_hq_sidebar_open') !== '0'
@@ -58,6 +57,26 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
     return (
       <>
         <div className={`mb-5 flex min-h-12 items-center ${compact ? 'justify-center px-0' : 'px-1'}`}><Logo showText={!compact} /></div>
+        {mobile && (
+          <div className="mb-5 space-y-3 border-b border-white/10 pb-5">
+            <div>
+              <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">Find anything</p>
+              <GlobalSearch className="w-full" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={refreshPage} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[.025] px-3 py-2.5 text-left text-xs font-medium text-slate-200 transition hover:border-gold/30 hover:text-gold">
+                <Icon name="refresh" size={15} /> Refresh
+              </button>
+              <Link to={p('communications')} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[.025] px-3 py-2.5 text-xs font-medium text-slate-200 transition hover:border-gold/30 hover:text-gold">
+                <Icon name="communications" size={15} /> Messages
+              </Link>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/[.02] p-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">Appearance</p>
+              <ThemeToggle />
+            </div>
+          </div>
+        )}
         <nav className="flex flex-1 flex-col overflow-y-auto pr-0.5">
           {groupedNav.map((group, groupIndex) => (
             <div key={group.section} className={groupIndex === 0 ? '' : 'mt-5'}>
@@ -79,7 +98,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
         ) : (
           <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.025] p-3 transition hover:border-white/15 hover:bg-white/[0.035]">
             <div className="flex items-center gap-3">{user && <Avatar userId={user.id} name={user.full_name} size={36} editable uploadPath="/me/avatar" />}<div className="min-w-0"><p className="truncate text-sm font-medium text-white">{displayName}</p><p className="truncate text-xs text-slate-500">{user?.email}</p></div></div>
-            <div className="mt-3"><ThemeToggle /></div>
+            {!mobile && <div className="mt-3"><ThemeToggle /></div>}
             <button onClick={() => logout()} className={`${btnOutline} mt-3 w-full !py-1.5 text-xs`}>Sign out</button>
           </div>
         )}
@@ -94,24 +113,25 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
       <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-visible border-r border-white/10 bg-navy-900 transition-[width,padding] duration-200 lg:flex print:hidden ${sidebarOpen ? 'w-64 p-4' : 'w-[76px] p-3'}`}><SidebarContent compact={!sidebarOpen} /></aside>
 
       <header className="border-b border-white/10 bg-navy-900 lg:hidden print:hidden">
-        <div className="flex items-center justify-between px-4 py-3">
-          <Logo />
-          <div className="flex items-center gap-2">
-            <span className="hidden text-xs text-slate-400 sm:inline">{activeLabel}</span>
-            <ThemeToggle compact />
-            <button onClick={refreshPage} className={iconButton} aria-label="Refresh this HQ page" title="Refresh page"><Icon name="refresh" size={17} /></button>
-            <button onClick={() => setMobileSearchOpen((v) => !v)} className={iconButton} aria-label="Search"><Icon name="search" size={17} /></button>
-            <MailBell /><NotificationBell />
+        <div className="flex min-h-[62px] items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
+          <Logo className="min-w-0 [&>div:first-child]:h-9 [&>div:first-child]:w-9 [&_img]:h-7 [&_img]:w-7 [&>div:last-child>div:first-child]:text-[13px] [&>div:last-child>div:last-child]:text-[9px]" />
+          <div className="flex shrink-0 items-center gap-2">
+            <NotificationBell />
             <button onClick={() => setMobileOpen(true)} className={iconButton} aria-label="Open menu"><Icon name="menu" size={19} /></button>
           </div>
         </div>
-        {mobileSearchOpen && <div className="border-t border-white/10 px-4 py-3"><GlobalSearch /></div>}
       </header>
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 flex h-full w-72 flex-col bg-navy-950 p-4 shadow-2xl"><button onClick={() => setMobileOpen(false)} className={`${iconButton} mb-4 self-end`} aria-label="Close menu"><Icon name="close" size={18} /></button><SidebarContent mobile /></div>
+          <div className="absolute right-0 top-0 flex h-full w-[min(88vw,340px)] flex-col overflow-y-auto bg-navy-950 p-4 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">{badge}</p><p className="mt-0.5 text-sm font-medium text-white">{activeLabel}</p></div>
+              <button onClick={() => setMobileOpen(false)} className={iconButton} aria-label="Close menu"><Icon name="close" size={18} /></button>
+            </div>
+            <SidebarContent mobile />
+          </div>
         </div>
       )}
 
