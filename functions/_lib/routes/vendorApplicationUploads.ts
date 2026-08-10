@@ -29,6 +29,17 @@ type UploadSession = { created_at: string; files: PendingFile[] }
 function key(token: string) { return `vendor-upload:${token}` }
 function safeName(value: string) { return (value || 'document').replace(/[^a-zA-Z0-9._ -]/g, '_').slice(0, 140) }
 
+async function ensureApplicationProfileTable(env: AppEnv['Bindings']) {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS vendor_application_profiles (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      application_json TEXT NOT NULL,
+      submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  ).run()
+}
+
 export const vendorApplicationUploadRoutes = new Hono<AppEnv>()
 
 vendorApplicationUploadRoutes.post('/vendor-application/session', async (c) => {
@@ -101,6 +112,7 @@ vendorApplicationUploadRoutes.post('/vendor-application/session/:token/finalize'
   if (parsedBody.application_data && typeof parsedBody.application_data === 'object') {
     const applicationJson = JSON.stringify(parsedBody.application_data).slice(0, 30000)
     try {
+      await ensureApplicationProfileTable(c.env)
       await c.env.DB.prepare(
         `INSERT INTO vendor_application_profiles(user_id, application_json, submitted_at, updated_at)
          VALUES (?, ?, datetime('now'), datetime('now'))
