@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useCapabilities } from '../../lib/capabilities'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, EmptyState, Tag, btnPrimary, btnOutline, inputCls, NoAccess, SkeletonTable } from '../../components/admin/ui'
 import { RichTextComposer } from '../../components/admin/RichTextComposer'
 import { Dialog, DialogContent, DialogTrigger } from '../../components/kit/Dialog'
@@ -65,15 +66,19 @@ export default function CommunicationsCRMAdmin() {
   const [signature, setSignature] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    setError(null)
     try {
       const [a, m, s] = await Promise.all([
         api.get<AudienceData>('/admin/comms/audience'),
         api.get<{ messages: MessageRow[] }>('/admin/comms/messages'),
         api.get<{ signature_html: string }>('/admin/my-signature'),
       ])
-      setAudience(a); setMessages(m.messages); setSignature(s.signature_html || '')
+      setAudience(a); setMessages(m.messages)
+      // Never overwrite a signature the employee is actively editing during a
+      // background sync. Initial/manual loads can hydrate the editor normally.
+      if (!silent) setSignature(s.signature_html || '')
       if (!seeded.current) {
         const lead = searchParams.get('lead')
         const leadIds = searchParams.get('leadIds')?.split(',').filter(Boolean) ?? []
@@ -84,11 +89,16 @@ export default function CommunicationsCRMAdmin() {
         if (client) { setUserIds([client]); setAudienceTab('records') }
         seeded.current = true
       }
-    } catch (err) { setError(err instanceof ApiError ? err.message : 'Could not load Communications Center.') }
-    finally { setLoading(false) }
+    } catch (err) {
+      if (!silent) setError(err instanceof ApiError ? err.message : 'Could not load Communications Center.')
+    } finally {
+      if (!silent) setLoading(false)
+    }
   }, [searchParams])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { void load() }, [load])
+  const backgroundLoad = useCallback(() => load(true), [load])
+  useLiveRefresh(backgroundLoad)
 
   useEffect(() => {
     if (!caps.can_manage_communications) return
