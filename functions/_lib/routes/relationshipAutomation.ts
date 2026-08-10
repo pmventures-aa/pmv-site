@@ -7,6 +7,21 @@ import { runClientNotificationOutbox } from '../clientNotificationOutbox'
 export const relationshipAutomationRoutes = new Hono<AppEnv>()
 export const relationshipAutomationAdminRoutes = new Hono<AppEnv>()
 
+function timingSafeEqualText(a: string, b: string) {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+async function requireAutomationCron(c: any, next: any) {
+  const expected = String(c.env.AUTOMATION_CRON_SECRET || '').trim()
+  if (!expected) return c.json({ error: 'automation secret not configured' }, 503)
+  const provided = String(c.req.header('x-pmv-automation-secret') || '').trim()
+  if (!provided || !timingSafeEqualText(provided, expected)) return c.json({ error: 'forbidden' }, 403)
+  await next()
+}
+
 relationshipAutomationRoutes.get('/portal/notification-preferences', requireUser, async (c) => {
   const user = c.get('user')
   if (user.role !== 'client') return c.json({ error:'client account required' },403)
@@ -101,14 +116,12 @@ relationshipAutomationAdminRoutes.get('/nurture-campaign', requireOwner, async (
   return c.json({summary:summary.results||[],deliveries:deliveries.results||[],notification_outbox:outbox.results||[]})
 })
 
-// These scheduled handlers are deliberately idempotent. The nurture runner enforces
-// each campaign step's due date and unique delivery, while the event outbox changes
-// each queued record to sent/skipped once processed.
-relationshipAutomationRoutes.post('/automation/nurture/run', async (c) => {
+// Scheduled handlers are idempotent and protected by a dedicated cron secret.
+relationshipAutomationRoutes.post('/automation/nurture/run', requireAutomationCron, async (c) => {
   const result=await runDueClientNurture(c.env,50)
   return c.json({ok:true,...result})
 })
-relationshipAutomationRoutes.post('/automation/client-notifications/run', async (c) => {
+relationshipAutomationRoutes.post('/automation/client-notifications/run', requireAutomationCron, async (c) => {
   const result=await runClientNotificationOutbox(c.env,75)
   return c.json({ok:true,...result})
 })
