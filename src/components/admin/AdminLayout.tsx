@@ -38,17 +38,37 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
     window.location.reload()
   }
 
+  // Group nav items by section, preserving order. Items without a section
+  // land in the leading unnamed group at the top (Dashboard, etc.) so we
+  // don't need a "General" heading above a single row.
+  const grouped: { section: string | null; items: NavItem[] }[] = []
+  for (const item of nav) {
+    const section = item.section ?? null
+    const last = grouped[grouped.length - 1]
+    if (last && last.section === section) last.items.push(item)
+    else grouped.push({ section, items: [item] })
+  }
+
   const sidebarContent = (
     <>
       <div className="mb-6 px-1">
         <Logo />
       </div>
-      <nav className="flex flex-1 flex-col gap-1">
-        {nav.map((item) => (
-          <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
-            <span className="grid h-6 w-6 shrink-0 place-items-center text-gold"><item.icon size={18} strokeWidth={1.75} /></span>
-            {item.label}
-          </NavLink>
+      <nav className="flex flex-1 flex-col gap-4">
+        {grouped.map((group, index) => (
+          <div key={group.section ?? `__top-${index}`} className="flex flex-col gap-1">
+            {group.section && (
+              <div className="mb-1 mt-2 px-3 text-[10px] font-semibold uppercase tracking-[.14em] text-slate-500">
+                {group.section}
+              </div>
+            )}
+            {group.items.map((item) => (
+              <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
+                <span className="grid h-6 w-6 shrink-0 place-items-center text-gold"><item.icon size={18} strokeWidth={1.75} /></span>
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
       <div className="mt-6 rounded-md border border-white/10 bg-white/[0.02] p-3">
@@ -131,11 +151,11 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
       )}
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <div className="hidden items-center justify-between gap-4 border-b border-white/10 bg-navy-900/60 px-8 py-3 lg:flex print:hidden">
+        <div className="hidden items-center justify-between gap-4 border-b border-white/10 bg-navy-900/60 px-8 py-2.5 lg:flex print:hidden">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <button
               onClick={toggleSidebar}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/10 text-slate-300 transition hover:border-gold/40 hover:text-gold"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-white/5 hover:text-white"
               aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
               title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
             >
@@ -143,17 +163,20 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
             </button>
             <GlobalSearch className="w-full max-w-sm" />
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          {/* Right cluster: refresh + bells grouped in a single subtle
+              chip so they read as one utility strip instead of five
+              competing controls. */}
+          <div className="flex shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/[.02] px-1 py-0.5">
             <button
               onClick={refreshPage}
-              className={`${btnOutline} !px-3 !py-1.5 text-xs`}
-              title="Reload the current HQ page and its latest data"
+              className="grid h-8 w-8 place-items-center rounded text-slate-400 transition hover:bg-white/5 hover:text-gold"
+              title="Reload this page"
+              aria-label="Reload this HQ page"
             >
-              <RotateCw size={13} /> Refresh
+              <RotateCw size={14} />
             </button>
             <MailBell />
             <NotificationBell />
-            <span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span>
           </div>
         </div>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
