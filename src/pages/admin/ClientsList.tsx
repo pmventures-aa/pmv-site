@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 
 interface ClientRow {
   id: string
@@ -27,12 +28,17 @@ export default function ClientsList() {
   const [q, setQ] = useState('')
   const [onboarding, setOnboarding] = useState('all')
 
-  useEffect(() => {
-    api
-      .get<{ clients: ClientRow[] }>('/admin/clients')
-      .then((r) => setClients(r.clients))
-      .finally(() => setLoading(false))
+  const load = useCallback(async () => {
+    try {
+      const r = await api.get<{ clients: ClientRow[] }>('/admin/clients')
+      setClients(r.clients)
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => { void load() }, [load])
+  useLiveRefresh(load)
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
