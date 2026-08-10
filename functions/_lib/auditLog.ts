@@ -81,14 +81,27 @@ export function auditInsert(env: Env, opts: AuditOpts): D1PreparedStatement {
 export async function logAudit(env: Env, opts: AuditOpts): Promise<void> {
   try {
     await auditInsert(env, opts).run()
+    return
   } catch (error) {
-    // Production deploys can briefly lead D1 migrations. Preserve authentication
-    // and other critical user flows by falling back to the pre-0039 audit schema
-    // when the new geo columns are not available yet.
+    // Production deploys can briefly lead D1 migrations. Try the pre-0039
+    // schema first so audit writes continue during a rolling deploy.
     const message = error instanceof Error ? error.message : String(error)
     const missingGeoColumns = /actor_(city|region|country)|no such column|has no column named/i.test(message)
-    if (!missingGeoColumns) throw error
-    await legacyAuditInsert(env, opts).run()
+    if (missingGeoColumns) {
+      try {
+        await legacyAuditInsert(env, opts).run()
+        return
+      } catch (legacyError) {
+        console.error('[audit] legacy fallback failed', legacyError)
+        return
+      }
+    }
+
+    // Audit telemetry must never take down a user-facing critical path such as
+    // login/logout. Surface the problem in runtime logs while allowing the
+    // requested action to complete; the underlying DB issue can then be fixed
+    // independently without locking every user out of the application.
+    console.error('[audit] write failed', error)
   }
 }
 
