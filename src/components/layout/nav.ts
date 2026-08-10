@@ -31,9 +31,6 @@ export interface NavItem {
   label: string
   to: string
   icon: LucideIcon
-  // Optional section label — used by AdminLayout to visually group the
-  // sidebar. Items with the same section render under a single heading;
-  // items without a section render at the top with no heading.
   section?: string
 }
 
@@ -56,23 +53,22 @@ export const portalNav: NavItem[] = [
 export const portalHiddenRoutes = ['planned-calls', 'funding', 'property-management', 'tax-filings'] as const
 
 export const adminNav: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', to: '', icon: Home },
+  { key: 'dashboard', label: 'Overview', to: '', icon: Home },
 
-  { key: 'pipelines', label: 'Pipelines', to: 'pipelines', icon: Workflow, section: 'Workspace' },
-  { key: 'inquiries', label: 'Leads & Prospects', to: 'inquiries', icon: UserPlus, section: 'Workspace' },
-  { key: 'clients', label: 'Clients', to: 'clients', icon: Users, section: 'Workspace' },
+  { key: 'pipelines', label: 'Pipeline', to: 'pipelines', icon: Workflow, section: 'Revenue' },
+  { key: 'inquiries', label: 'Leads', to: 'inquiries', icon: UserPlus, section: 'Revenue' },
+  { key: 'clients', label: 'Clients', to: 'clients', icon: Users, section: 'Revenue' },
 
-  { key: 'messages', label: 'Messages', to: 'messages', icon: MessageSquare, section: 'Communication' },
-  { key: 'communications', label: 'Communications', to: 'communications', icon: Megaphone, section: 'Communication' },
+  { key: 'messages', label: 'Inbox', to: 'messages', icon: MessageSquare, section: 'Operations' },
+  { key: 'communications', label: 'Campaigns', to: 'communications', icon: Megaphone, section: 'Operations' },
+  { key: 'field-work', label: 'Field Work & RON', to: 'field-work', icon: MapPinned, section: 'Operations' },
 
-  { key: 'field-work', label: 'Field & RON', to: 'field-work', icon: MapPinned, section: 'Operations' },
-  { key: 'activity', label: 'Activity', to: 'activity', icon: Activity, section: 'Operations' },
-  { key: 'audit-log', label: 'Audit Log', to: 'audit-log', icon: ClipboardList, section: 'Operations' },
+  { key: 'reports', label: 'Reports', to: 'reports', icon: BarChart3, section: 'Intelligence' },
+  { key: 'activity', label: 'Activity', to: 'activity', icon: Activity, section: 'Intelligence' },
+  { key: 'audit-log', label: 'Audit Log', to: 'audit-log', icon: ClipboardList, section: 'Intelligence' },
 
-  { key: 'reports', label: 'Reporting Center', to: 'reports', icon: BarChart3, section: 'Insights' },
-
-  { key: 'employees', label: 'Team & Vendors', to: 'employees', icon: UsersRound, section: 'Administration' },
-  { key: 'users', label: 'Users', to: 'users', icon: UserCog, section: 'Administration' },
-  { key: 'assignments', label: 'Assignments', to: 'assignments', icon: ArrowLeftRight, section: 'Administration' },
-  { key: 'settings', label: 'Settings', to: 'settings', icon: Settings, section: 'Administration' },
+  { key: 'employees', label: 'Team & Vendors', to: 'employees', icon: UsersRound, section: 'Access' },
+  { key: 'users', label: 'Users', to: 'users', icon: UserCog, section: 'Access' },
+  { key: 'assignments', label: 'Assignments', to: 'assignments', icon: ArrowLeftRight, section: 'Access' },
+  { key: 'settings', label: 'Settings', to: 'settings', icon: Settings, section: 'Access' },
 ]
