@@ -42,6 +42,7 @@ import { vendorApplicationUploadRoutes } from '../_lib/routes/vendorApplicationU
 import { serviceOfferingPublicRoutes, serviceOfferingAdminRoutes } from '../_lib/routes/serviceOfferings'
 import { relationshipAutomationRoutes, relationshipAutomationAdminRoutes } from '../_lib/routes/relationshipAutomation'
 import { fieldWorkRoutes } from '../_lib/routes/fieldWork'
+import { documentVerificationRoutes } from '../_lib/routes/documentVerification'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -55,6 +56,7 @@ app.route('/', invitationPublicRoutes)
 app.route('/', inviteCompletionRoutes)
 app.route('/', vendorApplicationUploadRoutes)
 app.route('/', relationshipAutomationRoutes)
+app.route('/', documentVerificationRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
