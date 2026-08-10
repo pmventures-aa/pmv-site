@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ShieldAlert, Monitor, Globe, MapPin } from 'lucide-react'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnOutline, SkeletonTable } from '../../components/admin/ui'
 import { useCapabilities } from '../../lib/capabilities'
-import { timeAgo } from '../../lib/activity'
+import { timeAgo, isSecurityKind } from '../../lib/activity'
+import { useAppPath } from '../../lib/basePath'
 
 interface AuditEntry {
   id: string
@@ -11,6 +14,9 @@ interface AuditEntry {
   actor_email: string | null
   actor_ip: string | null
   actor_user_agent: string | null
+  actor_city: string | null
+  actor_region: string | null
+  actor_country: string | null
   action: string
   entity_type: string | null
   entity_id: string | null
@@ -19,14 +25,39 @@ interface AuditEntry {
 
 const PAGE_SIZE = 50
 
+// Actions the app considers security-sensitive. Kept aligned with the
+// activity-side categorization so both pages agree on what turns red.
+const SECURITY_ACTIONS = new Set<string>([
+  'login',
+  'logout',
+  'login_failed',
+  'password_changed',
+  'password_reset',
+  'permission_changed',
+  'user_created',
+  'record_archived',
+  'record_restored',
+  'record_permanently_deleted',
+])
+
+function isSecurityAction(action: string): boolean {
+  return SECURITY_ACTIONS.has(action) || isSecurityKind(action)
+}
+
 function describeAction(entry: AuditEntry): string {
   const who = entry.actor_name || entry.actor_email || 'System'
   const what = entry.entity_type ? entry.entity_type.replace(/_/g, ' ') : 'a record'
   switch (entry.action) {
     case 'login':
-      return `${who} logged in`
+      return `${who} signed in`
     case 'logout':
-      return `${who} logged out`
+      return `${who} signed out`
+    case 'login_failed':
+      return `Failed sign-in attempt (${entry.actor_email || 'unknown user'})`
+    case 'password_changed':
+      return `${who} changed their password`
+    case 'password_reset':
+      return `${who} triggered a password reset`
     case 'record_created':
       return `${who} created ${what}`
     case 'record_updated':
@@ -52,11 +83,35 @@ function describeAction(entry: AuditEntry): string {
   }
 }
 
+function formatLocation(entry: AuditEntry): string {
+  const parts = [entry.actor_city, entry.actor_region, entry.actor_country].filter(Boolean)
+  return parts.length > 0 ? parts.join(', ') : ''
+}
+
+// Compress a raw User-Agent header down to just "Browser · OS" for the
+// audit row. Full UA still available on hover via title attribute.
+function browserAndOs(ua: string | null): string {
+  if (!ua) return ''
+  let browser = 'Unknown browser'
+  if (/Edg\//.test(ua)) browser = 'Edge'
+  else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome'
+  else if (/Firefox\//.test(ua)) browser = 'Firefox'
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari'
+  let os = ''
+  if (/Windows NT/.test(ua)) os = 'Windows'
+  else if (/Mac OS X/.test(ua)) os = 'macOS'
+  else if (/iPhone|iPad|iOS/.test(ua)) os = 'iOS'
+  else if (/Android/.test(ua)) os = 'Android'
+  else if (/Linux/.test(ua)) os = 'Linux'
+  return os ? `${browser} · ${os}` : browser
+}
+
 export default function AuditLogAdmin() {
   const caps = useCapabilities()
+  const p = useAppPath()
   const [entries, setEntries] = useState<AuditEntry[]>([])
   const [actions, setActions] = useState<string[]>([])
-  const [filters, setFilters] = useState({ action: '', entity_type: '', from: '', to: '' })
+  const [filters, setFilters] = useState({ action: '', entity_type: '', from: '', to: '', security_only: false, search: '' })
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState(false)
@@ -76,7 +131,7 @@ export default function AuditLogAdmin() {
       params.set('limit', String(PAGE_SIZE))
       return params.toString()
     },
-    [filters],
+    [filters.action, filters.entity_type, filters.from, filters.to],
   )
 
   const load = useCallback(async () => {
@@ -114,6 +169,27 @@ export default function AuditLogAdmin() {
     return `/api/admin/audit-log/export.csv?${query()}`
   }
 
+  const visible = useMemo(() => {
+    const term = filters.search.trim().toLowerCase()
+    return entries.filter((entry) => {
+      if (filters.security_only && !isSecurityAction(entry.action)) return false
+      if (!term) return true
+      const hay = [
+        entry.action,
+        entry.actor_name,
+        entry.actor_email,
+        entry.entity_type,
+        entry.entity_id,
+        entry.actor_ip,
+        formatLocation(entry),
+        entry.actor_user_agent,
+      ].filter(Boolean).join(' ').toLowerCase()
+      return hay.includes(term)
+    })
+  }, [entries, filters.search, filters.security_only])
+
+  const securityCount = useMemo(() => entries.filter((e) => isSecurityAction(e.action)).length, [entries])
+
   if (!caps.loading && !caps.can_view_audit_log) {
     return (
       <div>
@@ -128,7 +204,7 @@ export default function AuditLogAdmin() {
       <PageIntro
         kicker="Compliance"
         title="Audit Log"
-        subtitle="Every login, record change, and permission grant — read-only, never edited or pruned."
+        subtitle="Every sign-in, record change, and permission grant. Security-sensitive events highlighted in red."
         action={
           <a href={exportUrl()} className={btnOutline} download>
             Export CSV
@@ -167,6 +243,26 @@ export default function AuditLogAdmin() {
             <input className={inputCls} type="date" value={filters.to} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))} />
           </label>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <input
+            className={`${inputCls} flex-1 min-w-[200px]`}
+            type="search"
+            placeholder="Search actor, email, IP, city…"
+            value={filters.search}
+            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+          />
+          <button
+            type="button"
+            onClick={() => setFilters((f) => ({ ...f, security_only: !f.security_only }))}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition ${
+              filters.security_only
+                ? 'border-rose-500/60 bg-rose-500/15 text-rose-200'
+                : 'border-rose-500/30 text-rose-300 hover:border-rose-500/60'
+            }`}
+          >
+            <ShieldAlert size={13} /> Security only {securityCount > 0 && <span className="rounded bg-black/20 px-1.5 py-0.5 text-[10px]">{securityCount}</span>}
+          </button>
+        </div>
       </Panel>
 
       {loading ? (
@@ -180,25 +276,63 @@ export default function AuditLogAdmin() {
             Try again
           </button>
         </div>
-      ) : entries.length === 0 ? (
+      ) : visible.length === 0 ? (
         <Panel>
           <EmptyState label="No audit events match these filters." />
         </Panel>
       ) : (
         <>
           <Panel className="divide-y divide-white/5 !p-0">
-            {entries.map((e) => (
-              <div key={e.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm text-slate-200">{describeAction(e)}</p>
-                  <p className="mt-0.5 truncate text-xs text-slate-500" title={e.actor_user_agent ?? undefined}>
-                    {timeAgo(e.created_at)}
-                    {e.actor_ip ? ` · ${e.actor_ip}` : ''}
-                    {e.actor_user_agent ? ` · ${e.actor_user_agent}` : ''}
-                  </p>
+            {visible.map((entry) => {
+              const security = isSecurityAction(entry.action)
+              const location = formatLocation(entry)
+              const ua = browserAndOs(entry.actor_user_agent)
+              return (
+                <div
+                  key={entry.id}
+                  className={`flex flex-wrap items-start justify-between gap-3 px-5 py-3 ${
+                    security ? 'border-l-2 border-l-rose-500/70 bg-rose-500/[.04]' : ''
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-2">
+                      {security && <ShieldAlert size={14} className="mt-1 shrink-0 text-rose-400" />}
+                      <div className="min-w-0">
+                        <p className={`text-sm ${security ? 'font-medium text-rose-100' : 'text-slate-200'}`}>{describeAction(entry)}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                          <span>{timeAgo(entry.created_at)}</span>
+                          {location && (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin size={11} /> {location}
+                            </span>
+                          )}
+                          {entry.actor_ip && (
+                            <span className="inline-flex items-center gap-1">
+                              <Globe size={11} /> {entry.actor_ip}
+                            </span>
+                          )}
+                          {ua && (
+                            <span className="inline-flex items-center gap-1" title={entry.actor_user_agent ?? undefined}>
+                              <Monitor size={11} /> {ua}
+                            </span>
+                          )}
+                          {entry.actor_user_id && (
+                            <Link to={p(`users`)} className="text-slate-400 hover:text-gold hover:underline">
+                              Actor profile →
+                            </Link>
+                          )}
+                          {entry.entity_id && entry.entity_type === 'client' && (
+                            <Link to={p(`clients/${entry.entity_id}`)} className="text-gold hover:underline">
+                              Client →
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </Panel>
           {hasMore && (
             <div className="mt-4 text-center">

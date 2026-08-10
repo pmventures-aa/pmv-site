@@ -6,6 +6,7 @@ import { DateSelect, todayIsoDate } from '../../components/kit/DateSelect'
 import { Icon } from '../../components/kit/Icon'
 import { toast } from '../../components/kit/toast'
 import { COUNTRY_OPTIONS, US_STATES } from '../../data/regions'
+import { AddressAutocomplete } from '../../components/kit/AddressAutocomplete'
 
 interface ClientOption {
   id: string
@@ -150,10 +151,28 @@ function ContactFields({ value, onChange }: { value: ContactBlock; onChange: (ne
         <span className="mb-1 block text-xs text-slate-400">Company</span>
         <input className={inputCls} value={value.company} onChange={(e) => set('company', e.target.value)} />
       </label>
-      <label className="sm:col-span-2">
+      <div className="sm:col-span-2">
         <span className="mb-1 block text-xs text-slate-400">Address line 1</span>
-        <input className={inputCls} value={value.address_line_1} onChange={(e) => set('address_line_1', e.target.value)} />
-      </label>
+        <AddressAutocomplete
+          value={value.address_line_1}
+          onChange={(line1) => set('address_line_1', line1)}
+          onSelect={(address) => {
+            // Snap city / state / postal / country to whatever the picked
+            // suggestion resolved to. Preserves any existing line 2, email
+            // and phone the operator has already typed.
+            onChange({
+              ...value,
+              address_line_1: address.line1,
+              city: address.city || value.city,
+              state: address.state || value.state,
+              postal_code: address.postal_code || value.postal_code,
+              country: address.country === 'US' ? 'United States' : (address.country || value.country),
+            })
+          }}
+          inputClassName={inputCls}
+          placeholder="123 Main St"
+        />
+      </div>
       <label className="sm:col-span-2">
         <span className="mb-1 block text-xs text-slate-400">Address line 2</span>
         <input className={inputCls} value={value.address_line_2} onChange={(e) => set('address_line_2', e.target.value)} />

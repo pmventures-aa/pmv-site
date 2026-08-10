@@ -11,6 +11,83 @@ export interface ActivityEvent {
   created_at: string
 }
 
+export type ActivityCategory = 'security' | 'client' | 'money' | 'operations' | 'communications' | 'other'
+
+// Kinds tagged 'security' render with red styling in HQ. Kept intentionally
+// narrow to sign-in / access / permission / data-egress events so the color
+// stays a real signal instead of visual noise.
+const SECURITY_KINDS = new Set<string>([
+  'login',
+  'logout',
+  'login_failed',
+  'password_changed',
+  'password_reset',
+  'permission_changed',
+  'staff_profile_updated',
+  'user_status_changed',
+  'user_created',
+  'payment_info_revealed',
+  'record_archived',
+  'record_restored',
+  'record_permanently_deleted',
+])
+const MONEY_KINDS = new Set<string>([
+  'invoice_created',
+  'invoice_sent',
+  'invoice_status_changed',
+  'invoice_reminder_sent',
+  'funding_created',
+  'funding_status_changed',
+])
+const CLIENT_KINDS = new Set<string>([
+  'client_signed_up',
+  'onboarding_completed',
+  'inquiry_submitted',
+  'inquiry_status_changed',
+  'lead_profile_updated',
+  'lead_note_added',
+  'client_profile_updated',
+  'crm_import_completed',
+])
+const COMMUNICATIONS_KINDS = new Set<string>([
+  'message_received',
+  'message_sent',
+  'message_attachment_added',
+  'comms_message_created',
+  'comms_message_sent',
+  'account_welcome_sent',
+  'account_invite_sent',
+  'portal_reminder_sent',
+  'vendor_application_email_sent',
+  'vendor_approval_email_sent',
+  'account_email_failed',
+])
+
+export function categorizeActivity(kind: string): ActivityCategory {
+  if (SECURITY_KINDS.has(kind)) return 'security'
+  if (MONEY_KINDS.has(kind)) return 'money'
+  if (CLIENT_KINDS.has(kind)) return 'client'
+  if (COMMUNICATIONS_KINDS.has(kind)) return 'communications'
+  if (
+    kind.startsWith('matter') ||
+    kind.startsWith('task') ||
+    kind.startsWith('ticket') ||
+    kind.startsWith('call') ||
+    kind.startsWith('appointment') ||
+    kind.startsWith('property') ||
+    kind.startsWith('tax') ||
+    kind.startsWith('service') ||
+    kind.startsWith('bulk_')
+  ) {
+    return 'operations'
+  }
+  return 'other'
+}
+
+export function isSecurityKind(kind: string): boolean {
+  return categorizeActivity(kind) === 'security'
+}
+
 function fmtStatus(s?: string): string { return s ? s.replace(/_/g, ' ') : '—' }
 function money(cents?: number | null): string { return typeof cents === 'number' ? `$${(cents / 100).toLocaleString()}` : 'an amount' }
 
@@ -59,7 +136,12 @@ export function describeActivity(e: ActivityEvent): string {
     case 'property_status_changed': return `${actor} set “${d.address}” (${client}) to ${fmtStatus(d.to)}`
     case 'tax_filing_created': return `${actor} opened a ${d.tax_year ?? ''} tax filing for ${client}`
     case 'tax_filing_status_changed': return `${actor} set ${client}’s ${d.tax_year ?? ''} tax filing to ${fmtStatus(d.to)}`
-    case 'service_assigned_by_staff': return `${actor} added ${d.service_name || fmtStatus(d.service_key)} for ${client}`
+    case 'login': return `${actor} signed in${d.location ? ` from ${d.location}` : ''}${d.ip ? ` · ${d.ip}` : ''}`
+    case 'logout': return `${actor} signed out`
+    case 'login_failed': return `Failed sign-in attempt for ${d.email || 'a user'}${d.ip ? ` from ${d.ip}` : ''}`
+    case 'password_changed': return `${actor} changed their password`
+    case 'password_reset': return `${actor} reset the password for ${d.email || 'a user'}`
+    case 'permission_changed': return `${actor} changed permissions${d.target_name ? ` for ${d.target_name}` : ''}`
     case 'service_application_assigned': return `${actor} started ${client}’s ${d.service_name || fmtStatus(d.service_key)} application${typeof d.prefilled_answers === 'number' ? ` · ${d.prefilled_answers} answers prefilled` : ''}`
     case 'service_application_prefilled': return `${actor} updated a service application draft for ${client}`
     case 'service_application_signed': return `${client} electronically signed a service application`

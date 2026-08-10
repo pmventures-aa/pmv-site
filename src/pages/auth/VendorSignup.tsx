@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { CheckCircle2, Mail, Phone, User, Building2 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
 import { DocumentUpload, type UploadedDocument } from '../../components/forms/DocumentUpload'
 
 const MIN_PASSWORD = 10
 
-type Step = 'contact' | 'services' | 'documents' | 'account'
+type Step = 'contact' | 'review-contact' | 'services' | 'documents' | 'account'
 type DocType = 'government_id' | 'professional_license' | 'insurance' | 'supporting'
 
 interface InviteData {
@@ -40,7 +41,7 @@ export default function VendorSignup() {
   const [inviteLoading, setInviteLoading] = useState(!!inviteToken)
   const [step, setStep] = useState<Step>('contact')
   const [form, setForm] = useState({
-    full_name: '', email: '', phone: '', company_name: '', vendor_category: '', service_area: [] as string[],
+    first_name: '', last_name: '', email: '', phone: '', company_name: '', vendor_category: '', service_area: [] as string[],
     license_status: '' as ''|'yes'|'no'|'unsure', insurance_status: '' as ''|'yes'|'no', notes: '', password: '', confirm: '',
   })
   const [uploadToken, setUploadToken] = useState('')
@@ -57,9 +58,11 @@ export default function VendorSignup() {
       .then((response) => {
         if (response.invite.invite_type !== 'vendor') throw new Error('This is not a provider invitation.')
         setInvite(response.invite)
+        const invited = (response.invite.full_name || '').trim().split(/\s+/).filter(Boolean)
         setForm((current) => ({
           ...current,
-          full_name: response.invite.full_name || current.full_name,
+          first_name: invited[0] || current.first_name,
+          last_name: invited.slice(1).join(' ') || current.last_name,
           email: response.invite.email || current.email,
           company_name: response.invite.metadata?.company_name || current.company_name,
           vendor_category: response.invite.metadata?.vendor_category || current.vendor_category,
@@ -71,9 +74,10 @@ export default function VendorSignup() {
   }, [inviteToken])
 
   function set<K extends keyof typeof form>(key: K, value: typeof form[K]) { setForm((current) => ({ ...current, [key]: value })) }
-  const steps: Step[] = ['contact', 'services', 'documents', 'account']
+  const steps: Step[] = ['contact', 'review-contact', 'services', 'documents', 'account']
   const stepIndex = steps.indexOf(step)
   const progress = Math.round(((stepIndex + 1) / steps.length) * 100)
+  const fullName = `${form.first_name.trim()} ${form.last_name.trim()}`.trim()
   const licenseRequired = form.license_status === 'yes'
   const insuranceRequired = form.insurance_status === 'yes'
   const fileFor = (type: DocType) => files.filter((file) => file.document_type === type)
@@ -83,7 +87,8 @@ export default function VendorSignup() {
 
   function validate(next?: Step) {
     if (step === 'contact') {
-      if (!form.full_name.trim()) return 'Tell us your name to continue.'
+      if (!form.first_name.trim()) return 'Enter your first name to continue.'
+      if (!form.last_name.trim()) return 'Enter your last name to continue.'
       if (!form.email.includes('@')) return 'Enter a valid email address.'
       if (!form.phone.trim()) return 'Enter a phone number so we can reach you about assignments.'
     }
@@ -153,7 +158,9 @@ export default function VendorSignup() {
     setBusy(true)
     try {
       await api.post('/auth/vendor-signup', {
-        full_name: form.full_name,
+        full_name: fullName,
+        first_name: form.first_name,
+        last_name: form.last_name,
         email: form.email,
         phone: form.phone,
         company_name: form.company_name || undefined,
@@ -189,8 +196,8 @@ export default function VendorSignup() {
   return (
     <AuthLayout
       eyebrow={inviteToken ? 'Pinnacle provider invitation' : 'Pinnacle Professional Network'}
-      title={step === 'contact' ? 'Start with the basics' : step === 'services' ? 'Tell us what you do' : step === 'documents' ? 'Verify your provider profile' : 'Secure your account'}
-      subtitle={step === 'contact' ? 'A few quick details. You can complete the application from your phone or computer.' : step === 'services' ? 'Tap the options that fit. We only ask for documents that apply to your work.' : step === 'documents' ? 'Uploads are private and used to review your provider application.' : 'Last step. Create the password you will use after approval.'}
+      title={step === 'contact' ? 'Start with the basics' : step === 'review-contact' ? 'Confirm your details' : step === 'services' ? 'Tell us what you do' : step === 'documents' ? 'Verify your provider profile' : 'Secure your account'}
+      subtitle={step === 'contact' ? 'A few quick details. You can complete the application from your phone or computer.' : step === 'review-contact' ? 'Take a look before we send your verification email.' : step === 'services' ? 'Tap the options that fit. We only ask for documents that apply to your work.' : step === 'documents' ? 'Uploads are private and used to review your provider application.' : 'Last step. Create the password you will use after approval.'}
       footer={<>Already approved? <Link to="../login" className="font-medium text-gold hover:underline">Sign in</Link></>}
     >
       <div className="mb-6">
@@ -204,11 +211,35 @@ export default function VendorSignup() {
       <ErrorBanner message={error} />
 
       {step === 'contact' && <div className="space-y-4">
-        <Field label="Full name"><input className={inputCls} autoComplete="name" value={form.full_name} onChange={(e) => set('full_name', e.target.value)} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="First name"><input className={inputCls} autoComplete="given-name" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} /></Field>
+          <Field label="Last name"><input className={inputCls} autoComplete="family-name" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} /></Field>
+        </div>
         <Field label="Email"><input className={inputCls} type="email" autoComplete="email" readOnly={!!inviteToken} value={form.email} onChange={(e) => set('email', e.target.value)} /></Field>
         <Field label="Mobile phone"><input className={inputCls} type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></Field>
         <Field label="Company / practice name (optional)"><input className={inputCls} autoComplete="organization" value={form.company_name} onChange={(e) => set('company_name', e.target.value)} /></Field>
-        <button type="button" onClick={() => void go('services')} className="btn-gold w-full">Continue</button>
+        <button type="button" onClick={() => void go('review-contact')} className="btn-gold w-full">Continue</button>
+      </div>}
+
+      {step === 'review-contact' && <div className="space-y-4">
+        <div className="rounded-lg border border-gold/20 bg-gold/[.03] p-5">
+          <div className="mb-4 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gold">
+            <CheckCircle2 size={14} /> Ready to send verification
+          </div>
+          <ul className="divide-y divide-white/5 text-sm">
+            <SummaryRow icon={<User size={14} />} label="Name" value={fullName} />
+            <SummaryRow icon={<Mail size={14} />} label="Email" value={form.email} />
+            <SummaryRow icon={<Phone size={14} />} label="Phone" value={form.phone} />
+            {form.company_name.trim() && <SummaryRow icon={<Building2 size={14} />} label="Company" value={form.company_name} />}
+          </ul>
+          <p className="mt-4 text-xs leading-5 text-slate-500">
+            Continue and we'll send a verification email to <strong className="text-slate-300">{form.email}</strong> after your application is submitted. If anything looks wrong, go back and edit before continuing.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setStep('contact')} className="btn-outline flex-1">Back &amp; edit</button>
+          <button type="button" onClick={() => void go('services')} className="btn-gold flex-[1.5]">Looks good — continue</button>
+        </div>
       </div>}
 
       {step === 'services' && <div>
@@ -223,7 +254,7 @@ export default function VendorSignup() {
           <Choice label="Do you currently carry business or professional insurance?" value={form.insurance_status} options={[['yes','Yes'],['no','No']]} onChange={(value) => set('insurance_status', value as typeof form.insurance_status)} />
         </div>
         <div className="mt-5"><Field label="Anything else we should know? (optional)"><textarea className={`${inputCls} min-h-20`} placeholder="Specialty, years of experience, availability, certifications, languages, etc." value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field></div>
-        <div className="mt-6 flex gap-2"><button type="button" onClick={() => setStep('contact')} className="btn-outline flex-1">Back</button><button type="button" onClick={() => void go('documents')} className="btn-gold flex-[1.5]">Continue</button></div>
+        <div className="mt-6 flex gap-2"><button type="button" onClick={() => setStep('review-contact')} className="btn-outline flex-1">Back</button><button type="button" onClick={() => void go('documents')} className="btn-gold flex-[1.5]">Continue</button></div>
       </div>}
 
       {step === 'documents' && <div className="space-y-6">
@@ -247,4 +278,20 @@ export default function VendorSignup() {
 
 function Choice({ label, value, options, onChange }: { label:string; value:string; options:readonly (readonly [string,string])[]; onChange:(value:string)=>void }) {
   return <div><p className="mb-2 text-xs leading-5 text-slate-400">{label}</p><div className="flex flex-wrap gap-2">{options.map(([key,text]) => <button key={key} type="button" onClick={() => onChange(key)} className={`rounded-md border px-3 py-2 text-xs ${value === key ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-400 hover:border-white/25'}`}>{value === key ? '✓ ' : ''}{text}</button>)}</div></div>
+}
+
+// One line inside the pre-submission summary card. Renders a small icon,
+// the label, and the value the applicant just typed — a static visual
+// confirmation so they can catch typos before triggering the verification
+// email that starts the review clock.
+function SummaryRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <li className="flex items-center gap-3 py-3">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-gold/30 bg-gold/10 text-gold">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="mt-0.5 truncate text-sm font-medium text-white">{value}</p>
+      </div>
+    </li>
+  )
 }
