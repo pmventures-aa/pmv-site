@@ -1,0 +1,1 @@
+.doc-tool{display:inline-grid;height:2rem;width:2rem;place-items:center;border:1px solid rgba(255,255,255,.10);border-radius:.5rem;color:rgb(148 163 184);background:rgba(255,255,255,.02);transition:background .15s ease,border-color .15s ease,color .15s ease}.doc-tool:hover{border-color:rgba(201,162,39,.38);background:rgba(201,162,39,.06);color:rgb(201 162 39)}
