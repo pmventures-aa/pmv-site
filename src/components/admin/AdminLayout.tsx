@@ -20,6 +20,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
     return window.localStorage.getItem('pmv_hq_sidebar_open') !== '0'
   })
   const p = useAppPath()
+  const canOpenSettings = nav.some((item) => item.key === 'settings')
 
   function toggleSidebar() {
     setSidebarOpen((open) => {
@@ -93,16 +94,18 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
         </button>
         {profileOpen && (
           <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-lg border border-white/10 bg-navy-900 shadow-2xl">
-            <NavLink
-              to={p('settings')}
-              onClick={() => { setProfileOpen(false); setMobileOpen(false) }}
-              className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
-            >
-              <Settings size={15} /> Settings
-            </NavLink>
+            {canOpenSettings && (
+              <NavLink
+                to={p('settings')}
+                onClick={() => { setProfileOpen(false); setMobileOpen(false) }}
+                className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
+              >
+                <Settings size={15} /> Settings
+              </NavLink>
+            )}
             <button
               onClick={() => logout()}
-              className="flex w-full items-center gap-2 border-t border-white/10 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"
+              className={`flex w-full items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white ${canOpenSettings ? 'border-t border-white/10' : ''}`}
             >
               <LogOut size={15} /> Sign out
             </button>
