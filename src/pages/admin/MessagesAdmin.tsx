@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
 import { ThreadView } from '../../components/kit/ThreadView'
 import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
@@ -22,9 +23,6 @@ interface ClientOption {
   email: string
 }
 
-// initialClientId pre-selects the recipient (and auto-opens the dialog)
-// when arriving via a "Message this client" link from the client detail
-// page — see ClientDetail.tsx's PageIntro action.
 function NewThreadDialog({
   clients,
   initialClientId,
@@ -125,14 +123,13 @@ export default function MessagesAdmin() {
     }
   }, [])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useEffect(() => { void load() }, [load])
+  useLiveRefresh(load)
 
   function onCreated(id: string) {
     setActiveId(id)
     if (initialClientId) setSearchParams((p) => { p.delete('client'); return p }, { replace: true })
-    load()
+    void load()
   }
 
   return (
