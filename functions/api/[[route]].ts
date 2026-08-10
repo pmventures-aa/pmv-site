@@ -34,6 +34,7 @@ import { signaturePortalSyncRoutes, signatureAdminSyncRoutes } from '../_lib/rou
 import { invitationPublicRoutes } from '../_lib/routes/invitationPublic'
 import { trustedContactRoutes } from '../_lib/routes/trustedContacts'
 import { invitationAdminRoutes, roleAdminRoutes } from '../_lib/routes/invitationAdmin'
+import { bulkInvitationRoutes } from '../_lib/routes/bulkInvitations'
 import { roleCapabilityRoutes } from '../_lib/routes/roleCapabilities'
 import { inviteCompletionRoutes } from '../_lib/routes/inviteCompletion'
 import { teamManagementRoutes } from '../_lib/routes/teamManagement'
@@ -76,6 +77,7 @@ app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)
 app.route('/admin', roleCapabilityRoutes)
 app.route('/admin', invitationAdminRoutes)
+app.route('/admin', bulkInvitationRoutes)
 app.route('/admin', roleAdminRoutes)
 app.route('/admin', teamManagementRoutes)
 app.route('/admin', reportExportRoutes)
