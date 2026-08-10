@@ -4,7 +4,6 @@ import { Footer } from '../../components/public/Footer'
 import { OfferingLibrary } from '../../components/public/OfferingLibrary'
 import { btnOutline, btnPrimary, panelCls, ServiceList, TagLine } from '../../components/public/ui'
 import { getServiceBySlug, services } from '../../data/services'
-import { lowestStartingPrice, offeringsFor } from '../../data/serviceOfferings'
 import { usePageMeta } from '../../lib/usePageMeta'
 
 export default function ServiceDetail() {
@@ -16,8 +15,6 @@ export default function ServiceDetail() {
 
   const others = services.filter((item) => item.slug !== service.slug).slice(0, 3)
   const requestUrl = `https://client.pinnaclemanagementventures.com/signup?service=${encodeURIComponent(service.key)}&source=service-page`
-  const offerings = offeringsFor(service.key)
-  const startingPrice = lowestStartingPrice(service.key)
 
   return (
     <div className="min-h-screen bg-navy-950">
@@ -27,7 +24,6 @@ export default function ServiceDetail() {
         <div className="mt-5"><TagLine tag={service.tag} popular={service.popular} /></div>
         <h1 className="mt-2 max-w-4xl font-display text-4xl font-medium text-white sm:text-5xl">{service.title}</h1>
         <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-300">{service.heroDescription}</p>
-        {startingPrice && <p className="mt-4 text-sm text-slate-400">Defined one-time services from <strong className="text-white">${startingPrice}</strong>. Larger or ongoing engagements are scoped separately.</p>}
         <div className="mt-7 flex flex-wrap gap-3">
           <a href={requestUrl} className={btnPrimary}>Start with this service</a>
           <a href="tel:+15613887879" className={btnOutline}>Call (561) 388-7879</a>
@@ -49,7 +45,7 @@ export default function ServiceDetail() {
           </div>
         </div>
 
-        <OfferingLibrary offerings={offerings} serviceKey={service.key} />
+        <OfferingLibrary serviceKey={service.key} />
 
         <div className="mt-16">
           <p className="eyebrow mb-4">You may also want to explore</p>
