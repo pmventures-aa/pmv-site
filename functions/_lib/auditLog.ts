@@ -1,8 +1,6 @@
 import type { Env } from './types'
 import { uuid } from './crypto'
 
-// Compliance-grade audit trail — separate from activity.ts's activityInsert,
-// which feeds the staff notification bell/feed. This table is append-only.
 export type AuditAction =
   | 'login'
   | 'logout'
@@ -46,36 +44,13 @@ export interface AuditOpts {
 function legacyAuditInsert(env: Env, opts: AuditOpts): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO audit_log (id, actor_user_id, actor_ip, actor_user_agent, action, entity_type, entity_id, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    uuid(),
-    opts.actorUserId ?? null,
-    opts.actorIp ?? null,
-    opts.actorUserAgent ?? null,
-    opts.action,
-    opts.entityType ?? null,
-    opts.entityId ?? null,
-    opts.before !== undefined ? JSON.stringify(opts.before) : null,
-    opts.after !== undefined ? JSON.stringify(opts.after) : null,
-  )
+  ).bind(uuid(), opts.actorUserId ?? null, opts.actorIp ?? null, opts.actorUserAgent ?? null, opts.action, opts.entityType ?? null, opts.entityId ?? null, opts.before !== undefined ? JSON.stringify(opts.before) : null, opts.after !== undefined ? JSON.stringify(opts.after) : null)
 }
 
 export function auditInsert(env: Env, opts: AuditOpts): D1PreparedStatement {
   return env.DB.prepare(
     `INSERT INTO audit_log (id, actor_user_id, actor_ip, actor_user_agent, actor_city, actor_region, actor_country, action, entity_type, entity_id, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    uuid(),
-    opts.actorUserId ?? null,
-    opts.actorIp ?? null,
-    opts.actorUserAgent ?? null,
-    opts.actorGeo?.city ?? null,
-    opts.actorGeo?.region ?? null,
-    opts.actorGeo?.country ?? null,
-    opts.action,
-    opts.entityType ?? null,
-    opts.entityId ?? null,
-    opts.before !== undefined ? JSON.stringify(opts.before) : null,
-    opts.after !== undefined ? JSON.stringify(opts.after) : null,
-  )
+  ).bind(uuid(), opts.actorUserId ?? null, opts.actorIp ?? null, opts.actorUserAgent ?? null, opts.actorGeo?.city ?? null, opts.actorGeo?.region ?? null, opts.actorGeo?.country ?? null, opts.action, opts.entityType ?? null, opts.entityId ?? null, opts.before !== undefined ? JSON.stringify(opts.before) : null, opts.after !== undefined ? JSON.stringify(opts.after) : null)
 }
 
 export async function logAudit(env: Env, opts: AuditOpts): Promise<void> {
@@ -83,24 +58,12 @@ export async function logAudit(env: Env, opts: AuditOpts): Promise<void> {
     await auditInsert(env, opts).run()
     return
   } catch (error) {
-    // Production deploys can briefly lead D1 migrations. Try the pre-0039
-    // schema first so audit writes continue during a rolling deploy.
     const message = error instanceof Error ? error.message : String(error)
     const missingGeoColumns = /actor_(city|region|country)|no such column|has no column named/i.test(message)
     if (missingGeoColumns) {
-      try {
-        await legacyAuditInsert(env, opts).run()
-        return
-      } catch (legacyError) {
-        console.error('[audit] legacy fallback failed', legacyError)
-        return
-      }
+      try { await legacyAuditInsert(env, opts).run(); return }
+      catch (legacyError) { console.error('[audit] legacy fallback failed', legacyError); return }
     }
-
-    // Audit telemetry must never take down a user-facing critical path such as
-    // login/logout. Surface the problem in runtime logs while allowing the
-    // requested action to complete; the underlying DB issue can then be fixed
-    // independently without locking every user out of the application.
     console.error('[audit] write failed', error)
   }
 }
@@ -109,14 +72,41 @@ export function actorIp(request: Request): string | null {
   return request.headers.get('CF-Connecting-IP')
 }
 
-export function actorUserAgent(request: Request): string | null {
-  return request.headers.get('User-Agent')
+function cleanMeta(value: unknown, max = 120): string | null {
+  if (typeof value !== 'string' && typeof value !== 'number') return null
+  const cleaned = String(value).replace(/[|;\r\n]/g, ' ').trim().slice(0, max)
+  return cleaned || null
 }
 
-// Cloudflare's Workers/Pages runtime attaches request.cf with coarse geo
-// metadata (city, region, country) resolved from the connecting IP. Pull the
-// fields we display in the audit log; each falls back to null in local dev
-// where request.cf is undefined.
+// Store the normal UA first for compatibility, followed by a compact PMV
+// fingerprint suffix. This avoids a schema migration while preserving richer
+// security context for new audit events. Values come from request headers and
+// Cloudflare's IP-derived request.cf metadata; none of this is GPS tracking.
+export function actorUserAgent(request: Request): string | null {
+  const ua = request.headers.get('User-Agent') || ''
+  const cf = (request as unknown as { cf?: Record<string, unknown> }).cf || {}
+  const meta: Array<[string, unknown]> = [
+    ['ch', request.headers.get('sec-ch-ua')],
+    ['platform', request.headers.get('sec-ch-ua-platform')],
+    ['mobile', request.headers.get('sec-ch-ua-mobile')],
+    ['model', request.headers.get('sec-ch-ua-model')],
+    ['language', request.headers.get('accept-language')?.split(',')[0]],
+    ['timezone', cf.timezone],
+    ['postal', cf.postalCode],
+    ['latitude', cf.latitude],
+    ['longitude', cf.longitude],
+    ['colo', cf.colo],
+    ['asn', cf.asn],
+    ['network', cf.asOrganization],
+  ]
+  const encoded = meta.map(([key, value]) => {
+    const v = cleanMeta(value)
+    return v ? `${key}=${v}` : null
+  }).filter(Boolean)
+  if (!ua && encoded.length === 0) return null
+  return encoded.length ? `${ua || 'Unknown user agent'} | PMV:${encoded.join(';')}` : ua
+}
+
 export function actorGeo(request: Request): AuditGeo {
   const cf = (request as unknown as { cf?: Record<string, unknown> }).cf
   if (!cf) return { city: null, region: null, country: null }
