@@ -37,10 +37,9 @@ export async function notificationPreference(
 export async function runDueClientNurture(env: Env, limit = 40): Promise<{ processed:number; sent:number; skipped:number }> {
   const rows = await env.DB.prepare(
     `SELECT e.user_id,e.enrolled_at,e.next_step,u.email,u.first_name,u.full_name,u.status,
-            COALESCE(cp.marketing_email_status,'subscribed') marketing_email_status
+            COALESCE(u.marketing_email_status,'emailable') marketing_email_status
      FROM client_nurture_enrollments e
      JOIN users u ON u.id=e.user_id
-     LEFT JOIN client_profiles cp ON cp.user_id=e.user_id
      WHERE e.status='active' AND u.role='client' AND u.status='active'
      ORDER BY e.enrolled_at ASC LIMIT ?`,
   ).bind(limit).all<any>()
@@ -56,7 +55,7 @@ export async function runDueClientNurture(env: Env, limit = 40): Promise<{ proce
     }
     const dueAt = new Date(row.enrolled_at).getTime() + step.day * 86400000
     if (Date.now() < dueAt) continue
-    if (String(row.marketing_email_status || '').toLowerCase() === 'unsubscribed') {
+    if (String(row.marketing_email_status || '').toLowerCase() !== 'emailable') {
       await stopClientNurture(env, row.user_id)
       skipped++
       continue
@@ -65,7 +64,7 @@ export async function runDueClientNurture(env: Env, limit = 40): Promise<{ proce
       'SELECT 1 FROM client_nurture_deliveries WHERE user_id=? AND campaign_key=? AND step_key=?',
     ).bind(row.user_id, 'client_discovery_14d', step.key).first()
     if (existing) {
-      await env.DB.prepare('UPDATE client_nurture_enrollments SET next_step=next_step+1,updated_at=datetime(\'now\') WHERE user_id=?').bind(row.user_id).run()
+      await env.DB.prepare("UPDATE client_nurture_enrollments SET next_step=next_step+1,updated_at=datetime('now') WHERE user_id=?").bind(row.user_id).run()
       skipped++
       continue
     }
