@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Download, FileText, Maximize2, Minus, Plus, RotateCw } from 'lucide-react'
+import './documentCanvas.css'
 
 type CanvasDocument = {
   id:string
