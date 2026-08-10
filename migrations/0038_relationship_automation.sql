@@ -60,6 +60,14 @@ CREATE TABLE IF NOT EXISTS client_nurture_deliveries (
 CREATE INDEX IF NOT EXISTS idx_notification_preferences_user ON notification_user_preferences(user_id);
 CREATE INDEX IF NOT EXISTS idx_nurture_due ON client_nurture_enrollments(status, enrolled_at, next_step);
 
+CREATE TRIGGER IF NOT EXISTS trg_client_nurture_enroll
+AFTER INSERT ON users
+WHEN NEW.role = 'client'
+BEGIN
+  INSERT OR IGNORE INTO client_nurture_enrollments(user_id,campaign_key,status,enrolled_at,next_step)
+  VALUES(NEW.id,'client_discovery_14d','active',datetime('now'),1);
+END;
+
 INSERT OR IGNORE INTO notification_event_catalog(event_key,label,category,audience,description,default_in_app,default_email,client_configurable,sort_order) VALUES
 ('client_signed_up','New client registration','Clients','staff','A new client creates a Pinnacle account.',1,1,0,10),
 ('lead_created','New lead or prospect','CRM','staff','A new lead or prospect is added.',1,1,0,20),
