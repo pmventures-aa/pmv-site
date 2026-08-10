@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Menu, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, LogOut } from 'lucide-react'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
@@ -8,15 +8,10 @@ import { Avatar } from '../kit/Avatar'
 import { MailBell } from '../kit/MailBell'
 import type { NavItem } from './nav'
 
-export function Shell({
-  nav,
-  badge,
-}: {
-  nav: NavItem[]
-  badge: string
-}) {
+export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.localStorage.getItem('pmv_sidebar_open') !== '0'
@@ -32,100 +27,69 @@ export function Shell({
   }
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-      isActive ? 'bg-gold/15 text-gold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+    `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+      isActive ? 'bg-white/[.07] text-white ring-1 ring-white/[.08]' : 'text-slate-400 hover:bg-white/[.035] hover:text-white'
     }`
 
   const sidebarContent = (
     <>
-      <div className="mb-6 px-1">
+      <div className="shrink-0 px-1 pb-5">
         <Logo />
-      </div>
-      <nav className="flex flex-1 flex-col gap-1">
-        {nav.map((item) => (
-          <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
-            <span className="grid h-6 w-6 shrink-0 place-items-center text-gold"><item.icon size={18} strokeWidth={1.75} /></span>
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-      <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-        <div className="flex items-center gap-3">
-          {user && <Avatar userId={user.id} name={user.full_name} size={36} editable uploadPath="/me/avatar" />}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p>
-            <p className="truncate text-xs text-slate-500">{user?.email}</p>
-          </div>
+        <div className="mt-3 flex items-center gap-2 px-2">
+          <span className="rounded-full border border-gold/20 bg-gold/[.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.12em] text-gold/80">Secure</span>
+          <span className="text-[11px] font-medium uppercase tracking-[.12em] text-slate-600">{badge}</span>
         </div>
-        <button onClick={() => logout()} className="btn-outline mt-3 w-full !py-1.5 text-xs">
-          Sign out
+      </div>
+
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
+        <div className="space-y-1 pb-5">
+          {nav.map((item) => (
+            <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[.02] text-slate-500 transition group-hover:text-gold"><item.icon size={17} strokeWidth={1.8} /></span>
+              <span className="truncate">{item.label}</span>
+            </NavLink>
+          ))}
+        </div>
+      </nav>
+
+      <div className="relative shrink-0 border-t border-white/[.08] pt-3">
+        <button type="button" onClick={() => setProfileOpen((v) => !v)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-white/[.035]">
+          {user && <Avatar userId={user.id} name={user.full_name} size={36} editable uploadPath="/me/avatar" />}
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p><p className="truncate text-xs text-slate-500">{user?.email}</p></div>
+          <ChevronDown size={14} className={`shrink-0 text-slate-600 transition ${profileOpen ? 'rotate-180' : ''}`} />
         </button>
+        {profileOpen && <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-white/[.08] bg-navy-900 shadow-2xl"><button onClick={() => logout()} className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[.04] hover:text-white"><LogOut size={15}/>Sign out</button></div>}
       </div>
     </>
   )
 
   return (
     <div className="min-h-screen bg-navy-radial lg:flex">
-      {/* Desktop sidebar */}
-      <aside
-        className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/5 bg-navy-950/60 backdrop-blur transition-[width,padding] duration-200 lg:flex ${
-          sidebarOpen ? 'w-64 border-r p-4' : 'w-0 p-0'
-        }`}
-      >
-        <div className="flex w-64 shrink-0 flex-1 flex-col">{sidebarContent}</div>
+      <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/[.07] bg-navy-950/75 backdrop-blur-xl transition-[width,padding] duration-200 lg:flex ${sidebarOpen ? 'w-64 border-r p-4' : 'w-0 p-0'}`}>
+        <div className="flex h-full w-64 min-h-0 shrink-0 flex-col">{sidebarContent}</div>
       </aside>
 
-      {/* Mobile top bar */}
-      <header className="flex items-center justify-between border-b border-white/5 bg-navy-950/80 px-4 py-3 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[.07] bg-navy-950/90 px-4 py-3 backdrop-blur-xl lg:hidden">
         <Logo />
-        <div className="flex items-center gap-3">
-          <span className="hidden text-xs text-slate-400 sm:inline">{badge}</span>
-          <MailBell />
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white"
-            aria-label="Open menu"
-          >
-            <Menu size={18} />
-          </button>
-        </div>
+        <div className="flex items-center gap-2"><MailBell /><button onClick={() => setMobileOpen(true)} className="grid h-9 w-9 place-items-center rounded-lg border border-white/[.08] text-white" aria-label="Open menu"><Menu size={18} /></button></div>
       </header>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 flex h-full w-72 flex-col bg-navy-950 p-4 shadow-2xl">
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="mb-4 self-end grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-white"
-              aria-label="Close menu"
-            >
-              <X size={16} />
-            </button>
-            {sidebarContent}
-          </div>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 flex w-[86vw] max-w-[320px] min-h-0 flex-col border-r border-white/[.08] bg-navy-950 p-4 shadow-2xl">
+            <div className="flex shrink-0 justify-end pb-2"><button onClick={() => setMobileOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-300 hover:bg-white/[.04] hover:text-white" aria-label="Close menu"><X size={16} /></button></div>
+            <div className="flex min-h-0 flex-1 flex-col">{sidebarContent}</div>
+          </aside>
         </div>
       )}
 
-      <div className="flex min-h-screen flex-1 flex-col">
-        <div className="hidden items-center justify-between gap-4 border-b border-white/5 bg-navy-950/40 px-8 py-3 lg:flex">
-          <button
-            onClick={toggleSidebar}
-            className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:bg-white/5 hover:text-white"
-            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-          </button>
-          <div className="flex items-center gap-4">
-            <MailBell />
-            <span className="text-xs uppercase tracking-wide text-slate-500">{badge}</span>
-          </div>
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <div className="hidden h-14 items-center justify-between gap-4 border-b border-white/[.07] bg-navy-950/45 px-6 backdrop-blur lg:flex">
+          <button onClick={toggleSidebar} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/[.04] hover:text-white" aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>{sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}</button>
+          <div className="flex items-center gap-3"><MailBell /><span className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">{badge}</span></div>
         </div>
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-          <Outlet />
-        </main>
+        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><Outlet /></main>
       </div>
     </div>
   )
