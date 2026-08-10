@@ -17,6 +17,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.localStorage.getItem('pmv_hq_sidebar_open') !== '0'
@@ -35,6 +36,15 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
     const pulse = () => {
       if (document.visibilityState !== 'visible') return
       window.dispatchEvent(new Event('pmv:refresh'))
+
+      // Re-mount the active route so its normal load effects fetch fresh data.
+      // Do not do this while an employee is typing, choosing a field, or using
+      // a dialog. That keeps the three-second live behavior from wiping work.
+      const active = document.activeElement as HTMLElement | null
+      const tag = active?.tagName?.toLowerCase()
+      const editing = tag === 'input' || tag === 'textarea' || tag === 'select' || !!active?.isContentEditable
+      const dialogOpen = !!document.querySelector('[role="dialog"]')
+      if (!editing && !dialogOpen) setRefreshTick((tick) => tick + 1)
     }
     pulse()
     const timer = window.setInterval(pulse, LIVE_REFRESH_MS)
@@ -94,21 +104,14 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
             return (
               <div key={group.section ?? `__top-${index}`} className="space-y-1">
                 {group.section && (
-                  <button
-                    type="button"
-                    onClick={() => toggleSection(group.section!)}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500 transition hover:bg-white/[.025] hover:text-slate-300"
-                    aria-expanded={!collapsed}
-                  >
+                  <button type="button" onClick={() => toggleSection(group.section!)} className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500 transition hover:bg-white/[.025] hover:text-slate-300" aria-expanded={!collapsed}>
                     <span>{group.section}</span>
                     {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                   </button>
                 )}
                 {!collapsed && group.items.map((item) => (
                   <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[.025] text-slate-400 transition group-hover:text-gold">
-                      <item.icon size={17} strokeWidth={1.8} />
-                    </span>
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[.025] text-slate-400 transition group-hover:text-gold"><item.icon size={17} strokeWidth={1.8} /></span>
                     <span className="truncate">{item.label}</span>
                   </NavLink>
                 ))}
@@ -177,7 +180,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
             <NotificationBell />
           </div>
         </div>
-        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><Outlet /></main>
+        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><Outlet key={refreshTick} /></main>
       </div>
     </div>
   )
