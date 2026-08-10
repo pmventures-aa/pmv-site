@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { DateSelect, todayIsoDate } from '../../components/kit/DateSelect'
 import { Icon } from '../../components/kit/Icon'
@@ -157,9 +158,6 @@ function ContactFields({ value, onChange }: { value: ContactBlock; onChange: (ne
           value={value.address_line_1}
           onChange={(line1) => set('address_line_1', line1)}
           onSelect={(address) => {
-            // Snap city / state / postal / country to whatever the picked
-            // suggestion resolved to. Preserves any existing line 2, email
-            // and phone the operator has already typed.
             onChange({
               ...value,
               address_line_1: address.line1,
@@ -271,6 +269,7 @@ export default function InvoicesAdmin() {
   }, [search, status])
 
   useEffect(() => { void load() }, [load])
+  useLiveRefresh(load)
   useEffect(() => {
     if (requestedClient) {
       setClientId(requestedClient)
