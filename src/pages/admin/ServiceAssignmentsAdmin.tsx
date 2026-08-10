@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
@@ -6,6 +6,7 @@ import { DateSelect } from '../../components/kit/DateSelect'
 import { Icon } from '../../components/kit/Icon'
 import { toast } from '../../components/kit/toast'
 import { useAppPath } from '../../lib/basePath'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 import { parseOptions, questionVisible, type AnswerMap, type IntakeQuestion, type IntakeValue } from '../../lib/intake'
 
 interface ClientOption { id:string; full_name:string|null; email:string; phone:string|null; business_name:string|null }
@@ -30,11 +31,15 @@ function CompactField({ q, value, onChange, answers }:{q:IntakeQuestion;value:In
 export default function ServiceAssignmentsAdmin(){
   const p=useAppPath(); const [params]=useSearchParams(); const requestedClient=params.get('client')||''
   const [clients,setClients]=useState<ClientOption[]>([]); const [clientId,setClientId]=useState(requestedClient); const [workspace,setWorkspace]=useState<Workspace|null>(null); const [loading,setLoading]=useState(false); const [search,setSearch]=useState(''); const [editor,setEditor]=useState<PrefillResponse|null>(null); const [answers,setAnswers]=useState<AnswerMap>({}); const [busy,setBusy]=useState(false)
-  useEffect(()=>{api.get<{clients:ClientOption[]}>('/admin/invoice-clients').then((r)=>setClients(r.clients)).catch(()=>{})},[])
-  useEffect(()=>{if(!clientId){setWorkspace(null);return} setLoading(true); api.get<Workspace>(`/admin/clients/${clientId}/service-workspace`).then(setWorkspace).catch(()=>setWorkspace(null)).finally(()=>setLoading(false))},[clientId])
+  const loadClients=useCallback(async()=>{try{const r=await api.get<{clients:ClientOption[]}>('/admin/invoice-clients');setClients(r.clients)}catch{}},[])
+  const loadWorkspace=useCallback(async(silent=false)=>{if(!clientId){setWorkspace(null);return}if(!silent)setLoading(true);try{const r=await api.get<Workspace>(`/admin/clients/${clientId}/service-workspace`);setWorkspace(r)}catch{if(!silent)setWorkspace(null)}finally{if(!silent)setLoading(false)}},[clientId])
+  useEffect(()=>{void loadClients()},[loadClients])
+  useEffect(()=>{void loadWorkspace()},[loadWorkspace])
+  const backgroundRefresh=useCallback(async()=>{await Promise.all([loadClients(),loadWorkspace(true)])},[loadClients,loadWorkspace])
+  useLiveRefresh(backgroundRefresh)
   const filtered=useMemo(()=>workspace?.services.filter((s)=>`${s.name} ${s.description||''} ${s.category||''}`.toLowerCase().includes(search.toLowerCase()))||[],[workspace,search])
 
-  async function assign(service:WorkspaceService){setBusy(true);try{const r=await api.post<{requires_application:boolean;application_id?:string}>(`/admin/clients/${clientId}/services/${service.key}/assign`,{});toast.success(r.requires_application?'Application draft created and client notified.':'Service added to client.');if(r.application_id) await openEditor(r.application_id); const w=await api.get<Workspace>(`/admin/clients/${clientId}/service-workspace`);setWorkspace(w)}catch(err){toast.error(err instanceof ApiError?err.message:'Could not assign service.')}finally{setBusy(false)}}
+  async function assign(service:WorkspaceService){setBusy(true);try{const r=await api.post<{requires_application:boolean;application_id?:string}>(`/admin/clients/${clientId}/services/${service.key}/assign`,{});toast.success(r.requires_application?'Application draft created and client notified.':'Service added to client.');if(r.application_id) await openEditor(r.application_id); await loadWorkspace(true)}catch(err){toast.error(err instanceof ApiError?err.message:'Could not assign service.')}finally{setBusy(false)}}
   async function openEditor(id:string){try{const r=await api.get<PrefillResponse>(`/admin/service-applications/${id}/prefill-form`);setEditor(r);setAnswers(r.answers||{})}catch(err){toast.error(err instanceof ApiError?err.message:'Could not open draft.')}}
   async function savePrefill(){if(!editor)return;setBusy(true);try{await api.patch(`/admin/service-applications/${editor.application.id}/prefill`,{answers});toast.success('Prefill saved. The client will review and sign the latest version.');const r=await api.get<PrefillResponse>(`/admin/service-applications/${editor.application.id}/prefill-form`);setEditor(r);setAnswers(r.answers)}catch(err){toast.error(err instanceof ApiError?err.message:'Could not save draft.')}finally{setBusy(false)}}
 
