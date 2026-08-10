@@ -23,3 +23,6 @@ CREATE TABLE service_offerings (
 
 CREATE INDEX idx_service_offerings_service ON service_offerings(service_key, active, sort_order, name);
 CREATE INDEX idx_service_offerings_active ON service_offerings(active, service_key);
+
+ALTER TABLE service_applications ADD COLUMN requested_offering_id TEXT REFERENCES service_offerings(id) ON DELETE SET NULL;
+CREATE INDEX idx_service_applications_offering ON service_applications(requested_offering_id, created_at);
