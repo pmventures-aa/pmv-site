@@ -86,13 +86,8 @@ export async function notifyStaff(
   let usedFallback = false
 
   try {
-    const binds:string[]=[]
     let where="u.role IN ('staff','admin') AND u.status='active'"
-    if(staffUserIds.length){
-      where+=` AND u.id IN (${staffUserIds.map(()=>'?').join(',')})`
-      binds.push(...staffUserIds)
-    }
-    binds.push(kind)
+    if(staffUserIds.length) where+=` AND u.id IN (${staffUserIds.map(()=>'?').join(',')})`
     const res=await env.DB.prepare(
       `SELECT u.email,
               COALESCE(nup.email_enabled,nec.default_email,0) event_email_enabled,
@@ -101,13 +96,11 @@ export async function notifyStaff(
        LEFT JOIN notification_event_catalog nec ON nec.event_key=?
        LEFT JOIN notification_user_preferences nup ON nup.user_id=u.id AND nup.event_key=nec.event_key
        LEFT JOIN notification_prefs np ON np.user_id=u.id
-       WHERE ${where}`.replace('nec.event_key=?',`nec.event_key=?`),
+       WHERE ${where}`,
     ).bind(kind,...staffUserIds).all<any>()
     recipients=(res.results||[]).filter((row:any)=>{
       let muted:string[]=[];try{muted=JSON.parse(row.legacy_muted||'[]')}catch{muted=[]}
-      const eventEnabled=row.event_email_enabled===1
-      const legacyEnabled=row.legacy_email_enabled===1
-      return !muted.includes(kind) && (eventEnabled||legacyEnabled)
+      return !muted.includes(kind) && (row.event_email_enabled===1 || row.legacy_email_enabled===1)
     }).map((row:any)=>row.email).filter(Boolean)
   } catch (err) {
     console.error('[notification] preference lookup failed',err)
