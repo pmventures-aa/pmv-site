@@ -57,8 +57,23 @@ CREATE TABLE IF NOT EXISTS client_nurture_deliveries (
   UNIQUE(user_id, campaign_key, step_key)
 );
 
+CREATE TABLE IF NOT EXISTS client_notification_outbox (
+  id TEXT PRIMARY KEY,
+  client_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_key TEXT NOT NULL REFERENCES notification_event_catalog(event_key),
+  entity_type TEXT,
+  entity_id TEXT,
+  payload_json TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','sent','skipped','failed')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  processed_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_notification_preferences_user ON notification_user_preferences(user_id);
 CREATE INDEX IF NOT EXISTS idx_nurture_due ON client_nurture_enrollments(status, enrolled_at, next_step);
+CREATE INDEX IF NOT EXISTS idx_client_notification_outbox_pending ON client_notification_outbox(status, created_at);
 
 CREATE TRIGGER IF NOT EXISTS trg_client_nurture_enroll
 AFTER INSERT ON users
@@ -88,3 +103,83 @@ INSERT OR IGNORE INTO notification_event_catalog(event_key,label,category,audien
 ('client_inactive_30d','Client inactive for 30 days','Client success','staff','A client has had no meaningful activity for 30 days.',1,0,0,170),
 ('unanswered_message','Message awaiting response','Communication','staff','A client message has not received a response.',1,0,0,180),
 ('application_stale','Application needs follow-up','Services','staff','A started application has not been completed.',1,0,0,190);
+
+-- Event outbox: capture relationship events at the data boundary so individual
+-- routes do not need to implement their own email delivery logic.
+CREATE TRIGGER IF NOT EXISTS trg_notify_invoice_created
+AFTER INSERT ON invoices
+BEGIN
+  INSERT INTO client_notification_outbox(id,client_user_id,event_key,entity_type,entity_id,payload_json)
+  VALUES(lower(hex(randomblob(16))),NEW.client_user_id,'invoice_created','invoice',NEW.id,
+         json_object('amount_cents',NEW.amount_cents,'due_date',NEW.due_date));
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_notify_appointment_scheduled
+AFTER INSERT ON appointments
+BEGIN
+  INSERT INTO client_notification_outbox(id,client_user_id,event_key,entity_type,entity_id,payload_json)
+  VALUES(lower(hex(randomblob(16))),NEW.client_user_id,'appointment_scheduled','appointment',NEW.id,
+         json_object('title',COALESCE(NEW.title,'Appointment'),'starts_at',NEW.starts_at));
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_notify_document_uploaded
+AFTER INSERT ON client_documents
+WHEN COALESCE(NEW.visibility,'client') != 'internal'
+BEGIN
+  INSERT INTO client_notification_outbox(id,client_user_id,event_key,entity_type,entity_id,payload_json)
+  VALUES(lower(hex(randomblob(16))),NEW.client_user_id,'document_uploaded','document',NEW.id,
+         json_object('file_name',COALESCE(NEW.file_name,'New document'),'category',COALESCE(NEW.category,'document')));
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_notify_service_assigned
+AFTER INSERT ON client_services
+BEGIN
+  INSERT INTO client_notification_outbox(id,client_user_id,event_key,entity_type,entity_id,payload_json)
+  VALUES(lower(hex(randomblob(16))),NEW.client_user_id,'service_assigned','client_service',NEW.id,
+         json_object('service_key',NEW.service_key,'status',NEW.status));
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_notify_service_completed
+AFTER UPDATE OF status ON client_services
+WHEN NEW.status='completed' AND OLD.status!='completed'
+BEGIN
+  INSERT INTO client_notification_outbox(id,client_user_id,event_key,entity_type,entity_id,payload_json)
+  VALUES(lower(hex(randomblob(16))),NEW.client_user_id,'service_completed','client_service',NEW.id,
+         json_object('service_key',NEW.service_key));
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_notify_application_submitted
+AFTER UPDATE OF status ON service_applications
+WHEN NEW.status='submitted' AND OLD.status!='submitted'
+BEGIN
+  INSERT INTO client_notification_outbox(id,client_user_id,event_key,entity_type,entity_id,payload_json)
+  VALUES(lower(hex(randomblob(16))),NEW.client_user_id,'service_application_submitted','service_application',NEW.id,
+         json_object('service_key',NEW.service_key));
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_notify_application_approved
+AFTER UPDATE OF status ON service_applications
+WHEN NEW.status='approved' AND OLD.status!='approved'
+BEGIN
+  INSERT INTO client_notification_outbox(id,client_user_id,event_key,entity_type,entity_id,payload_json)
+  VALUES(lower(hex(randomblob(16))),NEW.client_user_id,'service_application_approved','service_application',NEW.id,
+         json_object('service_key',NEW.service_key));
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_notify_trusted_contact_accepted
+AFTER UPDATE OF status ON trusted_contacts
+WHEN NEW.status='active' AND OLD.status!='active'
+BEGIN
+  INSERT INTO client_notification_outbox(id,client_user_id,event_key,entity_type,entity_id,payload_json)
+  VALUES(lower(hex(randomblob(16))),NEW.client_user_id,'trusted_contact_accepted','trusted_contact',NEW.id,
+         json_object('full_name',NEW.full_name,'email',NEW.email));
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_notify_staff_message
+AFTER INSERT ON secure_messages
+WHEN EXISTS (SELECT 1 FROM users sender WHERE sender.id=NEW.sender_user_id AND sender.role IN ('staff','admin'))
+BEGIN
+  INSERT INTO client_notification_outbox(id,client_user_id,event_key,entity_type,entity_id,payload_json)
+  VALUES(lower(hex(randomblob(16))),NEW.client_user_id,'message_received','secure_message',NEW.id,
+         json_object('preview',substr(NEW.body,1,180)));
+END;
