@@ -39,6 +39,7 @@ import { inviteCompletionRoutes } from '../_lib/routes/inviteCompletion'
 import { teamManagementRoutes } from '../_lib/routes/teamManagement'
 import { vendorApplicationUploadRoutes } from '../_lib/routes/vendorApplicationUploads'
 import { serviceOfferingPublicRoutes, serviceOfferingAdminRoutes } from '../_lib/routes/serviceOfferings'
+import { relationshipAutomationRoutes, relationshipAutomationAdminRoutes } from '../_lib/routes/relationshipAutomation'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -51,6 +52,7 @@ app.route('/', resendWebhookRoutes)
 app.route('/', invitationPublicRoutes)
 app.route('/', inviteCompletionRoutes)
 app.route('/', vendorApplicationUploadRoutes)
+app.route('/', relationshipAutomationRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
@@ -64,6 +66,7 @@ app.route('/portal', selfRoutes)
 app.route('/portal', portalRoutes)
 app.route('/portal', messageRoutes)
 
+app.route('/admin', relationshipAutomationAdminRoutes)
 app.route('/admin', serviceOfferingAdminRoutes)
 app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', accountEmailsAdminRoutes)
