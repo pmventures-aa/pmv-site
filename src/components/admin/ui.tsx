@@ -5,6 +5,7 @@ export const btnPrimary =
   'inline-flex items-center justify-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-semibold text-navy-950 shadow-[0_10px_26px_rgba(201,162,39,.10)] transition-all duration-200 hover:-translate-y-px hover:bg-gold-400 hover:shadow-[0_14px_32px_rgba(201,162,39,.14)] disabled:translate-y-0 disabled:opacity-60'
 export const btnOutline =
   'inline-flex items-center justify-center gap-2 rounded-lg border border-white/12 bg-white/[.015] px-4 py-2.5 text-sm font-semibold text-slate-200 transition-all duration-200 hover:-translate-y-px hover:border-gold/45 hover:bg-gold/[.035] hover:text-gold disabled:translate-y-0 disabled:opacity-60'
+export const btnSecondary = btnOutline
 export const panelCls = 'surface-panel rounded-xl transition-all duration-200'
 export const inputCls =
   'w-full min-h-10 rounded-lg border border-white/10 bg-navy-900/80 px-3 py-2 text-sm text-white shadow-inner shadow-black/10 placeholder:text-slate-500 transition focus:border-gold/45 focus:bg-navy-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/30 focus-visible:ring-offset-1 focus-visible:ring-offset-navy-950'
