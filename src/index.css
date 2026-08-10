@@ -2,105 +2,104 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+:root {
+  color-scheme: dark;
+  --pmv-surface-0: #06111f;
+  --pmv-surface-1: #0a1727;
+  --pmv-surface-2: #0e1d2f;
+  --pmv-line: rgba(255,255,255,.085);
+  --pmv-line-strong: rgba(255,255,255,.14);
+  --pmv-muted: #8fa0b4;
+  --pmv-gold: #c9a227;
+  --pmv-shadow-sm: 0 8px 24px rgba(0,0,0,.14);
+  --pmv-shadow-md: 0 18px 52px rgba(0,0,0,.22);
+}
 :root[data-theme='light'] { color-scheme: light; }
 
+html { scroll-behavior: smooth; }
 body {
   @apply bg-navy-950 text-slate-100 font-sans antialiased;
   margin: 0;
+  min-width: 320px;
+  background-image:
+    radial-gradient(circle at 18% -10%, rgba(201,162,39,.06), transparent 30rem),
+    linear-gradient(180deg, rgba(255,255,255,.012), transparent 20rem);
   transition: background-color 160ms ease, color 160ms ease;
 }
+::selection { background: rgba(201,162,39,.28); color: #fff; }
 
-/* Native select menus can ignore utility-class foreground/background pairing.
-   Give option rows an explicit palette so Windows/Chrome never renders white
-   text on the browser's white popup menu. */
 select { color-scheme: dark; }
 select option,
-select optgroup {
-  background: #081525;
-  color: #f1f5f9;
-}
+select optgroup { background: #081525; color: #f1f5f9; }
 :root[data-theme='light'] select { color-scheme: light; }
 :root[data-theme='light'] select option,
-:root[data-theme='light'] select optgroup {
-  background: #ffffff;
-  color: #172033;
-}
+:root[data-theme='light'] select optgroup { background: #ffffff; color: #172033; }
 
 @layer components {
   .glass-card {
     @apply rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-md shadow-glass;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-semibold transition;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200;
   }
   .btn-gold {
-    @apply btn bg-gold text-navy-950 hover:bg-gold-400;
+    @apply btn bg-gold text-navy-950 hover:-translate-y-0.5 hover:bg-gold-400;
+    box-shadow: 0 10px 28px rgba(201,162,39,.12);
   }
   .btn-outline {
-    @apply btn border border-white/20 text-slate-100 hover:border-gold hover:text-gold;
+    @apply btn border border-white/15 bg-white/[.015] text-slate-100 hover:-translate-y-0.5 hover:border-gold/60 hover:bg-gold/[.035] hover:text-gold;
   }
-  .container-pmv { @apply mx-auto w-full max-w-6xl px-6; }
-  .eyebrow { @apply text-xs font-semibold uppercase tracking-[0.2em] text-gold; }
+  .container-pmv { @apply mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8; }
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.19em] text-gold; }
+  .surface-panel {
+    border: 1px solid var(--pmv-line);
+    background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+    box-shadow: var(--pmv-shadow-sm);
+  }
+  .surface-panel-strong {
+    border: 1px solid var(--pmv-line-strong);
+    background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+    box-shadow: var(--pmv-shadow-md);
+  }
+  .enterprise-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,.5), transparent 80%);
+  }
 }
 
+/* Keep legacy theme controls styled where they still appear outside HQ. */
 .theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 10px;
-  background: rgba(255,255,255,.035);
+  display: inline-flex; align-items: center; gap: 2px; padding: 3px;
+  border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.035);
 }
 .theme-toggle button {
-  border: 0;
-  border-radius: 7px;
-  padding: 5px 8px;
-  background: transparent;
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
+  border: 0; border-radius: 7px; padding: 5px 8px; background: transparent; color: #94a3b8;
+  font-size: 11px; font-weight: 600; cursor: pointer;
 }
 .theme-toggle button:hover { color: #f8fafc; }
 .theme-toggle button.is-active { background: rgba(201,162,39,.16); color: #e3cc7a; }
 .theme-toggle-compact {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 9px;
-  background: rgba(255,255,255,.025);
-  color: #cbd5e1;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px;
+  border: 1px solid rgba(255,255,255,.12); border-radius: 9px; background: rgba(255,255,255,.025);
+  color: #cbd5e1; font-size: 11px; font-weight: 600; cursor: pointer;
 }
 .theme-toggle-compact:hover { border-color: rgba(201,162,39,.45); color: #c9a227; }
 .theme-indicator { color: #c9a227; font-size: 10px; }
 
-/* Light mode is intentionally warm and restrained rather than a white clone of
-   the dark UI. Existing Tailwind utility classes stay the source of layout;
-   these semantic overrides remap the established dark palette. */
-:root[data-theme='light'] body {
-  background: #f5f2ec;
-  color: #172033;
-}
-:root[data-theme='light'] [class~='bg-navy-950'] { background-color: #f5f2ec !important; }
-:root[data-theme='light'] [class~='bg-navy-900'] { background-color: #ffffff !important; }
-:root[data-theme='light'] [class~='bg-navy-800'] { background-color: #f0ede7 !important; }
-:root[data-theme='light'] [class~='bg-navy-radial'] {
-  background-image: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, #f6f3ed 58%, #eee9df 100%) !important;
-}
+:root[data-theme='light'] body { background: #f4f1ea; color: #172033; background-image: radial-gradient(circle at 18% -10%, rgba(201,162,39,.08), transparent 30rem); }
+:root[data-theme='light'] [class~='bg-navy-950'] { background-color: #f4f1ea !important; }
+:root[data-theme='light'] [class~='bg-navy-900'] { background-color: #fffdfa !important; }
+:root[data-theme='light'] [class~='bg-navy-800'] { background-color: #eeeae2 !important; }
+:root[data-theme='light'] [class~='bg-navy-radial'] { background-image: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, #f6f3ed 58%, #eee9df 100%) !important; }
 :root[data-theme='light'] [class*='bg-navy-950/'],
-:root[data-theme='light'] [class*='bg-navy-900/'] { background-color: rgba(255,255,255,.88) !important; }
+:root[data-theme='light'] [class*='bg-navy-900/'] { background-color: rgba(255,253,250,.9) !important; }
 :root[data-theme='light'] [class*='bg-white/['],
 :root[data-theme='light'] [class*='bg-white/5'],
-:root[data-theme='light'] [class*='bg-white/10'] { background-color: rgba(255,255,255,.72) !important; }
-:root[data-theme='light'] [class*='border-white/'] { border-color: rgba(15,36,63,.13) !important; }
+:root[data-theme='light'] [class*='bg-white/10'] { background-color: rgba(255,255,255,.74) !important; }
+:root[data-theme='light'] [class*='border-white/'] { border-color: rgba(15,36,63,.12) !important; }
 :root[data-theme='light'] [class~='text-white'] { color: #10233d !important; }
 :root[data-theme='light'] [class~='text-slate-100'],
 :root[data-theme='light'] [class~='text-slate-200'] { color: #24334a !important; }
@@ -110,6 +109,8 @@ select optgroup {
 :root[data-theme='light'] [class~='text-slate-600'] { color: #808894 !important; }
 :root[data-theme='light'] .glass-card,
 :root[data-theme='light'] [class*='shadow-glass'] { box-shadow: 0 12px 32px rgba(28,43,59,.08) !important; }
+:root[data-theme='light'] .surface-panel,
+:root[data-theme='light'] .surface-panel-strong { background: rgba(255,255,255,.82); border-color: rgba(15,36,63,.11); box-shadow: 0 14px 38px rgba(28,43,59,.07); }
 :root[data-theme='light'] .btn-outline { border-color: rgba(15,36,63,.2); color: #24334a; }
 :root[data-theme='light'] .btn-outline:hover { border-color: #c9a227; color: #9a7612; }
 :root[data-theme='light'] .theme-toggle,
@@ -118,23 +119,22 @@ select optgroup {
 :root[data-theme='light'] .theme-toggle button:hover { color: #10233d; }
 :root[data-theme='light'] .theme-toggle button.is-active { background: rgba(201,162,39,.15); color: #7d600f; }
 
-@keyframes marquee-scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
+@keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .animate-marquee { animation: marquee-scroll 28s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .animate-marquee { animation: none; } }
-
 @keyframes loading-spin { to { transform: rotate(360deg); } }
 @keyframes loading-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 @keyframes loading-pulse-ring { 0% { transform: scale(0.82); opacity: 0.55; } 70%, 100% { transform: scale(1.18); opacity: 0; } }
 .loading-sweep {
-  background: conic-gradient(from 0deg, transparent 0%, rgba(201, 162, 39, 0.65) 22%, transparent 46%, transparent 100%);
+  background: conic-gradient(from 0deg, transparent 0%, rgba(201,162,39,.65) 22%, transparent 46%, transparent 100%);
   -webkit-mask-image: radial-gradient(closest-side, transparent 76%, black 80%, black 90%, transparent 94%);
   mask-image: radial-gradient(closest-side, transparent 76%, black 80%, black 90%, transparent 94%);
   animation: loading-spin 2.6s linear infinite;
 }
-.loading-pulse { border: 1px solid rgba(201, 162, 39, 0.45); animation: loading-pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.loading-pulse { border: 1px solid rgba(201,162,39,.45); animation: loading-pulse-ring 2.4s cubic-bezier(.4,0,.6,1) infinite; }
 .loading-pulse-delay { animation-delay: 1.2s; }
 .loading-breathe { animation: loading-breathe 2.6s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .loading-sweep, .loading-pulse, .loading-breathe { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .animate-marquee, .loading-sweep, .loading-pulse, .loading-breathe { animation: none; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
