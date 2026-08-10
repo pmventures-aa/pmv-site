@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
@@ -6,6 +6,7 @@ import { Panel, EmptyState, StatCard } from '../../components/admin/ui'
 import { DashboardWelcome } from '../../components/DashboardWelcome'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Icon } from '../../components/kit/Icon'
 
 interface Stats {
@@ -26,11 +27,12 @@ interface DashboardResponse { stats:Stats; upcoming_appointments:Appointment[]; 
 
 function money(cents:number):string { return `$${(cents/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}` }
 function StatLink({label,value,to}:{label:string;value:number|string;to?:string}) { const content=<StatCard label={label} value={value}/>; return to?<Link to={to} className="block">{content}</Link>:content }
-const POLL_MS=60_000
 
 export default function AdminDashboard(){
   const {user}=useAuth(); const p=useAppPath(); const[data,setData]=useState<DashboardResponse|null>(null); const[createOpen,setCreateOpen]=useState(false)
-  useEffect(()=>{const load=()=>api.get<DashboardResponse>('/admin/dashboard').then(setData).catch(()=>{});load();const t=setInterval(load,POLL_MS);return()=>clearInterval(t)},[])
+  const load=useCallback(()=>api.get<DashboardResponse>('/admin/dashboard').then(setData).catch(()=>{}),[])
+  useEffect(()=>{void load()},[load])
+  useLiveRefresh(load)
   const stats=data?.stats; const na=data?.needs_attention; const attentionCount=na?na.overdue_tasks.length+na.overdue_invoices.length+na.stale_tickets.length+na.stale_inquiries.length:0
   const quick='group inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/[.08] bg-white/[.018] px-3.5 py-2.5 text-xs font-semibold text-slate-300 transition-all duration-200 hover:-translate-y-px hover:border-gold/30 hover:bg-gold/[.03] hover:text-gold'
 
