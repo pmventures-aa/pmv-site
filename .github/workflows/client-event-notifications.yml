@@ -1,0 +1,15 @@
+name: Process client event notifications
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  notifications:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deliver queued Pinnacle client notifications
+        run: |
+          curl --fail --silent --show-error --request POST \
+            https://www.pinnaclemanagementventures.com/api/automation/client-notifications/run
