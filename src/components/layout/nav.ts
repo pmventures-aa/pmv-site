@@ -61,6 +61,7 @@ export const adminNav: NavItem[] = [
 
   { key: 'messages', label: 'Inbox', to: 'messages', icon: MessageSquare, section: 'Operations' },
   { key: 'communications', label: 'Campaigns', to: 'communications', icon: Megaphone, section: 'Operations' },
+  { key: 'document-center', label: 'Document Hub', to: 'document-center', icon: FileText, section: 'Operations' },
   { key: 'field-work', label: 'Field Work & RON', to: 'field-work', icon: MapPinned, section: 'Operations' },
 
   { key: 'reports', label: 'Reports', to: 'reports', icon: BarChart3, section: 'Intelligence' },
