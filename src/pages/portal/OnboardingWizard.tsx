@@ -31,6 +31,7 @@ export default function OnboardingWizard() {
   const p = useAppPath()
   const [params] = useSearchParams()
   const intentService = params.get('service') || ''
+  const intentOffering = params.get('offering') || ''
   const isFreshWelcome = params.get('welcome') === '1'
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState<Step>('services')
@@ -42,6 +43,11 @@ export default function OnboardingWizard() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  function destination() {
+    if (intentService && intentOffering) return `${p(`services/${encodeURIComponent(intentService)}/apply`)}?offering=${encodeURIComponent(intentOffering)}`
+    return p()
+  }
+
   useEffect(() => {
     ;(async () => {
       try {
@@ -51,7 +57,8 @@ export default function OnboardingWizard() {
         ])
         setCatalog(cat.services)
         if (status.completed) {
-          navigate(p(), { replace: true })
+          if (intentService && intentOffering) navigate(`${p(`services/${encodeURIComponent(intentService)}/apply`)}?offering=${encodeURIComponent(intentOffering)}`, { replace: true })
+          else navigate(p(), { replace: true })
           return
         }
         const initial = new Set(status.services || [])
@@ -63,7 +70,7 @@ export default function OnboardingWizard() {
         setLoading(false)
       }
     })()
-  }, [intentService, navigate, p])
+  }, [intentService, intentOffering, navigate, p])
 
   const grouped = useMemo(() => {
     const map = new Map<string, Question[]>()
@@ -129,7 +136,7 @@ export default function OnboardingWizard() {
     setBusy(true)
     try {
       await api.post('/portal/onboarding', { services: Array.from(selected), answers })
-      navigate(p(), { replace: true })
+      navigate(destination(), { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         setError('A required detail is still missing. We brought you back so you can finish it.')
@@ -234,8 +241,8 @@ export default function OnboardingWizard() {
                 <h2 className="mt-2 text-xl font-semibold text-white">We have enough to start the conversation.</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">Your selections help Pinnacle understand where to begin. They do not lock you into a package. From here you can message us, upload documents, track work, and discover other support only when it becomes useful.</p>
                 <div className="mt-5 flex flex-wrap gap-2">{selectedServices.map((service) => <StatusBadge key={service.key} tone="gold">{service.name}</StatusBadge>)}</div>
-                <div className="mt-7 border-l-2 border-gold pl-4"><p className="text-sm font-medium text-white">What happens next</p><p className="mt-1 text-xs leading-5 text-slate-400">We’ll review what you shared, route it appropriately, and follow up if anything needs clarification. Your dashboard will keep the next action visible without making you learn the whole portal at once.</p></div>
-                <div className="mt-7 flex items-center justify-between gap-3"><button onClick={() => { setQuestionServiceIndex(Math.max(0, selectedServices.length - 1)); setStep(questions.length ? 'questions' : 'services') }} className="btn-outline">Back</button><button onClick={submit} disabled={busy} className="btn-gold disabled:opacity-60">{busy ? 'Saving…' : 'Enter my portal'}</button></div>
+                <div className="mt-7 border-l-2 border-gold pl-4"><p className="text-sm font-medium text-white">What happens next</p><p className="mt-1 text-xs leading-5 text-slate-400">We’ll review what you shared, route it appropriately, and follow up if anything needs clarification. {intentService && intentOffering ? 'Next, we’ll open the exact service option you selected so you can complete its specific requirements.' : 'Your dashboard will keep the next action visible without making you learn the whole portal at once.'}</p></div>
+                <div className="mt-7 flex items-center justify-between gap-3"><button onClick={() => { setQuestionServiceIndex(Math.max(0, selectedServices.length - 1)); setStep(questions.length ? 'questions' : 'services') }} className="btn-outline">Back</button><button onClick={submit} disabled={busy} className="btn-gold disabled:opacity-60">{busy ? 'Saving…' : intentService && intentOffering ? 'Continue to my service' : 'Enter my portal'}</button></div>
               </Card>
             )}
           </main>
