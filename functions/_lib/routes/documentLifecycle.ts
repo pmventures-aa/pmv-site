@@ -13,7 +13,7 @@ function code6(){ return String(Math.floor(100000+Math.random()*900000)) }
 function token(){ const a=crypto.getRandomValues(new Uint8Array(24)); return btoa(String.fromCharCode(...a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'') }
 function requestEvidence(c:any){ const cf=c.req.raw.cf as any; return { ip:c.req.header('CF-Connecting-IP')||null, city:cf?.city||null, region:cf?.region||null, country:cf?.country||null, lat:cf?.latitude?Number(cf.latitude):null, lon:cf?.longitude?Number(cf.longitude):null, ua:c.req.header('user-agent')||null } }
 async function appendEvent(c:any, envId:string, type:string, actorType:string, actorId:string|null, recipientId:string|null, metadata:any={}){
-  const prev=await c.env.DB.prepare('SELECT event_hash FROM envelope_events WHERE envelope_id=? ORDER BY occurred_at_utc DESC,id DESC LIMIT 1').bind(envId).first<any>()
+  const prev=(await c.env.DB.prepare('SELECT event_hash FROM envelope_events WHERE envelope_id=? ORDER BY occurred_at_utc DESC,id DESC LIMIT 1').bind(envId).first()) as {event_hash?:string}|null
   const e=requestEvidence(c), occurred=now(), id=uuid(), requestId=uuid(), prevHash=prev?.event_hash||'GENESIS'
   const canonical=JSON.stringify({id,envId,recipientId,actorType,actorId,type,occurred,requestId,metadata,prevHash,ip:e.ip,city:e.city,region:e.region,country:e.country,lat:e.lat,lon:e.lon,ua:e.ua})
   const hash=await sha256Hex(canonical)
