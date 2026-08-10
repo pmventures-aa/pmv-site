@@ -1,0 +1,15 @@
+name: Run client nurture campaign
+
+on:
+  schedule:
+    - cron: '20 14 * * *'
+  workflow_dispatch:
+
+jobs:
+  nurture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process due Pinnacle client nurture emails
+        run: |
+          curl --fail --silent --show-error --request POST \
+            https://www.pinnaclemanagementventures.com/api/automation/nurture/run
