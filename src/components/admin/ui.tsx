@@ -10,6 +10,9 @@ export const inputCls =
   'w-full min-h-10 rounded-lg border border-white/10 bg-navy-900/80 px-3 py-2 text-sm text-white shadow-inner shadow-black/10 placeholder:text-slate-500 transition focus:border-gold/45 focus:bg-navy-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/30 focus-visible:ring-offset-1 focus-visible:ring-offset-navy-950'
 
 export function PageIntro({ kicker, title, subtitle, action, leading }: { kicker:string; title:string; subtitle?:string; action?:ReactNode; leading?:ReactNode }) {
+  function refresh() {
+    window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } }))
+  }
   return (
     <div className="mb-7 flex flex-wrap items-start justify-between gap-5 border-b border-white/[.08] pb-6">
       <div className="flex items-start gap-4">
@@ -22,13 +25,7 @@ export function PageIntro({ kicker, title, subtitle, action, leading }: { kicker
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {action}
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-400 transition hover:border-gold/35 hover:bg-gold/[.04] hover:text-gold"
-          title="Refresh this page"
-          aria-label={`Refresh ${title}`}
-        >
+        <button type="button" onClick={refresh} className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-400 transition hover:border-gold/35 hover:bg-gold/[.04] hover:text-gold" title="Refresh this page" aria-label={`Refresh ${title}`}>
           <RotateCw size={14} />
         </button>
       </div>
