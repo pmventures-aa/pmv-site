@@ -4,6 +4,7 @@ import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnPrimary, Tag } fro
 import { toast } from '../../components/kit/toast'
 import { ConfirmDialog } from '../../components/kit/ConfirmDialog'
 import { useAuth } from '../../lib/auth'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 
 interface UserRow {
   id: string
@@ -51,9 +52,8 @@ export default function AssignmentsAdmin() {
     }
   }, [])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useEffect(() => { void load() }, [load])
+  useLiveRefresh(load)
 
   const staff = users.filter((u) => u.role === 'staff' || u.role === 'admin')
   const clients = users.filter((u) => u.role === 'client')
