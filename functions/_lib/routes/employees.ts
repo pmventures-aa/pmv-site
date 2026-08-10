@@ -5,7 +5,6 @@ import { requireNamedPermission } from '../capabilities'
 
 export const employeeRoutes = new Hono<AppEnv>()
 
-// Minimal directory remains available to all staff for assignment pickers.
 employeeRoutes.get('/staff-directory', requireStaff, async (c) => {
   const res = await c.env.DB.prepare(
     "SELECT id, full_name, email FROM users WHERE role IN ('staff', 'admin') AND status = 'active' ORDER BY full_name",
@@ -76,12 +75,21 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
     ).bind(id).all(),
   ])
 
+  let vendorApplication: unknown = null
+  try {
+    const row = await c.env.DB.prepare('SELECT application_json, submitted_at, updated_at FROM vendor_application_profiles WHERE user_id = ?').bind(id).first<{ application_json:string; submitted_at:string; updated_at:string }>()
+    if (row) vendorApplication = { ...JSON.parse(row.application_json), submitted_at: row.submitted_at, updated_at: row.updated_at }
+  } catch (err) {
+    console.error('[employees] vendor application profile unavailable', err)
+  }
+
   return c.json({
     employee,
     login_history: logins.results ?? [],
     tasks: tasks.results ?? [],
     notes: notes.results ?? [],
     vendor_documents: vendorDocuments.results ?? [],
+    vendor_application: vendorApplication,
     avg_response_hours: avgResponse?.avg_hours ?? null,
   })
 })
