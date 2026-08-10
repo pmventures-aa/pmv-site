@@ -5,6 +5,7 @@ import { PageIntro, Panel, Tag } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { KanbanBoard, StageSelect, type KanbanColumn } from '../../components/admin/Kanban'
 import { useAppPath } from '../../lib/basePath'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 
 interface LeadRecord {
   id: string
@@ -111,7 +112,9 @@ export default function PipelinesAdmin() {
     }
   }, [recordType, lifecycle])
 
-  useEffect(() => { load(tab) }, [tab, load])
+  useEffect(() => { void load(tab) }, [tab, load])
+  const refreshCurrent = useCallback(() => load(tab), [load, tab])
+  useLiveRefresh(refreshCurrent)
 
   async function moveLead(item: LeadRecord, status: string) {
     setLeads((cur) => cur.map((lead) => lead.id === item.id ? { ...lead, status } : lead))
