@@ -4,13 +4,14 @@ import { api } from '../../lib/api'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 import { useAppPath } from '../../lib/basePath'
 import { displayValue, type IntakeValue } from '../../lib/intake'
-import { serviceOfferings } from '../../data/serviceOfferings'
+import { serviceOfferings, type ServiceOffering } from '../../data/serviceOfferings'
 import { services as publicServices } from '../../data/services'
 
 interface CatalogItem { key:string; name:string; description:string; category:string; intake_intro?:string|null; estimated_minutes?:number }
 interface Enrolled { service_key:string; name:string; status:string }
 interface ApplicationAnswer { question_key:string; question_label:string; step_label:string|null; step_order:number; sort_order:number; value:IntakeValue }
 interface Application { id:string; service_key:string; service_name:string; service_description:string|null; status:string; current_step:number; submission_source?:string; assigned_at?:string|null; submitted_at:string|null; created_at:string; updated_at:string; answers:ApplicationAnswer[] }
+interface LiveOffering extends ServiceOffering { requiredDocuments?:string[]; intakePrompts?:string[]; sortOrder?:number }
 
 const STATUS_TONE:Record<string,'gold'|'green'|'blue'|'slate'|'red'>={draft:'gold',requested:'gold',submitted:'blue',in_review:'blue',approved:'green',active:'green',completed:'green',closed:'slate',declined:'red'}
 const APPLICATION_LABEL:Record<string,string>={draft:'In progress',submitted:'Application received',in_review:'In review',approved:'Approved',declined:'Declined',closed:'Closed'}
@@ -21,15 +22,17 @@ export default function Services(){
   const [catalog,setCatalog]=useState<CatalogItem[]>([])
   const [enrolled,setEnrolled]=useState<Enrolled[]>([])
   const [applications,setApplications]=useState<Application[]>([])
+  const [liveOfferings,setLiveOfferings]=useState<LiveOffering[]>(serviceOfferings)
   const [loading,setLoading]=useState(true)
 
   const load=useCallback(async()=>{
-    const[cat,mine,apps]=await Promise.all([
+    const[cat,mine,apps,offerings]=await Promise.all([
       api.get<{services:CatalogItem[]}>('/portal/services-catalog'),
       api.get<{services:Enrolled[]}>('/portal/services'),
       api.get<{applications:Application[]}>('/portal/service-applications'),
+      api.get<{offerings:LiveOffering[]}>('/service-offerings').catch(()=>({offerings:serviceOfferings})),
     ])
-    setCatalog(cat.services);setEnrolled(mine.services);setApplications(apps.applications)
+    setCatalog(cat.services);setEnrolled(mine.services);setApplications(apps.applications);setLiveOfferings(offerings.offerings.length?offerings.offerings:serviceOfferings)
   },[])
   useEffect(()=>{load().finally(()=>setLoading(false))},[load])
 
@@ -41,7 +44,7 @@ export default function Services(){
     for(const item of available){const key=item.category||'Other support';if(!groups.has(key))groups.set(key,[]);groups.get(key)!.push(item)}
     return [...groups.entries()]
   },[available])
-  const offeringGroups=useMemo(()=>publicServices.map((service)=>({service,offerings:serviceOfferings.filter((item)=>item.serviceKey===service.key)})).filter((group)=>group.offerings.length),[])
+  const offeringGroups=useMemo(()=>publicServices.map((service)=>({service,offerings:liveOfferings.filter((item)=>item.serviceKey===service.key)})).filter((group)=>group.offerings.length),[liveOfferings])
 
   return <div>
     <PageHeader eyebrow="Your Pinnacle relationship" title="Services" subtitle="Keep current work easy to find. Additional services stay here to explore when they become relevant — there is no need to take everything on at once."/>
@@ -68,7 +71,7 @@ export default function Services(){
 
     <Card>
       <div className="max-w-2xl"><p className="eyebrow">One-time service library</p><h2 className="mt-1 text-lg font-semibold text-white">Defined services with straightforward starting prices</h2><p className="mt-1 text-sm leading-6 text-slate-400">Open only the category that interests you. Standard local pricing is shown as a starting point; unusual access, rush timing, distance, size, complexity, or third-party costs may require a different quote.</p></div>
-      <div className="mt-6 divide-y divide-white/10 border-y border-white/10">{offeringGroups.map(({service,offerings})=><details key={service.key} className="group py-1"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4"><div><p className="text-sm font-semibold text-white">{service.title}</p><p className="mt-1 text-xs text-slate-500">{offerings.length} defined option{offerings.length===1?'':'s'} · from ${Math.min(...offerings.map((item)=>item.startingPrice||Infinity).filter(Number.isFinite))}</p></div><span className="text-gold transition group-open:rotate-45">＋</span></summary><div className="pb-4"><div className="divide-y divide-white/10 border-t border-white/10">{offerings.map((item)=><div key={item.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6"><div className="max-w-2xl"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-white">{item.name}</p>{item.badge&&<span className="text-[10px] font-semibold uppercase tracking-wide text-gold">{item.badge}</span>}</div><p className="mt-1 text-xs leading-5 text-slate-400">{item.description}</p>{item.note&&<p className="mt-1 text-[11px] leading-5 text-slate-500">{item.note}</p>}</div><div className="flex shrink-0 items-center justify-between gap-4 sm:flex-col sm:items-end"><p className="text-xs font-semibold text-white">{item.pricingLabel || (item.startingPrice?`From $${item.startingPrice}`:'Custom quote')}</p><Link to={p(`services/${service.key}/apply?offering=${encodeURIComponent(item.id)}`)} className="text-xs font-medium text-gold hover:underline">Start →</Link></div></div>)}</div></div></details>)}</div>
+      <div className="mt-6 divide-y divide-white/10 border-y border-white/10">{offeringGroups.map(({service,offerings})=><details key={service.key} className="group py-1"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4"><div><p className="text-sm font-semibold text-white">{service.title}</p><p className="mt-1 text-xs text-slate-500">{offerings.length} defined option{offerings.length===1?'':'s'}{offerings.some(item=>typeof item.startingPrice==='number')?` · from $${Math.min(...offerings.map((item)=>item.startingPrice||Infinity).filter(Number.isFinite))}`:''}</p></div><span className="text-gold transition group-open:rotate-45">＋</span></summary><div className="pb-4"><div className="divide-y divide-white/10 border-t border-white/10">{offerings.map((item)=><div key={item.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6"><div className="max-w-2xl"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium text-white">{item.name}</p>{item.badge&&<span className="text-[10px] font-semibold uppercase tracking-wide text-gold">{item.badge}</span>}</div><p className="mt-1 text-xs leading-5 text-slate-400">{item.description}</p>{item.requiredDocuments?.length?<p className="mt-1 text-[11px] leading-5 text-slate-500">Documents: {item.requiredDocuments.join(' · ')}</p>:null}{item.intakePrompts?.length?<p className="mt-1 text-[11px] leading-5 text-slate-500">We’ll ask about: {item.intakePrompts.join(' · ')}</p>:null}{item.note&&<p className="mt-1 text-[11px] leading-5 text-slate-500">{item.note}</p>}</div><div className="flex shrink-0 items-center justify-between gap-4 sm:flex-col sm:items-end"><p className="text-xs font-semibold text-white">{item.pricingLabel || (item.startingPrice?`From $${item.startingPrice}`:'Custom quote')}</p><Link to={p(`services/${service.key}/apply?offering=${encodeURIComponent(item.id)}`)} className="text-xs font-medium text-gold hover:underline">Start →</Link></div></div>)}</div></div></details>)}</div>
     </Card>
   </div>
 }
