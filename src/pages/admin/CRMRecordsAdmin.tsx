@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
+import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 
@@ -158,8 +159,8 @@ export default function CRMRecordsAdmin() {
   const [newList, setNewList] = useState({ name: '', description: '', list_type: 'static' as 'static' | 'dynamic', record_type: 'all', lifecycle_stage: '', status: '' })
   const [listTarget, setListTarget] = useState('')
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       if (tab === 'records') {
         const params = new URLSearchParams()
@@ -180,13 +181,15 @@ export default function CRMRecordsAdmin() {
         setConversions(res.conversions)
       }
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Could not load CRM records.')
+      if (!silent) toast.error(err instanceof ApiError ? err.message : 'Could not load CRM records.')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [tab, query, recordType, lifecycle, pipelineStatus])
 
-  useEffect(() => { const t = window.setTimeout(load, query ? 250 : 0); return () => window.clearTimeout(t) }, [load, query])
+  useEffect(() => { const t = window.setTimeout(() => void load(), query ? 250 : 0); return () => window.clearTimeout(t) }, [load, query])
+  const backgroundLoad = useCallback(() => load(true), [load])
+  useLiveRefresh(backgroundLoad)
 
   const staticLists = useMemo(() => lists.filter((l) => l.list_type === 'static'), [lists])
 
