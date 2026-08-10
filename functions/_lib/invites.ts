@@ -40,11 +40,13 @@ export function inviteExpiry(hours = 24): string {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
 }
 
+const SECURE_BASE = 'https://secure.pinnaclemanagementventures.com'
+
 export function inviteUrl(type: InviteType, token: string): string {
-  if (type === 'vendor') return `https://hq.pinnaclemanagementventures.com/vendor-signup?invite=${encodeURIComponent(token)}`
-  if (type === 'trusted_contact') return `https://client.pinnaclemanagementventures.com/trusted-invite/${encodeURIComponent(token)}`
-  if (type === 'client') return `https://client.pinnaclemanagementventures.com/signup?invite=${encodeURIComponent(token)}`
-  return `https://hq.pinnaclemanagementventures.com/invite/${encodeURIComponent(token)}`
+  if (type === 'vendor') return `${SECURE_BASE}/hq/vendor-signup?invite=${encodeURIComponent(token)}`
+  if (type === 'trusted_contact') return `${SECURE_BASE}/trusted-invite/${encodeURIComponent(token)}`
+  if (type === 'client') return `${SECURE_BASE}/signup?invite=${encodeURIComponent(token)}`
+  return `${SECURE_BASE}/hq/invite/${encodeURIComponent(token)}`
 }
 
 export async function createInvite(
@@ -106,32 +108,32 @@ export async function rotateInviteToken(env: Env, inviteId: string): Promise<{ t
 
 function inviteCopy(type: InviteType, clientName?: string | null): { subject:string; eyebrow:string; title:string; body:string; cta:string } {
   if (type === 'vendor') return {
-    subject: 'You’re invited to join the Pinnacle Professional Network',
+    subject: 'Pinnacle provider application invitation',
     eyebrow: 'Pinnacle Professional Network',
-    title: 'Your professional network invitation is ready.',
-    body: 'Pinnacle would like to learn more about your services and qualifications for our vetted professional network. Approved providers may be invited to assignment-specific opportunities when their expertise, location, availability, and credentials fit a client need.\n\nThis is not an employment offer and joining the network does not guarantee work volume. Your application helps us understand where you fit and what assignments we should — and should not — send your way.',
-    cta: 'Begin Provider Application',
+    title: 'Complete your provider application',
+    body: 'Pinnacle would like to review your services and qualifications for our professional network. Approved providers may be contacted for specific client assignments based on specialty, location, availability, credentials, and fit.\n\nJoining the network is not an employment offer and does not guarantee assignment volume. The application helps us understand the work you are qualified and available to perform.',
+    cta: 'Open Provider Application',
   }
   if (type === 'trusted_contact') return {
     subject: `${clientName || 'A Pinnacle client'} invited you as a Trusted Contact`,
     eyebrow: 'Trusted Contact access',
-    title: 'You’ve been invited into a Pinnacle client workspace.',
-    body: `${clientName || 'A Pinnacle client'} has chosen to give you secure access to specific parts of their Pinnacle Client Portal. The client controls exactly what you can view or edit, and they can change or revoke that access at any time.\n\nAccept the invitation to create your own secure login. You will never need to share the client’s password or use their account.`,
-    cta: 'Review My Access',
+    title: 'You have been invited to a Pinnacle client workspace',
+    body: `${clientName || 'A Pinnacle client'} has given you secure access to specific parts of their Pinnacle Client Portal. The client controls what you can view or edit and may change or revoke that access at any time.\n\nUse the invitation to create your own secure login. You will not need the client’s password.`,
+    cta: 'Review Access',
   }
   if (type === 'client') return {
-    subject: 'You’re invited to start your Pinnacle journey',
+    subject: 'Your Pinnacle client invitation',
     eyebrow: 'Pinnacle client invitation',
-    title: 'Let’s make the next step easier.',
-    body: 'Pinnacle has created a private invitation for you to begin your Client Portal experience. Start with the situation or service that brought you here — you do not need to have every detail figured out before creating your account.\n\nYour portal becomes the home base for services, applications, documents, messages, appointments, billing, and the people helping coordinate the work.',
-    cta: 'Start My Pinnacle Account',
+    title: 'Set up your Pinnacle account',
+    body: 'Pinnacle has created a private invitation for you to open your Client Portal. Your portal keeps services, applications, documents, messages, appointments, billing, and active work in one place.',
+    cta: 'Set Up Client Account',
   }
   return {
-    subject: 'You’ve been invited to Pinnacle HQ',
+    subject: 'Your Pinnacle HQ invitation',
     eyebrow: 'Pinnacle HQ',
-    title: 'Your Pinnacle team invitation is ready.',
-    body: 'You have been invited to join Pinnacle Management Ventures with a role and permission set defined by the firm. Your HQ experience will show only the tools and client information your account is authorized to access.\n\nUse your private setup link to create your secure account.',
-    cta: 'Set Up My HQ Access',
+    title: 'Set up your Pinnacle team account',
+    body: 'You have been invited to Pinnacle Management Ventures with a defined role and permission set. HQ will show only the tools and client information your account is authorized to access.\n\nUse your private setup link to create your account.',
+    cta: 'Set Up HQ Access',
   }
 }
 
@@ -151,7 +153,7 @@ export async function sendInviteEmail(
     preheader: 'Your private Pinnacle invitation expires in 24 hours.',
     eyebrow: copy.eyebrow,
     title: copy.title,
-    body: `${copy.body}\n\nThis private, one-time invitation expires in 24 hours. If you were not expecting it, you can ignore this message or reply to Pinnacle before creating an account.`,
+    body: `${copy.body}\n\nThis private invitation expires in 24 hours. If you were not expecting it, you can ignore this message or contact Pinnacle before creating an account.`,
     ctaLabel: copy.cta,
     ctaUrl: url,
   })
