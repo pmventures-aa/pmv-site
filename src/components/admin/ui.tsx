@@ -8,8 +8,23 @@ export const panelCls = 'rounded-md border border-white/10 bg-white/[0.02] trans
 export const inputCls =
   'w-full min-h-10 rounded-md border border-white/10 bg-navy-900 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-gold/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-navy-950'
 
+// Every HQ page starts with this header. The trailing border + bottom margin
+// give a consistent horizon line between page title and page body across
+// every route so pages stop feeling like they each invented their own layout.
 export function PageIntro({ kicker, title, subtitle, action, leading }: { kicker:string; title:string; subtitle?:string; action?:ReactNode; leading?:ReactNode }) {
-  return <div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-4">{leading}<div><p className="eyebrow">{kicker}</p><h1 className="mt-2 font-display text-3xl font-medium text-white">{title}</h1>{subtitle&&<p className="mt-1 max-w-2xl text-sm text-slate-400">{subtitle}</p>}</div></div>{action}</div>
+  return (
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-5">
+      <div className="flex items-start gap-4">
+        {leading}
+        <div>
+          <p className="eyebrow">{kicker}</p>
+          <h1 className="mt-1.5 font-display text-2xl font-medium text-white sm:text-3xl">{title}</h1>
+          {subtitle && <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-400">{subtitle}</p>}
+        </div>
+      </div>
+      {action}
+    </div>
+  )
 }
 
 export function Panel({ className='', children }: { className?:string; children:ReactNode }) { return <div className={`${panelCls} p-5 ${className}`}>{children}</div> }
