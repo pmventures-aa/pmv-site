@@ -44,6 +44,7 @@ import { relationshipAutomationRoutes, relationshipAutomationAdminRoutes } from 
 import { fieldWorkRoutes } from '../_lib/routes/fieldWork'
 import { documentVerificationRoutes } from '../_lib/routes/documentVerification'
 import { documentLifecycleAdminRoutes, documentLifecyclePublicRoutes } from '../_lib/routes/documentLifecycle'
+import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_lib/routes/internalDocuments'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -59,6 +60,7 @@ app.route('/', vendorApplicationUploadRoutes)
 app.route('/', relationshipAutomationRoutes)
 app.route('/', documentVerificationRoutes)
 app.route('/', documentLifecyclePublicRoutes)
+app.route('/', internalDocumentPublicRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
@@ -87,6 +89,7 @@ app.route('/admin', roleAdminRoutes)
 app.route('/admin', teamManagementRoutes)
 app.route('/admin', reportExportRoutes)
 app.route('/admin', documentLifecycleAdminRoutes)
+app.route('/admin', internalDocumentAdminRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
