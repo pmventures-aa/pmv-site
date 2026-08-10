@@ -31,6 +31,7 @@ import ServiceAssignmentsAdmin from './ServiceAssignmentsAdmin'
 import InvitationsAdmin from './InvitationsAdmin'
 import RolesPermissionsAdmin from './RolesPermissionsAdmin'
 import DocumentCenter from './DocumentCenter'
+import EnvelopeWorkspace from './EnvelopeWorkspace'
 import FieldWorkAdmin from './FieldWorkAdmin'
 import FieldWorkDetail, { FieldWorkList } from './FieldWorkVendor'
 
@@ -46,7 +47,7 @@ function AdminShell() {
   if (caps.can_view_reports) visible.add('reports')
   if (caps.can_manage_communications) visible.add('communications')
   if (caps.can_manage_invitations) visible.add('invitations')
-  if (caps.can_manage_documents) visible.add('document-center')
+  if (caps.can_manage_documents) { visible.add('document-center'); visible.add('envelopes') }
   if (caps.can_manage_team) visible.add('employees')
   if (caps.is_owner) visible.add('roles')
 
@@ -85,6 +86,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="field-work/:id" element={<FieldWorkDetail />} />
             <Route path="invoices" element={<InvoicesAdmin />} />
             <Route path="document-center" element={<DocumentCenter />} />
+            <Route path="envelopes" element={<EnvelopeWorkspace />} />
             <Route path="audit-log" element={<AuditLogAdmin />} />
             <Route path="reports" element={<ReportingCenter />} />
             <Route path="communications" element={<CommunicationsCRMAdmin />} />
