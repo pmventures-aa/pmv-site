@@ -23,12 +23,32 @@ function SurfaceFallback() {
 }
 
 const host = window.location.hostname
-const surface: 'admin' | 'portal' | 'public' =
-  host.startsWith('hq.') ? 'admin' : host.startsWith('client.') ? 'portal' : 'public'
+// secure.pinnaclemanagementventures.com is the post-authentication landing
+// domain that hosts BOTH the client portal and the staff HQ behind a single
+// hardened subdomain. The specific surface (admin vs portal) is decided by
+// path prefix once inside secure. — /hq/* → admin, everything else → portal.
+// The legacy hq.* and client.* hosts still work so old bookmarks and
+// email links do not break during the DNS cutover.
+const isSecureHost = host.startsWith('secure.')
+const surface: 'admin' | 'portal' | 'public' = (() => {
+  if (isSecureHost) {
+    return window.location.pathname.startsWith('/hq') ? 'admin' : 'portal'
+  }
+  if (host.startsWith('hq.')) return 'admin'
+  if (host.startsWith('client.')) return 'portal'
+  return 'public'
+})()
+const secureBase = isSecureHost ? (surface === 'admin' ? '/hq' : '') : ''
 
 function App() {
   if (surface === 'admin') {
-    return <Suspense fallback={<SurfaceFallback />}><Routes><Route path="/*" element={<AdminApp basePath="" />} /></Routes></Suspense>
+    return (
+      <Suspense fallback={<SurfaceFallback />}>
+        <Routes>
+          <Route path={`${secureBase}/*`} element={<AdminApp basePath={secureBase} />} />
+        </Routes>
+      </Suspense>
+    )
   }
   if (surface === 'portal') {
     return <Suspense fallback={<SurfaceFallback />}><Routes><Route path="/*" element={<PortalApp basePath="" />} /></Routes></Suspense>

@@ -25,11 +25,18 @@ export type AuditAction =
   | 'internal_document_attached'
   | 'representative_notified'
 
+export interface AuditGeo {
+  city?: string | null
+  region?: string | null
+  country?: string | null
+}
+
 export interface AuditOpts {
   actorUserId?: string | null
   actorIp?: string | null
   actorUserAgent?: string | null
-  action: AuditAction
+  actorGeo?: AuditGeo | null
+  action: AuditAction | string
   entityType?: string | null
   entityId?: string | null
   before?: unknown
@@ -38,12 +45,15 @@ export interface AuditOpts {
 
 export function auditInsert(env: Env, opts: AuditOpts): D1PreparedStatement {
   return env.DB.prepare(
-    `INSERT INTO audit_log (id, actor_user_id, actor_ip, actor_user_agent, action, entity_type, entity_id, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO audit_log (id, actor_user_id, actor_ip, actor_user_agent, actor_city, actor_region, actor_country, action, entity_type, entity_id, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     uuid(),
     opts.actorUserId ?? null,
     opts.actorIp ?? null,
     opts.actorUserAgent ?? null,
+    opts.actorGeo?.city ?? null,
+    opts.actorGeo?.region ?? null,
+    opts.actorGeo?.country ?? null,
     opts.action,
     opts.entityType ?? null,
     opts.entityId ?? null,
@@ -62,4 +72,18 @@ export function actorIp(request: Request): string | null {
 
 export function actorUserAgent(request: Request): string | null {
   return request.headers.get('User-Agent')
+}
+
+// Cloudflare's Workers/Pages runtime attaches request.cf with coarse geo
+// metadata (city, region, country) resolved from the connecting IP. Pull the
+// fields we display in the audit log; each falls back to null in local dev
+// where request.cf is undefined.
+export function actorGeo(request: Request): AuditGeo {
+  const cf = (request as unknown as { cf?: Record<string, unknown> }).cf
+  if (!cf) return { city: null, region: null, country: null }
+  const pick = (key: string): string | null => {
+    const value = cf[key]
+    return typeof value === 'string' && value.length > 0 ? value : null
+  }
+  return { city: pick('city'), region: pick('region'), country: pick('country') }
 }

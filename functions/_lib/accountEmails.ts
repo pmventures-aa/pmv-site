@@ -37,9 +37,12 @@ interface TrackedSendInput {
   metadata?: Record<string, unknown>
 }
 
-export const CLIENT_PORTAL_URL = 'https://client.pinnaclemanagementventures.com/'
-export const CLIENT_LOGIN_URL = 'https://client.pinnaclemanagementventures.com/login'
-export const HQ_LOGIN_URL = 'https://hq.pinnaclemanagementventures.com/login'
+// Post-auth surfaces live behind secure.pinnaclemanagementventures.com. The
+// legacy hq. and client. hosts continue to work while the DNS cutover settles;
+// see DEPLOY.md → "Domain layout".
+export const CLIENT_PORTAL_URL = 'https://secure.pinnaclemanagementventures.com/'
+export const CLIENT_LOGIN_URL = 'https://secure.pinnaclemanagementventures.com/login'
+export const HQ_LOGIN_URL = 'https://secure.pinnaclemanagementventures.com/hq/login'
 
 function eventKind(kind: AccountEmailKind, status: AccountEmailStatus): string {
   if (status === 'failed' || status === 'skipped') return 'account_email_failed'

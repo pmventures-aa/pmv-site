@@ -1,5 +1,27 @@
 # Shipping PMV to Cloudflare
 
+## Domain layout
+
+Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
+`secure.pinnaclemanagementventures.com`. The public marketing site stays at
+`www.pinnaclemanagementventures.com`.
+
+| Host | Purpose | Detected in `src/main.tsx` as |
+|---|---|---|
+| `www.pinnaclemanagementventures.com` | Public marketing site | `surface: 'public'` |
+| `secure.pinnaclemanagementventures.com/` | Client Portal (post-signup) | `surface: 'portal'` with basePath `''` |
+| `secure.pinnaclemanagementventures.com/hq/*` | Pinnacle HQ (staff/admin) | `surface: 'admin'` with basePath `'/hq'` |
+| `hq.pinnaclemanagementventures.com` | Legacy HQ host — still routes to admin | `surface: 'admin'` |
+| `client.pinnaclemanagementventures.com` | Legacy portal host — still routes to portal | `surface: 'portal'` |
+
+### DNS + Cloudflare Pages setup for `secure.`
+1. In Cloudflare DNS, add a `CNAME secure` → `pmv-site.pages.dev` (proxied).
+2. In the Pages project → Custom domains, add `secure.pinnaclemanagementventures.com`. Cloudflare provisions a TLS cert automatically.
+3. Session cookies use `SameSite=Lax; Secure; HttpOnly` scoped to the current host — no shared cross-subdomain cookie is needed because both portal and HQ live on the same `secure.` host now.
+4. Update Resend + application email templates to link to `https://secure.pinnaclemanagementventures.com/…` (portal home = `/`, HQ home = `/hq`).
+5. Keep the legacy `hq.` and `client.` hosts pointed at the same Pages project during the cutover; they still work. Retire them after 30 days of low traffic.
+
+
 ## What this is
 - **Frontend:** React SPA (Vite) → Cloudflare **Pages**
 - **API:** Hono on **Pages Functions** (`functions/api/*`) → served at `/api/*`

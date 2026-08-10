@@ -73,7 +73,7 @@ auditRoutes.get('/audit-log/actions', requireStaff, requireCapability('can_view_
 auditRoutes.get('/audit-log/export.csv', requireStaff, requireCapability('can_view_audit_log'), async (c) => {
   const { where, params } = buildFilter(c)
   const res = await c.env.DB.prepare(
-    `SELECT al.created_at, u.full_name AS actor_name, u.email AS actor_email, al.action, al.entity_type, al.entity_id, al.actor_ip, al.actor_user_agent
+    `SELECT al.created_at, u.full_name AS actor_name, u.email AS actor_email, al.action, al.entity_type, al.entity_id, al.actor_ip, al.actor_user_agent, al.actor_city, al.actor_region, al.actor_country
      FROM audit_log al LEFT JOIN users u ON u.id = al.actor_user_id
      WHERE ${where}
      ORDER BY al.created_at DESC LIMIT 5000`,
@@ -86,6 +86,9 @@ auditRoutes.get('/audit-log/export.csv', requireStaff, requireCapability('can_vi
     entity_id: string | null
     actor_ip: string | null
     actor_user_agent: string | null
+    actor_city: string | null
+    actor_region: string | null
+    actor_country: string | null
   }>()
   const rows = (res.results ?? []).map((r) => [
     r.created_at,
@@ -95,7 +98,8 @@ auditRoutes.get('/audit-log/export.csv', requireStaff, requireCapability('can_vi
     r.entity_type ?? '',
     r.entity_id ?? '',
     r.actor_ip ?? '',
+    [r.actor_city, r.actor_region, r.actor_country].filter(Boolean).join(', '),
     r.actor_user_agent ?? '',
   ])
-  return csvResponse('audit-log.csv', ['Timestamp (UTC)', 'Actor', 'Actor Email', 'Action', 'Entity Type', 'Entity ID', 'IP', 'User Agent'], rows)
+  return csvResponse('audit-log.csv', ['Timestamp (UTC)', 'Actor', 'Actor Email', 'Action', 'Entity Type', 'Entity ID', 'IP', 'Location', 'User Agent'], rows)
 })

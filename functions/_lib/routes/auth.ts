@@ -3,7 +3,7 @@ import type { AppEnv, SessionUser } from '../types'
 import { uuid, hashPassword, verifyPassword } from '../crypto'
 import { createSession, sessionCookie, clearCookie, destroySession, createActivationToken, consumeActivationToken, getUser } from '../session'
 import { activityInsert } from '../activity'
-import { logAudit, actorIp, actorUserAgent } from '../auditLog'
+import { logAudit, actorIp, actorUserAgent, actorGeo } from '../auditLog'
 import { notifyStaff, escapeHtml } from '../email'
 import { CLIENT_PORTAL_URL, sendAccountWelcome, sendVendorApplicationReceived } from '../accountEmails'
 
@@ -267,6 +267,20 @@ authRoutes.post('/login', async (c) => {
 
   if (!user || user.status !== 'active' || !ok) {
     await recordFailure(c.env, e, ip)
+    // Log failed sign-in attempts as security events. actor_user_id stays
+    // null (we may not know who the caller is), but the email typed and the
+    // originating IP/geo/user-agent are recorded so an admin can spot
+    // credential-stuffing patterns in the Audit Log's Security filter.
+    await logAudit(c.env, {
+      actorUserId: user?.id ?? null,
+      actorIp: ip,
+      actorUserAgent: actorUserAgent(c.req.raw),
+      actorGeo: actorGeo(c.req.raw),
+      action: 'login_failed',
+      entityType: 'user',
+      entityId: user?.id ?? null,
+      after: { email: e },
+    })
     return c.json({ error: 'invalid email or password' }, 401)
   }
 
@@ -282,7 +296,13 @@ authRoutes.post('/login', async (c) => {
   }
   const token = await createSession(c.env, su)
   c.header('Set-Cookie', sessionCookie(token))
-  await logAudit(c.env, { actorUserId: user.id, actorIp: ip, actorUserAgent: actorUserAgent(c.req.raw), action: 'login' })
+  await logAudit(c.env, {
+    actorUserId: user.id,
+    actorIp: ip,
+    actorUserAgent: actorUserAgent(c.req.raw),
+    actorGeo: actorGeo(c.req.raw),
+    action: 'login',
+  })
   return c.json({ ok: true, user: su })
 })
 
@@ -290,6 +310,12 @@ authRoutes.post('/logout', async (c) => {
   const user = await getUser(c.env, c.req.raw)
   await destroySession(c.env, c.req.raw)
   c.header('Set-Cookie', clearCookie())
-  if (user) await logAudit(c.env, { actorUserId: user.id, actorIp: actorIp(c.req.raw), actorUserAgent: actorUserAgent(c.req.raw), action: 'logout' })
+  if (user) await logAudit(c.env, {
+    actorUserId: user.id,
+    actorIp: actorIp(c.req.raw),
+    actorUserAgent: actorUserAgent(c.req.raw),
+    actorGeo: actorGeo(c.req.raw),
+    action: 'logout',
+  })
   return c.json({ ok: true })
 })

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell } from 'lucide-react'
+import { Bell, Check, ShieldAlert, MapPin } from 'lucide-react'
 import { api } from '../../lib/api'
-import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
+import { categorizeActivity, describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
 import { playNotificationSound, soundKindFor } from '../../lib/sound'
 
@@ -12,12 +12,57 @@ import { playNotificationSound, soundKindFor } from '../../lib/sound'
 // the bell immediately when a caller dispatches `pmv:activity`.
 const POLL_MS = 10_000
 
+// Locally acknowledged events — a client-side flag on top of the server's
+// mark-seen. Server "seen" is a single per-user timestamp, so the individual
+// dismiss button here needs to remember which specific events were cleared
+// without also silencing new ones that arrive after. Bounded to a small
+// ring in localStorage.
+const DISMISSED_KEY = 'pmv_hq_notifications_dismissed'
+const DISMISSED_MAX = 200
+
+function readDismissed(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_KEY)
+    if (!raw) return new Set()
+    const arr = JSON.parse(raw)
+    return new Set(Array.isArray(arr) ? arr.slice(-DISMISSED_MAX) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function writeDismissed(set: Set<string>) {
+  if (typeof window === 'undefined') return
+  try {
+    const arr = Array.from(set).slice(-DISMISSED_MAX)
+    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(arr))
+  } catch {
+    /* storage full or disabled — dismissal is a best-effort UX affordance */
+  }
+}
+
+// Compact one-liner for the extra detail row: attempts to pull the actor's
+// location and origin/browser out of the event's detail JSON. Absent for
+// non-security kinds, so it stays out of the way for the common case.
+function eventDetailLine(event: ActivityEvent): string | null {
+  if (!event.detail) return null
+  let d: Record<string, unknown> = {}
+  try { d = JSON.parse(event.detail) } catch { return null }
+  const parts: string[] = []
+  if (typeof d.location === 'string' && d.location) parts.push(d.location)
+  if (typeof d.ip === 'string' && d.ip) parts.push(d.ip)
+  if (typeof d.browser === 'string' && d.browser) parts.push(d.browser)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
 export function NotificationBell() {
   const p = useAppPath()
   const [count, setCount] = useState(0)
   const [open, setOpen] = useState(false)
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(false)
+  const [dismissed, setDismissed] = useState<Set<string>>(readDismissed)
   const boxRef = useRef<HTMLDivElement>(null)
   const soundEnabledRef = useRef(true)
   const prevCountRef = useRef(0)
@@ -96,6 +141,26 @@ export function NotificationBell() {
     }
   }
 
+  function dismissOne(id: string) {
+    setDismissed((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      writeDismissed(next)
+      return next
+    })
+  }
+
+  function clearAll() {
+    setDismissed((prev) => {
+      const next = new Set(prev)
+      for (const event of events) next.add(event.id)
+      writeDismissed(next)
+      return next
+    })
+  }
+
+  const visibleEvents = events.filter((event) => !dismissed.has(event.id))
+
   return (
     <div className="relative" ref={boxRef}>
       <button
@@ -119,23 +184,81 @@ export function NotificationBell() {
               <p className="text-sm font-semibold text-white">Activity</p>
               <p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-500">Live refresh</p>
             </div>
-            <Link to={p('activity')} onClick={() => setOpen(false)} className="text-xs font-medium text-gold hover:underline">
-              View all
-            </Link>
+            <div className="flex items-center gap-3">
+              {visibleEvents.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-[11px] font-medium text-slate-400 hover:text-white"
+                  title="Hide all shown notifications"
+                >
+                  Clear all
+                </button>
+              )}
+              <Link to={p('activity')} onClick={() => setOpen(false)} className="text-xs font-medium text-gold hover:underline">
+                View all
+              </Link>
+            </div>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
               <p className="px-4 py-6 text-center text-sm text-slate-400">Loading…</p>
-            ) : events.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-slate-400">No activity yet.</p>
+            ) : visibleEvents.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-400">
+                {events.length === 0 ? 'No activity yet.' : 'All caught up.'}
+              </p>
             ) : (
               <ul className="divide-y divide-white/5">
-                {events.map((e) => (
-                  <li key={e.id} className="px-4 py-3 text-sm">
-                    <p className="text-slate-200">{describeActivity(e)}</p>
-                    <p className="mt-1 text-xs text-slate-500">{timeAgo(e.created_at)}</p>
-                  </li>
-                ))}
+                {visibleEvents.map((event) => {
+                  const category = categorizeActivity(event.kind)
+                  const security = category === 'security'
+                  const detail = eventDetailLine(event)
+                  return (
+                    <li
+                      key={event.id}
+                      className={`group px-4 py-3 text-sm ${
+                        security ? 'border-l-2 border-l-rose-500/70 bg-rose-500/[.05]' : ''
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start gap-2">
+                            {security && <ShieldAlert size={13} className="mt-0.5 shrink-0 text-rose-400" />}
+                            <div className="min-w-0">
+                              <p className={security ? 'text-rose-100' : 'text-slate-200'}>{describeActivity(event)}</p>
+                              {detail && (
+                                <p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-400">
+                                  <MapPin size={11} /> {detail}
+                                </p>
+                              )}
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                <span>{timeAgo(event.created_at)}</span>
+                                {event.client_user_id && (
+                                  <Link
+                                    to={p(`clients/${event.client_user_id}`)}
+                                    onClick={() => setOpen(false)}
+                                    className="text-gold hover:underline"
+                                  >
+                                    Client →
+                                  </Link>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => dismissOne(event.id)}
+                          className="opacity-0 shrink-0 rounded p-1 text-slate-500 transition hover:bg-white/5 hover:text-white group-hover:opacity-100"
+                          title="Mark as read"
+                          aria-label="Mark as read"
+                        >
+                          <Check size={13} />
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>

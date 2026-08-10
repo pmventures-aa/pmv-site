@@ -31,8 +31,10 @@ import ServiceAssignmentsAdmin from './ServiceAssignmentsAdmin'
 import InvitationsAdmin from './InvitationsAdmin'
 import RolesPermissionsAdmin from './RolesPermissionsAdmin'
 import DocumentCenter from './DocumentCenter'
+import FieldWorkAdmin from './FieldWorkAdmin'
+import FieldWorkDetail, { FieldWorkList } from './FieldWorkVendor'
 
-const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity', 'service-assignments', 'invoices']
+const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity', 'service-assignments', 'invoices', 'field-work']
 
 function AdminShell() {
   const { user } = useAuth()
@@ -78,6 +80,9 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="messages" element={<MessagesAdmin />} />
             <Route path="activity" element={<ActivityAdmin />} />
             <Route path="service-assignments" element={<ServiceAssignmentsAdmin />} />
+            <Route path="field-work" element={<FieldWorkAdmin />} />
+            <Route path="field-work/mine" element={<FieldWorkList />} />
+            <Route path="field-work/:id" element={<FieldWorkDetail />} />
             <Route path="invoices" element={<InvoicesAdmin />} />
             <Route path="document-center" element={<DocumentCenter />} />
             <Route path="audit-log" element={<AuditLogAdmin />} />
