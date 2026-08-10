@@ -1,8 +1,8 @@
-name: Validate editable service offerings
+name: Validate intake application wizard
 
 on:
   push:
-    branches: [agent/editable-service-offerings]
+    branches: [agent/intake-application-wizard]
   workflow_dispatch:
 
 jobs:
@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/editable-service-offerings
+          ref: agent/intake-application-wizard
       - uses: actions/setup-node@v4
         with:
           node-version: 22
