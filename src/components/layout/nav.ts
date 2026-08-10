@@ -1,53 +1,67 @@
-import type { IconName } from '../kit/Icon'
+import {
+  Home,
+  Layers,
+  Scale,
+  CheckSquare,
+  FileText,
+  MessageSquare,
+  Calendar,
+  Receipt,
+  HelpCircle,
+  Building2,
+  Users,
+  Bell,
+  ShieldCheck,
+  Workflow,
+  UserPlus,
+  Megaphone,
+  Activity,
+  ClipboardList,
+  BarChart3,
+  UsersRound,
+  Settings,
+  UserCog,
+  ArrowLeftRight,
+  type LucideIcon,
+} from 'lucide-react'
 
 export interface NavItem {
   key: string
   label: string
   to: string
-  icon: IconName
-  section?: string
+  icon: LucideIcon
 }
 
 export const portalNav: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', to: '', icon: 'home' },
-  { key: 'services', label: 'My Services', to: 'services', icon: 'services' },
-  { key: 'matters', label: 'Projects & Matters', to: 'matters', icon: 'briefcase' },
-  { key: 'tasks', label: 'Tasks', to: 'tasks', icon: 'check' },
-  { key: 'documents', label: 'Documents', to: 'documents', icon: 'file' },
-  { key: 'messages', label: 'Messages', to: 'messages', icon: 'mail' },
-  { key: 'calendar', label: 'Calendar', to: 'calendar', icon: 'calendar' },
-  { key: 'billing', label: 'Billing', to: 'billing', icon: 'billing' },
-  { key: 'support', label: 'Support', to: 'support', icon: 'support' },
-  { key: 'business-profile', label: 'Business Profile', to: 'business-profile', icon: 'building' },
-  { key: 'my-team', label: 'My Pinnacle Team', to: 'my-team', icon: 'team' },
-  { key: 'trusted-contacts', label: 'Trusted Contacts', to: 'trusted-contacts', icon: 'users' },
-  { key: 'notifications', label: 'Notifications', to: 'notifications', icon: 'bell' },
-  { key: 'security', label: 'Security', to: 'security', icon: 'shield' },
+  { key: 'dashboard', label: 'Dashboard', to: '', icon: Home },
+  { key: 'services', label: 'My Services', to: 'services', icon: Layers },
+  { key: 'matters', label: 'Projects & Matters', to: 'matters', icon: Scale },
+  { key: 'tasks', label: 'Tasks', to: 'tasks', icon: CheckSquare },
+  { key: 'documents', label: 'Documents', to: 'documents', icon: FileText },
+  { key: 'messages', label: 'Messages', to: 'messages', icon: MessageSquare },
+  { key: 'calendar', label: 'Calendar', to: 'calendar', icon: Calendar },
+  { key: 'billing', label: 'Billing', to: 'billing', icon: Receipt },
+  { key: 'support', label: 'Support', to: 'support', icon: HelpCircle },
+  { key: 'business-profile', label: 'Business Profile', to: 'business-profile', icon: Building2 },
+  { key: 'my-team', label: 'My Team', to: 'my-team', icon: Users },
+  { key: 'notifications', label: 'Notifications', to: 'notifications', icon: Bell },
+  { key: 'security', label: 'Security', to: 'security', icon: ShieldCheck },
 ]
 
 export const portalHiddenRoutes = ['planned-calls', 'funding', 'property-management', 'tax-filings'] as const
 
 export const adminNav: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', to: '', icon: 'home', section: 'Workspace' },
-  { key: 'pipelines', label: 'Pipelines', to: 'pipelines', icon: 'pipeline', section: 'Workspace' },
-  { key: 'inquiries', label: 'Leads & Prospects', to: 'inquiries', icon: 'leads', section: 'Workspace' },
-  { key: 'clients', label: 'Clients', to: 'clients', icon: 'clients', section: 'Workspace' },
-
-  { key: 'messages', label: 'Messages', to: 'messages', icon: 'messages', section: 'Communication' },
-  { key: 'communications', label: 'Communications', to: 'communications', icon: 'communications', section: 'Communication' },
-
-  { key: 'activity', label: 'Activity', to: 'activity', icon: 'activity', section: 'Operations' },
-  { key: 'service-assignments', label: 'Service Assignments', to: 'service-assignments', icon: 'services', section: 'Operations' },
-  { key: 'employees', label: 'Team & Vendors', to: 'employees', icon: 'team', section: 'Operations' },
-  { key: 'assignments', label: 'Assignments', to: 'assignments', icon: 'assignments', section: 'Operations' },
-  { key: 'invoices', label: 'Invoices', to: 'invoices', icon: 'billing', section: 'Operations' },
-  { key: 'document-center', label: 'Document Center', to: 'document-center', icon: 'file', section: 'Operations' },
-
-  { key: 'reports', label: 'Reporting Center', to: 'reports', icon: 'reports', section: 'Insights' },
-  { key: 'audit-log', label: 'Audit Log', to: 'audit-log', icon: 'audit', section: 'Insights' },
-
-  { key: 'invitations', label: 'Invitation Center', to: 'invitations', icon: 'send', section: 'Administration' },
-  { key: 'roles', label: 'Roles & Permissions', to: 'roles', icon: 'shield', section: 'Administration' },
-  { key: 'users', label: 'Users', to: 'users', icon: 'users', section: 'Administration' },
-  { key: 'settings', label: 'Settings', to: 'settings', icon: 'settings', section: 'Administration' },
+  { key: 'dashboard', label: 'Dashboard', to: '', icon: Home },
+  { key: 'pipelines', label: 'Pipelines', to: 'pipelines', icon: Workflow },
+  { key: 'inquiries', label: 'Leads & Prospects', to: 'inquiries', icon: UserPlus },
+  { key: 'clients', label: 'Clients', to: 'clients', icon: Users },
+  { key: 'messages', label: 'Messages', to: 'messages', icon: MessageSquare },
+  { key: 'communications', label: 'Communications', to: 'communications', icon: Megaphone },
+  { key: 'activity', label: 'Activity', to: 'activity', icon: Activity },
+  { key: 'audit-log', label: 'Audit Log', to: 'audit-log', icon: ClipboardList },
+  { key: 'reports', label: 'Reporting Center', to: 'reports', icon: BarChart3 },
+  { key: 'employees', label: 'Team & Vendors', to: 'employees', icon: UsersRound },
+  { key: 'users', label: 'Users', to: 'users', icon: UserCog },
+  { key: 'assignments', label: 'Assignments', to: 'assignments', icon: ArrowLeftRight },
+  { key: 'settings', label: 'Settings', to: 'settings', icon: Settings },
 ]

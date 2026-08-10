@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Bell } from 'lucide-react'
 import { api } from '../../lib/api'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
@@ -103,7 +104,7 @@ export function NotificationBell() {
         aria-label="Notifications"
         title="HQ notifications"
       >
-        <span aria-hidden>🔔</span>
+        <Bell size={16} strokeWidth={1.75} aria-hidden />
         {count > 0 && (
           <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-navy-950">
             {count > 99 ? '99+' : count}

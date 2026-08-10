@@ -37,7 +37,7 @@ const ALLOWED_UPLOAD_TYPES = new Set([
 const BANKING_SERVICES = new Set(['merchant_services', 'funding'])
 const APPLICATION_STATUSES = ['submitted', 'in_review', 'approved', 'declined', 'closed']
 
-interface ServiceRow {
+export interface ServiceRow {
   key: string
   name: string
   description: string | null
@@ -46,7 +46,7 @@ interface ServiceRow {
   estimated_minutes: number
 }
 
-interface ApplicationRow {
+export interface ApplicationRow {
   id: string
   client_user_id: string
   service_key: string
@@ -95,14 +95,14 @@ function safeFileName(name: string): string {
   return cleaned || 'upload'
 }
 
-async function getService(env: Env, key: string): Promise<ServiceRow | null> {
+export async function getService(env: Env, key: string): Promise<ServiceRow | null> {
   return env.DB.prepare(
     `SELECT key, name, description, category, intake_intro, estimated_minutes
      FROM services WHERE key = ? AND active = 1`,
   ).bind(key).first<ServiceRow>()
 }
 
-async function getQuestions(env: Env, serviceKey: string): Promise<IntakeQuestion[]> {
+export async function getQuestions(env: Env, serviceKey: string): Promise<IntakeQuestion[]> {
   const res = await env.DB.prepare(
     `SELECT * FROM onboarding_questions WHERE service_key = ? ORDER BY step_order, sort_order`,
   ).bind(serviceKey).all<IntakeQuestion>()
@@ -141,7 +141,7 @@ async function ownedDraft(env: Env, clientId: string, applicationId: string): Pr
   ).bind(applicationId, clientId).first<ApplicationRow>()
 }
 
-async function persistAnswers(
+export async function persistAnswers(
   env: Env,
   application: ApplicationRow,
   questions: IntakeQuestion[],
@@ -190,7 +190,7 @@ async function persistAnswers(
   await env.DB.batch(stmts)
 }
 
-function prefillForQuestions(user: SessionUser, profile: any, questions: IntakeQuestion[]): AnswerMap {
+export function prefillForQuestions(user: SessionUser, profile: any, questions: IntakeQuestion[]): AnswerMap {
   const result: AnswerMap = {}
   const fullName = user.full_name || [user.first_name, user.last_name].filter(Boolean).join(' ') || ''
   const businessName = profile?.business_name || ''
@@ -465,7 +465,7 @@ serviceApplicationRoutes.post('/service-applications/:id/submit', requireClient,
   if (!application) return c.json({ error: 'draft application not found' }, 404)
   const service = await getService(c.env, application.service_key)
   if (!service) return c.json({ error: 'service is unavailable' }, 404)
-  const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number; banking?: unknown }>().catch(() => ({} as { answers?: Record<string, unknown>; current_step?: number; banking?: unknown }))
+  const body = await c.req.json<{ answers?: Record<string, unknown>; current_step?: number; banking?: unknown; signed_name?: string; signature_ack?: boolean }>().catch(() => ({} as { answers?: Record<string, unknown>; current_step?: number; banking?: unknown; signed_name?: string; signature_ack?: boolean }))
   const questions = await getQuestions(c.env, application.service_key)
   if (body.answers) await persistAnswers(c.env, application, questions, body.answers, body.current_step)
 
@@ -478,6 +478,11 @@ serviceApplicationRoutes.post('/service-applications/:id/submit', requireClient,
   )
   const missingKeys = [...new Set([...missing, ...acknowledgementMissing].map((q) => q.question_key))]
   if (missingKeys.length > 0) return c.json({ error: 'missing required answers', missing: missingKeys }, 400)
+
+  const signedName = typeof body.signed_name === 'string' ? body.signed_name.trim() : ''
+  if (signedName.length < 2 || body.signature_ack !== true) {
+    return c.json({ error: 'type your full name and confirm the certification statement to submit' }, 400)
+  }
 
   try {
     await storeBankingIfProvided(c.env, user.id, application.service_key, body.banking)
@@ -526,6 +531,7 @@ serviceApplicationRoutes.post('/service-applications/:id/submit', requireClient,
     evictionDisclaimer,
     mayRequireAttorneyCoordination: mayRequireAttorney,
     logoBytes,
+    signature: { name: signedName, signedAt: submittedAt, ip: actorIp(c.req.raw) || 'unknown' },
   })
 
   const pdfDocumentId = uuid()
@@ -569,9 +575,13 @@ serviceApplicationRoutes.post('/service-applications/:id/submit', requireClient,
       ).bind(pdfLinkId, application.id, pdfDocumentId),
       c.env.DB.prepare(
         `UPDATE service_applications SET status = 'submitted', current_step = ?, assigned_rep_user_id = ?,
-           is_unassigned = ?, may_require_attorney_coordination = ?, pdf_document_id = ?, submitted_at = ?, updated_at = datetime('now')
+           is_unassigned = ?, may_require_attorney_coordination = ?, pdf_document_id = ?, submitted_at = ?,
+           signed_name = ?, signed_at = ?, signed_ip = ?, updated_at = datetime('now')
          WHERE id = ? AND status = 'draft'`,
-      ).bind(body.current_step ?? application.current_step, routing.primary?.staff_user_id ?? null, routing.unassigned ? 1 : 0, mayRequireAttorney ? 1 : 0, pdfDocumentId, submittedAt, application.id),
+      ).bind(
+        body.current_step ?? application.current_step, routing.primary?.staff_user_id ?? null, routing.unassigned ? 1 : 0,
+        mayRequireAttorney ? 1 : 0, pdfDocumentId, submittedAt, signedName, submittedAt, ip, application.id,
+      ),
       c.env.DB.prepare(
         `INSERT INTO client_services (id, client_user_id, service_key, status)
          VALUES (?, ?, ?, 'submitted')
@@ -655,7 +665,7 @@ serviceApplicationRoutes.post('/service-applications/:id/submit', requireClient,
 serviceApplicationRoutes.get('/service-applications', requireClient, async (c) => {
   const user = c.get('user')
   const apps = await c.env.DB.prepare(
-    `SELECT sa.id, sa.service_key, sa.status, sa.current_step, sa.is_unassigned,
+    `SELECT sa.id, sa.service_key, sa.status, sa.current_step, sa.is_unassigned, sa.submission_source,
             sa.may_require_attorney_coordination, sa.submitted_at, sa.created_at, sa.updated_at,
             s.name AS service_name, s.description AS service_description
      FROM service_applications sa JOIN services s ON s.key = sa.service_key
