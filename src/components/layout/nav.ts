@@ -22,6 +22,7 @@ import {
   Settings,
   UserCog,
   ArrowLeftRight,
+  MapPinned,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -58,6 +59,7 @@ export const adminNav: NavItem[] = [
   { key: 'messages', label: 'Messages', to: 'messages', icon: MessageSquare },
   { key: 'communications', label: 'Communications', to: 'communications', icon: Megaphone },
   { key: 'activity', label: 'Activity', to: 'activity', icon: Activity },
+  { key: 'field-work', label: 'Field & RON', to: 'field-work', icon: MapPinned },
   { key: 'audit-log', label: 'Audit Log', to: 'audit-log', icon: ClipboardList },
   { key: 'reports', label: 'Reporting Center', to: 'reports', icon: BarChart3 },
   { key: 'employees', label: 'Team & Vendors', to: 'employees', icon: UsersRound },

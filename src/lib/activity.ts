@@ -77,6 +77,7 @@ export function categorizeActivity(kind: string): ActivityCategory {
     kind.startsWith('property') ||
     kind.startsWith('tax') ||
     kind.startsWith('service') ||
+    kind.startsWith('field_assignment') ||
     kind.startsWith('bulk_')
   ) {
     return 'operations'
@@ -142,6 +143,8 @@ export function describeActivity(e: ActivityEvent): string {
     case 'password_changed': return `${actor} changed their password`
     case 'password_reset': return `${actor} reset the password for ${d.email || 'a user'}`
     case 'permission_changed': return `${actor} changed permissions${d.target_name ? ` for ${d.target_name}` : ''}`
+    case 'field_assignment_created': return `${actor} created a field assignment for ${client}${d.kind_value === 'ron' ? ' (RON)' : ''}`
+    case 'field_assignment_completed': return `${actor} completed a field assignment for ${client}${typeof d.documents === 'number' ? ` — ${d.documents} document${d.documents === 1 ? '' : 's'}` : ''}`
     case 'service_application_assigned': return `${actor} started ${client}’s ${d.service_name || fmtStatus(d.service_key)} application${typeof d.prefilled_answers === 'number' ? ` · ${d.prefilled_answers} answers prefilled` : ''}`
     case 'service_application_prefilled': return `${actor} updated a service application draft for ${client}`
     case 'service_application_signed': return `${client} electronically signed a service application`

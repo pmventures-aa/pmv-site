@@ -41,6 +41,7 @@ import { teamManagementRoutes } from '../_lib/routes/teamManagement'
 import { vendorApplicationUploadRoutes } from '../_lib/routes/vendorApplicationUploads'
 import { serviceOfferingPublicRoutes, serviceOfferingAdminRoutes } from '../_lib/routes/serviceOfferings'
 import { relationshipAutomationRoutes, relationshipAutomationAdminRoutes } from '../_lib/routes/relationshipAutomation'
+import { fieldWorkRoutes } from '../_lib/routes/fieldWork'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -91,6 +92,7 @@ app.route('/admin', searchRoutes)
 app.route('/admin', commsRoutes)
 app.route('/admin', crmWriteRoutes)
 app.route('/admin', crmRoutes)
+app.route('/admin', fieldWorkRoutes)
 
 app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
 
