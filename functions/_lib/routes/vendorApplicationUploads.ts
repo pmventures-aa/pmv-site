@@ -5,7 +5,15 @@ import { uuid } from '../crypto'
 const SESSION_TTL = 2 * 60 * 60
 const MAX_BYTES = 20 * 1024 * 1024
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
-const ALLOWED_DOCUMENT_TYPES = new Set(['government_id', 'professional_license', 'insurance', 'w9', 'supporting'])
+const ALLOWED_DOCUMENT_TYPES = new Set([
+  'government_id_front',
+  'government_id_back',
+  'ein_letter',
+  'professional_license',
+  'insurance',
+  'w9',
+  'supporting',
+])
 
 type PendingFile = {
   id: string
@@ -74,12 +82,13 @@ vendorApplicationUploadRoutes.post('/vendor-application/session/:token/finalize'
   const token = c.req.param('token')
   const raw = await c.env.SESSIONS.get(key(token))
   if (!raw) return c.json({ error: 'upload session expired' }, 410)
-  const parsedBody = await c.req.json().catch(() => ({})) as { email?: unknown }
+  const parsedBody = await c.req.json().catch(() => ({})) as { email?: unknown; application_data?: unknown }
   const email = typeof parsedBody.email === 'string' ? parsedBody.email.trim().toLowerCase() : ''
   if (!email) return c.json({ error: 'email required' }, 400)
   const user = await c.env.DB.prepare(`SELECT u.id FROM users u JOIN team_members tm ON tm.user_id = u.id WHERE lower(u.email) = ? AND tm.party_type = 'vendor' AND u.status = 'pending'`).bind(email).first<{ id: string }>()
   if (!user) return c.json({ error: 'pending provider application not found' }, 404)
   const session = JSON.parse(raw) as UploadSession
+
   for (const file of session.files) {
     const finalKey = `vendor-applications/${user.id}/${file.id}-${safeName(file.file_name)}`
     const object = await c.env.UPLOADS.get(file.object_key)
@@ -88,6 +97,20 @@ vendorApplicationUploadRoutes.post('/vendor-application/session/:token/finalize'
     await c.env.UPLOADS.delete(file.object_key)
     await c.env.DB.prepare(`INSERT INTO vendor_application_documents (id, user_id, document_type, object_key, file_name, content_type, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(file.id, user.id, file.document_type, finalKey, file.file_name, file.content_type, file.size_bytes).run()
   }
+
+  if (parsedBody.application_data && typeof parsedBody.application_data === 'object') {
+    const applicationJson = JSON.stringify(parsedBody.application_data).slice(0, 30000)
+    try {
+      await c.env.DB.prepare(
+        `INSERT INTO vendor_application_profiles(user_id, application_json, submitted_at, updated_at)
+         VALUES (?, ?, datetime('now'), datetime('now'))
+         ON CONFLICT(user_id) DO UPDATE SET application_json = excluded.application_json, updated_at = datetime('now')`,
+      ).bind(user.id, applicationJson).run()
+    } catch (err) {
+      console.error('[vendor-application] could not persist structured answers', err)
+    }
+  }
+
   await c.env.SESSIONS.delete(key(token))
   return c.json({ ok: true, uploaded: session.files.length })
 })
