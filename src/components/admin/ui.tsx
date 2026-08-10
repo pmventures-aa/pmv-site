@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { RotateCw } from 'lucide-react'
 
 export const btnPrimary =
   'inline-flex items-center justify-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-semibold text-navy-950 shadow-[0_10px_26px_rgba(201,162,39,.10)] transition-all duration-200 hover:-translate-y-px hover:bg-gold-400 hover:shadow-[0_14px_32px_rgba(201,162,39,.14)] disabled:translate-y-0 disabled:opacity-60'
@@ -19,7 +20,18 @@ export function PageIntro({ kicker, title, subtitle, action, leading }: { kicker
           {subtitle && <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{subtitle}</p>}
         </div>
       </div>
-      {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
+      <div className="flex shrink-0 items-center gap-2">
+        {action}
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-400 transition hover:border-gold/35 hover:bg-gold/[.04] hover:text-gold"
+          title="Refresh this page"
+          aria-label={`Refresh ${title}`}
+        >
+          <RotateCw size={14} />
+        </button>
+      </div>
     </div>
   )
 }
