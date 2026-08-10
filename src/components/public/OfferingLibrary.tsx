@@ -7,6 +7,8 @@ interface LiveOffering extends ServiceOffering {
   sortOrder?: number
 }
 
+type OfferingResponse = { offerings?: LiveOffering[] }
+
 export function OfferingLibrary({ serviceKey }: { serviceKey: string }) {
   const [offerings,setOfferings]=useState<LiveOffering[]>(()=>offeringsFor(serviceKey))
   const [query, setQuery] = useState('')
@@ -14,8 +16,11 @@ export function OfferingLibrary({ serviceKey }: { serviceKey: string }) {
   useEffect(()=>{
     let active=true
     fetch(`/api/service-offerings?service_key=${encodeURIComponent(serviceKey)}`)
-      .then(async(res)=>res.ok?res.json():Promise.reject(new Error('load failed')))
-      .then((data:{offerings?:LiveOffering[]})=>{if(active&&data.offerings?.length)setOfferings(data.offerings)})
+      .then(async(res)=>{
+        if(!res.ok) throw new Error('load failed')
+        return await res.json() as OfferingResponse
+      })
+      .then((data)=>{if(active&&Array.isArray(data.offerings)&&data.offerings.length)setOfferings(data.offerings)})
       .catch(()=>{})
     return()=>{active=false}
   },[serviceKey])
