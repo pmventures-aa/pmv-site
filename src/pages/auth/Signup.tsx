@@ -17,6 +17,7 @@ export default function Signup() {
   const [params] = useSearchParams()
   const inviteToken = params.get('invite') || ''
   const serviceKey = params.get('service') || ''
+  const offeringId = params.get('offering') || ''
   const requestedService = useMemo(() => services.find((service) => service.key === serviceKey), [serviceKey])
   const [step, setStep] = useState<Step>('contact')
   const [invite, setInvite] = useState<InviteResponse['invite'] | null>(null)
@@ -77,18 +78,24 @@ export default function Signup() {
     try {
       await signup({ email: form.email, password: form.password, first_name: form.first_name, last_name: form.last_name, phone: form.phone, business_name: form.business_name || undefined, tos_accepted: true })
       if (inviteToken) await api.post(`/invite/${encodeURIComponent(inviteToken)}/complete-existing`, {}).catch(() => {})
-      const query = requestedService ? `?service=${encodeURIComponent(requestedService.key)}&welcome=1` : '?welcome=1'
+      const query = requestedService
+        ? `?service=${encodeURIComponent(requestedService.key)}${offeringId ? `&offering=${encodeURIComponent(offeringId)}` : ''}&welcome=1`
+        : '?welcome=1'
       navigate(`${p('onboarding')}${query}`, { replace: true })
     } catch (err) { setError(isApiError(err) ? err.message : 'Something went wrong. Try again.') }
     finally { setBusy(false) }
   }
+
+  const loginQuery = requestedService
+    ? `?service=${encodeURIComponent(requestedService.key)}${offeringId ? `&offering=${encodeURIComponent(offeringId)}` : ''}`
+    : ''
 
   return (
     <AuthLayout
       eyebrow={inviteToken ? 'Pinnacle invitation' : requestedService ? 'Your Pinnacle journey' : 'Client portal'}
       title={step === 'contact' ? 'Start with you' : step === 'business' ? 'A little context' : 'Secure your account'}
       subtitle={step === 'contact' ? 'Just the basics. We’ll learn about the actual work after you’re inside.' : step === 'business' ? 'One quick choice helps us make the portal feel relevant from the start.' : 'Last step. Then we’ll pick up the service or situation that brought you here.'}
-      footer={<>Already have an account? <Link to={`../login${requestedService ? `?service=${encodeURIComponent(requestedService.key)}` : ''}`} className="font-medium text-gold hover:underline">Sign in</Link></>}
+      footer={<>Already have an account? <Link to={`../login${loginQuery}`} className="font-medium text-gold hover:underline">Sign in</Link></>}
     >
       <div className="mb-6">
         <div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {index + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div>
