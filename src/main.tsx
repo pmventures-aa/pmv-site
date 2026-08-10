@@ -5,6 +5,7 @@ import './index.css'
 import Home from './pages/Home'
 import ServicesOverview from './pages/public/ServicesOverview'
 import ServiceDetail from './pages/public/ServiceDetail'
+import { BusinessOperationsHub, PropertyFieldHub, MobileDocumentHub } from './pages/public/ServiceHubs'
 import About from './pages/public/About'
 import ServiceArea from './pages/public/ServiceArea'
 import Contact from './pages/public/Contact'
@@ -23,17 +24,9 @@ function SurfaceFallback() {
 }
 
 const host = window.location.hostname
-// secure.pinnaclemanagementventures.com is the post-authentication landing
-// domain that hosts BOTH the client portal and the staff HQ behind a single
-// hardened subdomain. The specific surface (admin vs portal) is decided by
-// path prefix once inside secure. — /hq/* → admin, everything else → portal.
-// The legacy hq.* and client.* hosts still work so old bookmarks and
-// email links do not break during the DNS cutover.
 const isSecureHost = host.startsWith('secure.')
 const surface: 'admin' | 'portal' | 'public' = (() => {
-  if (isSecureHost) {
-    return window.location.pathname.startsWith('/hq') ? 'admin' : 'portal'
-  }
+  if (isSecureHost) return window.location.pathname.startsWith('/hq') ? 'admin' : 'portal'
   if (host.startsWith('hq.')) return 'admin'
   if (host.startsWith('client.')) return 'portal'
   return 'public'
@@ -42,13 +35,7 @@ const secureBase = isSecureHost ? (surface === 'admin' ? '/hq' : '') : ''
 
 function App() {
   if (surface === 'admin') {
-    return (
-      <Suspense fallback={<SurfaceFallback />}>
-        <Routes>
-          <Route path={`${secureBase}/*`} element={<AdminApp basePath={secureBase} />} />
-        </Routes>
-      </Suspense>
-    )
+    return <Suspense fallback={<SurfaceFallback />}><Routes><Route path={`${secureBase}/*`} element={<AdminApp basePath={secureBase} />} /></Routes></Suspense>
   }
   if (surface === 'portal') {
     return <Suspense fallback={<SurfaceFallback />}><Routes><Route path="/*" element={<PortalApp basePath="" />} /></Routes></Suspense>
@@ -57,6 +44,9 @@ function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/services" element={<ServicesOverview />} />
+      <Route path="/services/business-operations" element={<BusinessOperationsHub />} />
+      <Route path="/services/property-field" element={<PropertyFieldHub />} />
+      <Route path="/services/mobile-documents" element={<MobileDocumentHub />} />
       <Route path="/services/:slug" element={<ServiceDetail />} />
       <Route path="/about" element={<About />} />
       <Route path="/service-area" element={<ServiceArea />} />
