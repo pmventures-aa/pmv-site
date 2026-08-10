@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Header } from '../components/public/Header'
 import { Footer } from '../components/public/Footer'
-import { btnOutline, btnPrimary, CtaBand, SplitFeatures } from '../components/public/ui'
+import { btnOutline, btnPrimary, CtaBand, MotionStage, SplitFeatures } from '../components/public/ui'
 import { Reveal } from '../components/public/motion'
 import { services } from '../data/services'
 import { usePageMeta } from '../lib/usePageMeta'
@@ -24,10 +24,11 @@ export default function Home() {
     <div className="min-h-screen bg-navy-950">
       <Header />
 
-      <section className="border-b border-white/[.06]">
-        <div className="container-pmv py-16 sm:py-20 lg:py-24 xl:py-28">
-          <div className="grid gap-12 lg:grid-cols-[1.12fr_.88fr] lg:items-center lg:gap-16">
-            <div>
+      <section className="relative overflow-hidden border-b border-white/[.06]">
+        <div className="pointer-events-none absolute -right-40 top-10 h-[34rem] w-[34rem] rounded-full border border-gold/10 opacity-60" />
+        <div className="container-pmv relative py-14 sm:py-18 lg:py-20 xl:py-24">
+          <div className="grid gap-10 lg:grid-cols-[1.02fr_.98fr] lg:items-center lg:gap-10">
+            <div className="relative z-10">
               <div className="mb-6 flex flex-wrap items-center gap-3 text-[11px] font-semibold uppercase tracking-[.14em] text-slate-500">
                 <span className="rounded-full border border-gold/20 bg-gold/[.05] px-3 py-1.5 text-gold/80">Professional Services</span>
                 <span>Business, Property, Operations</span>
@@ -43,17 +44,17 @@ export default function Home() {
                 <div><strong className="block text-white">Secure client access</strong><span className="mt-1 block">Keep documents, messages, and active work organized.</span></div>
               </div>
             </div>
+            <div className="relative lg:-mr-8"><MotionStage /></div>
+          </div>
 
-            <div className="surface-panel-strong overflow-hidden rounded-xl">
-              <div className="border-b border-white/[.08] px-6 py-5"><p className="text-[10px] font-semibold uppercase tracking-[.16em] text-gold/70">Common reasons clients contact us</p><p className="mt-2 text-sm text-slate-400">Choose the closest fit, or just tell us what is going on.</p></div>
-              {startingPoints.map((service, index) => (
-                <Link key={service.key} to={`/services/${service.slug}`} className="group grid gap-2 border-b border-white/[.07] px-6 py-5 last:border-b-0 sm:grid-cols-[38px_1fr_auto] sm:items-start sm:gap-4 hover:bg-white/[.025]">
-                  <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/[.08] bg-white/[.02] font-display text-xs text-gold/70">{String(index + 1).padStart(2, '0')}</span>
-                  <span><span className="block text-sm font-semibold text-white group-hover:text-gold">{service.title}</span><span className="mt-1.5 block text-xs leading-5 text-slate-400">{service.shortDescription}</span></span>
-                  <span className="hidden pt-1 text-slate-600 transition group-hover:translate-x-1 group-hover:text-gold sm:block">›</span>
-                </Link>
-              ))}
-            </div>
+          <div className="mt-10 grid overflow-hidden rounded-xl border border-white/[.08] bg-white/[.018] sm:grid-cols-2 lg:grid-cols-4">
+            {startingPoints.map((service, index) => (
+              <Link key={service.key} to={`/services/${service.slug}`} className="group border-b border-white/[.07] p-5 last:border-b-0 sm:border-r sm:[&:nth-child(2)]:border-r-0 lg:border-b-0 lg:[&:nth-child(2)]:border-r lg:last:border-r-0">
+                <span className="font-display text-xs text-gold/60">{String(index + 1).padStart(2, '0')}</span>
+                <span className="mt-2 block text-sm font-semibold text-white transition group-hover:text-gold">{service.title}</span>
+                <span className="mt-1.5 block text-xs leading-5 text-slate-400">{service.shortDescription}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
