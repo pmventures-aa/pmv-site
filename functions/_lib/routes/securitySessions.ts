@@ -48,7 +48,7 @@ securitySessionRoutes.get('/security/sessions', requireStaff, async (c) => {
     c.env.DB.prepare("SELECT COUNT(*) n FROM audit_log WHERE action IN ('permission_changed','record_permanently_deleted','session_revoked','bulk_sessions_revoked') AND created_at>=datetime('now','-24 hours')").first<{n:number}>(),
   ])
   const rows = (sessions.results||[]).map((row:any)=>({ ...row, current: row.id===currentId, active: !row.revoked_at && new Date(row.expires_at).getTime()>Date.now() }))
-  return c.json({ scope, owner, current_session_id:currentId, sessions:rows, summary:{ active_sessions:rows.filter((r:any)=>r.active).length, failed_logins_24h:failed?.n||0, exports_24h:(exports as any)?.n||0, privileged_events_24h:privileged?.n||0 } })
+  return c.json({ scope, owner, current_user_id:user.id, current_session_id:currentId, sessions:rows, summary:{ active_sessions:rows.filter((r:any)=>r.active).length, failed_logins_24h:failed?.n||0, exports_24h:(exports as any)?.n||0, privileged_events_24h:privileged?.n||0 } })
 })
 
 securitySessionRoutes.delete('/security/sessions/:id', requireStaff, async (c) => {
