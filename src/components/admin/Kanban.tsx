@@ -1,4 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
+import { pmvMotion } from '../../lib/motionTheme'
 
 export interface KanbanColumn {
   key: string
@@ -23,13 +25,16 @@ export function KanbanBoard<T extends { id: string }>({
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
+  const boardId = useId()
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-2">
+    <LayoutGroup id={boardId}>
+    <motion.div layout className="flex gap-4 overflow-x-auto pb-2">
       {columns.map((col) => {
         const colItems = items.filter((i) => getStatus(i) === col.key)
         return (
-          <div
+          <motion.div
+            layout="position"
             key={col.key}
             onDragOver={(e) => {
               e.preventDefault()
@@ -43,7 +48,9 @@ export function KanbanBoard<T extends { id: string }>({
               if (item && getStatus(item) !== col.key) onMove(item, col.key)
               setDraggingId(null)
             }}
-            className={`flex w-72 shrink-0 flex-col rounded-md border transition ${
+            animate={{scale: overCol === col.key ? 1.008 : 1}}
+            transition={pmvMotion.ui}
+            className={`flex w-72 shrink-0 flex-col rounded-md border transition-colors ${
               overCol === col.key ? 'border-gold/50 bg-gold/[0.04]' : 'border-white/10 bg-white/[0.02]'
             }`}
           >
@@ -52,28 +59,36 @@ export function KanbanBoard<T extends { id: string }>({
               <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-slate-400">{colItems.length}</span>
             </div>
             <div className="flex min-h-[100px] flex-1 flex-col gap-2 p-2.5">
+              <AnimatePresence initial={false} mode="popLayout">
               {colItems.length === 0 ? (
-                <p className="px-1 py-4 text-center text-xs text-slate-600">No items</p>
+                <motion.p key={`${col.key}-empty`} initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={pmvMotion.snap} className="px-1 py-4 text-center text-xs text-slate-600">No items</motion.p>
               ) : (
                 colItems.map((item) => (
-                  <div
+                  <motion.div
+                    layoutId={`kanban-card-${item.id}`}
                     key={item.id}
                     draggable
                     onDragStart={() => setDraggingId(item.id)}
                     onDragEnd={() => setDraggingId(null)}
-                    className={`cursor-grab rounded-md border border-white/10 bg-navy-900 p-3 text-sm transition active:cursor-grabbing ${
+                    initial={{opacity:0,scale:.985}}
+                    animate={{opacity:draggingId === item.id ? .4 : 1,scale:1}}
+                    exit={{opacity:0,scale:.985}}
+                    transition={pmvMotion.ui}
+                    className={`cursor-grab rounded-md border border-white/10 bg-navy-900 p-3 text-sm active:cursor-grabbing ${
                       draggingId === item.id ? 'opacity-40' : ''
                     }`}
                   >
                     {renderCard(item)}
-                  </div>
+                  </motion.div>
                 ))
               )}
+              </AnimatePresence>
             </div>
-          </div>
+          </motion.div>
         )
       })}
-    </div>
+    </motion.div>
+    </LayoutGroup>
   )
 }
 
