@@ -1,8 +1,10 @@
-export type UploadKind = 'png'|'jpeg'|'webp'|'gif'|'pdf'|'docx'|'text'
+export type UploadKind = 'png'|'jpeg'|'webp'|'gif'|'pdf'|'docx'|'xlsx'|'text'
 
 const MIME_KIND:Record<string,UploadKind>={
   'image/png':'png','image/jpeg':'jpeg','image/webp':'webp','image/gif':'gif','application/pdf':'pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'docx','text/plain':'text',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'docx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'xlsx',
+  'text/plain':'text',
 }
 
 function ascii(bytes:Uint8Array,start:number,length:number){return String.fromCharCode(...bytes.slice(start,start+length))}
@@ -20,12 +22,8 @@ export function validateUploadSignature(buffer:ArrayBuffer,claimedMime:string,al
     case 'webp':valid=bytes.length>=12&&ascii(bytes,0,4)==='RIFF'&&ascii(bytes,8,4)==='WEBP';break
     case 'gif':valid=ascii(bytes,0,6)==='GIF87a'||ascii(bytes,0,6)==='GIF89a';break
     case 'pdf':valid=ascii(bytes,0,5)==='%PDF-';break
-    // DOCX is an OPC ZIP container. This verifies the container signature;
-    // downstream document processing never executes embedded content/macros.
-    case 'docx':valid=starts(bytes,[0x50,0x4b,0x03,0x04])||starts(bytes,[0x50,0x4b,0x05,0x06]);break
-    case 'text':{
-      const sample=bytes.slice(0,Math.min(bytes.length,4096));valid=!sample.some(b=>b===0);break
-    }
+    case 'docx':case 'xlsx':valid=starts(bytes,[0x50,0x4b,0x03,0x04])||starts(bytes,[0x50,0x4b,0x05,0x06]);break
+    case 'text':{const sample=bytes.slice(0,Math.min(bytes.length,4096));valid=!sample.some(b=>b===0);break}
   }
   return valid?{ok:true,kind}:{ok:false,error:'The file contents do not match the declared file type.'}
 }
