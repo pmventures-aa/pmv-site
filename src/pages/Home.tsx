@@ -40,7 +40,7 @@ export default function Home(){
     <section className="pmv-hero-story relative min-h-[calc(100vh-68px)] overflow-hidden border-b border-white/[.07]"><AmbientGlow/><div className="pmv-home-grid" aria-hidden="true"/><div className="container-pmv relative z-10 grid min-h-[calc(100vh-68px)] gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
       <StaggerOnMount>
         <motion.p variants={staggerItem} className="eyebrow">Nationwide professional support · South Florida field services</motion.p>
-        <motion.h1 variants={staggerItem} className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-[-.05em] text-white sm:text-6xl lg:text-7xl xl:text-[5rem]">Business, property, document, and field support—<span className="pmv-gold-text">all in one place.</span></motion.h1>
+        <motion.h1 variants={staggerItem} className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-[-.05em] text-white sm:text-6xl lg:text-[3.75rem] xl:text-[4rem]"><span className="block">Business support.</span><span className="block">Property services.</span><span className="pmv-gold-text block">Documents &amp; field work.</span></motion.h1>
         <motion.p variants={staggerItem} className="mt-7 max-w-3xl text-lg leading-8 text-slate-300 sm:text-xl">Pinnacle helps business owners, property owners, landlords, and professionals get real work done: operations and administrative support, document preparation and filing, mobile notary and RON, inspections, property cleaning, eviction and REO support, field visits, and vendor coordination.</motion.p>
         <motion.p variants={staggerItem} className="mt-4 max-w-2xl text-base leading-7 text-slate-500">Use Pinnacle for one straightforward task, ongoing support, or a multi-step project that needs one accountable point of contact.</motion.p>
         <motion.div variants={staggerItem} className="mt-9 flex flex-wrap gap-3"><a href={CLIENT_SIGNUP} className={btnPrimary}>Request a Service</a><Link to="/services" className={btnOutline}>View All Services</Link></motion.div>
@@ -48,7 +48,6 @@ export default function Home(){
       </StaggerOnMount>
       <motion.div initial={{opacity:0,scale:.94,y:18}} animate={{opacity:1,scale:1,y:0}} transition={{...pmvMotion.gentle,delay:.18}} className="relative flex min-h-[360px] items-center justify-center lg:min-h-[520px] lg:justify-end">
         <motion.div className="pmv-free-floating-mark" animate={reduceMotion?undefined:{y:[0,-11,2,0],x:[0,5,-3,0],rotate:[-.5,.65,-.25,-.5]}} transition={{duration:13,repeat:Infinity,ease:'easeInOut'}}><WhiteGoldBrandMark size={370} decorative/></motion.div>
-        <motion.div className="absolute bottom-5 right-0 max-w-[290px] border-l border-gold/45 pl-4 lg:bottom-14" animate={reduceMotion?undefined:{y:[0,-4,0]}} transition={{duration:8.5,repeat:Infinity,ease:'easeInOut'}}><p className="font-display text-sm font-semibold leading-6 text-white">One request. One accountable point of contact.</p><p className="mt-1 text-xs leading-5 text-slate-500">Clear updates and documented completion.</p></motion.div>
       </motion.div>
     </div></section>
 
