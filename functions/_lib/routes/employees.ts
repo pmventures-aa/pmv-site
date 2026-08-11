@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
 import { requireNamedPermission } from '../capabilities'
+import { uuid } from '../crypto'
 
 export const employeeRoutes = new Hono<AppEnv>()
 
@@ -16,6 +17,7 @@ employeeRoutes.get('/employees', requireStaff, requireNamedPermission('manage_te
   const res = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status,
             tm.staff_role, tm.title, tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name,
+            tm.network_status, tm.availability_status, tm.is_preferred_provider, tm.service_area_summary,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id) AS tasks_assigned,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status = 'done') AS tasks_completed,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status != 'done' AND due_date IS NOT NULL AND due_date < date('now')) AS tasks_overdue,
@@ -39,6 +41,7 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
             tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
             tm.can_view_reports, tm.can_view_audit_log, tm.can_manage_communications, tm.is_owner,
             tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name,
+            tm.network_status, tm.availability_status, tm.is_preferred_provider, tm.service_area_summary,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id) AS tasks_assigned,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status = 'done') AS tasks_completed,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status != 'done' AND due_date IS NOT NULL AND due_date < date('now')) AS tasks_overdue,
@@ -53,12 +56,21 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
   ).bind(id).first()
   if (!employee) return c.json({ error: 'not found' }, 404)
 
-  const [logins, tasks, notes, avgResponse, vendorDocuments] = await Promise.all([
+  const [logins, tasks, networkNotes, dispatch, notes, avgResponse, vendorDocuments] = await Promise.all([
     c.env.DB.prepare("SELECT created_at, actor_ip, actor_user_agent FROM audit_log WHERE actor_user_id = ? AND action = 'login' ORDER BY created_at DESC LIMIT 20").bind(id).all(),
     c.env.DB.prepare(
       `SELECT t.id,t.title,t.status,t.due_date,t.created_at,u.full_name client_name,u.email client_email
        FROM client_tasks t JOIN users u ON u.id = t.client_user_id
        WHERE t.assigned_staff_user_id = ? ORDER BY t.created_at DESC LIMIT 50`,
+    ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT pn.id,pn.body,pn.note_type,pn.created_at,u.full_name author_name,u.email author_email
+       FROM provider_network_notes pn JOIN users u ON u.id=pn.author_user_id
+       WHERE pn.provider_user_id=? ORDER BY pn.created_at DESC LIMIT 100`,
+    ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT id,kind,service_key,status,title,site_label,site_address,scheduled_at,completed_at,created_at
+       FROM field_assignments WHERE vendor_user_id=? ORDER BY created_at DESC LIMIT 100`,
     ).bind(id).all(),
     c.env.DB.prepare(
       `SELECT n.id,n.body,n.created_at,u.full_name client_name,u.email client_email
@@ -90,8 +102,34 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
     notes: notes.results ?? [],
     vendor_documents: vendorDocuments.results ?? [],
     vendor_application: vendorApplication,
+    network_notes: networkNotes.results ?? [],
+    dispatch_history: dispatch.results ?? [],
     avg_response_hours: avgResponse?.avg_hours ?? null,
   })
+})
+
+employeeRoutes.patch('/employees/:id/network', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  const id = c.req.param('id') || ''
+  const body: Record<string, unknown> = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
+  const networkStatus = String(body.network_status || 'active')
+  const availability = String(body.availability_status || 'available')
+  if (!['prospect','vetting','active','paused','inactive'].includes(networkStatus)) return c.json({ error: 'invalid network status' }, 400)
+  if (!['available','limited','unavailable'].includes(availability)) return c.json({ error: 'invalid availability status' }, 400)
+  const result = await c.env.DB.prepare(`UPDATE team_members SET network_status=?,availability_status=?,is_preferred_provider=?,service_area_summary=? WHERE user_id=?`)
+    .bind(networkStatus, availability, body.is_preferred_provider ? 1 : 0, String(body.service_area_summary || '').slice(0,500) || null, id).run()
+  if (!result.meta.changes) return c.json({ error: 'provider not found' }, 404)
+  return c.json({ ok: true })
+})
+
+employeeRoutes.post('/employees/:id/network-notes', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  const id = c.req.param('id') || ''
+  const body: { body?: string; note_type?: string } = await c.req.json<{ body?: string; note_type?: string }>().catch(() => ({}))
+  const text = String(body.body || '').trim()
+  if (!text) return c.json({ error: 'note is required' }, 400)
+  const noteId = uuid()
+  await c.env.DB.prepare(`INSERT INTO provider_network_notes(id,provider_user_id,author_user_id,body,note_type) VALUES(?,?,?,?,?)`)
+    .bind(noteId, id, c.get('user').id, text.slice(0,5000), String(body.note_type || 'general').slice(0,40)).run()
+  return c.json({ id: noteId }, 201)
 })
 
 employeeRoutes.get('/employees/:id/vendor-documents/:documentId/download', requireStaff, requireNamedPermission('manage_team'), async (c) => {
