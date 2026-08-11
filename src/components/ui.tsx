@@ -22,7 +22,7 @@ const crestClass = 'pmv-crest-adaptive object-contain'
 type BrandMarkVariant = 'standard' | 'spotlight' | 'quiet'
 
 export function WhiteGoldBrandMark({ size = 120, className = '', decorative = false }: { size?: number; className?: string; decorative?: boolean }) {
-  return <div role={decorative ? undefined : 'img'} aria-label={decorative ? undefined : 'Pinnacle Management Ventures crest'} aria-hidden={decorative || undefined} className={`pmv-white-gold-mark ${className}`} style={{ width: size, height: size }} />
+  return <img src="/logo-crest-transparent.png" alt={decorative ? '' : 'Pinnacle Management Ventures crest'} aria-hidden={decorative || undefined} className={`pmv-white-gold-mark object-contain ${className}`} style={{ width: size, height: size }} />
 }
 
 export function Logo({ className = '', showText = true, markSize = 62 }: { className?: string; showText?: boolean; markSize?: number }) {
