@@ -17,6 +17,7 @@ import { auditRoutes } from '../_lib/routes/auditRoutes'
 import { employeeRoutes } from '../_lib/routes/employees'
 import { reportRoutes } from '../_lib/routes/reports'
 import { reportExportRoutes } from '../_lib/routes/reportExports'
+import { scheduledReportRoutes } from '../_lib/routes/scheduledReportRoutes'
 import { searchRoutes } from '../_lib/routes/search'
 import { commsRoutes } from '../_lib/routes/comms'
 import { crmRoutes } from '../_lib/routes/crm'
@@ -91,6 +92,7 @@ app.route('/admin', bulkInvitationRoutes)
 app.route('/admin', roleAdminRoutes)
 app.route('/admin', teamManagementRoutes)
 app.route('/admin', reportExportRoutes)
+app.route('/admin', scheduledReportRoutes)
 app.route('/admin', documentWorkspaceExtraRoutes)
 app.route('/admin', documentLifecycleAdminRoutes)
 app.route('/admin', internalDocumentAdminRoutes)
