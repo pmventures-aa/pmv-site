@@ -11,6 +11,11 @@ interface Ticket {
   priority: string
   status: string
   created_at: string
+  details?: string | null
+  service_key?: string | null
+  response_due_at?: string | null
+  resolution_due_at?: string | null
+  waiting_on?: string
 }
 interface Msg {
   id: string
@@ -25,7 +30,7 @@ export default function Support() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ subject: '', category: '', priority: 'normal' })
+  const [form, setForm] = useState({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -52,7 +57,7 @@ export default function Support() {
     setError(null)
     try {
       await api.post('/portal/support', form)
-      setForm({ subject: '', category: '', priority: 'normal' })
+      setForm({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '' })
       setShowForm(false)
       await load()
     } catch (err) {
@@ -88,12 +93,12 @@ export default function Support() {
   return (
     <div>
       <PageHeader
-        eyebrow="We're here to help"
-        title="Support"
-        subtitle="Open a ticket and message our team directly."
+        eyebrow="One place for every need"
+        title="Requests & Cases"
+        subtitle="Request a service, send instructions, and follow ownership, messages, and response commitments in one thread."
         action={
           <button className="btn-gold" onClick={() => setShowForm((s) => !s)}>
-            {showForm ? 'Cancel' : '+ New ticket'}
+            {showForm ? 'Cancel' : '+ Start request'}
           </button>
         }
       />
@@ -101,11 +106,17 @@ export default function Support() {
       {showForm && (
         <Card className="mb-6">
           <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-3">
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">What do you need?</span>
+              <select className={inputCls} value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
+                <option value="property">Property / REO</option><option value="eviction">Eviction support</option><option value="inspection">Inspection</option><option value="cleaning">Cleaning / deep clean</option><option value="documents">Document preparation</option><option value="notary">Notary / courier</option><option value="general">Something else</option>
+              </select>
+            </label>
             <label className="sm:col-span-2">
               <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Subject</span>
               <input className={inputCls} required value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} />
             </label>
-            <label>
+            <label className="sm:col-span-1">
               <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Priority</span>
               <select className={inputCls} value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}>
                 {['low', 'normal', 'high', 'urgent'].map((p) => (
@@ -114,10 +125,15 @@ export default function Support() {
                   </option>
                 ))}
               </select>
+              <span className="mt-1 block text-[11px] text-slate-500">Urgent: 30 min · High: 2 hrs · Normal: 4 hrs</span>
+            </label>
+            <label className="sm:col-span-2">
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Details</span>
+              <textarea className={`${inputCls} min-h-24`} value={form.details} onChange={(e) => setForm((f) => ({ ...f, details: e.target.value }))} placeholder="Address, deadline, access notes, documents needed, or anything else that will help us begin." />
             </label>
             <div className="flex items-center gap-3 sm:col-span-3">
               <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">
-                {busy ? 'Saving…' : 'Submit'}
+                {busy ? 'Submitting…' : 'Submit request'}
               </button>
               {error && <span className="text-sm text-rose-300">{error}</span>}
             </div>
@@ -129,7 +145,7 @@ export default function Support() {
         <p className="text-sm text-slate-400">Loading…</p>
       ) : tickets.length === 0 ? (
         <Card>
-          <EmptyState label="No support tickets yet." />
+          <EmptyState label="No requests yet. Start one whenever you need Pinnacle's help." />
         </Card>
       ) : (
         <div className="space-y-3">
@@ -138,7 +154,8 @@ export default function Support() {
               <button onClick={() => openThread(t.id)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
                 <div>
                   <p className="text-sm font-medium text-white">{t.subject}</p>
-                  <p className="mt-1 text-xs text-slate-500">{new Date(t.created_at).toLocaleString()}</p>
+                  <p className="mt-1 text-xs text-slate-500">Case {t.id.slice(0, 8).toUpperCase()} · {t.category?.replace('_', ' ') || 'General'} · {new Date(t.created_at).toLocaleString()}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">{t.status === 'open' && t.response_due_at ? `Response due ${new Date(t.response_due_at).toLocaleString()}` : t.status === 'closed' ? 'Completed' : `In progress · waiting on ${t.waiting_on === 'pinnacle' ? 'Pinnacle' : t.waiting_on || 'Pinnacle'}`}</p>
                 </div>
                 <StatusBadge tone={t.status === 'closed' ? 'green' : t.status === 'in_progress' ? 'blue' : 'gold'}>{t.status}</StatusBadge>
               </button>

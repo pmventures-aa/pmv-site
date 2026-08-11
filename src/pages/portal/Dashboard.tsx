@@ -19,6 +19,19 @@ interface DashboardData {
   }
   upcoming_appointments: { id: string; title: string; starts_at: string }[]
   recent_messages: { id: string; body: string; sender_user_id: string; created_at: string }[]
+  enabled_services: { service_key: string; name: string; status: string }[]
+  properties: { id: string; address: string; property_type: string; status: string }[]
+  active_cases: { id: string; subject: string; priority: string; status: string; response_due_at: string | null; resolution_due_at: string | null; waiting_on: string }[]
+}
+
+function SlaClock({ due, complete }: { due: string | null; complete?: boolean }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer) }, [])
+  if (complete || !due) return <span className="text-emerald-300">Response logged</span>
+  const remaining = new Date(due).getTime() - now
+  const mins = Math.max(0, Math.floor(Math.abs(remaining) / 60000))
+  const hours = Math.floor(mins / 60)
+  return <span className={remaining < 0 ? 'text-rose-300' : remaining < 3600000 ? 'text-amber-300' : 'text-slate-400'}>{remaining < 0 ? 'Overdue ' : ''}{hours ? `${hours}h ` : ''}{mins % 60}m</span>
 }
 
 export default function Dashboard() {
@@ -53,7 +66,7 @@ export default function Dashboard() {
         name={user?.first_name || user?.full_name}
         userId={user?.id}
         variant="portal"
-        subtitle="Your portal keeps the work, documents, messages, billing, and next steps connected in one place."
+        subtitle="Everything Pinnacle is handling for you—requests, properties, documents, appointments, and next steps—in one place."
         className="mb-5"
       />
 
@@ -67,12 +80,22 @@ export default function Dashboard() {
         </Link>
       )}
 
+      <div className="mb-8 grid gap-3 sm:grid-cols-3">
+        <Link to={p('support')} className="rounded-xl border border-gold/25 bg-gold/[.055] p-4 transition hover:border-gold/50"><p className="text-sm font-semibold text-white">Start a request</p><p className="mt-1 text-xs text-slate-400">Cleaning, inspections, evictions, documents, property work, and more.</p></Link>
+        <Link to={p('documents')} className="rounded-xl border border-white/10 bg-white/[.025] p-4 transition hover:border-gold/30"><p className="text-sm font-semibold text-white">Send or review documents</p><p className="mt-1 text-xs text-slate-400">Keep files, signatures, and requested items together.</p></Link>
+        <Link to={p('services')} className="rounded-xl border border-white/10 bg-white/[.025] p-4 transition hover:border-gold/30"><p className="text-sm font-semibold text-white">Discover services</p><p className="mt-1 text-xs text-slate-400">Activate additional support without leaving your portal.</p></Link>
+      </div>
+
+      {data?.active_cases?.length ? <Card className="mb-8"><div className="mb-4 flex items-center justify-between"><div><p className="eyebrow">Live work</p><h2 className="mt-1 text-base font-semibold text-white">Active requests & cases</h2></div><Link to={p('support')} className="text-xs font-medium text-gold">View all →</Link></div><div className="divide-y divide-white/10">{data.active_cases.map((item) => <Link key={item.id} to={p('support')} className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[1fr_auto_auto] sm:items-center"><div><p className="text-sm font-medium text-white">{item.subject}</p><p className="mt-1 text-[11px] text-slate-500">Waiting on {item.waiting_on === 'pinnacle' ? 'Pinnacle' : item.waiting_on}</p></div><span className="text-xs capitalize text-slate-400">{item.status.replace('_',' ')}</span><span className="text-xs tabular-nums"><SlaClock due={item.response_due_at} complete={item.status !== 'open'} /></span></Link>)}</div></Card> : null}
+
+      {data?.properties?.length ? <section className="mb-8"><div className="mb-3 flex items-end justify-between"><div><p className="eyebrow">Property services</p><h2 className="mt-1 text-lg font-semibold text-white">My Properties</h2></div><Link to={p('property-management')} className="text-xs font-medium text-gold">Open workspace →</Link></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.properties.slice(0,3).map((property) => <Link key={property.id} to={p('property-management')} className="rounded-lg border border-white/10 bg-white/[.02] p-4 hover:border-gold/25"><p className="text-sm font-medium text-white">{property.address}</p><p className="mt-1 text-xs capitalize text-slate-500">{property.property_type?.replace('_',' ')} · {property.status}</p></Link>)}</div></section> : null}
+
       <ClientJourney stats={data?.stats} className="mb-8" />
 
       <section>
         <div className="mb-3 flex items-end justify-between gap-4">
           <div><p className="eyebrow">Account overview</p><h2 className="mt-1 text-lg font-semibold text-white">Current workload and outstanding items</h2></div>
-          <Link to={p('services')} className="text-xs font-medium text-gold hover:underline">Start another request →</Link>
+          <Link to={p('support')} className="text-xs font-medium text-gold hover:underline">Start another request →</Link>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {pulse.map(([label, value, to, detail]) => (

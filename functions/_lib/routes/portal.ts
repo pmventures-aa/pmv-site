@@ -41,7 +41,7 @@ portalRoutes.get('/dashboard', async (c) => {
   const { where, params } = await scopeFilter(c.env, user)
   const p2 = () => [...params]
 
-  const [matters, tasks, docs, invoices, tickets, calls, appts, msgs] = await Promise.all([
+  const [matters, tasks, docs, invoices, tickets, calls, appts, msgs, services, properties, activeCases] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${where} AND status != 'closed'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${where} AND status != 'done'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM document_requests WHERE ${where} AND status = 'requested'`).bind(...p2()).first<{ n: number }>(),
@@ -50,6 +50,9 @@ portalRoutes.get('/dashboard', async (c) => {
     c.env.DB.prepare(`SELECT COUNT(*) n FROM planned_calls WHERE ${where} AND status = 'requested'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT * FROM appointments WHERE ${where} AND starts_at >= datetime('now') ORDER BY starts_at ASC LIMIT 5`).bind(...p2()).all(),
     c.env.DB.prepare(`SELECT * FROM secure_messages WHERE ${where} ORDER BY created_at DESC LIMIT 5`).bind(...p2()).all(),
+    c.env.DB.prepare(`SELECT cs.service_key, cs.status, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE cs.client_user_id = ? AND cs.status IN ('requested','submitted','active') ORDER BY s.name`).bind(user.role === 'client' ? user.id : (params[0] ?? user.id)).all(),
+    c.env.DB.prepare(`SELECT id, address, property_type, status FROM properties WHERE ${where} ORDER BY created_at DESC LIMIT 6`).bind(...p2()).all(),
+    c.env.DB.prepare(`SELECT id, subject, category, priority, status, service_key, property_id, response_due_at, resolution_due_at, waiting_on, created_at FROM support_tickets WHERE ${where} AND status != 'closed' ORDER BY created_at DESC LIMIT 5`).bind(...p2()).all(),
   ])
 
   return c.json({
@@ -63,6 +66,9 @@ portalRoutes.get('/dashboard', async (c) => {
     },
     upcoming_appointments: appts.results ?? [],
     recent_messages: msgs.results ?? [],
+    enabled_services: services.results ?? [],
+    properties: properties.results ?? [],
+    active_cases: activeCases.results ?? [],
   })
 })
 
@@ -536,17 +542,20 @@ portalRoutes.get('/support', async (c) => c.json({ tickets: await listScoped(c, 
 
 portalRoutes.post('/support', async (c) => {
   const user = c.get('user')
-  const body = await c.req.json<{ subject: string; category?: string; priority?: string; client_user_id?: string; assigned_staff_user_id?: string }>().catch(() => null)
+  const body = await c.req.json<{ subject: string; category?: string; priority?: string; details?: string; service_key?: string; property_id?: string; client_user_id?: string; assigned_staff_user_id?: string }>().catch(() => null)
   if (!body?.subject) return c.json({ error: 'subject is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const assigneeId = await resolveAssignee(c.env, user, body.assigned_staff_user_id)
   const priority = ['low', 'normal', 'high', 'urgent'].includes(body.priority ?? '') ? body.priority! : 'normal'
   const id = uuid()
   const subject = body.subject.trim().slice(0, 300)
+  const sla = { low: [480, 4320], normal: [240, 2880], high: [120, 1440], urgent: [30, 480] }[priority]!
+  const responseDue = new Date(Date.now() + sla[0] * 60_000).toISOString()
+  const resolutionDue = new Date(Date.now() + sla[1] * 60_000).toISOString()
   await c.env.DB.batch([
     c.env.DB.prepare(
-      `INSERT INTO support_tickets (id, client_user_id, subject, category, priority, status, assigned_staff_user_id) VALUES (?, ?, ?, ?, ?, 'open', ?)`,
-    ).bind(id, clientId, subject, body.category ?? null, priority, assigneeId),
+      `INSERT INTO support_tickets (id, client_user_id, subject, category, priority, status, assigned_staff_user_id, service_key, property_id, details, response_due_at, resolution_due_at) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, clientId, subject, body.category ?? null, priority, assigneeId, body.service_key ?? null, body.property_id ?? null, body.details?.trim().slice(0, 4000) ?? null, responseDue, resolutionDue),
     activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'ticket_created', detail: { subject, priority } }),
   ])
   return c.json({ ok: true, id }, 201)
@@ -603,6 +612,11 @@ portalRoutes.post('/support/:id/messages', async (c) => {
   await c.env.DB.prepare(
     `INSERT INTO secure_messages (id, client_user_id, sender_user_id, body, ticket_id) VALUES (?, ?, ?, ?, ?)`,
   ).bind(id, ticket.client_user_id, user.id, body.body.trim().slice(0, 4000), ticket.id).run()
+  if (user.role !== 'client' && !ticket.first_response_at) {
+    await c.env.DB.prepare("UPDATE support_tickets SET first_response_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").bind(ticket.id).run()
+  } else {
+    await c.env.DB.prepare("UPDATE support_tickets SET waiting_on = ?, updated_at = datetime('now') WHERE id = ?").bind(user.role === 'client' ? 'pinnacle' : 'client', ticket.id).run()
+  }
   return c.json({ ok: true, id }, 201)
 })
 
