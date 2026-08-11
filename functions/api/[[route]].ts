@@ -28,7 +28,6 @@ import { serviceOfferingApplicationRoutes } from '../_lib/routes/serviceOffering
 import { intakeCatalogAdminRoutes } from '../_lib/routes/intakeCatalogAdmin'
 import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
 import { accountEmailsAdminRoutes } from '../_lib/routes/accountEmailsAdmin'
-import { resendWebhookRoutes } from '../_lib/routes/resendWebhooks'
 import { staffServiceAssignmentRoutes, clientApplicationSignatureRoutes } from '../_lib/routes/staffServiceAssignments'
 import { staffServicePrefillRoutes } from '../_lib/routes/staffServicePrefill'
 import { invoiceAdminRoutes } from '../_lib/routes/invoiceAdmin'
@@ -49,6 +48,8 @@ import { documentLifecycleAdminRoutes, documentLifecyclePublicRoutes } from '../
 import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_lib/routes/internalDocuments'
 import { documentWorkspaceExtraRoutes } from '../_lib/routes/documentWorkspaceExtras'
 import { securitySessionRoutes } from '../_lib/routes/securitySessions'
+import { communicationBrandingAdminRoutes, communicationBrandingPublicRoutes } from '../_lib/routes/communicationBranding'
+import { mailTransportRoutes, mailTransportAdminRoutes } from '../_lib/routes/mailTransport'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -57,7 +58,6 @@ app.route('/', publicRoutes)
 app.route('/', serviceOfferingPublicRoutes)
 app.route('/', uploadRoutes)
 app.route('/', unsubscribeRoutes)
-app.route('/', resendWebhookRoutes)
 app.route('/', invitationPublicRoutes)
 app.route('/', inviteCompletionRoutes)
 app.route('/', vendorApplicationUploadRoutes)
@@ -65,6 +65,8 @@ app.route('/', relationshipAutomationRoutes)
 app.route('/', documentVerificationRoutes)
 app.route('/', documentLifecyclePublicRoutes)
 app.route('/', internalDocumentPublicRoutes)
+app.route('/', communicationBrandingPublicRoutes)
+app.route('/', mailTransportRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
@@ -98,6 +100,8 @@ app.route('/admin', managementInsightRoutes)
 app.route('/admin', documentWorkspaceExtraRoutes)
 app.route('/admin', documentLifecycleAdminRoutes)
 app.route('/admin', internalDocumentAdminRoutes)
+app.route('/admin', communicationBrandingAdminRoutes)
+app.route('/admin', mailTransportAdminRoutes)
 app.route('/admin', adminRoutes)
 app.route('/admin', deletionRoutes)
 app.route('/admin', conversionRoutes)
