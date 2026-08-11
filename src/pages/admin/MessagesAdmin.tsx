@@ -5,6 +5,8 @@ import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
 import { ThreadView } from '../../components/kit/ThreadView'
+import { PresenceDot } from '../../components/kit/PresenceDot'
+import { usePresence } from '../../lib/presence'
 import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 import { toast } from '../../components/kit/toast'
 import { timeAgo } from '../../lib/activity'
@@ -86,6 +88,9 @@ export default function MessagesAdmin() {
     return threads.filter((t) => `${t.client_name || ''} ${t.client_email} ${t.subject}`.toLowerCase().includes(q))
   }, [threads, search])
 
+  const clientIds = useMemo(() => Array.from(new Set(visibleThreads.map((t) => t.client_user_id))), [visibleThreads])
+  const presence = usePresence(clientIds, 'admin')
+
   function onCreated(id: string) {
     setActiveId(id)
     if (initialClientId) setSearchParams((p) => { p.delete('client'); return p }, { replace: true })
@@ -100,7 +105,7 @@ export default function MessagesAdmin() {
           <div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" /><input className={`${inputCls} !pl-9`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search conversations" /></div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {loading ? <p className="p-4 text-sm text-slate-400">Loading conversations…</p> : visibleThreads.length === 0 ? <div className="p-4"><EmptyState label={search ? 'No conversations match your search.' : 'No secure conversations yet.'} /></div> : <ul className="divide-y divide-white/5">{visibleThreads.map((t) => <li key={t.id}><button onClick={() => setActiveId(t.id)} className={`block w-full px-4 py-3.5 text-left transition ${activeId === t.id ? 'bg-gold/10 ring-1 ring-inset ring-gold/20' : 'hover:bg-white/5'}`}><div className="flex items-center gap-2"><span className="text-slate-500">{t.unread ? <Mail size={15} /> : <MailOpen size={15} />}</span><p className={`min-w-0 flex-1 truncate text-sm font-medium ${t.unread ? 'text-white' : 'text-slate-300'}`}>{t.client_name || t.client_email}</p><span className="shrink-0 text-[10px] text-slate-500">{timeAgo(t.last_message_at)}</span></div><p className={`mt-1 truncate pl-[23px] text-xs ${t.unread ? 'text-slate-200' : 'text-slate-500'}`}>{t.subject}</p></button></li>)}</ul>}
+          {loading ? <p className="p-4 text-sm text-slate-400">Loading conversations…</p> : visibleThreads.length === 0 ? <div className="p-4"><EmptyState label={search ? 'No conversations match your search.' : 'No secure conversations yet.'} /></div> : <ul className="divide-y divide-white/5">{visibleThreads.map((t) => <li key={t.id}><button onClick={() => setActiveId(t.id)} className={`block w-full px-4 py-3.5 text-left transition ${activeId === t.id ? 'bg-gold/10 ring-1 ring-inset ring-gold/20' : 'hover:bg-white/5'}`}><div className="flex items-center gap-2"><span className="text-slate-500">{t.unread ? <Mail size={15} /> : <MailOpen size={15} />}</span><PresenceDot entry={presence[t.client_user_id]} size={7} /><p className={`min-w-0 flex-1 truncate text-sm font-medium ${t.unread ? 'text-white' : 'text-slate-300'}`}>{t.client_name || t.client_email}</p><span className="shrink-0 text-[10px] text-slate-500">{timeAgo(t.last_message_at)}</span></div><p className={`mt-1 truncate pl-[38px] text-xs ${t.unread ? 'text-slate-200' : 'text-slate-500'}`}>{t.subject}</p></button></li>)}</ul>}
         </div>
       </aside>
       <section className="min-h-0 bg-navy-950/20">{activeId ? <ThreadView threadId={activeId} onSent={load} /> : <div className="grid h-full place-items-center p-6"><EmptyState label="Select a conversation or start a new secure message." /></div>}</section>
