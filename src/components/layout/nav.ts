@@ -74,6 +74,7 @@ export const adminNav: NavItem[] = [
   { key: 'activity', label: 'Activity', to: 'activity', icon: Activity, section: 'Intelligence' },
   { key: 'audit-log', label: 'Audit Log', to: 'audit-log', icon: ClipboardList, section: 'Intelligence' },
 
+  { key: 'security-center', label: 'Security Center', to: 'security-center', icon: ShieldCheck, section: 'Access' },
   { key: 'employees', label: 'Team & Vendors', to: 'employees', icon: UsersRound, section: 'Access' },
   { key: 'users', label: 'Users', to: 'users', icon: UserCog, section: 'Access' },
   { key: 'assignments', label: 'Assignments', to: 'assignments', icon: ArrowLeftRight, section: 'Access' },
