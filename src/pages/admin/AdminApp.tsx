@@ -27,6 +27,7 @@ import EmployeesAdmin from './EmployeesAdmin'
 import ReportingCenter from './ReportingCenter'
 import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
 import AutomationCenter from './AutomationCenter'
+import SecurityCenter from './SecurityCenter'
 import InvoicesAdmin from './InvoicesAdmin'
 import ServiceAssignmentsAdmin from './ServiceAssignmentsAdmin'
 import InvitationsAdmin from './InvitationsAdmin'
@@ -37,7 +38,7 @@ import EnvelopeWorkspace from './EnvelopeWorkspace'
 import FieldWorkAdmin from './FieldWorkAdmin'
 import FieldWorkDetail, { FieldWorkList } from './FieldWorkVendor'
 
-const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity', 'service-assignments', 'invoices', 'field-work']
+const STAFF_VISIBLE = ['dashboard', 'pipelines', 'clients', 'inquiries', 'messages', 'activity', 'service-assignments', 'invoices', 'field-work', 'security-center']
 
 function AdminShell() {
   const { user } = useAuth()
@@ -94,6 +95,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="reports" element={<ReportingCenter />} />
             <Route path="communications" element={<CommunicationsCRMAdmin />} />
             <Route path="automation-center" element={<AutomationCenter />} />
+            <Route path="security-center" element={<SecurityCenter />} />
             <Route path="employees" element={<EmployeesAdmin />} />
             <Route path="open-items/:type" element={<OpenItemsAdmin />} />
             <Route path="open-items" element={<OpenItemsAdmin />} />
