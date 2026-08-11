@@ -74,7 +74,7 @@ export default function LeadCreate() {
       }
 
       toast.success(inviteSent ? 'Lead created and branded account invitation sent.' : 'Lead created.')
-      navigate(p(`leads/${result.id}`))
+      navigate(p(`leads/${result.id}/overview`))
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not create lead.')
     } finally {

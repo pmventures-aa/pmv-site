@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { Panel, Tag, inputCls, btnPrimary, btnOutline, EmptyState } from '../../components/admin/ui'
@@ -67,12 +67,13 @@ function plainText(html: string) {
 }
 
 export default function LeadDetail() {
-  const { id } = useParams<{ id: string }>()
+  const { id, section } = useParams<{ id: string; section?: string }>()
   const p = useAppPath()
+  const navigate = useNavigate()
   const [data, setData] = useState<Bundle | null>(null)
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [allLists, setAllLists] = useState<CRMList[]>([])
-  const [tab, setTab] = useState<Tab>('overview')
+  const tab:Tab = (['overview','activity','lists','details'] as Tab[]).includes(section as Tab) ? section as Tab : 'overview'
   const [editing, setEditing] = useState(false)
   const [note, setNote] = useState('')
   const [listId, setListId] = useState('')
@@ -89,6 +90,7 @@ export default function LeadDetail() {
   }, [id])
 
   useEffect(() => { load().catch(() => setData(null)) }, [load])
+  useEffect(() => { if(id&&!section)navigate(p(`leads/${id}/overview`),{replace:true}) },[id,section,navigate,p])
 
   const timeline = useMemo(() => {
     if (!data) return []
@@ -134,7 +136,7 @@ export default function LeadDetail() {
     try {
       const res = await api.post<{ client_user_id: string }>(`/admin/inquiries/${id}/convert`)
       toast.success('Converted to client.')
-      window.location.href = p(`clients/${res.client_user_id}`)
+      window.location.href = p(`clients/${res.client_user_id}/overview`)
     } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Could not convert this record.') }
     finally { setBusy(false) }
   }
@@ -172,16 +174,16 @@ export default function LeadDetail() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to={`${p('communications')}?lead=${encodeURIComponent(r.id)}`} className={btnPrimary}>Email</Link>
-            <button className={btnOutline} onClick={() => setTab('activity')}>Add note</button>
+            <Link className={btnOutline} to={p(`leads/${r.id}/activity`)}>Add note</Link>
             {!r.client_user_id && !data.conversion && <button className={btnOutline} disabled={busy} onClick={convert}>Convert to client</button>}
-            {(r.client_user_id || data.conversion) && <Link to={p(`clients/${r.client_user_id || data.conversion?.client_user_id}`)} className={btnOutline}>Open client</Link>}
+            {(r.client_user_id || data.conversion) && <Link to={p(`clients/${r.client_user_id || data.conversion?.client_user_id}/overview`)} className={btnOutline}>Open client</Link>}
           </div>
         </div>
       </header>
 
       <div className="mt-5 flex gap-6 overflow-x-auto border-b border-white/10">
-        {([['overview', 'Overview'], ['activity', 'Activity'], ['lists', 'Lists & Tags'], ['details', 'Details']] as const).map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)} className={`shrink-0 border-b-2 pb-3 text-sm font-medium transition ${tab === key ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{label}</button>
+        {([['overview', 'Overview'], ['activity', 'Activity & Notes'], ['lists', 'Lists & Tags'], ['details', 'Profile']] as const).map(([key, label]) => (
+          <Link key={key} to={p(`leads/${r.id}/${key}`)} className={`shrink-0 border-b-2 pb-3 text-sm font-medium transition ${tab === key ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{label}</Link>
         ))}
       </div>
 
@@ -201,7 +203,7 @@ export default function LeadDetail() {
           {r.message && <div className="mt-8"><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Original context</p><p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-6 text-slate-300">{r.message}</p></div>}
         </section>
         <aside className="border-l border-white/10 xl:pl-7">
-          <div className="flex items-center justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Timeline</p><h2 className="mt-1 text-lg font-semibold text-white">Latest activity</h2></div><button className="text-xs text-gold hover:underline" onClick={() => setTab('activity')}>View all</button></div>
+          <div className="flex items-center justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Timeline</p><h2 className="mt-1 text-lg font-semibold text-white">Latest activity</h2></div><Link className="text-xs text-gold hover:underline" to={p(`leads/${r.id}/activity`)}>View all</Link></div>
           <Timeline rows={timeline.slice(0, 7)} />
         </aside>
       </div>}
