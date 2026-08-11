@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'functions/**'
+      - 'migrations/**'
       - 'public/**'
       - 'index.html'
       - 'package.json'
