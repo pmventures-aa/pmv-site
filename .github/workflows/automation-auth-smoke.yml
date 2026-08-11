@@ -43,5 +43,5 @@ jobs:
             fi
           }
 
-          check_endpoint 'Client notifications' 'https://www.pinnaclemanagementventures.com/api/automation/client-notifications/run'
-          check_endpoint 'Client nurture' 'https://www.pinnaclemanagementventures.com/api/automation/nurture/run'
+          check_endpoint 'Client notifications' 'https://secure.pinnaclemanagementventures.com/api/automation/client-notifications/run'
+          check_endpoint 'Client nurture' 'https://secure.pinnaclemanagementventures.com/api/automation/nurture/run'
