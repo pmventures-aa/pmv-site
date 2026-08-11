@@ -196,7 +196,7 @@ documentPlatformV2AdminRoutes.post('/document-platform/retention/holds/:holdId/r
 
 // Bulk envelope operations
 documentPlatformV2AdminRoutes.post('/document-platform/envelopes/bulk',async c=>{
-  const b=await c.req.json<any>().catch(()=>({})),ids=Array.isArray(b.envelope_ids)?[...new Set(b.envelope_ids.map(String))].slice(0,100):[],operation=String(b.operation||'')
+  const b=await c.req.json<any>().catch(()=>({})),ids:string[]=Array.isArray(b.envelope_ids)?Array.from(new Set<string>(b.envelope_ids.map((v:any)=>String(v)))).slice(0,100):[],operation=String(b.operation||'')
   if(!ids.length||!['send','void','remind','archive','download','status'].includes(operation))return c.json({error:'valid operation and envelope_ids are required'},400)
   const jobId=uuid(),results:any[]=[];let success=0,failed=0
   await c.env.DB.prepare(`INSERT INTO envelope_bulk_jobs(id,operation,requested_count,status,requested_by_user_id,request_json) VALUES (?,?,?,'running',?,?)`).bind(jobId,operation,ids.length,c.get('user').id,JSON.stringify(b)).run()
