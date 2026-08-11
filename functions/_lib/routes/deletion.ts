@@ -48,14 +48,15 @@ async function dependencySummary(env:AppEnv['Bindings'],entity:string,id:string)
 }
 
 deletionRoutes.patch('/records/:entity/:id/archive', requireStaff, async (c) => {
-  const entity = c.req.param('entity')!; const table = ARCHIVABLE[entity]
+  const entity = c.req.param('entity')??''; const table = ARCHIVABLE[entity]
   if (!table) return c.json({ error: 'unknown or non-archivable entity' }, 404)
-  const user = c.get('user'); const id = c.req.param('id')!
+  const user = c.get('user'); const id = c.req.param('id')??''
+  if(!id)return c.json({error:'not found'},404)
   const row = await loadRow(c.env, table, id)
   if (!row) return c.json({ error: 'not found' }, 404)
   if (!UNSCOPED.has(entity) && row.client_user_id && !(await canAccessClient(c.env,user,row.client_user_id))) return c.json({error:'forbidden'},403)
   if (row.archived_at) return c.json({ error: 'already archived' }, 409)
-  const body = await c.req.json<{ reason?: string }>().catch(() => ({}))
+  const body = await c.req.json<{ reason?: string }>().catch(() => ({} as {reason?:string}))
   const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 500) || null : null
   await c.env.DB.batch([
     c.env.DB.prepare(`UPDATE ${table} SET archived_at = datetime('now'), archived_by = ?, archived_reason = ? WHERE id = ?`).bind(user.id, reason, id),
@@ -65,9 +66,11 @@ deletionRoutes.patch('/records/:entity/:id/archive', requireStaff, async (c) => 
 })
 
 deletionRoutes.patch('/records/:entity/:id/restore', requireStaff, async (c) => {
-  const entity=c.req.param('entity')!;const table=ARCHIVABLE[entity]
+  const entity=c.req.param('entity')??'';const table=ARCHIVABLE[entity]
   if(!table)return c.json({error:'unknown or non-archivable entity'},404)
-  const user=c.get('user');const id=c.req.param('id')!;const row=await loadRow(c.env,table,id)
+  const user=c.get('user');const id=c.req.param('id')??''
+  if(!id)return c.json({error:'not found'},404)
+  const row=await loadRow(c.env,table,id)
   if(!row)return c.json({error:'not found'},404)
   if(!UNSCOPED.has(entity)&&row.client_user_id&&!(await canAccessClient(c.env,user,row.client_user_id)))return c.json({error:'forbidden'},403)
   if(!row.archived_at)return c.json({error:'not archived'},409)
@@ -84,7 +87,7 @@ deletionRoutes.get('/records/users/archived', requireOwner, async(c)=>{
 })
 
 deletionRoutes.get('/records/:entity/archived', requireStaff, async (c) => {
-  const entity=c.req.param('entity')!;const table=ARCHIVABLE[entity]
+  const entity=c.req.param('entity')??'';const table=ARCHIVABLE[entity]
   if(!table)return c.json({error:'unknown or non-archivable entity'},404)
   const user=c.get('user');let where='archived_at IS NOT NULL';let params:unknown[]=[]
   if(!UNSCOPED.has(entity)){const sf=await scopeFilter(c.env,user);where+=` AND (client_user_id IS NULL OR ${sf.where})`;params=sf.params}
@@ -93,22 +96,25 @@ deletionRoutes.get('/records/:entity/archived', requireStaff, async (c) => {
 })
 
 deletionRoutes.get('/records/:entity/:id/deletion-impact', requireOwner, async(c)=>{
-  const entity=c.req.param('entity')!;const table=DELETABLE[entity]
+  const entity=c.req.param('entity')??'';const table=DELETABLE[entity]
   if(!table)return c.json({error:'unknown entity'},404)
-  const row=await loadRow(c.env,table,c.req.param('id'))
+  const id=c.req.param('id')??''
+  if(!id)return c.json({error:'not found'},404)
+  const row=await loadRow(c.env,table,id)
   if(!row)return c.json({error:'not found'},404)
-  const dependencies=await dependencySummary(c.env,entity,c.req.param('id'))
+  const dependencies=await dependencySummary(c.env,entity,id)
   const total=Object.values(dependencies).reduce((a,b)=>a+b,0)
   const eligible=entity==='users'?row.status!=='active':!!row.archived_at
-  return c.json({impact:{entity,id:c.req.param('id'),label:labelFor(entity,row),eligible,required_state:entity==='users'?'suspended or inactive':'archived',dependencies,total_dependencies:total,confirmation:`DELETE ${entity}:${c.req.param('id')}`}})
+  return c.json({impact:{entity,id,label:labelFor(entity,row),eligible,required_state:entity==='users'?'suspended or inactive':'archived',dependencies,total_dependencies:total,confirmation:`DELETE ${entity}:${id}`}})
 })
 
 deletionRoutes.delete('/records/:entity/:id/permanent', requireOwner, async (c) => {
-  const entity=c.req.param('entity')!;const table=DELETABLE[entity]
+  const entity=c.req.param('entity')??'';const table=DELETABLE[entity]
   if(!table)return c.json({error:'unknown entity'},404)
-  const user=c.get('user');const id=c.req.param('id')!
+  const user=c.get('user');const id=c.req.param('id')??''
+  if(!id)return c.json({error:'not found'},404)
   if(entity==='users'&&id===user.id)return c.json({error:"you can't permanently delete your own account"},400)
-  const body=await c.req.json<{password?:string;reason?:string;confirmation?:string}>().catch(()=>({}))
+  const body=await c.req.json<{password?:string;reason?:string;confirmation?:string}>().catch(()=>({} as {password?:string;reason?:string;confirmation?:string}))
   const reason=typeof body.reason==='string'?body.reason.trim():''
   if(reason.length<8)return c.json({error:'a specific reason (at least 8 characters) is required'},400)
   if(!body.password)return c.json({error:'password is required'},400)
