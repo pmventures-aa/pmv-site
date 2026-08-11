@@ -15,7 +15,7 @@ function timingSafeEqualText(a: string, b: string) {
 }
 
 async function requireAutomationCron(c: any, next: any) {
-  const expected = String(c.env.AUTOMATION_CRON_SECRET || '').trim()
+  const expected = String(c.env.AUTOMATION_CRON_SECRET1 || '').trim()
   if (!expected) return c.json({ error: 'automation secret not configured' }, 503)
   const provided = String(c.req.header('x-pmv-automation-secret') || '').trim()
   if (!provided || !timingSafeEqualText(provided, expected)) return c.json({ error: 'forbidden' }, 403)
