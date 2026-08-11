@@ -24,10 +24,19 @@ function systemTheme(): ResolvedTheme {
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
+function isPublicMarketingSurface() {
+  if (typeof window === 'undefined') return false
+  const host = window.location.hostname
+  const dedicatedWorkspace = host.startsWith('hq.') || host.startsWith('client.') || host.startsWith('secure.') || host.startsWith('mail.')
+  const embeddedWorkspace = /^\/(portal|admin)(\/|$)/.test(window.location.pathname)
+  return !dedicatedWorkspace && !embeddedWorkspace
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreferenceState] = useState<ThemePreference>(storedPreference)
   const [system, setSystem] = useState<ResolvedTheme>(systemTheme)
-  const resolved: ResolvedTheme = preference === 'system' ? system : preference
+  const publicMarketing = isPublicMarketingSurface()
+  const resolved: ResolvedTheme = publicMarketing ? 'dark' : preference === 'system' ? system : preference
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: light)')
@@ -40,9 +49,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const root = document.documentElement
     root.dataset.theme = resolved
-    root.dataset.themePreference = preference
+    root.dataset.themePreference = publicMarketing ? 'dark' : preference
     root.style.colorScheme = resolved
-  }, [preference, resolved])
+  }, [preference, publicMarketing, resolved])
 
   function setPreference(value: ThemePreference) {
     window.localStorage.setItem(STORAGE_KEY, value)
