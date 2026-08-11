@@ -1,6 +1,7 @@
 import type { Env } from './types'
 import { REPORTS_BY_KEY, type ReportCtx } from './reportRegistry'
 import { uuid } from './crypto'
+import { sendEmailStrict } from './email'
 
 function csvCell(value: unknown) {
   if (value === null || value === undefined) return ''
@@ -59,16 +60,15 @@ export function nextScheduledReportRun(kind: string | null, timeValue: string | 
 }
 
 async function sendReportEmail(env: Env, to: string, subject: string, html: string, fileName: string, csv: string, idempotencyKey: string) {
-  if (!env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured')
-  const from = env.RESEND_FROM_EMAIL || 'Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>'
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey.slice(0, 256) },
-    body: JSON.stringify({ from, to, subject, html, attachments: [{ filename: fileName, content: toBase64(csv) }], tags: [{ name: 'category', value: 'scheduled_report' }] }),
+  return sendEmailStrict(env, {
+    to,
+    subject,
+    html,
+    replyTo: 'mail@pinnaclemanagementventures.com',
+    idempotencyKey,
+    tags: [{ name: 'category', value: 'scheduled_report' }],
+    attachments: [{ filename: fileName, content: toBase64(csv), contentType: 'text/csv; charset=utf-8' }],
   })
-  const payload = await res.json<any>().catch(() => ({}))
-  if (!res.ok || !payload?.id) throw new Error(payload?.message || `Resend send failed (${res.status})`)
-  return payload.id as string
 }
 
 async function visibleIdsForCreator(env: Env, userId: string) {
