@@ -36,12 +36,12 @@ export default function AdminDashboard(){
   const stats=data?.stats; const na=data?.needs_attention; const attentionCount=na?na.overdue_tasks.length+na.overdue_invoices.length+na.stale_tickets.length+na.stale_inquiries.length:0
   const quick='group inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/[.08] bg-white/[.018] px-3.5 py-2.5 text-xs font-semibold text-slate-300 transition-all duration-200 hover:-translate-y-px hover:border-gold/30 hover:bg-gold/[.03] hover:text-gold'
 
-  return <div className="pb-20 lg:pb-0">
+  return <div className="pb-24 lg:pb-0">
     <div className="mb-7 rounded-2xl border border-white/[.08] bg-gradient-to-br from-white/[.035] to-transparent p-5 sm:p-6">
       <DashboardWelcome name={user?.first_name||user?.full_name} userId={user?.id} variant="admin" subtitle={user?.role==='admin'?'Here’s the firm-wide picture and the work that needs attention next.':'Here’s your assigned client work and the next items that need attention.'}/>
-      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/[.07] pt-4">
+      <div className="mt-5 hidden flex-wrap items-center gap-2 border-t border-white/[.07] pt-4 sm:flex">
         <span className="mr-1 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">Quick actions</span>
-        <Link to={p('inquiries')} className={quick}><Icon name="plus" size={13}/>Add lead</Link>
+        <Link to={p('leads/new')} className={quick}><Icon name="plus" size={13}/>Add lead</Link>
         <Link to={p('service-assignments')} className={quick}><Icon name="services" size={13}/>Assign service</Link>
         <Link to={p('invoices')} className={quick}><Icon name="billing" size={13}/>New invoice</Link>
         <Link to={p('communications')} className={quick}><Icon name="communications" size={13}/>Communications</Link>
@@ -76,12 +76,13 @@ export default function AdminDashboard(){
     </div>
 
     <div className="fixed right-4 z-40 lg:hidden" style={{bottom:'calc(env(safe-area-inset-bottom) + 1rem)'}}>
-      {createOpen&&<div className="mb-3 w-52 overflow-hidden rounded-xl border border-white/10 bg-navy-900 shadow-2xl">
-        <Link to={p('inquiries')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 border-b border-white/10 px-4 py-3 text-sm text-slate-200 hover:bg-white/[.04] hover:text-gold"><Icon name="plus" size={15}/>Add lead</Link>
-        <Link to={p('service-assignments')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 border-b border-white/10 px-4 py-3 text-sm text-slate-200 hover:bg-white/[.04] hover:text-gold"><Icon name="services" size={15}/>Assign service</Link>
-        <Link to={p('invoices')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-white/[.04] hover:text-gold"><Icon name="billing" size={15}/>New invoice</Link>
+      {createOpen&&<div className="mb-3 w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-white/10 bg-navy-900/98 p-1.5 shadow-2xl shadow-black/40 backdrop-blur-xl">
+        <div className="px-3 pb-2 pt-2"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">Quick Actions</p><p className="mt-1 text-xs text-slate-500">Start the next HQ task without leaving your place.</p></div>
+        <Link to={p('leads/new')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-200 transition hover:bg-white/[.05] hover:text-gold"><span className="grid h-9 w-9 place-items-center rounded-lg bg-gold/10 text-gold"><Icon name="plus" size={16}/></span><span><strong className="block font-semibold">Add Lead</strong><small className="text-xs text-slate-500">Create a CRM lead and optionally send their account invite.</small></span></Link>
+        <Link to={p('service-assignments')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-200 transition hover:bg-white/[.05] hover:text-gold"><span className="grid h-9 w-9 place-items-center rounded-lg bg-white/[.04] text-gold"><Icon name="services" size={16}/></span><span><strong className="block font-semibold">Assign Service</strong><small className="text-xs text-slate-500">Open service assignment workflow.</small></span></Link>
+        <Link to={p('invoices')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-200 transition hover:bg-white/[.05] hover:text-gold"><span className="grid h-9 w-9 place-items-center rounded-lg bg-white/[.04] text-gold"><Icon name="billing" size={16}/></span><span><strong className="block font-semibold">New Invoice</strong><small className="text-xs text-slate-500">Move directly into billing.</small></span></Link>
       </div>}
-      <button type="button" onClick={()=>setCreateOpen(v=>!v)} className="ml-auto flex h-12 items-center gap-2 rounded-full border border-gold/30 bg-gold px-4 text-sm font-semibold text-navy-950 shadow-2xl shadow-black/30 transition active:scale-[.98]" aria-expanded={createOpen} aria-label="Create new item"><Icon name={createOpen?'close':'plus'} size={17}/><span>{createOpen?'Close':'Create'}</span></button>
+      <button type="button" onClick={()=>setCreateOpen(v=>!v)} className="ml-auto flex h-12 items-center gap-2 rounded-full border border-gold/30 bg-gold px-4 text-sm font-bold text-navy-950 shadow-2xl shadow-black/30 transition active:scale-[.98]" aria-expanded={createOpen} aria-label="Create new item"><Icon name={createOpen?'close':'plus'} size={17}/><span>{createOpen?'Close':'Create'}</span></button>
     </div>
   </div>
 }

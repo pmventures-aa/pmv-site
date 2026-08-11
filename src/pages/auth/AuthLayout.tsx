@@ -1,5 +1,5 @@
 import { CheckCircle2, LockKeyhole, Sparkles } from 'lucide-react'
-import { Crest } from '../../components/ui'
+import { BrandMark3D } from '../../components/ui'
 import { ThemeToggle } from '../../components/ThemeToggle'
 
 interface AuthLayoutProps {
@@ -53,16 +53,16 @@ export function AuthLayout({
         <div className="auth-brand-glow" aria-hidden="true" />
         <div className="auth-brand-orbit auth-brand-orbit-one" aria-hidden="true" />
         <div className="auth-brand-orbit auth-brand-orbit-two" aria-hidden="true" />
-        <div className="relative z-10 flex h-full w-full max-w-xl flex-col justify-between py-12">
-          <a href="https://pinnaclemanagementventures.com" className="inline-flex w-fit items-center gap-3" aria-label="Pinnacle Management Ventures home">
-            <span className="auth-crest-wrap"><Crest size={52} /></span>
+        <div className="relative z-10 flex h-full w-full max-w-xl flex-col justify-between py-10">
+          <a href="https://pinnaclemanagementventures.com" className="inline-flex w-fit items-center gap-4" aria-label="Pinnacle Management Ventures home">
+            <BrandMark3D size={88} decorative className="shrink-0" />
             <span>
-              <span className="block text-[10px] font-bold uppercase tracking-[.2em] text-gold">Pinnacle</span>
-              <span className="mt-1 block text-sm font-semibold tracking-wide text-white">Management Ventures</span>
+              <span className="block text-xs font-bold uppercase tracking-[.2em] text-gold">Pinnacle</span>
+              <span className="mt-1 block text-base font-semibold tracking-wide text-white">Management Ventures</span>
             </span>
           </a>
 
-          <div className="py-12">
+          <div className="py-10">
             <div className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/[.06] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.16em] text-gold">
               <Sparkles size={13} /> {copy.label}
             </div>
@@ -90,7 +90,7 @@ export function AuthLayout({
         <div className="w-full max-w-[520px]">
           <div className="mb-8 lg:hidden">
             <a href="https://pinnaclemanagementventures.com" className="inline-flex items-center gap-3">
-              <span className="auth-crest-wrap"><Crest size={48} /></span>
+              <BrandMark3D size={70} decorative className="shrink-0" />
               <span>
                 <span className="block text-[10px] font-bold uppercase tracking-[.2em] text-gold">Pinnacle</span>
                 <span className="mt-1 block text-sm font-semibold text-white">Management Ventures</span>

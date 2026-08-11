@@ -19,14 +19,11 @@ export function StatusBadge({ children, tone = 'slate' }: { children: React.Reac
 
 const crestClass = 'pmv-crest-adaptive object-contain'
 
-export function Logo({ className = '', showText = true }: { className?: string; showText?: boolean }) {
+export function Logo({ className = '', showText = true, markSize = 62 }: { className?: string; showText?: boolean; markSize?: number }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <span className="relative grid h-11 w-11 place-items-center">
-        <span className="pmv-logo-halo absolute inset-0 rounded-full" aria-hidden="true" />
-        <img src="/logo-crest-transparent.png" alt="Pinnacle Management Ventures crest" className={`relative h-11 w-11 ${crestClass}`} />
-      </span>
-      {showText && <div className="leading-tight"><div className="text-sm font-bold tracking-[.02em] text-white">PINNACLE</div><div className="text-[10px] font-medium uppercase tracking-[0.24em] text-gold">Management Ventures</div></div>}
+      <BrandMark3D size={markSize} decorative className="shrink-0" />
+      {showText && <div className="leading-tight"><div className="text-[15px] font-bold tracking-[.025em] text-white">PINNACLE</div><div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">Management Ventures</div></div>}
     </div>
   )
 }
@@ -40,7 +37,7 @@ export function BrandMark3D({ size = 120, className = '', decorative = false }: 
   return (
     <div className={`relative [perspective:800px] ${className}`} style={{ width: size, height: size }} aria-hidden={decorative || undefined}>
       <div className="pmv-brand-stage absolute inset-[-14%] rounded-full" aria-hidden="true" />
-      <div className="brand-mark-3d relative h-full w-full [transform-style:preserve-3d]">
+      <div className="brand-mark-3d relative h-full w-full [transform-style:preserve-3d] will-change-transform">
         {shadows.map((_, i) => <img key={i} src="/logo-crest-transparent.png" alt="" aria-hidden="true" className="pmv-crest-depth absolute inset-0 h-full w-full object-contain opacity-20" style={{ transform: `translate3d(${7 - i}px, ${7 - i}px, ${-7 + i}px)` }} />)}
         <img src="/logo-crest-transparent.png" alt={decorative ? '' : 'Pinnacle Management Ventures crest'} className={`absolute inset-0 h-full w-full drop-shadow-[0_20px_24px_rgba(0,0,0,.34)] ${crestClass}`} style={{ transform: 'translateZ(8px)' }} />
         <div className="pointer-events-none absolute inset-[5%] rounded-full bg-gradient-to-br from-white/30 via-transparent to-gold/20 opacity-50 mix-blend-screen" aria-hidden="true" />
