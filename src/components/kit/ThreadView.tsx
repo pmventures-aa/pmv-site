@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { CheckCheck, Paperclip, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { toast } from './toast'
@@ -12,6 +13,8 @@ interface ThreadMessage {
   sender_name: string | null
   sender_email: string
   sender_role: string
+  delivery_status?: string
+  read_at?: string | null
 }
 interface Attachment {
   id: string
@@ -32,12 +35,6 @@ function fmtSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-// Shared thread detail (messages + attachments + reply/attach box), used by
-// both the client portal's Messages page and the staff console's Messages
-// page — the two surfaces differ in how they list/start threads (a client
-// always messages "the firm"; staff pick a client), but once a thread is
-// open the read/reply/attach experience is identical, so it isn't
-// duplicated per surface.
 export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: () => void }) {
   const { user } = useAuth()
   const [data, setData] = useState<ThreadDetail | null>(null)
@@ -54,19 +51,14 @@ export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: ()
       const res = await api.get<ThreadDetail>(`/portal/message-threads/${threadId}`)
       setData(res)
     } catch {
-      toast.error('Could not load this conversation.')
+      toast.error('Unable to load this conversation.')
     } finally {
       setLoading(false)
     }
   }, [threadId])
 
-  useEffect(() => {
-    load()
-  }, [load])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [data?.messages.length])
+  useEffect(() => { void load() }, [load])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [data?.messages.length])
 
   function attachmentsFor(messageId: string) {
     return data?.attachments.filter((a) => a.message_id === messageId) ?? []
@@ -78,108 +70,49 @@ export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: ()
     setSending(true)
     try {
       const res = await api.post<{ id: string }>(`/portal/message-threads/${threadId}/messages`, { body: draft.trim() })
-      for (const file of pendingFiles) {
-        await api.upload(`/portal/message-threads/${threadId}/messages/${res.id}/attachments`, file)
-      }
-      setDraft('')
-      setPendingFiles([])
-      await load()
-      onSent?.()
+      for (const file of pendingFiles) await api.upload(`/portal/message-threads/${threadId}/messages/${res.id}/attachments`, file)
+      setDraft(''); setPendingFiles([]); await load(); onSent?.()
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Message could not be sent. Try again.')
-    } finally {
-      setSending(false)
-    }
+      toast.error(err instanceof ApiError ? err.message : 'The message could not be sent. Please try again.')
+    } finally { setSending(false) }
   }
 
-  if (loading) return <p className="p-5 text-sm text-slate-400">Loading…</p>
-  if (!data) return <p className="p-5 text-sm text-slate-400">Couldn't load this conversation.</p>
+  if (loading) return <p className="p-5 text-sm text-slate-400">Loading conversation…</p>
+  if (!data) return <p className="p-5 text-sm text-slate-400">This conversation is currently unavailable.</p>
 
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto p-5">
-        <ul className="space-y-4">
-          {data.messages.map((m) => {
-            const mine = m.sender_user_id === user?.id
-            const files = attachmentsFor(m.id)
-            return (
-              <li key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${mine ? 'bg-gold/20 text-white' : 'bg-white/[0.06] text-slate-200'}`}>
-                  {!mine && <p className="mb-1 text-xs font-semibold text-gold">{m.sender_name || m.sender_email}</p>}
-                  <p className="whitespace-pre-wrap">{m.body}</p>
-                  {files.length > 0 && (
-                    <ul className="mt-2 space-y-1 border-t border-white/10 pt-2">
-                      {files.map((f) => (
-                        <li key={f.id}>
-                          <a
-                            href={`/api/portal/message-attachments/${f.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-1.5 text-xs text-gold hover:underline"
-                          >
-                            📎 {f.file_name} <span className="text-slate-500">({fmtSize(f.size_bytes)})</span>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <p className="mt-1 text-[10px] text-slate-500">{new Date(m.created_at).toLocaleString()}</p>
-                </div>
-              </li>
-            )
-          })}
-          <div ref={bottomRef} />
-        </ul>
-      </div>
-      <form onSubmit={send} className="border-t border-white/10 p-4">
-        {pendingFiles.length > 0 && (
-          <ul className="mb-2 flex flex-wrap gap-2">
-            {pendingFiles.map((f, i) => (
-              <li key={`${f.name}-${i}`} className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200">
-                📎 {f.name}
-                <button
-                  type="button"
-                  onClick={() => setPendingFiles((fs) => fs.filter((_, j) => j !== i))}
-                  className="text-slate-400 hover:text-white"
-                  aria-label={`Remove ${f.name}`}
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex items-center gap-3">
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            multiple
-            onChange={(e) => {
-              const files = Array.from(e.target.files ?? [])
-              setPendingFiles((fs) => [...fs, ...files])
-              e.target.value = ''
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/10 text-slate-300 hover:border-gold/40 hover:text-gold"
-            aria-label="Attach file"
-          >
-            📎
-          </button>
-          <input
-            className="min-w-0 flex-1 rounded-md border border-white/10 bg-navy-900 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-gold/50 focus:outline-none"
-            placeholder="Type a message…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <button type="submit" disabled={sending || !draft.trim()} className="btn-gold shrink-0 disabled:opacity-60">
-            Send
-          </button>
-        </div>
-      </form>
+  return <div className="flex h-full flex-col">
+    <div className="border-b border-white/10 px-5 py-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Secure conversation</p>
+      <h2 className="mt-1 text-base font-semibold text-white">{data.thread.subject}</h2>
     </div>
-  )
+    <div className="flex-1 overflow-y-auto p-5">
+      <ul className="space-y-4">
+        {data.messages.map((m) => {
+          const mine = m.sender_user_id === user?.id
+          const files = attachmentsFor(m.id)
+          return <li key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${mine ? 'bg-gold/15 text-white ring-1 ring-gold/20' : 'bg-white/[0.06] text-slate-200 ring-1 ring-white/5'}`}>
+              {!mine && <p className="mb-1 text-xs font-semibold text-gold">{m.sender_name || m.sender_email}</p>}
+              <p className="whitespace-pre-wrap leading-6">{m.body}</p>
+              {files.length > 0 && <ul className="mt-3 space-y-1 border-t border-white/10 pt-2">{files.map((f) => <li key={f.id}><a href={`/api/portal/message-attachments/${f.id}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-gold hover:underline"><Paperclip size={13} /> {f.file_name} <span className="text-slate-500">({fmtSize(f.size_bytes)})</span></a></li>)}</ul>}
+              <div className="mt-2 flex items-center justify-end gap-2 text-[10px] text-slate-500">
+                <span>{new Date(m.created_at).toLocaleString()}</span>
+                {mine && <span className={`inline-flex items-center gap-1 ${m.read_at ? 'text-emerald-300' : 'text-slate-400'}`} title={m.read_at ? `Read ${new Date(m.read_at).toLocaleString()}` : 'Delivered'}><CheckCheck size={13} />{m.read_at ? 'Read' : 'Delivered'}</span>}
+              </div>
+            </div>
+          </li>
+        })}
+        <div ref={bottomRef} />
+      </ul>
+    </div>
+    <form onSubmit={send} className="border-t border-white/10 bg-navy-950/40 p-4">
+      {pendingFiles.length > 0 && <ul className="mb-3 flex flex-wrap gap-2">{pendingFiles.map((f, i) => <li key={`${f.name}-${i}`} className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200"><Paperclip size={12} /> {f.name}<button type="button" onClick={() => setPendingFiles((fs) => fs.filter((_, j) => j !== i))} className="text-slate-400 hover:text-white" aria-label={`Remove ${f.name}`}><X size={12} /></button></li>)}</ul>}
+      <div className="flex items-end gap-3">
+        <input type="file" ref={fileInputRef} className="hidden" multiple onChange={(e) => { const files = Array.from(e.target.files ?? []); setPendingFiles((fs) => [...fs, ...files]); e.target.value = '' }} />
+        <button type="button" onClick={() => fileInputRef.current?.click()} className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-white/10 text-slate-300 hover:border-gold/40 hover:text-gold" aria-label="Attach files"><Paperclip size={17} /></button>
+        <textarea className="min-h-[42px] max-h-32 min-w-0 flex-1 resize-y rounded-md border border-white/10 bg-navy-900 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-gold/50 focus:outline-none" placeholder="Write a secure message…" value={draft} onChange={(e) => setDraft(e.target.value)} />
+        <button type="submit" disabled={sending || !draft.trim()} className="btn-gold shrink-0 disabled:opacity-60">{sending ? 'Sending…' : 'Send'}</button>
+      </div>
+    </form>
+  </div>
 }
