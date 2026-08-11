@@ -172,7 +172,7 @@ function CreateForm({
 }
 
 // Entity keys the backend's generic archive routes recognize
-// (functions/_lib/routes/deletion.ts ARCHIVABLE map) — only sections for
+// (functions/_lib/routes/deletion.ts ARCHIVABLE map): only sections for
 // one of these get an Archive action.
 type ArchiveEntity = 'matters' | 'tasks' | 'invoices' | 'documents' | 'tickets'
 
@@ -260,7 +260,7 @@ function Section({
                 <tr key={r.id ?? i} className="border-t border-white/5">
                   {columns.map((c) => (
                     <td key={c.key} className="whitespace-nowrap px-5 py-2.5 text-slate-200">
-                      {c.render ? c.render(r) : String(r[c.key] ?? '—')}
+                      {c.render ? c.render(r) : String(r[c.key] ?? 'Not provided')}
                     </td>
                   ))}
                   {statusKey && onStatusChange && (
@@ -402,7 +402,7 @@ function RevealPaymentMethodDialog({
       <DialogTrigger asChild>
         <button className="text-xs font-medium text-gold hover:underline">Reveal (admin only)</button>
       </DialogTrigger>
-      <DialogContent title="Banking details" description={`${method.account_holder_name} — this view is logged for audit`}>
+      <DialogContent title="Banking details" description={`${method.account_holder_name}: this view is logged for audit`}>
         {busy ? (
           <p className="text-sm text-slate-400">Decrypting…</p>
         ) : data ? (
@@ -450,7 +450,7 @@ function PaymentMethods({ clientId, methods, onRevealed }: { clientId: string; m
   )
 }
 
-// Shared list + add-note form — used both inline (profile notes) and inside
+// Shared list + add-note form: used both inline (profile notes) and inside
 // a Dialog (matter notes). Staff-only, never exposed to the client API.
 function NoteThread({
   notes,
@@ -539,7 +539,7 @@ function ProfileNotes({ clientId, notes, onChanged }: { clientId: string; notes:
   return (
     <Panel className="mb-5">
       <h3 className="mb-3 text-sm font-semibold text-white">Internal Notes</h3>
-      <p className="mb-3 text-xs text-slate-500">Staff-only — never visible to the client. Anyone on the team can add to this thread.</p>
+      <p className="mb-3 text-xs text-slate-500">Staff-only: never visible to the client. Anyone on the team can add to this thread.</p>
       <NoteThread notes={notes} onAdd={addNote} busy={busy} onArchive={archiveNote} />
     </Panel>
   )
@@ -588,7 +588,7 @@ function MatterNotesDialog({ clientId, matterId, title }: { clientId: string; ma
       <DialogTrigger asChild>
         <button className="text-xs font-medium text-gold hover:underline">Notes</button>
       </DialogTrigger>
-      <DialogContent title={`Notes — ${title}`} description="Staff-only, never visible to the client.">
+      <DialogContent title={`Notes: ${title}`} description="Staff-only, never visible to the client.">
         {loading ? <p className="text-sm text-slate-400">Loading…</p> : <NoteThread notes={notes} onAdd={addNote} busy={busy} onArchive={archiveNote} />}
       </DialogContent>
     </Dialog>
@@ -859,7 +859,7 @@ export default function ClientDetail() {
   }, [])
 
   const staffOptions = [{ value: '', label: 'Unassigned' }, ...staff.map((s) => ({ value: s.id, label: s.full_name || s.email }))]
-  const staffName = (staffId: string | null | undefined) => staff.find((s) => s.id === staffId)?.full_name || staff.find((s) => s.id === staffId)?.email || '—'
+  const staffName = (staffId: string | null | undefined) => staff.find((s) => s.id === staffId)?.full_name || staff.find((s) => s.id === staffId)?.email || 'Not provided'
 
   const load = useCallback(async () => {
     if (!id) return
@@ -1051,7 +1051,7 @@ export default function ClientDetail() {
           statusOptionsKey="funding"
           rows={data.funding}
           columns={[
-            { key: 'amount_requested_cents', label: 'Amount', render: (r) => (r.amount_requested_cents ? `$${(r.amount_requested_cents / 100).toLocaleString()}` : '—') },
+            { key: 'amount_requested_cents', label: 'Amount', render: (r) => (r.amount_requested_cents ? `$${(r.amount_requested_cents / 100).toLocaleString()}` : 'Not provided') },
           ]}
           statusKey="status"
           onStatusChange={(itemId, status) => setStatus('funding', itemId, status)}

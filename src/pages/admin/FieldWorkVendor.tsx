@@ -78,7 +78,7 @@ function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: 
 
 function siteLine(a: Assignment): string {
   const address = [a.site_address, a.site_city, a.site_state, a.site_postal_code].filter(Boolean).join(', ')
-  return a.site_label && address ? `${a.site_label} — ${address}` : (a.site_label || address || '—')
+  return a.site_label && address ? `${a.site_label}: ${address}` : (a.site_label || address || 'Not provided')
 }
 
 function statusTone(status: string): { tone: 'gold' | 'blue' | 'green' | 'slate'; label: string } {
@@ -106,7 +106,7 @@ async function getPosition(): Promise<GeolocationPosition | null> {
 }
 
 // -------------------------------------------------------------
-// List page — vendor's queue of active field / RON assignments.
+// List page: vendor's queue of active field / RON assignments.
 // -------------------------------------------------------------
 
 export function FieldWorkList() {
@@ -177,7 +177,7 @@ export function FieldWorkList() {
                     </div>
                     <p className="mt-2 truncate text-sm font-semibold text-white">{assignment.title || assignment.service_key.replace(/_/g, ' ')}</p>
                     <p className="mt-1 truncate text-xs text-slate-400">{siteLine(assignment)}</p>
-                    <p className="mt-1 text-xs text-slate-500">Client: {assignment.client_name || assignment.client_email || '—'}</p>
+                    <p className="mt-1 text-xs text-slate-500">Client: {assignment.client_name || assignment.client_email || 'Not provided'}</p>
                   </div>
                 </div>
               </button>
@@ -190,7 +190,7 @@ export function FieldWorkList() {
 }
 
 // -------------------------------------------------------------
-// Detail page — the whole depart/arrive/document/sign flow.
+// Detail page: the whole depart/arrive/document/sign flow.
 // -------------------------------------------------------------
 
 export default function FieldWorkDetail() {
@@ -445,7 +445,7 @@ export default function FieldWorkDetail() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{isRon ? '1' : '2'}. Documents handled</p>
-                <p className="mt-1 text-xs text-slate-500">Record every document — signers, witness role, oath, stamps. Add each one as you complete it.</p>
+                <p className="mt-1 text-xs text-slate-500">Record every document: signers, witness role, oath, stamps. Add each one as you complete it.</p>
               </div>
               {!done && (
                 <button type="button" onClick={() => setAddingDoc((v) => !v)} className={btnOutline}>
@@ -592,7 +592,7 @@ export default function FieldWorkDetail() {
         <div className="space-y-4">
           <Panel>
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Client</p>
-            <p className="mt-1 text-sm font-medium text-white">{assignment.client_name || '—'}</p>
+            <p className="mt-1 text-sm font-medium text-white">{assignment.client_name || 'Not provided'}</p>
             <p className="text-xs text-slate-500">{assignment.client_email}</p>
           </Panel>
           <Panel>

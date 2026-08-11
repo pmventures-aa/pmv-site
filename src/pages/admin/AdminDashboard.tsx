@@ -54,12 +54,12 @@ export default function AdminDashboard(){
         <div className="hidden gap-3 text-xs text-slate-500 sm:flex"><Link to={p('clients')} className="hover:text-gold">Clients</Link><Link to={p('pipelines')} className="hover:text-gold">Pipeline</Link><Link to={p('reports')} className="hover:text-gold">Reports</Link></div>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <StatLink label="Clients" value={stats?.clients??'—'} to={p('clients')}/>
-        <StatLink label="Open Tickets" value={stats?.open_tickets??'—'} to={p('open-items/tickets')}/>
-        <StatLink label="Open Matters" value={stats?.open_matters??'—'} to={p('open-items/matters')}/>
-        <StatLink label="Pending Tasks" value={stats?.pending_tasks??'—'} to={p('open-items/tasks')}/>
-        <StatLink label="Calls Pending" value={stats?.pending_calls??'—'} to={p('open-items/calls')}/>
-        <StatLink label="Open Invoices" value={stats?.open_invoices??'—'} to={p('invoices')}/>
+        <StatLink label="Clients" value={stats?.clients??'Not provided'} to={p('clients')}/>
+        <StatLink label="Open Tickets" value={stats?.open_tickets??'Not provided'} to={p('open-items/tickets')}/>
+        <StatLink label="Open Matters" value={stats?.open_matters??'Not provided'} to={p('open-items/matters')}/>
+        <StatLink label="Pending Tasks" value={stats?.pending_tasks??'Not provided'} to={p('open-items/tasks')}/>
+        <StatLink label="Calls Pending" value={stats?.pending_calls??'Not provided'} to={p('open-items/calls')}/>
+        <StatLink label="Open Invoices" value={stats?.open_invoices??'Not provided'} to={p('invoices')}/>
       </div>
     </section>
 

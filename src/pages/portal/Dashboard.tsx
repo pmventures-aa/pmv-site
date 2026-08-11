@@ -31,10 +31,10 @@ export default function Dashboard() {
   }, [])
 
   const pulse = [
-    ['Active projects & matters', data?.stats.open_matters ?? '—', p('matters'), 'Work currently in progress'],
-    ['Open tasks', data?.stats.open_tasks ?? '—', p('tasks'), 'Items that still need action'],
-    ['Documents pending', data?.stats.pending_documents ?? '—', p('documents'), 'Uploads, review, or signatures'],
-    ['Open invoices', data?.stats.open_invoices ?? '—', p('billing'), 'Billing items not yet closed'],
+    ['Active projects & matters', data?.stats.open_matters ?? 'Not provided', p('matters'), 'Work currently in progress'],
+    ['Open tasks', data?.stats.open_tasks ?? 'Not provided', p('tasks'), 'Items that still need action'],
+    ['Documents pending', data?.stats.pending_documents ?? 'Not provided', p('documents'), 'Uploads, review, or signatures'],
+    ['Open invoices', data?.stats.open_invoices ?? 'Not provided', p('billing'), 'Billing items not yet closed'],
   ] as const
 
   const nextAction = useMemo(() => {

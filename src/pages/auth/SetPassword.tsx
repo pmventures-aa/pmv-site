@@ -60,7 +60,7 @@ export default function SetPassword({ surface }: { surface: 'client' | 'staff' }
       subtitle="Choose a password for your Pinnacle account. This link can only be used once."
     >
       {done ? (
-        <p className="text-sm text-emerald-300">Password set — signing you in…</p>
+        <p className="text-sm text-emerald-300">Password set: signing you in…</p>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
           <ErrorBanner message={error} />

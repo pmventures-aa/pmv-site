@@ -6,6 +6,8 @@ import { BasePathProvider, useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
 import Login from '../auth/Login'
 import Signup from '../auth/Signup'
+import ForgotPassword from '../auth/ForgotPassword'
+import ResetPassword from '../auth/ResetPassword'
 import SetPassword from '../auth/SetPassword'
 import TrustedInvite from '../auth/TrustedInvite'
 import OnboardingWizard from './OnboardingWizard'
@@ -45,6 +47,8 @@ export default function PortalApp({ basePath }: { basePath: string }) {
       <Routes>
         <Route path="login" element={<Login surface="client" />} />
         <Route path="signup" element={<Signup />} />
+        <Route path="forgot-password" element={<ForgotPassword surface="client" />} />
+        <Route path="reset-password" element={<ResetPassword surface="client" />} />
         <Route path="set-password" element={<SetPassword surface="client" />} />
         <Route path="trusted-invite/:token" element={<TrustedInvite />} />
 
@@ -74,8 +78,6 @@ export default function PortalApp({ basePath }: { basePath: string }) {
             <Route path="trusted-contacts" element={<TrustedContacts />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="security" element={<Security />} />
-
-            {/* Old slugs — redirect so existing bookmarks/links keep working. */}
             <Route path="calls" element={<Navigate to="../planned-calls" replace />} />
             <Route path="property" element={<Navigate to="../property-management" replace />} />
             <Route path="tax" element={<Navigate to="../tax-filings" replace />} />

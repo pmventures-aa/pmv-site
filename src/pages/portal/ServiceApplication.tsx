@@ -435,7 +435,7 @@ export default function ServiceApplication() {
     if (page?.type === 'banking' && !skipBanking) {
       const started = banking.account_holder_name || banking.routing_number || banking.account_number || banking.bank_name
       if (started && (!banking.account_holder_name || !banking.routing_number || !banking.account_number)) {
-        return 'Complete the account holder, routing number, and account number — or choose “Provide later.”'
+        return 'Complete the account holder, routing number, and account number: or choose “Provide later.”'
       }
       if (banking.routing_number && !/^\d{9}$/.test(banking.routing_number)) return 'Routing number must be 9 digits.'
     }
@@ -613,7 +613,7 @@ export default function ServiceApplication() {
                   </div>
                   {application.submission_source === 'staff_assigned' && (
                     <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-xs font-medium text-sky-300">
-                      Started for you by your Pinnacle team — review and sign to submit
+                      Started for you by your Pinnacle team: review and sign to submit
                     </div>
                   )}
                 </div>

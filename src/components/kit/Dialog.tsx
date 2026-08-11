@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
 
 // Shared Dialog primitive (Radix under the hood, for correct focus-trap /
-// Escape / click-outside behavior) — used by the public site, client
+// Escape / click-outside behavior): used by the public site, client
 // portal, and staff console alike, so it's deliberately self-styled here
 // rather than pulling in any single surface's design tokens.
 export const Dialog = RadixDialog.Root

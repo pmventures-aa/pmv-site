@@ -1,6 +1,6 @@
 import type { ModuleConfig } from './ModulePage'
 
-const dt = (v: string) => (v ? new Date(v).toLocaleDateString() : '—')
+const dt = (v: string) => (v ? new Date(v).toLocaleDateString() : 'Not provided')
 
 export const callsConfig: ModuleConfig = {
   title: 'Planned Calls',
@@ -30,8 +30,8 @@ export const mattersConfig: ModuleConfig = {
   emptyLabel: 'No matters yet.',
   columns: [
     { key: 'title', label: 'Title' },
-    { key: 'type', label: 'Type', render: (r) => r.type ?? '—' },
-    { key: 'due_date', label: 'Due', render: (r) => (r.due_date ? dt(r.due_date) : '—') },
+    { key: 'type', label: 'Type', render: (r) => r.type ?? 'Not provided' },
+    { key: 'due_date', label: 'Due', render: (r) => (r.due_date ? dt(r.due_date) : 'Not provided') },
     { key: 'created_at', label: 'Opened', render: (r) => dt(r.created_at) },
   ],
   statusField: 'status',
@@ -52,7 +52,7 @@ export const tasksConfig: ModuleConfig = {
   ],
   columns: [
     { key: 'title', label: 'Task' },
-    { key: 'due_date', label: 'Due', render: (r) => (r.due_date ? dt(r.due_date) : '—') },
+    { key: 'due_date', label: 'Due', render: (r) => (r.due_date ? dt(r.due_date) : 'Not provided') },
   ],
   statusField: 'status',
   statusOptions: ['pending', 'in_progress', 'done'],
@@ -97,7 +97,7 @@ export const fundingConfig: ModuleConfig = {
     use_of_funds: form.use_of_funds,
   }),
   columns: [
-    { key: 'amount_requested_cents', label: 'Amount', render: (r) => (r.amount_requested_cents ? `$${(r.amount_requested_cents / 100).toLocaleString()}` : '—') },
+    { key: 'amount_requested_cents', label: 'Amount', render: (r) => (r.amount_requested_cents ? `$${(r.amount_requested_cents / 100).toLocaleString()}` : 'Not provided') },
     { key: 'use_of_funds', label: 'Use of funds', render: (r) => <span className="line-clamp-1 max-w-xs">{r.use_of_funds}</span> },
     { key: 'created_at', label: 'Submitted', render: (r) => dt(r.created_at) },
   ],
@@ -120,7 +120,7 @@ export const propertyConfig: ModuleConfig = {
   ],
   columns: [
     { key: 'address', label: 'Address' },
-    { key: 'property_type', label: 'Type', render: (r) => r.property_type ?? '—' },
+    { key: 'property_type', label: 'Type', render: (r) => r.property_type ?? 'Not provided' },
   ],
   statusField: 'status',
   statusOptions: ['active', 'under_contract', 'sold', 'inactive'],
@@ -141,8 +141,8 @@ export const taxConfig: ModuleConfig = {
   ],
   columns: [
     { key: 'tax_year', label: 'Year' },
-    { key: 'filing_type', label: 'Type', render: (r) => r.filing_type ?? '—' },
-    { key: 'due_date', label: 'Due', render: (r) => (r.due_date ? dt(r.due_date) : '—') },
+    { key: 'filing_type', label: 'Type', render: (r) => r.filing_type ?? 'Not provided' },
+    { key: 'due_date', label: 'Due', render: (r) => (r.due_date ? dt(r.due_date) : 'Not provided') },
   ],
   statusField: 'status',
   statusOptions: ['not_started', 'in_progress', 'filed', 'extended'],

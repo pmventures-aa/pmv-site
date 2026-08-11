@@ -98,7 +98,7 @@ export default function ClientsList() {
                     </Link>
                     <p className="text-xs text-slate-500">{c.email}</p>
                   </td>
-                  <td className="px-5 py-3 text-slate-200">{c.business_name ?? '—'}</td>
+                  <td className="px-5 py-3 text-slate-200">{c.business_name ?? 'Not provided'}</td>
                   <td className="px-5 py-3">
                     <Tag tone={c.onboarding_completed ? 'green' : 'gold'}>
                       {c.onboarding_completed ? 'Complete' : 'Pending'}

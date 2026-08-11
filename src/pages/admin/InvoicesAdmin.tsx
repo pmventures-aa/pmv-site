@@ -410,7 +410,7 @@ export default function InvoicesAdmin() {
                   <option value="">Choose client</option>
                   {clients.map((client) => (
                     <option key={client.id} value={client.id}>
-                      {client.business_name ? `${client.business_name} — ` : ''}{client.full_name || client.email}
+                      {client.business_name ? `${client.business_name}: ` : ''}{client.full_name || client.email}
                     </option>
                   ))}
                 </select>
@@ -628,7 +628,7 @@ export default function InvoicesAdmin() {
                   <tr key={row.id} className="border-b border-white/5 transition hover:bg-white/[.025]">
                     <td className="px-5 py-3"><p className="font-medium text-white">{row.invoice_number || row.id.slice(0, 8)}</p><p className="text-xs text-slate-500">{row.title || 'Invoice'} · {row.line_item_count} line{Number(row.line_item_count) === 1 ? '' : 's'}</p></td>
                     <td className="px-5 py-3"><p className="text-slate-200">{row.business_name || row.client_name || row.client_email}</p><p className="text-xs text-slate-500">{row.client_email}</p></td>
-                    <td className="px-5 py-3 text-slate-300">{row.due_date ? new Date(`${row.due_date}T12:00:00`).toLocaleDateString() : '—'}</td>
+                    <td className="px-5 py-3 text-slate-300">{row.due_date ? new Date(`${row.due_date}T12:00:00`).toLocaleDateString() : 'Not provided'}</td>
                     <td className="px-5 py-3 font-medium text-white">{dollars(row.amount_cents)}</td>
                     <td className="px-5 py-3"><Tag tone={row.status === 'paid' ? 'green' : row.status === 'void' ? 'slate' : 'gold'}>{row.status}</Tag></td>
                     <td className="px-5 py-3 text-xs text-slate-400">{row.sent_at ? 'Sent' : 'Not sent'}</td>

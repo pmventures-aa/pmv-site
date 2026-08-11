@@ -45,7 +45,7 @@ export default function BusinessProfile() {
 
   return (
     <div>
-      <PageHeader eyebrow="Your business" title="Business Profile" subtitle="Kept on file for every service you enroll in — update anytime." />
+      <PageHeader eyebrow="Your business" title="Business Profile" subtitle="Kept on file for every service you enroll in: update anytime." />
       <Card className="max-w-2xl">
         {loading ? (
           <p className="text-sm text-slate-400">Loading…</p>
@@ -91,7 +91,7 @@ export default function BusinessProfile() {
           </form>
         )}
         {!loading && !loadError && !profile && (
-          <p className="mt-4 text-xs text-slate-500">No business profile on file yet — fill in what you can above.</p>
+          <p className="mt-4 text-xs text-slate-500">No business profile on file yet: fill in what you can above.</p>
         )}
       </Card>
     </div>

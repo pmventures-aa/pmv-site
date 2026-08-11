@@ -16,7 +16,7 @@ type DocDetail={document:WorkspaceDoc;versions:any[];shares:any[]}
 type UploadResponse={id:string;error?:string;version_number?:number}
 
 const today=(offset=0)=>new Date(Date.now()+offset*86400000).toISOString().slice(0,10)
-const size=(bytes:number|null)=>!bytes?'—':bytes<1048576?`${Math.max(1,Math.round(bytes/1024))} KB`:`${(bytes/1048576).toFixed(1)} MB`
+const size=(bytes:number|null)=>!bytes?'Not provided':bytes<1048576?`${Math.max(1,Math.round(bytes/1024))} KB`:`${(bytes/1048576).toFixed(1)} MB`
 
 export default function DocumentCenter(){
   const p=useAppPath()

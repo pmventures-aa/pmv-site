@@ -5,43 +5,45 @@ export function Footer() {
   return (
     <footer className="border-t border-white/[.07] bg-navy-950">
       <div className="container-pmv py-12">
-        <div className="grid gap-10 lg:grid-cols-[1.35fr_.8fr_.9fr_1fr]">
+        <div className="grid gap-10 lg:grid-cols-[1.25fr_.75fr_.8fr_1fr]">
           <div>
             <Logo />
-            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Professional support for business operations, property work, projects, transitions, and defined mobile services.</p>
-            <p className="mt-4 text-xs text-slate-500">South Florida based. Remote and project support available nationwide where appropriate.</p>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Hands-on professional support for business operations, projects, transitions, property and field needs, and defined mobile services.</p>
+            <p className="mt-4 text-xs leading-5 text-slate-500">South Florida based. Remote consulting and project support are available nationwide when appropriate for the engagement.</p>
           </div>
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[.14em] text-gold">Services</p>
-            <ul className="space-y-2.5 text-sm text-slate-400">
-              <li><Link to="/services/business-operations" className="hover:text-gold">Business & Operations</Link></li>
-              <li><Link to="/services/property-field" className="hover:text-gold">Property & Field</Link></li>
-              <li><Link to="/services/mobile-documents" className="hover:text-gold">Documents & Mobile</Link></li>
+            <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Services</p>
+            <ul className="space-y-2.5 text-sm font-medium text-slate-400">
+              <li><Link to="/services/business-operations" className="hover:text-gold">Business &amp; Operations</Link></li>
+              <li><Link to="/services/property-field" className="hover:text-gold">Property &amp; Field</Link></li>
+              <li><Link to="/services/mobile-documents" className="hover:text-gold">Documents &amp; Mobile</Link></li>
               <li><Link to="/services" className="hover:text-gold">All Services</Link></li>
             </ul>
           </div>
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[.14em] text-gold">Company</p>
-            <ul className="space-y-2.5 text-sm text-slate-400">
-              <li><Link to="/about" className="hover:text-gold">About</Link></li>
+            <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Company</p>
+            <ul className="space-y-2.5 text-sm font-medium text-slate-400">
+              <li><Link to="/about" className="hover:text-gold">About Pinnacle</Link></li>
               <li><Link to="/professionals" className="hover:text-gold">Professional Network</Link></li>
               <li><Link to="/service-area" className="hover:text-gold">Service Area</Link></li>
               <li><Link to="/contact" className="hover:text-gold">Contact</Link></li>
-              <li><Link to="/terms" className="hover:text-gold">Terms of Service</Link></li>
             </ul>
           </div>
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[.14em] text-gold">Contact</p>
+            <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Contact</p>
             <ul className="space-y-2.5 text-sm text-slate-400">
-              <li><a href="mailto:support@pinnaclemanagementventures.com" className="break-all hover:text-gold">support@pinnaclemanagementventures.com</a></li>
-              <li><a href="tel:+15613887879" className="hover:text-gold">(561) 388-7879</a></li>
-              <li><Link to="/contact" className="font-medium text-gold hover:underline">Start a conversation →</Link></li>
+              <li><a href="mailto:support@pinnaclemanagementventures.com" className="break-all font-medium hover:text-gold">support@pinnaclemanagementventures.com</a></li>
+              <li><a href="tel:+15613887879" className="font-medium hover:text-gold">(561) 388-7879</a></li>
+              <li><Link to="/contact" className="font-bold text-gold hover:text-gold-300">Start a Conversation →</Link></li>
             </ul>
           </div>
         </div>
         <div className="mt-10 border-t border-white/[.07] pt-6">
-          <div className="flex flex-col items-start justify-between gap-3 text-xs text-slate-500 md:flex-row md:items-center"><span>&copy; {new Date().getFullYear()} Pinnacle Management Ventures. All rights reserved.</span></div>
-          <p className="mt-4 max-w-4xl text-xs leading-relaxed text-slate-500">Notarial acts are performed only by a commissioned Florida notary. Pinnacle Management Ventures is not a law firm and does not provide legal advice, legal document preparation, licensed real estate brokerage, or contracting services unless the applicable credentials are specifically confirmed.</p>
+          <div className="flex flex-col gap-4 text-xs text-slate-500 lg:flex-row lg:items-center lg:justify-between">
+            <span>&copy; {new Date().getFullYear()} Pinnacle Management Ventures. All rights reserved.</span>
+            <nav className="flex flex-wrap gap-x-5 gap-y-2 font-semibold"><Link to="/terms" className="hover:text-gold">Terms</Link><Link to="/privacy" className="hover:text-gold">Privacy</Link><Link to="/electronic-communications" className="hover:text-gold">Electronic Records</Link><Link to="/accessibility" className="hover:text-gold">Accessibility</Link></nav>
+          </div>
+          <p className="mt-4 max-w-5xl text-xs leading-6 text-slate-500">Pinnacle Management Ventures is a professional services and coordination company. We are not automatically acting as a law firm, lender, tax or accounting firm, real estate broker, contractor, engineer, or licensed property manager because an engagement touches one of those areas. Regulated or licensed work is performed only when the applicable qualified provider and scope are specifically identified. Notarial acts are performed only by a duly commissioned notary acting within the notary’s authorized scope.</p>
         </div>
       </div>
     </footer>

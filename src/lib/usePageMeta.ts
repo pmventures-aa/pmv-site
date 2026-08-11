@@ -2,13 +2,11 @@ import { useEffect } from 'react'
 
 const SITE_NAME = 'Pinnacle Management Ventures'
 const DEFAULT_DESCRIPTION =
-  'Pinnacle Management Ventures — professional support wherever business takes you. Consulting, funding & capital, property management, mobile notary, property inspections, document courier, and administrative support.'
+  'Pinnacle Management Ventures provides business consulting, operational coordination, POS and payment transition support, property and field support, and defined mobile professional services.'
 
-// index.html only sets one static <title>/<meta description> for the whole
-// app — this is the per-route equivalent, without pulling in
-// react-helmet-async (no other data-fetching/routing-adjacent libraries are
-// used in this codebase; see src/lib/api.ts). Restores the site defaults on
-// unmount so navigating between public pages never leaves a stale title.
+// index.html sets the initial title and description. Public routes use this
+// lightweight helper to keep metadata accurate as visitors move through the
+// client-side application, then restore the previous values on unmount.
 export function usePageMeta(title: string, description = DEFAULT_DESCRIPTION) {
   useEffect(() => {
     const prevTitle = document.title

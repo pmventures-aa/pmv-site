@@ -89,7 +89,7 @@ export function isSecurityKind(kind: string): boolean {
   return categorizeActivity(kind) === 'security'
 }
 
-function fmtStatus(s?: string): string { return s ? s.replace(/_/g, ' ') : '—' }
+function fmtStatus(s?: string): string { return s ? s.replace(/_/g, ' ') : 'Not provided' }
 function money(cents?: number | null): string { return typeof cents === 'number' ? `$${(cents / 100).toLocaleString()}` : 'an amount' }
 
 export function describeActivity(e: ActivityEvent): string {
@@ -108,7 +108,7 @@ export function describeActivity(e: ActivityEvent): string {
     case 'comms_message_sent': return `${actor} sent “${d.subject || 'a communication'}” to ${d.recipients ?? 'selected'} recipient${d.recipients === 1 ? '' : 's'}`
     case 'client_signed_up': return `${client} signed up${d.business_name ? ` (${d.business_name})` : ''}`
     case 'user_created': return `${actor} created a${d.role === 'admin' ? 'n' : ''} ${d.role} account for ${d.full_name || d.email}`
-    case 'user_status_changed': return `${actor} updated ${d.name || 'a user'} — ${d.to?.status ?? ''} · ${d.to?.role ?? ''}`.trim()
+    case 'user_status_changed': return `${actor} updated ${d.name || 'a user'}: ${d.to?.status ?? ''} · ${d.to?.role ?? ''}`.trim()
     case 'account_welcome_sent': return `Welcome email sent to ${d.email || client}`
     case 'account_invite_sent': return `Account setup invitation sent to ${d.email || client}`
     case 'portal_reminder_sent': return `Portal access reminder sent to ${d.email || client}`
@@ -122,7 +122,7 @@ export function describeActivity(e: ActivityEvent): string {
     case 'task_status_changed': return `${actor} marked “${d.title}” (${client}) as ${fmtStatus(d.to)}`
     case 'ticket_created': return `${actor} opened ticket “${d.subject}” for ${client}`
     case 'ticket_status_changed': return `${actor} set ticket “${d.subject}” (${client}) to ${fmtStatus(d.to)}`
-    case 'call_created': return `${actor} requested a call — “${d.topic}” for ${client}`
+    case 'call_created': return `${actor} requested a call: “${d.topic}” for ${client}`
     case 'call_status_changed': return `${actor} set call “${d.topic}” (${client}) to ${fmtStatus(d.to)}`
     case 'appointment_created': return `${actor} scheduled “${d.title}” for ${client}`
     case 'appointment_status_changed': return `${actor} set appointment “${d.title}” (${client}) to ${fmtStatus(d.to)}`
@@ -130,7 +130,7 @@ export function describeActivity(e: ActivityEvent): string {
     case 'invoice_sent': return `${actor} sent ${d.invoice_number || 'an invoice'} to ${d.recipients ?? 1} recipient${d.recipients === 1 ? '' : 's'} for ${client}`
     case 'invoice_status_changed': return `${actor} marked ${client}’s invoice as ${fmtStatus(d.to)}`
     case 'invoice_reminder_sent': return `${actor} sent a payment reminder to ${client}${d.invoice_number ? ` for ${d.invoice_number}` : ''}`
-    case 'service_assigned_by_staff': return `${actor} assigned ${d.service_name || fmtStatus(d.service_key)} to ${client} — awaiting their signature`
+    case 'service_assigned_by_staff': return `${actor} assigned ${d.service_name || fmtStatus(d.service_key)} to ${client}: awaiting their signature`
     case 'funding_created': return `${actor} opened a funding application for ${client}`
     case 'funding_status_changed': return `${actor} set ${client}’s funding application to ${fmtStatus(d.to)}`
     case 'property_created': return `${actor} added property “${d.address}” for ${client}`
@@ -144,7 +144,7 @@ export function describeActivity(e: ActivityEvent): string {
     case 'password_reset': return `${actor} reset the password for ${d.email || 'a user'}`
     case 'permission_changed': return `${actor} changed permissions${d.target_name ? ` for ${d.target_name}` : ''}`
     case 'field_assignment_created': return `${actor} created a field assignment for ${client}${d.kind_value === 'ron' ? ' (RON)' : ''}`
-    case 'field_assignment_completed': return `${actor} completed a field assignment for ${client}${typeof d.documents === 'number' ? ` — ${d.documents} document${d.documents === 1 ? '' : 's'}` : ''}`
+    case 'field_assignment_completed': return `${actor} completed a field assignment for ${client}${typeof d.documents === 'number' ? `: ${d.documents} document${d.documents === 1 ? '' : 's'}` : ''}`
     case 'service_application_assigned': return `${actor} started ${client}’s ${d.service_name || fmtStatus(d.service_key)} application${typeof d.prefilled_answers === 'number' ? ` · ${d.prefilled_answers} answers prefilled` : ''}`
     case 'service_application_prefilled': return `${actor} updated a service application draft for ${client}`
     case 'service_application_signed': return `${client} electronically signed a service application`
@@ -154,9 +154,9 @@ export function describeActivity(e: ActivityEvent): string {
     case 'staff_profile_updated': return `${actor} updated ${d.name || 'a staff member'}’s role to ${fmtStatus(d.staff_role)}`
     case 'client_profile_updated': return `${actor} updated ${client}’s profile`
     case 'bulk_assignment_created': return `${actor} assigned ${d.client_count ?? 'several'} client${d.client_count === 1 ? '' : 's'} to a staff member`
-    case 'message_received': return `${client} sent a message — “${d.subject}”`
-    case 'message_sent': return `${actor} sent a message to ${client} — “${d.subject}”`
-    case 'message_attachment_added': return `${actor} attached “${d.file_name}” to a message${d.subject ? ` — “${d.subject}”` : ''}`
+    case 'message_received': return `${client} sent a message: “${d.subject}”`
+    case 'message_sent': return `${actor} sent a message to ${client}: “${d.subject}”`
+    case 'message_attachment_added': return `${actor} attached “${d.file_name}” to a message${d.subject ? `: “${d.subject}”` : ''}`
     default: return fmtStatus(e.kind)
   }
 }

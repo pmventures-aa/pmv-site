@@ -1,95 +1,33 @@
-import { Header } from '../../components/public/Header'
-import { Footer } from '../../components/public/Footer'
-import { panelCls } from '../../components/public/ui'
+import { LegalPage, P, Strong, UL, type LegalSection } from '../../components/public/LegalPage'
 import { usePageMeta } from '../../lib/usePageMeta'
 
-const sections: [string, string][] = [
-  [
-    'Scope of services',
-    'Pinnacle Management Ventures ("Pinnacle," "we," "us") provides business consulting, funding and capital ' +
-      'introductions, property management, mobile notary services, property inspections, document courier, and ' +
-      'administrative support. Not every service is available in every location or to every account. Availability ' +
-      'is confirmed individually.',
-  ],
-  [
-    'Not a law firm',
-    'Pinnacle is not a law firm and does not provide legal advice, legal document preparation, licensed ' +
-      'real-estate brokerage, or contracting services unless those credentials are specifically confirmed in ' +
-      'writing for a given engagement. Notarial acts are performed only by a commissioned Florida notary, strictly ' +
-      'within the bounds of Florida notary law, which does not include drafting legal documents or giving legal advice.',
-  ],
-  [
-    'Funding and capital introductions',
-    'Any funding, lending, or capital services are provided through third-party lenders and financing partners. ' +
-      'Pinnacle does not itself extend credit, and no approval, rate, term, or funding outcome is guaranteed by ' +
-      'Pinnacle or by any third-party partner we introduce you to.',
-  ],
-  [
-    'Tax and accounting matters',
-    'Any tax-related guidance is provided by, or in coordination with, appropriately qualified and licensed tax ' +
-      'professionals. Nothing on this portal or site constitutes tax advice on its own; you should confirm your ' +
-      'specific tax position with your assigned professional.',
-  ],
-  [
-    'Property services',
-    'Property management, inspection, and related services are provided where Pinnacle or its affiliated ' +
-      'professionals are appropriately licensed for the applicable jurisdiction and service type.',
-  ],
-  [
-    'Your account',
-    'You are responsible for keeping your login credentials confidential and for all activity under your account. ' +
-      'Notify us promptly at support@pinnaclemanagementventures.com if you suspect unauthorized access. You agree ' +
-      'to provide accurate contact information, including a working phone number, so we can reach you about your ' +
-      'services.',
-  ],
-  [
-    'Communications',
-    'By creating an account, you agree that Pinnacle may contact you by phone, email, or through the client ' +
-      'portal about the services associated with your account.',
-  ],
-  [
-    'Fees and payment',
-    'Fees for specific services are quoted and agreed to separately before work begins. Invoices are payable per ' +
-      'the terms stated on each invoice.',
-  ],
-  [
-    'Limitation of liability',
-    'To the fullest extent permitted by law, Pinnacle’s liability for any claim arising from these services is ' +
-      'limited to the amount you paid Pinnacle for the specific service giving rise to the claim.',
-  ],
-  [
-    'Changes to these terms',
-    'We may update these terms from time to time. Continued use of the portal after an update constitutes ' +
-      'acceptance of the revised terms. Material changes will be reflected by an updated effective date below.',
-  ],
-  [
-    'Contact',
-    'Questions about these terms can be sent to support@pinnaclemanagementventures.com or (561) 388-7879.',
-  ],
+const UPDATED = 'August 10, 2026'
+
+const sections:LegalSection[] = [
+  { id:'agreement', title:'Agreement and Order of Precedence', content:<><P>These Terms of Service govern access to the Pinnacle Management Ventures website, client workspace, HQ-supported service channels, and services offered by Pinnacle Management Ventures, referred to as <Strong>Pinnacle</Strong>, <Strong>we</Strong>, <Strong>us</Strong>, or <Strong>our</Strong>. By creating an account, using the platform, requesting a service, signing an engagement document, or otherwise accepting these Terms, you agree to them.</P><P>A proposal, statement of work, engagement letter, order form, signed application, invoice, or other written service agreement may contain terms specific to an engagement. If a specific written agreement conflicts with these general Terms, the specific written agreement controls for that engagement. These Terms do not expand the scope of any signed engagement.</P></> },
+  { id:'eligibility', title:'Eligibility and Authority', content:<><P>You must be at least 18 years old and legally able to enter into a binding agreement. If you use Pinnacle for a company, property owner, organization, or another person, you represent that you are authorized to act for that party and to provide the information, instructions, and documents you submit.</P><P>You may not use another person’s identity, account, payment method, records, or authority without permission.</P></> },
+  { id:'services', title:'Service Scope and Professional Boundaries', content:<><P>Pinnacle provides professional support that may include business consulting, operational coordination, POS and payment transition support, project management support, administrative services, funding navigation or introductions, property and field support, document handling, courier work, notarial services through commissioned notaries, and other defined professional services.</P><UL><li>Pinnacle is not a law firm and does not provide legal advice or legal representation.</li><li>Pinnacle is not a bank, lender, or credit decision maker and does not guarantee financing, approval, rates, terms, or funding.</li><li>Pinnacle is not a tax, accounting, investment, insurance, real estate brokerage, construction, engineering, or other licensed professional firm unless a written engagement specifically identifies the qualified provider and service.</li><li>Property and field support does not automatically constitute licensed property management, brokerage, inspection, contracting, engineering, or appraisal services.</li><li>A notary public verifies and performs authorized notarial acts but does not select legal documents or provide legal advice.</li></UL><P>When an engagement requires licensed, regulated, or specialized work, Pinnacle may coordinate with an appropriately qualified independent provider. The provider remains responsible for professional services within that provider’s licensed scope.</P></> },
+  { id:'third-parties', title:'Third-Party Providers, Platforms, and Referrals', content:<><P>Some engagements depend on outside providers, financial institutions, software companies, payment processors, vendors, contractors, notaries, licensed professionals, carriers, or other third parties. Pinnacle may coordinate, introduce, transmit information to, or work alongside those parties when reasonably necessary to perform the requested work.</P><P>Unless a written agreement states otherwise, third parties are independent and not Pinnacle employees or agents. Their products, eligibility rules, approvals, pricing, service levels, outages, professional judgments, and acts or omissions are outside Pinnacle’s direct control. Any separate terms you accept with a third party also apply to your relationship with that provider.</P></> },
+  { id:'client-responsibilities', title:'Your Responsibilities', content:<><P>You agree to provide information that is accurate, complete, current, and lawfully obtained. You are responsible for reviewing deliverables and decisions that require your approval, responding to reasonable requests, meeting deadlines assigned to you, and telling Pinnacle promptly when circumstances change.</P><UL><li>Do not submit false, fraudulent, altered, stolen, unlawful, or misleading records.</li><li>Do not upload confidential information you are not authorized to disclose.</li><li>Review material instructions, applications, forms, funding submissions, contracts, and account changes before authorizing them.</li><li>Maintain your own source records when a law, contract, accounting rule, or business need requires independent retention.</li></UL><P>Pinnacle may rely on information you or your authorized representatives provide unless we have reason to question it.</P></> },
+  { id:'accounts', title:'Accounts, Credentials, and Security', content:<><P>You are responsible for safeguarding your credentials and the devices used to access your account. Do not share passwords or attempt to bypass access controls. Notify Pinnacle promptly if you suspect unauthorized access, account compromise, or misuse.</P><P>Pinnacle may use session controls, device and IP information, authentication logs, rate limits, one-time links, security alerts, and other safeguards to protect accounts and the platform. We may suspend or revoke sessions when we reasonably believe access is unauthorized or presents a security risk.</P></> },
+  { id:'electronic', title:'Electronic Records and Signatures', content:<><P>You agree that transactions with Pinnacle may be conducted electronically where permitted by law. Electronic records, click acknowledgments, typed signatures, drawn signatures, one-time verification codes, audit events, timestamps, and other electronic evidence may be used to document intent and activity.</P><P>Your consent to electronic records is further described in the <a href="/electronic-communications" className="font-bold text-gold hover:text-gold-300">Electronic Communications Disclosure</a>. Certain records or transactions may require additional formalities, and Pinnacle may require a different signing method when appropriate.</P></> },
+  { id:'communications', title:'Service Communications and Marketing', content:<><P>By maintaining an account or active engagement, you authorize Pinnacle to send service-related and transactional communications reasonably necessary to administer your account or requested work. These may include email, secure portal messages, phone calls, and text messages you request or that are connected to an existing relationship, subject to applicable law.</P><P>Promotional or marketing communications are separate from required service communications. Where consent is required for marketing calls or automated texts, Pinnacle will request that consent separately. Consent to marketing is not a condition of purchasing services. You may opt out of marketing email using the unsubscribe method provided and may communicate a request to stop marketing texts or calls. Transactional messages necessary to administer an active account or service may continue where permitted by law.</P></> },
+  { id:'fees', title:'Fees, Invoices, Cancellations, and Taxes', content:<><P>Pricing, retainers, deposits, project fees, recurring support fees, reimbursable expenses, and payment timing are established in the applicable proposal, order, invoice, or engagement document. Unless a written agreement states otherwise, fees are earned as the corresponding work is performed and are nonrefundable once earned.</P><P>You are responsible for applicable taxes, filing fees, government fees, third-party charges, travel, shipping, or other pass-through costs identified for the engagement. Pinnacle may pause nonessential work on materially past-due invoices after reasonable notice. A chargeback or payment dispute does not replace the contractual dispute process.</P><P>Cancellation rights, notice periods, minimum commitments, refund eligibility, and wind-down obligations are governed by the specific engagement terms. If no specific rule applies, you may ask Pinnacle to stop future work, but you remain responsible for completed work and noncancelable third-party costs already incurred.</P></> },
+  { id:'content', title:'Documents, Client Content, and Confidential Information', content:<><P>You retain ownership of documents and content you lawfully provide. You grant Pinnacle a limited right to host, copy, process, transmit, convert, and use that content as reasonably necessary to provide services, administer the account, maintain records, protect the platform, and satisfy legal obligations.</P><P>Pinnacle will use reasonable safeguards for confidential information. Confidentiality obligations do not apply to information that is publicly available through no breach, already lawfully known, independently developed, lawfully received from another source, or required to be disclosed by law, subpoena, court order, regulator, insurer, professional adviser, or similar lawful process.</P></> },
+  { id:'acceptable-use', title:'Acceptable Use', content:<><P>You may not use Pinnacle systems to violate law, infringe rights, distribute malicious code, probe or defeat security, scrape or extract data without authorization, impersonate others, interfere with service, send unlawful communications, upload harmful files, reverse engineer protected platform components except where law expressly permits, or access data outside your authorized scope.</P><P>Pinnacle may investigate suspected misuse and may restrict access when reasonably necessary to protect clients, users, service providers, the public, or our systems.</P></> },
+  { id:'intellectual-property', title:'Pinnacle Intellectual Property', content:<><P>The Pinnacle name, logos, platform design, workflows, templates, original materials, software, documentation, and other proprietary content are owned by Pinnacle or its licensors unless stated otherwise. You receive a limited, revocable, nonexclusive right to use the platform and deliverables for their intended purpose during your authorized use.</P><P>Client-specific deliverables may have different ownership or reuse terms in the applicable engagement. Third-party materials remain subject to their owners’ rights and licenses.</P></> },
+  { id:'availability', title:'Platform Availability, Security, and Records', content:<><P>Pinnacle uses commercially reasonable safeguards and operational controls, but no internet service, storage system, email provider, telecommunications network, or security program can be guaranteed to be uninterrupted or completely secure. Planned maintenance, provider outages, emergencies, network failures, security events, and events outside reasonable control may affect availability.</P><P>We may maintain logs, audit records, communication records, service records, and backups for legitimate business, security, contractual, legal, dispute, insurance, and compliance purposes. Retention periods vary by record type and legal need.</P></> },
+  { id:'no-guarantees', title:'No Guaranteed Outcomes and Disclaimer of Warranties', content:<><P>Pinnacle will perform agreed services in a commercially reasonable and professional manner appropriate to the engagement. Unless expressly guaranteed in a signed writing, we do not guarantee a particular business outcome, cost savings, funding approval, conversion result, regulatory outcome, property condition, vendor performance, software uptime, timing controlled by third parties, or other result outside our direct control.</P><P>To the fullest extent permitted by law, the website and platform are otherwise provided on an “as available” basis and Pinnacle disclaims implied warranties that cannot reasonably be applied to a professional-services platform, including implied warranties of merchantability, fitness for a particular purpose, and noninfringement, except where such disclaimers are prohibited.</P></> },
+  { id:'liability', title:'Limitation of Liability', content:<><P>To the fullest extent permitted by law, Pinnacle will not be liable for indirect, incidental, special, exemplary, punitive, or consequential damages, or for lost profits, lost business opportunity, loss of goodwill, or loss caused by a third-party provider, even if the possibility was known.</P><P>Except for liability that cannot lawfully be limited, Pinnacle’s aggregate liability arising from a specific engagement will not exceed the total fees actually paid to Pinnacle for the services giving rise to the claim during the twelve months preceding the event giving rise to liability. Nothing in these Terms limits liability where limitation is prohibited by applicable law, or for Pinnacle’s fraud, willful misconduct, or other liability that cannot be disclaimed.</P></> },
+  { id:'indemnity', title:'Indemnification for Business Misuse', content:<><P>If you use Pinnacle on behalf of a business or organization, you agree to defend and indemnify Pinnacle and its personnel from third-party claims, losses, penalties, or reasonable legal costs arising from your unlawful use of the services, materials you had no right to submit, instructions that violated law or third-party rights, or material breach of these Terms. This section does not require you to indemnify Pinnacle for Pinnacle’s own negligence, willful misconduct, or liability that cannot lawfully be shifted.</P></> },
+  { id:'disputes', title:'Dispute Resolution, Arbitration, and Class Waiver', content:<><P><Strong>Please read this section carefully because it affects legal rights.</Strong> Before filing a formal claim, the complaining party must send a written notice describing the dispute and requested resolution and allow at least 30 days for good-faith informal resolution. Notice to Pinnacle may be sent to support@pinnaclemanagementventures.com with the subject “Legal Dispute Notice.”</P><P>If the dispute is not resolved, either party may elect individual binding arbitration administered by the American Arbitration Association under the rules applicable to the dispute. The Federal Arbitration Act governs the arbitration provision. Hearings may be remote when permitted. Unless the parties agree otherwise, the arbitration seat will be Broward County, Florida. The arbitrator may award remedies available under applicable law.</P><P>Claims must be brought only on an individual basis and not as a class, collective, coordinated, consolidated, or representative action to the fullest extent permitted by law. Either party may bring an eligible individual claim in small claims court. Either party may also seek temporary or emergency injunctive relief from a court to protect confidential information, intellectual property, account security, or prevent unauthorized system access while arbitration is pending.</P><P>You may opt out of this arbitration agreement by emailing support@pinnaclemanagementventures.com within 30 days after first accepting these Terms. Use the subject “Arbitration Opt Out” and include your name, account email, and a clear statement that you are opting out. Opting out does not affect service eligibility.</P></> },
+  { id:'law', title:'Governing Law and Venue', content:<><P>These Terms are governed by Florida law, without regard to conflict-of-law principles, and by applicable federal law. If a dispute is not subject to arbitration, the parties consent to exclusive venue in the state or federal courts located in Broward County, Florida, unless applicable law requires a different venue.</P></> },
+  { id:'termination', title:'Suspension and Termination', content:<><P>You may stop using the platform at any time, subject to outstanding contractual or payment obligations. Pinnacle may suspend or terminate access for material breach, nonpayment, fraud, unlawful activity, security risk, abusive conduct, misuse of the platform, or when continuing service would violate law or a professional obligation. Where practical and safe, Pinnacle will provide reasonable notice and an opportunity to address a curable issue.</P><P>Provisions that by their nature should survive termination, including payment obligations, confidentiality, intellectual property, disclaimers, liability limits, dispute terms, audit records, and lawful retention duties, remain effective.</P></> },
+  { id:'changes', title:'Changes to These Terms', content:<><P>Pinnacle may update these Terms as the platform, services, or law evolves. The current version and updated date will be posted here. If a change materially affects existing account rights or obligations, Pinnacle will use a reasonable method to provide notice before the change applies when required by law. A specific signed agreement will not be retroactively changed by a website update unless that agreement permits it.</P></> },
+  { id:'general', title:'General Provisions', content:<><P>If a provision is unenforceable, the remaining provisions continue to apply and the invalid provision will be enforced to the maximum lawful extent. Failure to enforce a provision once is not a waiver. You may not assign an engagement without Pinnacle’s written consent, except as part of a permitted business succession. Pinnacle may assign these Terms in connection with a merger, reorganization, sale, financing, or transfer of the relevant business, subject to applicable law.</P><P>Neither party is liable for delay caused by events beyond reasonable control, except payment obligations for work already performed. These Terms and applicable written engagement documents form the agreement concerning their subject matter and supersede prior inconsistent discussions about that subject.</P></> },
 ]
 
-export default function Terms() {
-  usePageMeta('Terms of Service', 'Terms of service for Pinnacle Management Ventures consulting, funding, property management, notary, inspection, courier, and administrative support.')
-  return (
-    <div className="min-h-screen bg-navy-950">
-      <Header />
-      <section className="container-pmv py-16">
-        <div className="mx-auto max-w-3xl">
-          <p className="eyebrow">Legal</p>
-          <h1 className="mt-3 font-display text-4xl font-medium text-white">Terms of Service</h1>
-          <p className="mt-3 text-sm text-slate-400">Effective date: August 2, 2026</p>
-
-          <div className={`${panelCls} mt-8 space-y-6`}>
-            {sections.map(([title, body]) => (
-              <div key={title}>
-                <h2 className="text-base font-semibold text-white">{title}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-300">{body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <Footer />
-    </div>
-  )
+export default function Terms(){
+  usePageMeta('Terms of Service','Terms governing Pinnacle Management Ventures accounts, professional services, electronic transactions, payments, platform use, and dispute resolution.')
+  return <LegalPage title="Terms of Service" intro="These terms establish the operating rules for Pinnacle accounts, professional engagements, the secure platform, electronic transactions, communications, payments, and disputes. Transaction-specific signed documents may add or replace terms for a particular engagement." updated={UPDATED} sections={sections}/>
 }

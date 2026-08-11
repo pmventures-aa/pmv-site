@@ -77,7 +77,7 @@ export function parseOptions(raw: string | null): IntakeOption[] {
 }
 
 export function displayValue(value: IntakeValue | undefined): string {
-  if (value === undefined || value === null || value === '') return '—'
+  if (value === undefined || value === null || value === '') return 'Not provided'
   if (Array.isArray(value)) return value.join(', ')
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   return String(value)

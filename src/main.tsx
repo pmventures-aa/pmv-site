@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
+import './enterprise-polish.css'
 import Home from './pages/Home'
 import ServicesOverview from './pages/public/ServicesOverview'
 import ServiceDetail from './pages/public/ServiceDetail'
@@ -11,20 +12,22 @@ import ServiceArea from './pages/public/ServiceArea'
 import Contact from './pages/public/Contact'
 import Professionals from './pages/public/Professionals'
 import Terms from './pages/public/Terms'
+import Privacy from './pages/public/Privacy'
+import ElectronicCommunications from './pages/public/ElectronicCommunications'
+import Accessibility from './pages/public/Accessibility'
 import VerifyDocument from './pages/public/VerifyDocument'
 import SignerExperience from './pages/public/SignerExperience'
 import SharedDocument from './pages/public/SharedDocument'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
+import { installAudioUnlock } from './lib/sound'
 import { AppToaster } from './components/kit/Toaster'
 import { LoadingScreen } from './components/LoadingScreen'
 
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
 
-function SurfaceFallback() {
-  return <LoadingScreen />
-}
+function SurfaceFallback() { return <LoadingScreen /> }
 
 const host = window.location.hostname
 const isSecureHost = host.startsWith('secure.')
@@ -35,6 +38,9 @@ const surface: 'admin' | 'portal' | 'public' = (() => {
   return 'public'
 })()
 const secureBase = isSecureHost ? (surface === 'admin' ? '/hq' : '') : ''
+
+document.documentElement.dataset.pmvSurface = surface
+installAudioUnlock()
 
 function App() {
   if (surface === 'admin') {
@@ -57,6 +63,9 @@ function App() {
       <Route path="/work-with-pinnacle" element={<Navigate to="/professionals" replace />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/electronic-communications" element={<ElectronicCommunications />} />
+      <Route path="/accessibility" element={<Accessibility />} />
       <Route path="/verify" element={<VerifyDocument />} />
       <Route path="/sign/:token" element={<SignerExperience />} />
       <Route path="/shared/:token" element={<SharedDocument />} />

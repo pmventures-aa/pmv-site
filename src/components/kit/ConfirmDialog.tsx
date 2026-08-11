@@ -6,7 +6,7 @@ const btnDanger = `${btnBase} bg-rose-500 text-white hover:bg-rose-400`
 const btnPrimary = `${btnBase} bg-gold text-navy-950 hover:bg-gold-400`
 
 // Controlled confirm-before-destroy dialog (Radix AlertDialog under the
-// hood — modal, focus-trapped, Escape-to-cancel). Shared across every
+// hood: modal, focus-trapped, Escape-to-cancel). Shared across every
 // surface; the caller owns the open/busy state.
 export function ConfirmDialog({
   open,

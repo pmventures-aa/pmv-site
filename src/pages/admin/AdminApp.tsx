@@ -6,6 +6,8 @@ import { useAuth } from '../../lib/auth'
 import { useCapabilities } from '../../lib/capabilities'
 import { BasePathProvider, useAppPath } from '../../lib/basePath'
 import Login from '../auth/Login'
+import ForgotPassword from '../auth/ForgotPassword'
+import ResetPassword from '../auth/ResetPassword'
 import SetPassword from '../auth/SetPassword'
 import VendorSignup from '../auth/VendorSignup'
 import StaffInvite from '../auth/StaffInvite'
@@ -59,7 +61,12 @@ function CatchAll(){const p=useAppPath();return <Navigate to={p()} replace/>}
 
 export default function AdminApp({basePath}:{basePath:string}){
   return <BasePathProvider base={basePath}><Routes>
-    <Route path="login" element={<Login surface="staff"/>}/><Route path="set-password" element={<SetPassword surface="staff"/>}/><Route path="vendor-signup" element={<VendorSignup/>}/><Route path="invite/:token" element={<StaffInvite/>}/>
+    <Route path="login" element={<Login surface="staff"/>}/>
+    <Route path="forgot-password" element={<ForgotPassword surface="staff"/>}/>
+    <Route path="reset-password" element={<ResetPassword surface="staff"/>}/>
+    <Route path="set-password" element={<SetPassword surface="staff"/>}/>
+    <Route path="vendor-signup" element={<VendorSignup/>}/>
+    <Route path="invite/:token" element={<StaffInvite/>}/>
     <Route element={<ProtectedRoute allow={['staff','admin']}/>}><Route element={<AdminShell/>}>
       <Route index element={<AdminDashboard/>}/><Route path="pipelines" element={<PipelinesAdmin/>}/><Route path="clients" element={<ClientsList/>}/><Route path="clients/:id" element={<ClientDetailModern/>}/><Route path="clients/:id/manage" element={<ClientDetail/>}/><Route path="inquiries" element={<CRMRecordsAdmin/>}/><Route path="leads/:id" element={<LeadDetail/>}/><Route path="messages" element={<MessagesAdmin/>}/><Route path="activity" element={<ActivityAdmin/>}/><Route path="service-assignments" element={<ServiceAssignmentsAdmin/>}/><Route path="field-work" element={<FieldWorkAdmin/>}/><Route path="field-work/mine" element={<FieldWorkList/>}/><Route path="field-work/:id" element={<FieldWorkDetail/>}/><Route path="invoices" element={<InvoicesAdmin/>}/><Route path="document-center" element={<DocumentCenter/>}/><Route path="community-documents" element={<CommunityDocuments/>}/><Route path="envelopes" element={<EnvelopeWorkspace/>}/><Route path="audit-log" element={<AuditLogAdmin/>}/><Route path="management" element={<ManagementCenter/>}/><Route path="reports" element={<ReportingCenter/>}/><Route path="communications" element={<CommunicationsCRMAdmin/>}/><Route path="automation-center" element={<AutomationCenter/>}/><Route path="security-center" element={<SecurityCenter/>}/><Route path="employees" element={<EmployeesAdmin/>}/><Route path="open-items/:type" element={<OpenItemsAdmin/>}/><Route path="open-items" element={<OpenItemsAdmin/>}/><Route path="invitations" element={<InvitationsAdmin/>}/><Route path="roles" element={<RolesPermissionsAdmin/>}/><Route path="users" element={<UsersAdmin/>}/><Route path="assignments" element={<AssignmentsAdmin/>}/><Route path="settings" element={<SettingsAdmin/>}/>
     </Route></Route><Route path="*" element={<CatchAll/>}/>
