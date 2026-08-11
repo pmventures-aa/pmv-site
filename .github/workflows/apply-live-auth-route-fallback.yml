@@ -1,0 +1,104 @@
+name: Apply live PMV auth route fallback
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-live-auth-route-fallback.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Replace unresolved secure-host links with live application routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=None):
+              p = Path(path)
+              text = p.read_text()
+              actual = text.count(old)
+              if count is not None and actual != count:
+                  raise SystemExit(f'{path}: expected {count} occurrence(s), found {actual}: {old!r}')
+              if actual == 0:
+                  raise SystemExit(f'{path}: target not found: {old!r}')
+              p.write_text(text.replace(old, new))
+
+          replace('src/components/public/Header.tsx',
+                  "const CLIENT_LOGIN='https://secure.pinnaclemanagementventures.com/login'\nconst CLIENT_SIGNUP='https://secure.pinnaclemanagementventures.com/signup?source=header'",
+                  "const CLIENT_LOGIN='/portal/login'\nconst CLIENT_SIGNUP='/portal/signup?source=header'", 1)
+
+          replace('src/pages/Home.tsx',
+                  "const CLIENT_SIGNUP='https://secure.pinnaclemanagementventures.com/signup?source=home'",
+                  "const CLIENT_SIGNUP='/portal/signup?source=home'", 1)
+
+          replace('src/pages/public/About.tsx',
+                  'https://secure.pinnaclemanagementventures.com/signup',
+                  '/portal/signup', 2)
+
+          replace('src/pages/public/ServiceHubs.tsx',
+                  "const CLIENT_SIGNUP = 'https://secure.pinnaclemanagementventures.com/signup'",
+                  "const CLIENT_SIGNUP = '/portal/signup'", 1)
+
+          replace('src/pages/public/ServicesOverview.tsx',
+                  "const CLIENT_SIGNUP='https://secure.pinnaclemanagementventures.com/signup?source=services-overview'",
+                  "const CLIENT_SIGNUP='/portal/signup?source=services-overview'", 1)
+
+          replace('src/pages/public/Contact.tsx',
+                  'https://secure.pinnaclemanagementventures.com/login',
+                  '/portal/login', 1)
+
+          replace('src/pages/public/Professionals.tsx',
+                  "const VENDOR_SIGNUP='https://secure.pinnaclemanagementventures.com/hq/vendor-signup'",
+                  "const VENDOR_SIGNUP='/admin/vendor-signup'", 1)
+
+          replace('functions/_lib/accountEmails.ts',
+                  "// Post-auth surfaces live behind secure.pinnaclemanagementventures.com. The\n// legacy hq. and client. hosts continue to work while the DNS cutover settles;\n// see DEPLOY.md → \"Domain layout\".\nexport const CLIENT_PORTAL_URL = 'https://secure.pinnaclemanagementventures.com/'\nexport const CLIENT_LOGIN_URL = 'https://secure.pinnaclemanagementventures.com/login'\nexport const HQ_LOGIN_URL = 'https://secure.pinnaclemanagementventures.com/hq/login'",
+                  "// Use the public site's routed application surfaces until the dedicated\n// secure. hostname finishes DNS activation. These routes are first-class app\n// entry points and keep account emails usable throughout the DNS cutover.\nexport const CLIENT_PORTAL_URL = 'https://www.pinnaclemanagementventures.com/portal/'\nexport const CLIENT_LOGIN_URL = 'https://www.pinnaclemanagementventures.com/portal/login'\nexport const HQ_LOGIN_URL = 'https://www.pinnaclemanagementventures.com/admin/login'", 1)
+
+          replace('functions/_lib/invites.ts',
+                  "const SECURE_BASE = 'https://secure.pinnaclemanagementventures.com'\n\nexport function inviteUrl(type: InviteType, token: string): string {\n  if (type === 'vendor') return `${SECURE_BASE}/hq/vendor-signup?invite=${encodeURIComponent(token)}`\n  if (type === 'trusted_contact') return `${SECURE_BASE}/trusted-invite/${encodeURIComponent(token)}`\n  if (type === 'client') return `${SECURE_BASE}/signup?invite=${encodeURIComponent(token)}`\n  return `${SECURE_BASE}/hq/invite/${encodeURIComponent(token)}`\n}",
+                  "const PUBLIC_BASE = 'https://www.pinnaclemanagementventures.com'\nconst CLIENT_BASE = `${PUBLIC_BASE}/portal`\nconst HQ_BASE = `${PUBLIC_BASE}/admin`\n\nexport function inviteUrl(type: InviteType, token: string): string {\n  if (type === 'vendor') return `${HQ_BASE}/vendor-signup?invite=${encodeURIComponent(token)}`\n  if (type === 'trusted_contact') return `${CLIENT_BASE}/trusted-invite/${encodeURIComponent(token)}`\n  if (type === 'client') return `${CLIENT_BASE}/signup?invite=${encodeURIComponent(token)}`\n  return `${HQ_BASE}/invite/${encodeURIComponent(token)}`\n}", 1)
+
+          replace('functions/_lib/routes/auth.ts',
+                  "  const resetUrl = isStaff\n    ? `https://secure.pinnaclemanagementventures.com/hq/reset-password?token=${encodeURIComponent(token)}`\n    : `https://secure.pinnaclemanagementventures.com/reset-password?token=${encodeURIComponent(token)}`",
+                  "  const resetUrl = isStaff\n    ? `https://www.pinnaclemanagementventures.com/admin/reset-password?token=${encodeURIComponent(token)}`\n    : `https://www.pinnaclemanagementventures.com/portal/reset-password?token=${encodeURIComponent(token)}`", 1)
+          PY
+
+          if grep -RIn --include='*.ts' --include='*.tsx' 'secure\.pinnaclemanagementventures\.com' src functions; then
+            echo 'A runtime secure-host reference remains in src/ or functions/.'
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+
+      - name: Commit validated fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'pmventures-aa'
+          git config user.email 'c.raymondjenkins@gmail.com'
+          git add src functions
+          git diff --cached --quiet && exit 0
+          git commit -m 'route auth journeys through live portal and HQ paths'
+          git push origin HEAD:main
