@@ -1,0 +1,68 @@
+/* Comprehensive light-mode contrast contract for auth and onboarding surfaces. */
+:root[data-theme='light'] .auth-shell .text-white { color:#0f172a !important; }
+:root[data-theme='light'] .auth-shell .text-slate-100 { color:#172033 !important; }
+:root[data-theme='light'] .auth-shell .text-slate-200 { color:#1e293b !important; }
+:root[data-theme='light'] .auth-shell .text-slate-300 { color:#334155 !important; }
+:root[data-theme='light'] .auth-shell .text-slate-400 { color:#475569 !important; }
+:root[data-theme='light'] .auth-shell .text-slate-500 { color:#64748b !important; }
+:root[data-theme='light'] .auth-shell .text-slate-600 { color:#64748b !important; }
+:root[data-theme='light'] .auth-shell .text-gold { color:#806514 !important; }
+:root[data-theme='light'] .auth-shell .text-gold\/70 { color:#806514 !important; }
+:root[data-theme='light'] .auth-shell .text-emerald-300 { color:#047857 !important; }
+:root[data-theme='light'] .auth-shell .text-emerald-200 { color:#047857 !important; }
+:root[data-theme='light'] .auth-shell .text-amber-100,
+:root[data-theme='light'] .auth-shell .text-amber-200,
+:root[data-theme='light'] .auth-shell .text-amber-300 { color:#92400e !important; }
+:root[data-theme='light'] .auth-shell .text-rose-100,
+:root[data-theme='light'] .auth-shell .text-rose-200,
+:root[data-theme='light'] .auth-shell .text-rose-300 { color:#be123c !important; }
+
+:root[data-theme='light'] .auth-shell [class*='border-white'] { border-color:rgba(15,23,42,.13) !important; }
+:root[data-theme='light'] .auth-shell [class*='border-gold'] { border-color:rgba(128,101,20,.28) !important; }
+:root[data-theme='light'] .auth-shell [class*='border-emerald'] { border-color:rgba(4,120,87,.25) !important; }
+:root[data-theme='light'] .auth-shell [class*='border-amber'] { border-color:rgba(146,64,14,.25) !important; }
+:root[data-theme='light'] .auth-shell [class*='border-rose'] { border-color:rgba(190,18,60,.22) !important; }
+
+:root[data-theme='light'] .auth-shell [class*='bg-white/'] { background-color:rgba(15,23,42,.035) !important; }
+:root[data-theme='light'] .auth-shell [class*='bg-gold/'] { background-color:rgba(201,162,39,.10) !important; }
+:root[data-theme='light'] .auth-shell [class*='bg-emerald'] { background-color:rgba(16,185,129,.08) !important; }
+:root[data-theme='light'] .auth-shell [class*='bg-amber'] { background-color:rgba(245,158,11,.09) !important; }
+:root[data-theme='light'] .auth-shell [class*='bg-rose'] { background-color:rgba(244,63,94,.07) !important; }
+
+:root[data-theme='light'] .auth-shell .auth-card {
+  color:#0f172a;
+  background:rgba(255,255,255,.96);
+  border-color:rgba(15,23,42,.12);
+}
+
+:root[data-theme='light'] .auth-shell label,
+:root[data-theme='light'] .auth-shell legend { color:#1e293b; }
+
+:root[data-theme='light'] .auth-shell input[type='checkbox'],
+:root[data-theme='light'] .auth-shell input[type='radio'] { accent-color:#a8861b; }
+
+:root[data-theme='light'] .auth-shell .btn-outline {
+  border-color:rgba(15,23,42,.17);
+  background:#fff;
+  color:#263449;
+}
+
+:root[data-theme='light'] .auth-shell .btn-outline:hover {
+  border-color:rgba(128,101,20,.5);
+  background:rgba(201,162,39,.08);
+  color:#6f5710;
+}
+
+:root[data-theme='light'] .auth-shell .btn-gold,
+:root[data-theme='light'] .auth-shell .bg-gold.text-navy-950 { color:#111827 !important; }
+
+:root[data-theme='light'] .auth-shell select option,
+:root[data-theme='light'] .auth-shell select optgroup { background:#fff; color:#0f172a; }
+
+:root[data-theme='light'] .auth-shell .auth-brand-panel .text-white { color:#fff !important; }
+:root[data-theme='light'] .auth-shell .auth-brand-panel .text-slate-200 { color:#e2e8f0 !important; }
+:root[data-theme='light'] .auth-shell .auth-brand-panel .text-slate-300 { color:#cbd5e1 !important; }
+:root[data-theme='light'] .auth-shell .auth-brand-panel .text-slate-400 { color:#94a3b8 !important; }
+:root[data-theme='light'] .auth-shell .auth-brand-panel .text-slate-500 { color:#8291a6 !important; }
+:root[data-theme='light'] .auth-shell .auth-brand-panel .text-gold,
+:root[data-theme='light'] .auth-shell .auth-brand-panel .text-gold\/70 { color:#d7b94e !important; }
