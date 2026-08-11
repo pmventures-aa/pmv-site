@@ -6,11 +6,11 @@
   contain: layout paint style;
 }
 
-/* Render the production crest artwork directly. The previous mask treatment
- * flattened its white and transparent interior details into solid shapes. */
+/* Dedicated light-on-navy production asset. It preserves every element of the
+ * source crest while translating the original dark palette to white and gold. */
 .pmv-white-gold-mark {
   display: block;
-  filter: drop-shadow(0 22px 30px rgba(0,0,0,.32)) drop-shadow(0 0 22px rgba(214,180,90,.12));
+  filter: contrast(1.03) drop-shadow(0 22px 30px rgba(0,0,0,.28)) drop-shadow(0 0 24px rgba(214,180,90,.18));
 }
 
 .pmv-free-floating-mark {
