@@ -16,7 +16,6 @@
 .pmv-free-floating-mark {
   position: relative;
   isolation: isolate;
-  will-change: transform;
 }
 
 .pmv-free-floating-mark::before {
@@ -35,6 +34,27 @@
   background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
   background-size: 64px 64px;
   mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+
+/* Large radial fields replace expensive blurred circles. Their animation is
+ * transform-only and pauses outside the viewport in AmbientGlow. */
+.pmv-ambient-field {
+  border-radius: 999px;
+  opacity: .82;
+  transform: translateZ(0);
+  contain: paint;
+}
+
+.pmv-ambient-field-gold {
+  background: radial-gradient(circle, rgba(214,180,90,.16), rgba(214,180,90,.045) 42%, transparent 70%);
+}
+
+.pmv-ambient-field-blue {
+  background: radial-gradient(circle, rgba(67,112,160,.11), rgba(29,66,105,.035) 44%, transparent 71%);
+}
+
+.pmv-loading-line {
+  animation: pmv-loading-line 1.65s cubic-bezier(.4,0,.2,1) infinite;
 }
 
 .pmv-brand-gyro {
@@ -131,6 +151,13 @@
   50% { transform: rotate(7deg) scale(1.03); opacity:.8; }
 }
 
+@keyframes pmv-loading-line {
+  0% { transform: translateX(-120%); opacity: 0; }
+  18% { opacity: 1; }
+  78% { opacity: 1; }
+  100% { transform: translateX(240%); opacity: 0; }
+}
+
 /* Auth pages render the crest OUTSIDE the 3D tile stack, so the aggressive
  * brightness / drop-shadow filter tuned for the glossy tile stops applying
  * here. Give the standalone crest a subtle warm-tone drop shadow instead
@@ -177,7 +204,8 @@
 @media (prefers-reduced-motion: reduce) {
   .pmv-brand-gyro,
   .pmv-brand-aura,
-  .pmv-brand-specular::before {
+  .pmv-brand-specular::before,
+  .pmv-loading-line {
     animation: none !important;
   }
   .pmv-brand-object:hover .pmv-brand-depth { transform:none; }
