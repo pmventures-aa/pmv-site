@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { MotionConfig } from 'motion/react'
 import './index.css'
 import './enterprise-polish.css'
 import './auth-light-fix.css'
@@ -34,8 +35,8 @@ const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
 const MailApp = lazy(() => import('./pages/mail/MailApp'))
 
-// Portal + HQ get the calmer ambient orb; the public site keeps the brand
-// mark loader so unauthenticated visitors see the recognizable logo first.
+// `orb` remains as a compatibility name for existing lazy-route calls, but
+// authenticated surfaces now use the quiet PMV crest rather than an orb.
 function SurfaceFallback({ variant = 'brand', label = 'Loading…' }: { variant?: 'brand' | 'orb'; label?: string }) {
   return <LoadingScreen variant={variant} label={label} />
 }
@@ -101,8 +102,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <App />
-          <AppToaster />
+          <MotionConfig reducedMotion="user">
+            <App />
+            <AppToaster />
+          </MotionConfig>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
