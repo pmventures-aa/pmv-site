@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { Panel, EmptyState, StatCard } from '../../components/admin/ui'
 import { DashboardWelcome } from '../../components/DashboardWelcome'
@@ -29,14 +29,15 @@ function money(cents:number):string { return `$${(cents/100).toLocaleString(unde
 function StatLink({label,value,to}:{label:string;value:number|string;to?:string}) { const content=<StatCard label={label} value={value}/>; return to?<Link to={to} className="block">{content}</Link>:content }
 
 export default function AdminDashboard(){
-  const {user}=useAuth(); const p=useAppPath(); const[data,setData]=useState<DashboardResponse|null>(null); const[createOpen,setCreateOpen]=useState(false)
-  const load=useCallback(()=>api.get<DashboardResponse>('/admin/dashboard').then(setData).catch(()=>{}),[])
+  const {user}=useAuth(); const p=useAppPath(); const[data,setData]=useState<DashboardResponse|null>(null); const[createOpen,setCreateOpen]=useState(false); const[loadError,setLoadError]=useState<string|null>(null)
+  const load=useCallback(async()=>{try{const next=await api.get<DashboardResponse>('/admin/dashboard');setData(next);setLoadError(null)}catch(error){setLoadError(error instanceof ApiError?error.message:'The HQ overview could not load.')}},[])
   useEffect(()=>{void load()},[load])
   useLiveRefresh(load)
   const stats=data?.stats; const na=data?.needs_attention; const attentionCount=na?na.overdue_tasks.length+na.overdue_invoices.length+na.stale_tickets.length+na.stale_inquiries.length:0
   const quick='group inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/[.08] bg-white/[.018] px-3.5 py-2.5 text-xs font-semibold text-slate-300 transition-all duration-200 hover:-translate-y-px hover:border-gold/30 hover:bg-gold/[.03] hover:text-gold'
 
   return <div className="pb-24 lg:pb-0">
+    {loadError&&<div role="alert" className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[.04] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-amber-100">Overview data is temporarily unavailable</p><p className="mt-1 text-xs text-slate-400">{loadError} Existing navigation and tools remain available.</p></div><button type="button" onClick={()=>void load()} className="shrink-0 rounded-lg border border-amber-300/25 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-300/10">Try again</button></div>}
     <div className="mb-7 rounded-2xl border border-white/[.08] bg-gradient-to-br from-white/[.035] to-transparent p-5 sm:p-6">
       <DashboardWelcome name={user?.first_name||user?.full_name} userId={user?.id} variant="admin" subtitle={user?.role==='admin'?'Here’s the firm-wide picture and the work that needs attention next.':'Here’s your assigned client work and the next items that need attention.'}/>
       <div className="mt-5 hidden flex-wrap items-center gap-2 border-t border-white/[.07] pt-4 sm:flex">
