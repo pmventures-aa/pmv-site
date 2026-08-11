@@ -211,7 +211,7 @@ export default function CRMRecordsAdmin() {
       toast.success('CRM record created.')
       setDraft(emptyRecord)
       setShowCreate(false)
-      window.location.href = p(`leads/${result.id}`)
+      window.location.href = p(`leads/${result.id}/overview`)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not create lead.')
     } finally { setBusy(false) }
