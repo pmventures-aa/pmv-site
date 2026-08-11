@@ -100,6 +100,17 @@
   50% { transform: rotate(7deg) scale(1.03); opacity:.8; }
 }
 
+/* Auth pages render the crest OUTSIDE the 3D tile stack, so the aggressive
+ * brightness / drop-shadow filter tuned for the glossy tile stops applying
+ * here. Give the standalone crest a subtle warm-tone drop shadow instead
+ * and drop the extra brightness that made it feel washed-out on dark navy. */
+.pmv-auth-crest.pmv-crest-adaptive {
+  filter: drop-shadow(0 10px 22px rgba(0,0,0,.35)) drop-shadow(0 0 22px rgba(201,162,39,.14));
+}
+:root[data-theme='light'] .pmv-auth-crest.pmv-crest-adaptive {
+  filter: drop-shadow(0 8px 18px rgba(88,70,20,.18));
+}
+
 /* Light mode is a distinct white-and-gold material, not a dark asset dropped onto cream. */
 :root[data-theme='light'] .pmv-brand-face.pmv-crest-adaptive {
   filter: brightness(1.9) contrast(.88) saturate(.52) sepia(.08) drop-shadow(0 12px 18px rgba(88,70,20,.15));
