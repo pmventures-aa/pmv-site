@@ -1,16 +1,29 @@
 import { Hono } from 'hono'
 import type { AppEnv, SessionUser } from '../types'
 import { uuid, hashPassword, verifyPassword } from '../crypto'
-import { createSession, sessionCookie, clearCookie, destroySession, createActivationToken, consumeActivationToken, getUser } from '../session'
+import {
+  createSession,
+  sessionCookie,
+  clearCookie,
+  destroySession,
+  createActivationToken,
+  consumeActivationToken,
+  createPasswordResetToken,
+  consumePasswordResetToken,
+  revokeUserSessions,
+  getUser,
+} from '../session'
 import { activityInsert } from '../activity'
 import { logAudit, actorIp, actorUserAgent, actorGeo } from '../auditLog'
-import { notifyStaff, escapeHtml } from '../email'
+import { notifyStaff, escapeHtml, sendEmail } from '../email'
+import { renderPinnacleEmailLayout } from '../emailTemplates/layout'
 import { CLIENT_PORTAL_URL, sendAccountWelcome, sendVendorApplicationReceived } from '../accountEmails'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
 const LOCKOUT_SECONDS = 15 * 60
 const SIGNUP_MAX_PER_HOUR = 8
+const RESET_MAX_PER_HOUR = 5
 
 const norm = (e: string) => (e || '').trim().toLowerCase()
 const cleanName = (s: unknown) => (typeof s === 'string' ? s.trim().slice(0, 120) : '')
@@ -34,6 +47,13 @@ async function signupThrottled(env: AppEnv['Bindings'], ip: string): Promise<boo
   const k = `signup:${ip}`
   const cur = parseInt((await env.SESSIONS.get(k)) || '0', 10)
   if (cur >= SIGNUP_MAX_PER_HOUR) return true
+  await env.SESSIONS.put(k, String(cur + 1), { expirationTtl: 3600 })
+  return false
+}
+async function resetThrottled(env: AppEnv['Bindings'], email: string, ip: string): Promise<boolean> {
+  const k = `pwreset-request:${ip}:${email}`
+  const cur = parseInt((await env.SESSIONS.get(k)) || '0', 10)
+  if (cur >= RESET_MAX_PER_HOUR) return true
   await env.SESSIONS.put(k, String(cur + 1), { expirationTtl: 3600 })
   return false
 }
@@ -73,7 +93,7 @@ authRoutes.post('/signup', async (c) => {
 
   const ip = c.req.header('CF-Connecting-IP') || 'unknown'
   if (await signupThrottled(c.env, ip)) {
-    return c.json({ error: 'too many signups from this network — try again later' }, 429)
+    return c.json({ error: 'too many signups from this network. Try again later.' }, 429)
   }
 
   const exists = await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(e).first()
@@ -116,17 +136,12 @@ authRoutes.post('/signup', async (c) => {
   )
 
   const su: SessionUser = { id, email: e, role: 'client', full_name: fullName, first_name: firstName, last_name: lastName }
-  const token = await createSession(c.env, su)
+  const token = await createSession(c.env, su, c.req.raw)
   c.header('Set-Cookie', sessionCookie(token))
   return c.json({ ok: true, user: su }, 201)
 })
 
 // ---------- self-service signup (vendors/providers) ----------
-// Creates a staff-role account like any employee, but party_type='vendor'
-// and status='pending' — the existing `status !== 'active'` check in the
-// login handlers below already blocks sign-in, so a pending vendor simply
-// can't log in until an admin/owner approves them from Team & Vendors
-// (which sets status='active' and assigns capabilities/role there).
 authRoutes.post('/vendor-signup', async (c) => {
   const body = await c.req.json<{
     email: string
@@ -155,7 +170,7 @@ authRoutes.post('/vendor-signup', async (c) => {
 
   const ip = c.req.header('CF-Connecting-IP') || 'unknown'
   if (await signupThrottled(c.env, ip)) {
-    return c.json({ error: 'too many signups from this network — try again later' }, 429)
+    return c.json({ error: 'too many signups from this network. Try again later.' }, 429)
   }
 
   const exists = await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(e).first()
@@ -163,7 +178,7 @@ authRoutes.post('/vendor-signup', async (c) => {
 
   const id = uuid()
   const hash = await hashPassword(body.password, c.env.SESSION_SECRET)
-  const title = companyName ? `${vendorCategory} — ${companyName}` : vendorCategory
+  const title = companyName ? `${vendorCategory}: ${companyName}` : vendorCategory
 
   await c.env.DB.batch([
     c.env.DB.prepare(
@@ -204,7 +219,7 @@ authRoutes.post('/bootstrap', async (c) => {
   if (!e) return c.json({ error: 'email required' }, 400)
 
   const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>()
-  if ((count?.n ?? 0) > 0) return c.json({ error: 'bootstrap disabled: an account already exists' }, 403)
+  if ((count?.n ?? 0) > 0) return c.json({ error: 'bootstrap disabled because an account already exists' }, 403)
 
   const id = uuid()
   await c.env.DB.prepare(
@@ -216,7 +231,7 @@ authRoutes.post('/bootstrap', async (c) => {
   return c.json({ ok: true, user: { id, email: e, role: 'admin', full_name: full_name ?? null }, setup_token: setupToken }, 201)
 })
 
-// ---------- set-password (consumes a one-time activation token) ----------
+// ---------- set password from a one-time activation token ----------
 authRoutes.post('/set-password', async (c) => {
   const { token, password } = await c.req.json<{ token: string; password: string }>()
     .catch(() => ({ token: '', password: '' }))
@@ -224,7 +239,7 @@ authRoutes.post('/set-password', async (c) => {
   if (password.length < MIN_PASSWORD) return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
 
   const userId = await consumeActivationToken(c.env, token)
-  if (!userId) return c.json({ error: 'this setup link is invalid or has expired — ask an admin for a new one' }, 400)
+  if (!userId) return c.json({ error: 'this setup link is invalid or has expired. Ask an admin for a new one.' }, 400)
 
   const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first<any>()
   if (!user || user.status !== 'active') return c.json({ error: 'account not found or inactive' }, 400)
@@ -240,12 +255,96 @@ authRoutes.post('/set-password', async (c) => {
     first_name: user.first_name ?? null,
     last_name: user.last_name ?? null,
   }
-  const sessToken = await createSession(c.env, su)
+  const sessToken = await createSession(c.env, su, c.req.raw)
   c.header('Set-Cookie', sessionCookie(sessToken))
   return c.json({ ok: true, user: su })
 })
 
-// ---------- login (password) with throttling ----------
+// ---------- password recovery ----------
+authRoutes.post('/forgot-password', async (c) => {
+  const body = await c.req.json<{ email?: string; surface?: 'client' | 'staff' }>().catch(() => ({}))
+  const email = norm(body.email || '')
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown'
+  const generic = { ok: true, message: 'If an active Pinnacle account matches that email, a reset link is on the way.' }
+  if (!email || !email.includes('@')) return c.json(generic)
+  if (await resetThrottled(c.env, email, ip)) return c.json(generic)
+
+  const user = await c.env.DB.prepare(
+    "SELECT id,email,role,full_name,first_name,status FROM users WHERE email=? AND status='active'",
+  ).bind(email).first<any>()
+  if (!user) return c.json(generic)
+
+  const token = await createPasswordResetToken(c.env, user.id)
+  const isStaff = user.role === 'staff' || user.role === 'admin'
+  const resetUrl = isStaff
+    ? `https://secure.pinnaclemanagementventures.com/hq/reset-password?token=${encodeURIComponent(token)}`
+    : `https://secure.pinnaclemanagementventures.com/reset-password?token=${encodeURIComponent(token)}`
+  const firstName = user.first_name || String(user.full_name || '').split(/\s+/)[0] || 'there'
+  const html = renderPinnacleEmailLayout({
+    preheader: 'Reset your Pinnacle password',
+    eyebrow: isStaff ? 'Pinnacle HQ security' : 'Pinnacle account security',
+    title: 'Reset your password',
+    bodyHtml: `<p>Hi ${escapeHtml(firstName)},</p><p>We received a request to reset the password for your Pinnacle account. This secure link expires in 30 minutes and can be used only once.</p><p style="margin:24px 0"><a href="${resetUrl}" style="display:inline-block;background:#c9a227;color:#06111f;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:8px">Reset My Password</a></p><p>If you did not request this, you can ignore this email. Your current password will remain unchanged.</p>`,
+  })
+  c.executionCtx.waitUntil(sendEmail(c.env, {
+    to: user.email,
+    subject: 'Reset your Pinnacle password',
+    html,
+    replyTo: 'support@pinnaclemanagementventures.com',
+    tags: [{ name: 'category', value: 'account_security' }],
+  }))
+  c.executionCtx.waitUntil(logAudit(c.env, {
+    actorUserId: user.id,
+    actorIp: ip,
+    actorUserAgent: actorUserAgent(c.req.raw),
+    actorGeo: actorGeo(c.req.raw),
+    action: 'password_reset_requested',
+    entityType: 'user',
+    entityId: user.id,
+    after: { requested_surface: body.surface || null },
+  }))
+  return c.json(generic)
+})
+
+authRoutes.post('/reset-password', async (c) => {
+  const body = await c.req.json<{ token?: string; password?: string }>().catch(() => ({}))
+  const token = String(body.token || '')
+  const password = String(body.password || '')
+  if (!token || !password) return c.json({ error: 'reset token and new password are required' }, 400)
+  if (password.length < MIN_PASSWORD) return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
+
+  const userId = await consumePasswordResetToken(c.env, token)
+  if (!userId) return c.json({ error: 'this password reset link is invalid or has expired' }, 400)
+  const user = await c.env.DB.prepare('SELECT * FROM users WHERE id=?').bind(userId).first<any>()
+  if (!user || user.status !== 'active') return c.json({ error: 'account not found or inactive' }, 400)
+
+  const hash = await hashPassword(password, c.env.SESSION_SECRET)
+  await c.env.DB.prepare("UPDATE users SET password_hash=?,last_login_at=datetime('now') WHERE id=?").bind(hash, userId).run()
+  await revokeUserSessions(c.env, userId, userId, null)
+
+  const su: SessionUser = {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    full_name: user.full_name,
+    first_name: user.first_name ?? null,
+    last_name: user.last_name ?? null,
+  }
+  const session = await createSession(c.env, su, c.req.raw)
+  c.header('Set-Cookie', sessionCookie(session))
+  await logAudit(c.env, {
+    actorUserId: userId,
+    actorIp: actorIp(c.req.raw),
+    actorUserAgent: actorUserAgent(c.req.raw),
+    actorGeo: actorGeo(c.req.raw),
+    action: 'password_reset_completed',
+    entityType: 'user',
+    entityId: userId,
+  })
+  return c.json({ ok: true, user: su })
+})
+
+// ---------- login with password and throttling ----------
 authRoutes.post('/login', async (c) => {
   const { email, password } = await c.req.json<{ email: string; password: string }>()
     .catch(() => ({ email: '', password: '' }))
@@ -254,7 +353,7 @@ authRoutes.post('/login', async (c) => {
   const ip = c.req.header('CF-Connecting-IP') || 'unknown'
 
   if (await isLockedOut(c.env, e, ip)) {
-    return c.json({ error: 'too many attempts — try again in 15 minutes' }, 429)
+    return c.json({ error: 'too many attempts. Try again in 15 minutes.' }, 429)
   }
 
   const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(e).first<any>()
@@ -267,10 +366,6 @@ authRoutes.post('/login', async (c) => {
 
   if (!user || user.status !== 'active' || !ok) {
     await recordFailure(c.env, e, ip)
-    // Log failed sign-in attempts as security events. actor_user_id stays
-    // null (we may not know who the caller is), but the email typed and the
-    // originating IP/geo/user-agent are recorded so an admin can spot
-    // credential-stuffing patterns in the Audit Log's Security filter.
     await logAudit(c.env, {
       actorUserId: user?.id ?? null,
       actorIp: ip,
@@ -294,7 +389,7 @@ authRoutes.post('/login', async (c) => {
     first_name: user.first_name ?? null,
     last_name: user.last_name ?? null,
   }
-  const token = await createSession(c.env, su)
+  const token = await createSession(c.env, su, c.req.raw)
   c.header('Set-Cookie', sessionCookie(token))
   await logAudit(c.env, {
     actorUserId: user.id,
