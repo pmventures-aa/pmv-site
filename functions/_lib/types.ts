@@ -1,7 +1,7 @@
 export interface Env {
   DB: D1Database
   SESSIONS: KVNamespace
-  // Optional: profile picture and private document storage.
+  // Profile picture, document, brand asset, and font storage.
   UPLOADS?: R2Bucket
   SESSION_SECRET: string
   // Shared secret used only by trusted scheduled automation callers.
@@ -13,10 +13,12 @@ export interface Env {
   // lifecycle falls back to an HMAC server seal using SESSION_SECRET.
   DOCUMENT_SIGNING_PRIVATE_KEY?: string
   DOCUMENT_SIGNING_KEY_ID?: string
-  // Optional: email delivery via Resend.
-  RESEND_API_KEY?: string
-  RESEND_FROM_EMAIL?: string
-  RESEND_WEBHOOK_SECRET?: string
+  // First-party mail transport. The relay must be operated by Pinnacle and
+  // exposed on a Pinnacle-controlled hostname. Messages remain in D1 outbox
+  // until the relay confirms acceptance.
+  SELF_HOSTED_MAIL_RELAY_URL?: string
+  SELF_HOSTED_MAIL_RELAY_SECRET?: string
+  SELF_HOSTED_MAIL_FROM?: string
 }
 
 export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
