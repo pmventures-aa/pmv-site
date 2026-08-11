@@ -26,6 +26,7 @@ import TrustedContacts from './TrustedContacts'
 import TrustedPortal from './TrustedPortal'
 import Notifications from './Notifications'
 import Security from './Security'
+import ClientPortalDemo from './ClientPortalDemo'
 import { ModulePage } from './ModulePage'
 import { callsConfig, mattersConfig, tasksConfig, calendarConfig, fundingConfig, propertyConfig, taxConfig } from './moduleConfigs'
 
@@ -63,6 +64,7 @@ export default function PortalApp({ basePath }: { basePath: string }) {
         <Route path="reset-password" element={<ResetPassword surface="client" />} />
         <Route path="set-password" element={<SetPassword surface="client" />} />
         <Route path="trusted-invite/:token" element={<TrustedInvite />} />
+        <Route path="demo" element={<ClientPortalDemo />} />
 
         <Route element={<ProtectedRoute allow={['trusted_contact']} />}>
           <Route path="trusted" element={<TrustedPortal />} />
