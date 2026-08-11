@@ -31,6 +31,15 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Enforce user-facing dash style
+        shell: bash
+        run: |
+          if grep -RIn --include='*.tsx' --include='*.ts' '—' src; then
+            echo 'User-facing source still contains em dashes. Replace them with clearer punctuation before release.'
+            exit 1
+          fi
       - name: Run tests
         run: npm test
       - name: Typecheck
