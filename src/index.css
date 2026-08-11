@@ -36,7 +36,7 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
   .btn-gold { @apply btn bg-gold text-navy-950 hover:-translate-y-0.5 hover:bg-gold-400; box-shadow:0 8px 20px rgba(201,162,39,.1); }
   .btn-outline { @apply btn border border-white/15 bg-white/[.015] text-slate-100 hover:-translate-y-0.5 hover:border-gold/60 hover:bg-gold/[.035] hover:text-gold; }
   .container-pmv { @apply mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8; }
-  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-gold; }
+  .eyebrow { @apply font-display text-[10px] font-bold uppercase tracking-[0.2em] text-gold-400; }
   .surface-panel { border:1px solid var(--pmv-line); background:rgba(255,255,255,.022); box-shadow:var(--pmv-shadow-sm); }
   .surface-panel-strong { border:1px solid var(--pmv-line-strong); background:rgba(255,255,255,.032); box-shadow:var(--pmv-shadow-md); }
   .enterprise-grid { background-image:none; }
@@ -50,7 +50,7 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 .theme-toggle-compact:hover { border-color:rgba(201,162,39,.45); color:#c9a227; }
 .theme-indicator { color:#c9a227; font-size:10px; }
 
-.pmv-crest-adaptive { filter:brightness(1.45) contrast(1.08) saturate(.92) drop-shadow(0 0 10px rgba(201,162,39,.16)); }
+.pmv-crest-adaptive { filter:contrast(1.03) drop-shadow(0 0 12px rgba(201,162,39,.18)); }
 .pmv-logo-halo { background:radial-gradient(circle,rgba(201,162,39,.18),rgba(201,162,39,.045) 48%,transparent 72%); filter:blur(5px); }
 .pmv-crest-depth { filter:brightness(.85) sepia(.18) saturate(1.1); }
 .pmv-brand-stage { background:radial-gradient(circle,rgba(201,162,39,.22),rgba(201,162,39,.065) 38%,transparent 68%); filter:blur(12px); }

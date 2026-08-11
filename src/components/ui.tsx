@@ -22,20 +22,20 @@ const crestClass = 'pmv-crest-adaptive object-contain'
 type BrandMarkVariant = 'standard' | 'spotlight' | 'quiet'
 
 export function WhiteGoldBrandMark({ size = 120, className = '', decorative = false }: { size?: number; className?: string; decorative?: boolean }) {
-  return <img src="/logo-crest-transparent.png" alt={decorative ? '' : 'Pinnacle Management Ventures crest'} aria-hidden={decorative || undefined} className={`pmv-white-gold-mark object-contain ${className}`} style={{ width: size, height: size }} />
+  return <img src="/logo-crest-white-gold.png" alt={decorative ? '' : 'Pinnacle Management Ventures crest'} aria-hidden={decorative || undefined} className={`pmv-white-gold-mark object-contain ${className}`} style={{ width: size, height: size }} />
 }
 
-export function Logo({ className = '', showText = true, markSize = 62 }: { className?: string; showText?: boolean; markSize?: number }) {
+export function Logo({ className = '', showText = true, markSize = 54 }: { className?: string; showText?: boolean; markSize?: number }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <WhiteGoldBrandMark size={markSize} decorative className="shrink-0" />
-      {showText && <div className="leading-tight"><div className="text-[15px] font-bold tracking-[.025em] text-white">PINNACLE</div><div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">Management Ventures</div></div>}
+      {showText && <div className="leading-tight"><div className="font-display text-[15px] font-extrabold tracking-[.04em] text-white">PINNACLE</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[0.24em] text-gold-400">Management Ventures</div></div>}
     </div>
   )
 }
 
 export function Crest({ size = 96, className = '' }: { size?: number; className?: string }) {
-  return <img src="/logo-crest-transparent.png" alt="Pinnacle Management Ventures crest" style={{ width: size, height: size }} className={`${crestClass} ${className}`} />
+  return <img src="/logo-crest-white-gold.png" alt="Pinnacle Management Ventures crest" style={{ width: size, height: size }} className={`${crestClass} ${className}`} />
 }
 
 export function BrandMark3D({ size = 120, className = '', decorative = false, variant = 'standard' }: { size?: number; className?: string; decorative?: boolean; variant?: BrandMarkVariant }) {
@@ -46,9 +46,9 @@ export function BrandMark3D({ size = 120, className = '', decorative = false, va
       <div className="pmv-brand-gyro relative h-full w-full">
         <div className="pmv-brand-depth relative h-full w-full">
           {depth.map((_, i) => (
-            <img key={i} src="/logo-crest-transparent.png" alt="" aria-hidden="true" className="pmv-crest-depth pmv-brand-depth-layer absolute inset-0 h-full w-full object-contain" style={{ transform: `translate3d(${depth.length - i}px, ${Math.max(1, depth.length - i - 1)}px, ${-10 + i * 2}px)`, opacity: Math.max(.06, .18 - i * .018) }} />
+            <img key={i} src="/logo-crest-white-gold.png" alt="" aria-hidden="true" className="pmv-crest-depth pmv-brand-depth-layer absolute inset-0 h-full w-full object-contain" style={{ transform: `translate3d(${depth.length - i}px, ${Math.max(1, depth.length - i - 1)}px, ${-10 + i * 2}px)`, opacity: Math.max(.06, .18 - i * .018) }} />
           ))}
-          <img src="/logo-crest-transparent.png" alt={decorative ? '' : 'Pinnacle Management Ventures crest'} className={`pmv-brand-face absolute inset-0 h-full w-full drop-shadow-[0_18px_24px_rgba(0,0,0,.28)] ${crestClass}`} />
+          <img src="/logo-crest-white-gold.png" alt={decorative ? '' : 'Pinnacle Management Ventures crest'} className={`pmv-brand-face absolute inset-0 h-full w-full drop-shadow-[0_18px_24px_rgba(0,0,0,.28)] ${crestClass}`} />
           <div className="pmv-brand-specular pointer-events-none absolute inset-[3%]" aria-hidden="true" />
           <div className="pmv-brand-rim pointer-events-none absolute inset-[4%]" aria-hidden="true" />
         </div>

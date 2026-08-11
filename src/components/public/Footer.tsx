@@ -8,8 +8,8 @@ export function Footer() {
         <div className="grid gap-10 lg:grid-cols-[1.25fr_.75fr_.8fr_1fr]">
           <div>
             <Logo />
-            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">A dependable support partner for business owners, property owners, and professionals who need practical help, clear communication, and real follow-through.</p>
-            <p className="mt-4 text-xs leading-5 text-slate-500">Nationwide remote support with direct field coverage in South Florida and qualified provider coordination where needed.</p>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">One accountable relationship for the operational, document, property, and field work that keeps owners and professionals moving.</p>
+            <p className="mt-4 text-xs leading-5 text-slate-500">Nationwide coordination. Direct South Florida field coverage. Qualified providers where the scope requires them.</p>
           </div>
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Services</p>
