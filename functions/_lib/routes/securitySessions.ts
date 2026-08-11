@@ -16,7 +16,7 @@ function deviceLabel(ua: string | null) {
 async function isOwner(c: any) {
   const user = c.get('user')
   if (user.role !== 'admin') return false
-  const row = await c.env.DB.prepare('SELECT is_owner FROM team_members WHERE user_id=?').bind(user.id).first<{ is_owner:number }>()
+  const row = await c.env.DB.prepare('SELECT is_owner FROM team_members WHERE user_id=?').bind(user.id).first() as {is_owner:number}|null
   return !!row?.is_owner
 }
 
@@ -53,7 +53,8 @@ securitySessionRoutes.get('/security/sessions', requireStaff, async (c) => {
 
 securitySessionRoutes.delete('/security/sessions/:id', requireStaff, async (c) => {
   const user = c.get('user')
-  const id = c.req.param('id')
+  const id = c.req.param('id')??''
+  if(!id)return c.json({error:'session not found'},404)
   const row = await c.env.DB.prepare('SELECT user_id FROM auth_sessions WHERE id=?').bind(id).first<{user_id:string}>()
   if (!row) return c.json({error:'session not found'},404)
   const owner = await isOwner(c)
@@ -75,7 +76,8 @@ securitySessionRoutes.post('/security/sessions/revoke-others', requireStaff, asy
 securitySessionRoutes.post('/security/users/:id/revoke-sessions', requireStaff, async (c) => {
   const user=c.get('user')
   if (!(await isOwner(c))) return c.json({error:'owner accounts only'},403)
-  const target=c.req.param('id')
+  const target=c.req.param('id')??''
+  if(!target)return c.json({error:'user not found'},404)
   if (target===user.id) return c.json({error:'use Revoke other sessions for your own account'},400)
   await revokeUserSessions(c.env,target,user.id,null)
   await logAudit(c.env,{actorUserId:user.id,actorIp:actorIp(c.req.raw),actorUserAgent:actorUserAgent(c.req.raw),actorGeo:actorGeo(c.req.raw),action:'bulk_sessions_revoked',entityType:'user',entityId:target})
