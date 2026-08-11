@@ -124,14 +124,22 @@ export default function ClientDetailModern() {
   const [note, setNote] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set())
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (section: Tab = tab, force = false) => {
     if (!id) return
-    const result = await api.get<Bundle>(`/admin/clients/${id}`)
-    setData(result)
-  }, [id])
+    if (!force && loadedTabs.has(section)) return
+    const result = await api.get<Partial<Bundle>>(`/admin/clients/${id}?section=${section}`)
+    setData((current) => ({
+      account: result.account ?? current?.account,
+      profile: result.profile === undefined ? current?.profile ?? null : result.profile,
+      assigned_staff: result.assigned_staff ?? current?.assigned_staff ?? [], recent_activity: result.recent_activity ?? current?.recent_activity ?? [],
+      services: result.services ?? current?.services ?? [], matters: result.matters ?? current?.matters ?? [], tasks: result.tasks ?? current?.tasks ?? [], documents: result.documents ?? current?.documents ?? [], invoices: result.invoices ?? current?.invoices ?? [], funding: result.funding ?? current?.funding ?? [], properties: result.properties ?? current?.properties ?? [], tax_filings: result.tax_filings ?? current?.tax_filings ?? [], tickets: result.tickets ?? current?.tickets ?? [], calls: result.calls ?? current?.calls ?? [], appointments: result.appointments ?? current?.appointments ?? [], application_answers: result.application_answers ?? current?.application_answers ?? [], payment_methods: result.payment_methods ?? current?.payment_methods ?? [], notes: result.notes ?? current?.notes ?? [], onboarding_progress: result.onboarding_progress ?? current?.onboarding_progress ?? { answered: 0, total: 0 }, service_catalog: result.service_catalog ?? current?.service_catalog ?? [], service_applications: result.service_applications ?? current?.service_applications ?? [],
+    } as Bundle))
+    setLoadedTabs((current) => new Set(current).add(section))
+  }, [id, loadedTabs, tab])
 
-  useEffect(() => { load().catch(() => setData(null)) }, [load])
+  useEffect(() => { load(tab).catch(() => setData(null)) }, [tab])
 
   const timeline = useMemo(() => {
     if (!data) return []
@@ -178,7 +186,7 @@ export default function ClientDetailModern() {
       await api.post(`/admin/clients/${id}/notes`, { body: note.trim() })
       setNote('')
       toast.success('Internal note added.')
-      await load()
+      await load('activity', true)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not add note.')
     } finally { setNoteBusy(false) }
@@ -264,7 +272,7 @@ export default function ClientDetailModern() {
           clientId={account.id}
           catalog={data.service_catalog}
           taken={new Set([...data.services.map((s) => s.service_key), ...data.service_applications.filter((a) => a.status !== 'declined' && a.status !== 'closed').map((a) => a.service_key)])}
-          onAssigned={load}
+          onAssigned={() => load('services', true)}
         />
         {data.service_applications.filter((a) => a.submission_source === 'staff_assigned').length > 0 && (
           <div className="mt-5 divide-y divide-white/5 border-y border-white/10">

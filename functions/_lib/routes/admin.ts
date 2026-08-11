@@ -156,6 +156,64 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   const ok = await canAccessClient(c.env, user, id)
   if (!ok) return c.json({ error: 'forbidden' }, 403)
 
+  // Client profiles are intentionally sectional. HQ asks only for the active
+  // subpage instead of pulling the entire relationship history on every open.
+  const section = c.req.query('section')
+  if (section && ['overview', 'activity', 'services', 'work', 'documents', 'billing', 'details'].includes(section)) {
+    const [account, profile, assignedStaff] = await Promise.all([
+      c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
+      c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
+      c.env.DB.prepare('SELECT u.id, u.full_name, u.email FROM staff_assignments sa JOIN users u ON u.id = sa.staff_user_id WHERE sa.client_user_id = ?').bind(id).all(),
+    ])
+    if (!account) return c.json({ error: 'not found' }, 404)
+    const base = { account, profile, assigned_staff: assignedStaff.results ?? [] }
+
+    if (section === 'overview') {
+      const [services, matters, tasks, invoices, tickets, appts, activity] = await Promise.all([
+        c.env.DB.prepare('SELECT cs.*, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE client_user_id = ? ORDER BY cs.created_at DESC LIMIT 12').bind(id).all(),
+        c.env.DB.prepare("SELECT * FROM matters WHERE client_user_id = ? AND status != 'closed' ORDER BY created_at DESC LIMIT 8").bind(id).all(),
+        c.env.DB.prepare("SELECT * FROM client_tasks WHERE client_user_id = ? AND status != 'done' ORDER BY created_at DESC LIMIT 8").bind(id).all(),
+        c.env.DB.prepare("SELECT * FROM invoices WHERE client_user_id = ? AND status = 'open' ORDER BY created_at DESC LIMIT 8").bind(id).all(),
+        c.env.DB.prepare("SELECT * FROM support_tickets WHERE client_user_id = ? AND status != 'closed' ORDER BY created_at DESC LIMIT 8").bind(id).all(),
+        c.env.DB.prepare("SELECT * FROM appointments WHERE client_user_id = ? AND starts_at >= datetime('now') ORDER BY starts_at ASC LIMIT 5").bind(id).all(),
+        c.env.DB.prepare('SELECT ae.*, actor.full_name AS actor_name, actor.email AS actor_email FROM activity_events ae LEFT JOIN users actor ON actor.id = ae.actor_user_id WHERE ae.client_user_id = ? ORDER BY ae.created_at DESC LIMIT 8').bind(id).all(),
+      ])
+      return c.json({ ...base, services: services.results ?? [], matters: matters.results ?? [], tasks: tasks.results ?? [], invoices: invoices.results ?? [], tickets: tickets.results ?? [], appointments: appts.results ?? [], recent_activity: activity.results ?? [] })
+    }
+    if (section === 'activity') {
+      const [notes, activity] = await Promise.all([
+        c.env.DB.prepare('SELECT n.*, a.full_name AS author_name, a.email AS author_email FROM internal_notes n LEFT JOIN users a ON a.id = n.author_user_id WHERE n.client_user_id = ? AND n.matter_id IS NULL ORDER BY n.created_at DESC LIMIT 100').bind(id).all(),
+        c.env.DB.prepare('SELECT ae.*, actor.full_name AS actor_name, actor.email AS actor_email FROM activity_events ae LEFT JOIN users actor ON actor.id = ae.actor_user_id WHERE ae.client_user_id = ? ORDER BY ae.created_at DESC LIMIT 100').bind(id).all(),
+      ])
+      return c.json({ ...base, notes: notes.results ?? [], recent_activity: activity.results ?? [] })
+    }
+    if (section === 'services') {
+      const [services, answers, catalog, applications] = await Promise.all([
+        c.env.DB.prepare('SELECT cs.*, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE client_user_id = ?').bind(id).all(),
+        c.env.DB.prepare('SELECT r.service_key, r.question_key, r.value, q.label, q.step_label FROM client_onboarding_responses r LEFT JOIN onboarding_questions q ON q.service_key = r.service_key AND q.question_key = r.question_key WHERE r.client_user_id = ? ORDER BY r.service_key, q.step_order, q.sort_order').bind(id).all(),
+        c.env.DB.prepare('SELECT key, name FROM services WHERE active = 1 ORDER BY name').all(),
+        c.env.DB.prepare('SELECT sa.id, sa.service_key, sa.status, sa.submission_source, sa.signed_name, sa.submitted_at, sa.created_at, s.name AS service_name, creator.full_name AS created_by_name FROM service_applications sa JOIN services s ON s.key = sa.service_key LEFT JOIN users creator ON creator.id = sa.created_by_user_id WHERE sa.client_user_id = ? ORDER BY sa.created_at DESC').bind(id).all(),
+      ])
+      return c.json({ ...base, services: services.results ?? [], application_answers: answers.results ?? [], service_catalog: catalog.results ?? [], service_applications: applications.results ?? [] })
+    }
+    if (section === 'work') {
+      const [matters, tasks, funding, properties, tax, tickets, calls, appts] = await Promise.all([
+        c.env.DB.prepare('SELECT * FROM matters WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100').bind(id).all(), c.env.DB.prepare('SELECT * FROM client_tasks WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100').bind(id).all(),
+        c.env.DB.prepare('SELECT * FROM funding_applications WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100').bind(id).all(), c.env.DB.prepare('SELECT * FROM properties WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100').bind(id).all(),
+        c.env.DB.prepare('SELECT * FROM tax_filings WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100').bind(id).all(), c.env.DB.prepare('SELECT * FROM support_tickets WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100').bind(id).all(),
+        c.env.DB.prepare('SELECT * FROM planned_calls WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100').bind(id).all(), c.env.DB.prepare('SELECT * FROM appointments WHERE client_user_id = ? ORDER BY starts_at DESC LIMIT 100').bind(id).all(),
+      ])
+      return c.json({ ...base, matters: matters.results ?? [], tasks: tasks.results ?? [], funding: funding.results ?? [], properties: properties.results ?? [], tax_filings: tax.results ?? [], tickets: tickets.results ?? [], calls: calls.results ?? [], appointments: appts.results ?? [] })
+    }
+    if (section === 'documents') { const rows = await c.env.DB.prepare('SELECT * FROM client_documents WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 200').bind(id).all(); return c.json({ ...base, documents: rows.results ?? [] }) }
+    if (section === 'billing') {
+      const [invoices, methods] = await Promise.all([c.env.DB.prepare('SELECT * FROM invoices WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 200').bind(id).all(), c.env.DB.prepare('SELECT id, service_key, method_type, account_holder_name, bank_name, account_type, account_last4, created_at FROM client_payment_methods WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all()])
+      return c.json({ ...base, invoices: invoices.results ?? [], payment_methods: methods.results ?? [] })
+    }
+    const onboarding = await c.env.DB.prepare(`SELECT (SELECT COUNT(*) FROM onboarding_questions q JOIN client_services cs ON cs.service_key=q.service_key WHERE cs.client_user_id=? AND q.required=1) total, (SELECT COUNT(*) FROM client_onboarding_responses r WHERE r.client_user_id=? AND r.value IS NOT NULL AND r.value!='') answered`).bind(id, id).first<any>()
+    return c.json({ ...base, onboarding_progress: { answered: onboarding?.answered ?? 0, total: onboarding?.total ?? 0 } })
+  }
+
   const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes, assignedStaff, recentActivity, catalog, applications] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
