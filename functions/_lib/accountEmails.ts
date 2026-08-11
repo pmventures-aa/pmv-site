@@ -37,9 +37,6 @@ interface TrackedSendInput {
   metadata?: Record<string, unknown>
 }
 
-// Post-auth surfaces live behind secure.pinnaclemanagementventures.com. The
-// legacy hq. and client. hosts continue to work while the DNS cutover settles;
-// see DEPLOY.md → "Domain layout".
 export const CLIENT_PORTAL_URL = 'https://secure.pinnaclemanagementventures.com/'
 export const CLIENT_LOGIN_URL = 'https://secure.pinnaclemanagementventures.com/login'
 export const HQ_LOGIN_URL = 'https://secure.pinnaclemanagementventures.com/hq/login'
@@ -114,23 +111,13 @@ export async function sendTrackedAccountEmail(env: Env, input: TrackedSendInput)
   if (inserted.existing) return inserted.existing
   const deliveryId = inserted.id
 
-  if (!env.RESEND_API_KEY) {
-    const error = 'RESEND_API_KEY is not configured'
-    await env.DB.prepare(
-      `UPDATE account_email_deliveries SET status = 'skipped', last_error = ?, last_event_type = 'local.skipped', failed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-    ).bind(error, deliveryId).run()
-    if (input.updateWelcomeSummary) await updateWelcomeSummary(env, input.userId, 'skipped', null)
-    await writeActivity(env, input, 'skipped', null, error)
-    return { deliveryId, status: 'skipped', providerId: null, error }
-  }
-
   try {
     const providerId = await sendEmailStrict(env, {
       to: input.email,
       subject: input.rendered.subject,
       html: input.rendered.html,
       text: input.rendered.text,
-      replyTo: 'orders@pinnaclemanagementventures.com',
+      replyTo: 'mail@pinnaclemanagementventures.com',
       idempotencyKey: input.idempotencyKey,
       tags: [
         { name: 'category', value: input.kind },
@@ -138,7 +125,7 @@ export async function sendTrackedAccountEmail(env: Env, input: TrackedSendInput)
       ],
     })
     await env.DB.prepare(
-      `UPDATE account_email_deliveries SET provider_id = ?, status = 'sent', last_event_type = 'local.sent', sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+      `UPDATE account_email_deliveries SET provider_id = ?, status = 'sent', last_event_type = 'local.queued_or_sent', sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
     ).bind(providerId, deliveryId).run()
     if (input.updateWelcomeSummary) await updateWelcomeSummary(env, input.userId, 'sent', providerId)
     await writeActivity(env, input, 'sent', providerId)
