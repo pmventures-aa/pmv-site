@@ -1,0 +1,30 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { BriefcaseBusiness, MailPlus, MapPinned, Search, ShieldCheck, Star, UserRoundCheck } from 'lucide-react'
+import { api, ApiError } from '../../lib/api'
+import { PageIntro, Panel, EmptyState, Tag, inputCls } from '../../components/admin/ui'
+import { useAppPath } from '../../lib/basePath'
+import { useLiveRefresh } from '../../lib/liveRefresh'
+import { toast } from '../../components/kit/toast'
+
+interface Provider { id:string;email:string;full_name:string|null;status:string;party_type:string|null;vendor_category:string|null;role_name?:string|null;title:string|null;network_status?:string;availability_status?:string;is_preferred_provider?:number;service_area_summary?:string|null;tasks_assigned:number;tasks_completed:number;tasks_overdue:number;application_documents?:number }
+type Filter='all'|'active'|'vetting'|'available'|'preferred'|'internal'
+
+const tone=(status?:string)=>status==='active'||status==='available'?'green':status==='vetting'||status==='limited'?'gold':status==='inactive'||status==='unavailable'?'red':'blue'
+
+export default function ProviderNetworkAdmin(){
+  const p=useAppPath();const[rows,setRows]=useState<Provider[]>([]);const[loading,setLoading]=useState(true);const[error,setError]=useState('');const[query,setQuery]=useState('');const[filter,setFilter]=useState<Filter>('all')
+  const load=useCallback(async()=>{setLoading(true);try{const r=await api.get<{employees:Provider[]}>('/admin/employees');setRows(r.employees||[]);setError('')}catch(e){setError(e instanceof ApiError?e.message:'The provider network could not load.')}finally{setLoading(false)}},[])
+  useEffect(()=>{void load()},[load]);useLiveRefresh(load)
+  const filtered=useMemo(()=>rows.filter(r=>{const provider=r.party_type==='vendor';const q=`${r.full_name||''} ${r.email} ${r.vendor_category||''} ${r.service_area_summary||''}`.toLowerCase();if(query&&!q.includes(query.toLowerCase()))return false;if(filter==='internal')return !provider;if(!provider)return filter==='all';if(filter==='active')return r.network_status==='active';if(filter==='vetting')return r.network_status==='vetting'||r.status==='pending';if(filter==='available')return r.availability_status==='available';if(filter==='preferred')return !!r.is_preferred_provider;return true}),[rows,query,filter])
+  const providers=rows.filter(r=>r.party_type==='vendor')
+  return <div>
+    <PageIntro kicker="Professional network operations" title="Network & Dispatch" subtitle="Manage providers, notaries, contractors, professional contacts, vetting, coverage, availability and active work from one operating center." action={<Link to={p('invitations')} className="btn-gold"><MailPlus size={15}/>Invite Provider</Link>}/>
+    <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric icon={BriefcaseBusiness} label="Network providers" value={providers.length}/><Metric icon={UserRoundCheck} label="Available now" value={providers.filter(r=>r.availability_status==='available').length}/><Metric icon={ShieldCheck} label="In vetting" value={providers.filter(r=>r.network_status==='vetting'||r.status==='pending').length}/><Metric icon={MapPinned} label="Open assignments" value={providers.reduce((n,r)=>n+Math.max(0,r.tasks_assigned-r.tasks_completed),0)}/></div>
+    <Panel className="mb-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-center"><label className="relative flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input className={`${inputCls} pl-9`} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search name, specialty, email or service area"/></label><div className="flex flex-wrap gap-2">{(['all','active','vetting','available','preferred','internal'] as Filter[]).map(f=><button key={f} onClick={()=>setFilter(f)} className={`rounded-lg border px-3 py-2 text-xs font-semibold capitalize ${filter===f?'border-gold/35 bg-gold/[.07] text-gold':'border-white/10 text-slate-400 hover:text-white'}`}>{f==='internal'?'Internal access':f}</button>)}</div></div></Panel>
+    {error&&<div role="alert" className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-rose-400/20 bg-rose-400/[.04] p-4 text-sm text-rose-200"><span>{error}</span><button onClick={()=>void load()} className="btn-outline">Retry</button></div>}
+    {loading?<p className="text-sm text-slate-400">Loading network…</p>:filtered.length===0?<Panel><EmptyState label="No matching professional contacts."/></Panel>:<div className="grid gap-3 xl:grid-cols-2">{filtered.map(r=><Link key={r.id} to={p(`network/${r.id}/profile`)} className="group rounded-2xl border border-white/[.08] bg-white/[.018] p-5 transition hover:-translate-y-px hover:border-gold/25 hover:bg-gold/[.025]"><div className="flex items-start justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate font-semibold text-white group-hover:text-gold">{r.full_name||r.email}</h2>{r.is_preferred_provider?<Star size={14} className="fill-gold text-gold"/>:null}</div><p className="mt-1 text-sm text-slate-400">{r.vendor_category||r.role_name||r.title||'Professional contact'}</p><p className="mt-1 truncate text-xs text-slate-600">{r.email}</p></div><Tag tone={tone(r.party_type==='vendor'?r.network_status:'active') as any}>{r.party_type==='vendor'?(r.network_status||'active'):'Internal'}</Tag></div><div className="mt-4 flex flex-wrap gap-2"><Tag tone={tone(r.availability_status) as any}>{r.availability_status||'availability not set'}</Tag>{r.service_area_summary&&<Tag>{r.service_area_summary}</Tag>}<Tag>{r.tasks_assigned} assigned</Tag>{r.tasks_overdue>0&&<Tag tone="red">{r.tasks_overdue} overdue</Tag>}</div></Link>)}</div>}
+  </div>
+}
+
+function Metric({icon:Icon,label,value}:{icon:any;label:string;value:number}){return <Panel className="!p-4"><Icon size={16} className="text-gold"/><p className="mt-3 text-2xl font-semibold text-white tabular-nums">{value}</p><p className="mt-1 text-xs text-slate-500">{label}</p></Panel>}
