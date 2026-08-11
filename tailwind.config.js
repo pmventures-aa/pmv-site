@@ -15,9 +15,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['"Inter Tight"', 'Inter', 'system-ui', 'sans-serif'],
-        // Used only on the public marketing site (see src/components/public/ui.tsx)
-        // to break up an all-sans, all-geometric type system — not used in the portal/admin apps.
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
         display: ['"Newsreader"', 'ui-serif', 'Georgia', 'serif'],
       },
       boxShadow: {
