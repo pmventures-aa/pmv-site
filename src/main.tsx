@@ -8,6 +8,7 @@ import Home from './pages/Home'
 import ServicesOverview from './pages/public/ServicesOverview'
 import ServiceDetail from './pages/public/ServiceDetail'
 import { BusinessOperationsHub, PropertyFieldHub, MobileDocumentHub } from './pages/public/ServiceHubs'
+import ProjectGuidePage from './pages/public/ProjectGuides'
 import About from './pages/public/About'
 import ServiceArea from './pages/public/ServiceArea'
 import Contact from './pages/public/Contact'
@@ -58,6 +59,7 @@ function App() {
       <Route path="/services/property-field" element={<PropertyFieldHub />} />
       <Route path="/services/mobile-documents" element={<MobileDocumentHub />} />
       <Route path="/services/:slug" element={<ServiceDetail />} />
+      <Route path="/projects/:slug" element={<ProjectGuidePage />} />
       <Route path="/about" element={<About />} />
       <Route path="/service-area" element={<ServiceArea />} />
       <Route path="/professionals" element={<Professionals />} />
