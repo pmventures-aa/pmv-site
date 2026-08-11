@@ -3,9 +3,17 @@ import type { AppEnv } from '../types'
 import { requireOwner, requireUser } from '../mid'
 import { runDueClientNurture } from '../relationshipAutomation'
 import { runClientNotificationOutbox } from '../clientNotificationOutbox'
+import { uuid } from '../crypto'
 
 export const relationshipAutomationRoutes = new Hono<AppEnv>()
 export const relationshipAutomationAdminRoutes = new Hono<AppEnv>()
+
+const AUTOMATIONS = {
+  client_notifications: { label: 'Client event notifications', cadence: 'Every 10 minutes', intervalMinutes: 10 },
+  client_nurture: { label: 'Client nurture campaign', cadence: 'Daily at 10:20 AM ET', intervalMinutes: 1440 },
+} as const
+
+type AutomationKey = keyof typeof AUTOMATIONS
 
 function timingSafeEqualText(a: string, b: string) {
   if (a.length !== b.length) return false
@@ -20,6 +28,31 @@ async function requireAutomationCron(c: any, next: any) {
   const provided = String(c.req.header('x-pmv-automation-secret') || '').trim()
   if (!provided || !timingSafeEqualText(provided, expected)) return c.json({ error: 'forbidden' }, 403)
   await next()
+}
+
+async function executeAutomation(c: any, key: AutomationKey, triggerType: 'scheduled'|'manual', actorUserId?: string) {
+  const runId = uuid()
+  await c.env.DB.prepare(
+    `INSERT INTO automation_runs(id,automation_key,trigger_type,status,triggered_by_user_id)
+     VALUES(?,?,?,'running',?)`,
+  ).bind(runId, key, triggerType, actorUserId || null).run()
+  try {
+    const result = key === 'client_notifications'
+      ? await runClientNotificationOutbox(c.env, 75)
+      : await runDueClientNurture(c.env, 50)
+    const processed = Number(result.processed || 0)
+    const succeeded = Number((result as any).sent || 0)
+    const failed = Number((result as any).failed || 0)
+    await c.env.DB.prepare(
+      `UPDATE automation_runs SET status=?,items_processed=?,items_succeeded=?,items_failed=?,detail_json=?,finished_at=datetime('now') WHERE id=?`,
+    ).bind(failed > 0 ? 'partial' : 'success', processed, succeeded, failed, JSON.stringify(result), runId).run()
+    return result
+  } catch (err) {
+    await c.env.DB.prepare(
+      `UPDATE automation_runs SET status='failed',detail_json=?,finished_at=datetime('now') WHERE id=?`,
+    ).bind(JSON.stringify({ error: err instanceof Error ? err.message : 'automation failed' }), runId).run()
+    throw err
+  }
 }
 
 relationshipAutomationRoutes.get('/portal/notification-preferences', requireUser, async (c) => {
@@ -59,6 +92,30 @@ relationshipAutomationRoutes.patch('/portal/notification-preferences', requireUs
   }
   if(statements.length) await c.env.DB.batch(statements)
   return c.json({ok:true})
+})
+
+relationshipAutomationAdminRoutes.get('/automation-center', requireOwner, async (c) => {
+  const runs = await c.env.DB.prepare(`SELECT * FROM automation_runs ORDER BY started_at DESC LIMIT 100`).all<any>()
+  const latestByKey = new Map<string, any>()
+  for (const run of runs.results || []) if (!latestByKey.has(run.automation_key)) latestByKey.set(run.automation_key, run)
+  const automations = Object.entries(AUTOMATIONS).map(([key, meta]) => {
+    const last = latestByKey.get(key) || null
+    let nextRunAt: string | null = null
+    if (key === 'client_notifications') {
+      const now = new Date(); const minute = now.getUTCMinutes(); const next = new Date(now)
+      next.setUTCSeconds(0,0); next.setUTCMinutes(minute - (minute % 10) + 10)
+      nextRunAt = next.toISOString()
+    }
+    return { key, ...meta, last_run: last, next_run_at: nextRunAt }
+  })
+  return c.json({ automations, runs: runs.results || [] })
+})
+
+relationshipAutomationAdminRoutes.post('/automation-center/:key/run', requireOwner, async (c) => {
+  const key = c.req.param('key') as AutomationKey
+  if (!(key in AUTOMATIONS)) return c.json({ error:'unknown automation' },404)
+  const result = await executeAutomation(c, key, 'manual', c.get('user').id)
+  return c.json({ ok:true, ...result })
 })
 
 relationshipAutomationAdminRoutes.get('/notification-center', requireOwner, async (c) => {
@@ -116,12 +173,11 @@ relationshipAutomationAdminRoutes.get('/nurture-campaign', requireOwner, async (
   return c.json({summary:summary.results||[],deliveries:deliveries.results||[],notification_outbox:outbox.results||[]})
 })
 
-// Scheduled handlers are idempotent and protected by a dedicated cron secret.
 relationshipAutomationRoutes.post('/automation/nurture/run', requireAutomationCron, async (c) => {
-  const result=await runDueClientNurture(c.env,50)
+  const result=await executeAutomation(c,'client_nurture','scheduled')
   return c.json({ok:true,...result})
 })
 relationshipAutomationRoutes.post('/automation/client-notifications/run', requireAutomationCron, async (c) => {
-  const result=await runClientNotificationOutbox(c.env,75)
+  const result=await executeAutomation(c,'client_notifications','scheduled')
   return c.json({ok:true,...result})
 })

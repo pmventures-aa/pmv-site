@@ -26,6 +26,7 @@ import AuditLogAdmin from './AuditLogAdmin'
 import EmployeesAdmin from './EmployeesAdmin'
 import ReportingCenter from './ReportingCenter'
 import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
+import AutomationCenter from './AutomationCenter'
 import InvoicesAdmin from './InvoicesAdmin'
 import ServiceAssignmentsAdmin from './ServiceAssignmentsAdmin'
 import InvitationsAdmin from './InvitationsAdmin'
@@ -50,9 +51,9 @@ function AdminShell() {
   if (caps.can_manage_invitations) visible.add('invitations')
   if (caps.can_manage_documents) { visible.add('document-center'); visible.add('community-documents'); visible.add('envelopes') }
   if (caps.can_manage_team) visible.add('employees')
-  if (caps.is_owner) visible.add('roles')
+  if (caps.is_owner) { visible.add('roles'); visible.add('automation-center') }
 
-  const nav = user?.role === 'admin' ? adminNav.filter((item) => item.key !== 'roles' || caps.is_owner) : adminNav.filter((item) => visible.has(item.key))
+  const nav = user?.role === 'admin' ? adminNav.filter((item) => (item.key !== 'roles' && item.key !== 'automation-center') || caps.is_owner) : adminNav.filter((item) => visible.has(item.key))
   return <AdminLayout nav={nav} badge="Staff Console" />
 }
 
@@ -92,6 +93,7 @@ export default function AdminApp({ basePath }: { basePath: string }) {
             <Route path="audit-log" element={<AuditLogAdmin />} />
             <Route path="reports" element={<ReportingCenter />} />
             <Route path="communications" element={<CommunicationsCRMAdmin />} />
+            <Route path="automation-center" element={<AutomationCenter />} />
             <Route path="employees" element={<EmployeesAdmin />} />
             <Route path="open-items/:type" element={<OpenItemsAdmin />} />
             <Route path="open-items" element={<OpenItemsAdmin />} />

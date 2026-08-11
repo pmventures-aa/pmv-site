@@ -73,8 +73,6 @@ function addUser(byEmail: Map<string, Recipient>, row: any, type: MessageType) {
 function addLead(byEmail: Map<string, Recipient>, row: any, type: MessageType) {
   if (!row?.email || !leadEligible(row, type)) return
   const email = String(row.email).trim().toLowerCase()
-  // Prefer an active PMV user when the same email exists as both a lead and
-  // an account; this prevents duplicate delivery after conversion/linking.
   if (byEmail.has(email) && byEmail.get(email)?.recipient_kind === 'user') return
   byEmail.set(email, {
     key: `lead:${row.id}`,
@@ -188,8 +186,6 @@ async function resolveAudience(env: Env, audience: Audience, type: MessageType):
   return [...byEmail.values()]
 }
 
-// Anyone on staff can browse audiences/history. Actual sending remains behind
-// can_manage_communications.
 commsRoutes.get('/comms/audience', requireStaff, async (c) => {
   const [counts, categories, users, leads, lists] = await Promise.all([
     c.env.DB.prepare(
@@ -228,18 +224,37 @@ commsRoutes.get('/comms/messages', requireStaff, async (c) => {
     `SELECT m.id, m.subject, m.message_type, m.send_mode, m.status, m.scheduled_at, m.recurrence, m.next_run_at, m.last_sent_at, m.sent_at, m.created_at,
             u.full_name AS created_by_name,
             (SELECT COUNT(*) FROM comms_recipients r WHERE r.message_id = m.id) AS recipient_count,
-            (SELECT COUNT(*) FROM comms_recipients r WHERE r.message_id = m.id AND r.status = 'sent') AS sent_count,
-            (SELECT COUNT(*) FROM comms_recipients r WHERE r.message_id = m.id AND r.status = 'failed') AS failed_count
+            (SELECT COUNT(*) FROM comms_recipients r WHERE r.message_id = m.id AND r.status IN ('sent','delivered')) AS sent_count,
+            (SELECT COUNT(*) FROM comms_recipients r WHERE r.message_id = m.id AND r.status = 'delivered') AS delivered_count,
+            (SELECT COUNT(*) FROM comms_recipients r WHERE r.message_id = m.id AND r.status IN ('failed','bounced','suppressed')) AS failed_count
      FROM comms_messages m JOIN users u ON u.id = m.created_by_user_id ORDER BY m.created_at DESC LIMIT 300`,
   ).all()
   return c.json({ messages: res.results ?? [] })
 })
 
+commsRoutes.get('/comms/folders', requireStaff, async (c) => {
+  const row = await c.env.DB.prepare(
+    `SELECT COUNT(*) total,
+            SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END) drafts,
+            SUM(CASE WHEN status='queued' THEN 1 ELSE 0 END) scheduled,
+            SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) sent,
+            SUM(CASE WHEN status IN ('failed','canceled') THEN 1 ELSE 0 END) exceptions
+     FROM comms_messages`,
+  ).first<any>()
+  return c.json({
+    total: Number(row?.total || 0),
+    drafts: Number(row?.drafts || 0),
+    scheduled: Number(row?.scheduled || 0),
+    sent: Number(row?.sent || 0),
+    exceptions: Number(row?.exceptions || 0),
+  })
+})
+
 commsRoutes.get('/comms/messages/:id', requireStaff, async (c) => {
   const id = c.req.param('id') ?? ''
   const [message, recipients] = await Promise.all([
-    c.env.DB.prepare(`SELECT m.*, u.full_name AS created_by_name FROM comms_messages m JOIN users u ON u.id = m.created_by_user_id WHERE m.id = ?`).bind(id).first(),
-    c.env.DB.prepare('SELECT * FROM comms_recipients WHERE message_id = ? ORDER BY full_name, email').bind(id).all(),
+    c.env.DB.prepare(`SELECT m.*, u.full_name AS created_by_name, u.email AS created_by_email FROM comms_messages m JOIN users u ON u.id = m.created_by_user_id WHERE m.id = ?`).bind(id).first(),
+    c.env.DB.prepare(`SELECT id,email,full_name,recipient_kind,status,provider_message_id,sent_at,error FROM comms_recipients WHERE message_id = ? ORDER BY COALESCE(full_name,email),email`).bind(id).all(),
   ])
   if (!message) return c.json({ error: 'not found' }, 404)
   return c.json({ message, recipients: recipients.results ?? [] })

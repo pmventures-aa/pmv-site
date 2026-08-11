@@ -25,6 +25,7 @@ import {
   MapPinned,
   Send,
   BookOpen,
+  Bot,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -62,7 +63,8 @@ export const adminNav: NavItem[] = [
   { key: 'clients', label: 'Clients', to: 'clients', icon: Users, section: 'Revenue' },
 
   { key: 'messages', label: 'Inbox', to: 'messages', icon: MessageSquare, section: 'Operations' },
-  { key: 'communications', label: 'Campaigns', to: 'communications', icon: Megaphone, section: 'Operations' },
+  { key: 'communications', label: 'Email Center', to: 'communications', icon: Megaphone, section: 'Operations' },
+  { key: 'automation-center', label: 'Automation Center', to: 'automation-center', icon: Bot, section: 'Operations' },
   { key: 'document-center', label: 'Document Hub', to: 'document-center', icon: FileText, section: 'Operations' },
   { key: 'community-documents', label: 'Community Docs', to: 'community-documents', icon: BookOpen, section: 'Operations' },
   { key: 'envelopes', label: 'Envelopes', to: 'envelopes', icon: Send, section: 'Operations' },
