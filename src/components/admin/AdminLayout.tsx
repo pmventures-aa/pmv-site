@@ -11,6 +11,7 @@ import { MailBell } from '../kit/MailBell'
 import { Avatar } from '../kit/Avatar'
 import { SlaAlertChip } from './SlaAlertChip'
 import { MailWorkspaceLauncher } from './MailWorkspaceLauncher'
+import { AdminPageBoundary } from './AdminPageBoundary'
 
 const LIVE_REFRESH_MS = 3_000
 const MOBILE_MEDIA = '(max-width: 767px), (pointer: coarse)'
@@ -204,7 +205,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <NotificationBell />
           </div>
         </div>
-        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><Outlet /></main>
+        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><AdminPageBoundary><Outlet /></AdminPageBoundary></main>
       </div>
     </div>
   )

@@ -3,7 +3,7 @@
 -- server-side, see functions/_lib/session.ts). The presence endpoints
 -- derive the green/yellow/red status by comparing last_seen_at to NOW at
 -- read time - no separate presence table, no scheduled job to age rows
--- out. Column is nullable so accounts that predate the migration or
--- have never signed in show as "unknown" (rendered as slate/no dot).
-ALTER TABLE users ADD COLUMN last_seen_at TEXT;
+-- out. users.last_seen_at was introduced by 0016_employee_metrics.sql.
+-- Re-adding it here stopped the migration chain on clean and production
+-- databases. This migration owns only the presence lookup index.
 CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users(last_seen_at);
