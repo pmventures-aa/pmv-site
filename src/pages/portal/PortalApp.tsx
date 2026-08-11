@@ -1,7 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { Shell } from '../../components/layout/Shell'
-import { portalNav } from '../../components/layout/nav'
+import { useEffect, useState } from 'react'
+import { clientPortalNav } from '../../components/layout/nav'
+import { api } from '../../lib/api'
 import { BasePathProvider, useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
 import Login from '../auth/Login'
@@ -26,6 +28,16 @@ import Notifications from './Notifications'
 import Security from './Security'
 import { ModulePage } from './ModulePage'
 import { callsConfig, mattersConfig, tasksConfig, calendarConfig, fundingConfig, propertyConfig, taxConfig } from './moduleConfigs'
+
+function ClientShell() {
+  const [keys, setKeys] = useState<string[]>([])
+  useEffect(() => {
+    api.get<{ services: { service_key: string }[] }>('/portal/services')
+      .then((result) => setKeys(result.services.map((service) => service.service_key)))
+      .catch(() => setKeys([]))
+  }, [])
+  return <Shell nav={clientPortalNav(keys)} badge="Client Portal" />
+}
 
 function PortalRoot() {
   const { user, loading } = useAuth()
@@ -58,7 +70,7 @@ export default function PortalApp({ basePath }: { basePath: string }) {
 
         <Route element={<ProtectedRoute allow={['client']} />}>
           <Route path="onboarding" element={<OnboardingWizard />} />
-          <Route element={<Shell nav={portalNav} badge="Client Portal" />}>
+          <Route element={<ClientShell />}>
             <Route index element={<Dashboard />} />
             <Route path="planned-calls" element={<ModulePage config={callsConfig} />} />
             <Route path="services" element={<Services />} />

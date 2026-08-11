@@ -1,14 +1,27 @@
 import {
   Home, Layers, Scale, CheckSquare, FileText, MessageSquare, Calendar, Receipt, HelpCircle, Building2, Users, Bell, ShieldCheck,
   Workflow, UserPlus, Megaphone, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned, Send,
-  BookOpen, Bot, Gauge, PenTool, type LucideIcon,
+  BookOpen, Bot, Gauge, PenTool, Wrench, type LucideIcon,
 } from 'lucide-react'
 
 export interface NavItem { key:string;label:string;to:string;icon:LucideIcon;section?:string }
 
 export const portalNav: NavItem[] = [
-  {key:'dashboard',label:'Dashboard',to:'',icon:Home},{key:'services',label:'My Services',to:'services',icon:Layers},{key:'matters',label:'Projects & Matters',to:'matters',icon:Scale},{key:'tasks',label:'Tasks',to:'tasks',icon:CheckSquare},{key:'documents',label:'Documents',to:'documents',icon:FileText},{key:'messages',label:'Messages',to:'messages',icon:MessageSquare},{key:'calendar',label:'Calendar',to:'calendar',icon:Calendar},{key:'billing',label:'Billing',to:'billing',icon:Receipt},{key:'support',label:'Support',to:'support',icon:HelpCircle},{key:'business-profile',label:'Business Profile',to:'business-profile',icon:Building2},{key:'my-team',label:'My Team',to:'my-team',icon:Users},{key:'notifications',label:'Notifications',to:'notifications',icon:Bell},{key:'security',label:'Security',to:'security',icon:ShieldCheck},
+  {key:'dashboard',label:'Command Center',to:'',icon:Home},
+  {key:'support',label:'Requests & Cases',to:'support',icon:HelpCircle},
+  {key:'documents',label:'Documents',to:'documents',icon:FileText},
+  {key:'messages',label:'Messages',to:'messages',icon:MessageSquare},
+  {key:'billing',label:'Billing',to:'billing',icon:Receipt},
+  {key:'services',label:'Services',to:'services',icon:Layers},
 ]
+export function clientPortalNav(serviceKeys: string[]): NavItem[] {
+  const keys = new Set(serviceKeys)
+  const contextual: NavItem[] = []
+  if (keys.has('property_management') || keys.has('property_inspections')) contextual.push({key:'properties',label:'My Properties',to:'property-management',icon:Building2,section:'Your work'})
+  if (keys.has('funding')) contextual.push({key:'funding',label:'Funding',to:'funding',icon:Gauge,section:'Your work'})
+  if ([...keys].some((key) => ['admin_support','document_courier','mobile_notary'].includes(key))) contextual.push({key:'work',label:'Projects & Tasks',to:'matters',icon:Wrench,section:'Your work'})
+  return [portalNav[0], ...contextual, ...portalNav.slice(1)]
+}
 export const portalHiddenRoutes=['planned-calls','funding','property-management','tax-filings'] as const
 
 export const adminNav: NavItem[] = [
