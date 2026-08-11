@@ -46,6 +46,7 @@ import { documentVerificationRoutes } from '../_lib/routes/documentVerification'
 import { documentLifecycleAdminRoutes, documentLifecyclePublicRoutes } from '../_lib/routes/documentLifecycle'
 import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_lib/routes/internalDocuments'
 import { documentWorkspaceExtraRoutes } from '../_lib/routes/documentWorkspaceExtras'
+import { securitySessionRoutes } from '../_lib/routes/securitySessions'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -76,6 +77,7 @@ app.route('/portal', portalRoutes)
 app.route('/portal', messageRoutes)
 
 app.route('/admin', relationshipAutomationAdminRoutes)
+app.route('/admin', securitySessionRoutes)
 app.route('/admin', serviceOfferingAdminRoutes)
 app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', accountEmailsAdminRoutes)
