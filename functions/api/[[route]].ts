@@ -46,6 +46,7 @@ import { relationshipAutomationRoutes, relationshipAutomationAdminRoutes } from 
 import { fieldWorkRoutes } from '../_lib/routes/fieldWork'
 import { documentVerificationRoutes } from '../_lib/routes/documentVerification'
 import { documentLifecycleAdminRoutes, documentLifecyclePublicRoutes } from '../_lib/routes/documentLifecycle'
+import { documentOperationsAdminRoutes } from '../_lib/routes/documentOperations'
 import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_lib/routes/internalDocuments'
 import { documentWorkspaceExtraRoutes } from '../_lib/routes/documentWorkspaceExtras'
 import { securitySessionRoutes } from '../_lib/routes/securitySessions'
@@ -96,6 +97,7 @@ app.route('/admin', reportExportRoutes)
 app.route('/admin', scheduledReportRoutes)
 app.route('/admin', managementInsightRoutes)
 app.route('/admin', documentWorkspaceExtraRoutes)
+app.route('/admin', documentOperationsAdminRoutes)
 app.route('/admin', documentLifecycleAdminRoutes)
 app.route('/admin', internalDocumentAdminRoutes)
 app.route('/admin', adminRoutes)
