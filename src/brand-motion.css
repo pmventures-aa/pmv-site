@@ -10,7 +10,7 @@
  * The artwork itself never changes between public, HQ, client, and email use. */
 .pmv-white-gold-mark {
   display: block;
-  filter: brightness(0) invert(1) contrast(.96) drop-shadow(0 22px 30px rgba(0,0,0,.28));
+  filter: drop-shadow(0 22px 30px rgba(0,0,0,.28));
 }
 
 .pmv-free-floating-mark {
@@ -162,10 +162,6 @@
  * brightness / drop-shadow filter tuned for the glossy tile stops applying
  * here. Give the standalone crest a subtle warm-tone drop shadow instead
  * and drop the extra brightness that made it feel washed-out on dark navy. */
-.pmv-auth-crest.pmv-crest-light,
-.pmv-auth-crest .pmv-crest-light {
-  filter: brightness(0) invert(1) contrast(.96) drop-shadow(0 10px 22px rgba(0,0,0,.35));
-}
 .pmv-auth-crest.pmv-crest-switch {
   filter: drop-shadow(0 8px 18px rgba(0,0,0,.24));
 }
