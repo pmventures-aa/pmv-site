@@ -39,7 +39,7 @@ export function renderPinnacleEmailLayout(input: EmailLayoutInput): string {
     <tr><td align="center" style="padding:30px 14px">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px">
         <tr><td align="center" style="padding:4px 0 22px">
-          <img src="${LOGO_URL}" width="64" height="64" alt="Pinnacle Management Ventures" style="display:block;width:64px;height:64px;object-fit:contain;margin:0 auto 10px">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto 10px"><tr><td bgcolor="#fffefa" style="width:72px;height:72px;border-radius:12px;border:1px solid #e7e2d8" align="center" valign="middle"><img src="${LOGO_URL}" width="58" height="58" alt="Pinnacle Management Ventures" style="display:block;width:58px;height:58px;object-fit:contain;margin:0 auto"></td></tr></table>
           <div style="font-family:Georgia,'Times New Roman',serif;font-size:19px;line-height:24px;color:#ffffff;letter-spacing:.2px">Pinnacle Management Ventures</div>
           <div style="margin-top:5px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;letter-spacing:1.8px;text-transform:uppercase;color:#d7b56d">Professional support. One call away.</div>
         </td></tr>
