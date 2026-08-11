@@ -17,7 +17,7 @@ const TABS = [
   { key: 'appearance', label: 'Appearance', short: 'Personal HQ display preferences for this device.', icon: Palette, terms: 'theme dark light workspace display' },
   { key: 'catalog', label: 'Service Catalog', short: 'Define service structure, intake configuration, and client-facing service data.', icon: BriefcaseBusiness, terms: 'services catalog intake applications client offerings' },
   { key: 'offerings', label: 'Service Offerings', short: 'Control which services are available and how they are presented.', icon: SlidersHorizontal, terms: 'services offerings enabled availability pricing scope' },
-  { key: 'staff', label: 'Staff & Permissions', short: 'Manage team access, roles, responsibilities, and permissions.', icon: Users, terms: 'staff users roles access permissions team employees' },
+  { key: 'staff', label: 'Network Access & Permissions', short: 'Manage internal access, provider roles, responsibilities, and permissions.', icon: Users, terms: 'staff users roles access permissions team providers professionals network' },
   { key: 'notifications', label: 'Notifications', short: 'Choose how operational events reach you across HQ, email, desktop, and sound.', icon: Bell, terms: 'notifications email desktop sound alerts events' },
   { key: 'deletions', label: 'Permanent Deletions', short: 'Owner-only irreversible record deletion and impact review.', icon: Trash2, terms: 'delete danger purge permanent owner archive' },
 ] as const
