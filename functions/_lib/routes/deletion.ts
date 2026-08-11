@@ -22,7 +22,7 @@ function labelFor(entity:string,row:Record<string,any>){
   if(entity==='invoices')return `Invoice ${(Number(row.amount_cents||0)/100).toLocaleString(undefined,{style:'currency',currency:'USD'})}`
   return row.title||row.subject||row.file_name||row.category||String(row.body||'').slice(0,80)||row.id
 }
-async function safeCount(env:AppEnv['Bindings'],sql:string,id:string){try{return (await env.DB.prepare(sql).bind(id).first<{n:number}>())?.n||0}catch{return 0}}
+async function safeCount(env:AppEnv['Bindings'],sql:string,...params:string[]){try{return (await env.DB.prepare(sql).bind(...params).first<{n:number}>())?.n||0}catch{return 0}}
 async function dependencySummary(env:AppEnv['Bindings'],entity:string,id:string){
   const deps:Record<string,number>={}
   if(entity==='inquiries'){
@@ -32,13 +32,13 @@ async function dependencySummary(env:AppEnv['Bindings'],entity:string,id:string)
     deps.crm_lists=await safeCount(env,'SELECT COUNT(*) n FROM crm_list_members WHERE inquiry_id=?',id)
   }else if(entity==='users'){
     deps.client_profile=await safeCount(env,'SELECT COUNT(*) n FROM client_profiles WHERE user_id=?',id)
-    deps.staff_assignments=await safeCount(env,'SELECT COUNT(*) n FROM staff_assignments WHERE client_user_id=? OR staff_user_id=?',id).catch(()=>0)
+    deps.staff_assignments=await safeCount(env,'SELECT COUNT(*) n FROM staff_assignments WHERE client_user_id=? OR staff_user_id=?',id,id)
     deps.matters=await safeCount(env,'SELECT COUNT(*) n FROM matters WHERE client_user_id=?',id)
     deps.tasks=await safeCount(env,'SELECT COUNT(*) n FROM client_tasks WHERE client_user_id=?',id)
     deps.invoices=await safeCount(env,'SELECT COUNT(*) n FROM invoices WHERE client_user_id=?',id)
     deps.documents=await safeCount(env,'SELECT COUNT(*) n FROM client_documents WHERE client_user_id=?',id)
     deps.tickets=await safeCount(env,'SELECT COUNT(*) n FROM support_tickets WHERE client_user_id=?',id)
-    deps.messages=await safeCount(env,'SELECT COUNT(*) n FROM secure_messages WHERE client_user_id=? OR sender_user_id=?',id).catch(()=>0)
+    deps.messages=await safeCount(env,'SELECT COUNT(*) n FROM secure_messages WHERE client_user_id=? OR sender_user_id=?',id,id)
   }else if(entity==='matters'){
     deps.tasks=await safeCount(env,'SELECT COUNT(*) n FROM client_tasks WHERE matter_id=?',id)
   }else if(entity==='documents'){
@@ -46,8 +46,6 @@ async function dependencySummary(env:AppEnv['Bindings'],entity:string,id:string)
   }
   return deps
 }
-
-// ---------------- archive / restore ----------------
 
 deletionRoutes.patch('/records/:entity/:id/archive', requireStaff, async (c) => {
   const entity = c.req.param('entity')!; const table = ARCHIVABLE[entity]
@@ -93,8 +91,6 @@ deletionRoutes.get('/records/:entity/archived', requireStaff, async (c) => {
   const res=await c.env.DB.prepare(`SELECT * FROM ${table} WHERE ${where} ORDER BY archived_at DESC LIMIT 200`).bind(...params).all()
   return c.json({entity,records:res.results??[]})
 })
-
-// ---------------- permanent deletion (Owner only) ----------------
 
 deletionRoutes.get('/records/:entity/:id/deletion-impact', requireOwner, async(c)=>{
   const entity=c.req.param('entity')!;const table=DELETABLE[entity]
