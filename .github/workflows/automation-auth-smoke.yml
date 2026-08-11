@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify production automation endpoints
+      - name: Verify refreshed production automation endpoints
         env:
           PMV_AUTOMATION_SECRET: ${{ secrets.PMV_AUTOMATION_SECRET }}
         shell: bash
@@ -24,8 +24,19 @@ jobs:
           test -n "$PMV_AUTOMATION_SECRET"
 
           host='pmv-site.pages.dev'
-          echo "Testing $host"
-          getent ahosts "$host" | head -n 2
+          marker_url="https://$host/.well-known/pmv-automation-binding-v1.txt"
+          echo "Confirming post-secret deployment on $host"
+
+          marker=''
+          for attempt in $(seq 1 24); do
+            marker="$(curl --silent --show-error --max-time 10 "$marker_url" || true)"
+            if [[ "$marker" == 'pmv-automation-binding-v1' ]]; then
+              echo 'Refreshed Pages deployment confirmed.'
+              break
+            fi
+            sleep 5
+          done
+          [[ "$marker" == 'pmv-automation-binding-v1' ]]
 
           health_body="$(mktemp)"
           health_status="$(curl --silent --show-error --output "$health_body" --write-out '%{http_code}' --max-time 15 "https://$host/api/health")"
