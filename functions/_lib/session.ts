@@ -3,12 +3,54 @@ import { uuid } from './crypto'
 
 const COOKIE = 'pmv_session'
 const TTL_SECONDS = 60 * 60 * 12 // 12h
+const LAST_SEEN_THROTTLE_SECONDS = 5 * 60
 
-export async function createSession(env: Env, user: SessionUser): Promise<string> {
+function cookieToken(request: Request): string | null {
+  const cookie = request.headers.get('Cookie') ?? ''
+  const match = cookie.match(new RegExp(`${COOKIE}=([^;]+)`))
+  return match?.[1] || null
+}
+
+function requestGeo(request?: Request) {
+  if (!request) return { city: null, region: null, country: null }
+  const cf = (request as unknown as { cf?: Record<string, unknown> }).cf || {}
+  const pick = (key: string) => typeof cf[key] === 'string' ? String(cf[key]).slice(0, 120) : null
+  return { city: pick('city'), region: pick('region'), country: pick('country') }
+}
+
+function deviceLabel(userAgent: string | null): string {
+  const ua = userAgent || ''
+  const platform = /iPhone/i.test(ua) ? 'iPhone' : /iPad/i.test(ua) ? 'iPad' : /Android/i.test(ua) ? 'Android' : /Macintosh|Mac OS X/i.test(ua) ? 'Mac' : /Windows/i.test(ua) ? 'Windows PC' : /Linux/i.test(ua) ? 'Linux device' : 'Unknown device'
+  const browser = /Edg\//i.test(ua) ? 'Edge' : /CriOS|Chrome\//i.test(ua) ? 'Chrome' : /FxiOS|Firefox\//i.test(ua) ? 'Firefox' : /Safari\//i.test(ua) ? 'Safari' : 'Browser'
+  return `${browser} on ${platform}`
+}
+
+async function recordSession(env: Env, sessionId: string, user: SessionUser, request?: Request) {
+  const ua = request?.headers.get('User-Agent') || null
+  const ip = request?.headers.get('CF-Connecting-IP') || null
+  const geo = requestGeo(request)
+  const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000).toISOString()
+  try {
+    await env.DB.prepare(
+      `INSERT INTO auth_sessions(id,user_id,device_label,user_agent,ip_address,city,region,country,expires_at)
+       VALUES(?,?,?,?,?,?,?,?,?)`,
+    ).bind(sessionId, user.id, deviceLabel(ua), ua?.slice(0, 1000) || null, ip, geo.city, geo.region, geo.country, expiresAt).run()
+  } catch (err) {
+    // Session creation remains available during a rolling deploy before the
+    // migration reaches D1. Once 0042 is applied, all new sessions are tracked.
+    console.error('[session] metadata write failed', err)
+  }
+}
+
+export async function createSession(env: Env, user: SessionUser, request?: Request): Promise<string> {
   const token = uuid()
+  const sessionId = uuid()
   await Promise.all([
     env.SESSIONS.put(`sess:${token}`, JSON.stringify(user), { expirationTtl: TTL_SECONDS }),
     env.SESSIONS.put(`usess:${user.id}:${token}`, '1', { expirationTtl: TTL_SECONDS }),
+    env.SESSIONS.put(`sessmeta:${token}`, sessionId, { expirationTtl: TTL_SECONDS }),
+    env.SESSIONS.put(`sid:${sessionId}`, token, { expirationTtl: TTL_SECONDS }),
+    recordSession(env, sessionId, user, request),
   ])
   return token
 }
@@ -21,11 +63,27 @@ export function clearCookie(): string {
   return `${COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`
 }
 
+export async function currentSessionId(env: Env, request: Request): Promise<string | null> {
+  const token = cookieToken(request)
+  if (!token) return null
+  return env.SESSIONS.get(`sessmeta:${token}`)
+}
+
+async function touchSession(env: Env, token: string, userId: string): Promise<void> {
+  const sessionId = await env.SESSIONS.get(`sessmeta:${token}`)
+  if (!sessionId) return
+  const key = `sessiontouch:${sessionId}`
+  const marker = await env.SESSIONS.get(key)
+  if (marker) return
+  await Promise.all([
+    env.SESSIONS.put(key, '1', { expirationTtl: LAST_SEEN_THROTTLE_SECONDS }),
+    env.DB.prepare("UPDATE auth_sessions SET last_seen_at=datetime('now') WHERE id=? AND user_id=? AND revoked_at IS NULL").bind(sessionId, userId).run().catch(() => undefined),
+  ])
+}
+
 export async function getUser(env: Env, request: Request): Promise<SessionUser | null> {
-  const cookie = request.headers.get('Cookie') ?? ''
-  const m = cookie.match(new RegExp(`${COOKIE}=([^;]+)`))
-  if (!m) return null
-  const token = m[1]
+  const token = cookieToken(request)
+  if (!token) return null
   const raw = await env.SESSIONS.get(`sess:${token}`)
   if (!raw) return null
 
@@ -35,17 +93,18 @@ export async function getUser(env: Env, request: Request): Promise<SessionUser |
     return null
   }
 
-  // KV is only the session carrier. D1 remains authoritative for whether the
-  // identity still exists, is active, and still has the same account role.
-  // This closes the stale-session gap after an account is deleted even if an
-  // external cleanup process cannot directly enumerate/delete KV keys.
+  // KV carries the session, while D1 remains authoritative for account state.
   const live = await env.DB.prepare(
     `SELECT id,email,role,full_name,first_name,last_name,status FROM users WHERE id=?`,
   ).bind(cached.id).first<any>()
   if (!live || live.status !== 'active' || live.role !== cached.role || live.email !== cached.email) {
+    const sessionId = await env.SESSIONS.get(`sessmeta:${token}`)
     await Promise.all([
       env.SESSIONS.delete(`sess:${token}`),
       env.SESSIONS.delete(`usess:${cached.id}:${token}`),
+      env.SESSIONS.delete(`sessmeta:${token}`),
+      sessionId ? env.SESSIONS.delete(`sid:${sessionId}`) : Promise.resolve(),
+      sessionId ? env.DB.prepare("UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,datetime('now')),revoke_reason='account state changed' WHERE id=?").bind(sessionId).run().catch(() => undefined) : Promise.resolve(),
     ])
     return null
   }
@@ -58,11 +117,10 @@ export async function getUser(env: Env, request: Request): Promise<SessionUser |
     first_name: live.first_name ?? null,
     last_name: live.last_name ?? null,
   }
-  await touchLastSeen(env, user.id)
+  await Promise.all([touchLastSeen(env, user.id), touchSession(env, token, user.id)])
   return user
 }
 
-const LAST_SEEN_THROTTLE_SECONDS = 5 * 60
 async function touchLastSeen(env: Env, userId: string): Promise<void> {
   const key = `lastseen:${userId}`
   const marker = await env.SESSIONS.get(key)
@@ -73,28 +131,63 @@ async function touchLastSeen(env: Env, userId: string): Promise<void> {
   ])
 }
 
+export async function revokeSession(env: Env, sessionId: string, actorUserId?: string | null, reason = 'revoked'): Promise<{ userId: string | null; revoked: boolean }> {
+  const row = await env.DB.prepare('SELECT user_id,revoked_at FROM auth_sessions WHERE id=?').bind(sessionId).first<{ user_id: string; revoked_at: string | null }>().catch(() => null)
+  if (!row || row.revoked_at) return { userId: row?.user_id || null, revoked: false }
+  const token = await env.SESSIONS.get(`sid:${sessionId}`)
+  await Promise.all([
+    token ? env.SESSIONS.delete(`sess:${token}`) : Promise.resolve(),
+    token ? env.SESSIONS.delete(`usess:${row.user_id}:${token}`) : Promise.resolve(),
+    token ? env.SESSIONS.delete(`sessmeta:${token}`) : Promise.resolve(),
+    env.SESSIONS.delete(`sid:${sessionId}`),
+    env.DB.prepare("UPDATE auth_sessions SET revoked_at=datetime('now'),revoked_by_user_id=?,revoke_reason=? WHERE id=? AND revoked_at IS NULL").bind(actorUserId || null, reason.slice(0, 200), sessionId).run(),
+  ])
+  return { userId: row.user_id, revoked: true }
+}
+
 export async function destroySession(env: Env, request: Request): Promise<void> {
-  const cookie = request.headers.get('Cookie') ?? ''
-  const m = cookie.match(new RegExp(`${COOKIE}=([^;]+)`))
-  if (!m) return
-  const token = m[1]
+  const token = cookieToken(request)
+  if (!token) return
   const raw = await env.SESSIONS.get(`sess:${token}`)
-  const user = raw ? (JSON.parse(raw) as SessionUser) : null
+  const user = raw ? (() => { try { return JSON.parse(raw) as SessionUser } catch { return null } })() : null
+  const sessionId = await env.SESSIONS.get(`sessmeta:${token}`)
   await Promise.all([
     env.SESSIONS.delete(`sess:${token}`),
     user ? env.SESSIONS.delete(`usess:${user.id}:${token}`) : Promise.resolve(),
+    env.SESSIONS.delete(`sessmeta:${token}`),
+    sessionId ? env.SESSIONS.delete(`sid:${sessionId}`) : Promise.resolve(),
+    sessionId ? env.DB.prepare("UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,datetime('now')),revoked_by_user_id=?,revoke_reason=COALESCE(revoke_reason,'logout') WHERE id=?").bind(user?.id || null, sessionId).run().catch(() => undefined) : Promise.resolve(),
   ])
 }
 
-export async function revokeUserSessions(env: Env, userId: string): Promise<void> {
+export async function revokeUserSessions(env: Env, userId: string, actorUserId?: string | null, exceptSessionId?: string | null): Promise<void> {
   const prefix = `usess:${userId}:`
   const list = await env.SESSIONS.list({ prefix })
   await Promise.all(
     list.keys.flatMap((k) => {
       const token = k.name.slice(prefix.length)
-      return [env.SESSIONS.delete(`sess:${token}`), env.SESSIONS.delete(k.name)]
+      return [
+        (async () => {
+          const sid = await env.SESSIONS.get(`sessmeta:${token}`)
+          if (sid && sid === exceptSessionId) return
+          await Promise.all([
+            env.SESSIONS.delete(`sess:${token}`),
+            env.SESSIONS.delete(k.name),
+            env.SESSIONS.delete(`sessmeta:${token}`),
+            sid ? env.SESSIONS.delete(`sid:${sid}`) : Promise.resolve(),
+            sid ? env.DB.prepare("UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,datetime('now')),revoked_by_user_id=?,revoke_reason='bulk revoke' WHERE id=?").bind(actorUserId || null, sid).run().catch(() => undefined) : Promise.resolve(),
+          ])
+        })(),
+      ]
     }),
   )
+  try {
+    if (exceptSessionId) {
+      await env.DB.prepare("UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,datetime('now')),revoked_by_user_id=?,revoke_reason='bulk revoke' WHERE user_id=? AND revoked_at IS NULL AND id<>?").bind(actorUserId || null, userId, exceptSessionId).run()
+    } else {
+      await env.DB.prepare("UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,datetime('now')),revoked_by_user_id=?,revoke_reason='bulk revoke' WHERE user_id=? AND revoked_at IS NULL").bind(actorUserId || null, userId).run()
+    }
+  } catch { /* rolling migration safety */ }
 }
 
 const ACTIVATION_TTL_SECONDS = 60 * 60 * 24 // 24h
