@@ -112,7 +112,7 @@ export function AuthLayout({
   )
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+export function Field({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-2 flex items-center justify-between gap-3">
