@@ -93,7 +93,7 @@ export default function ClientsList() {
               {filtered.map((c) => (
                 <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                   <td className="px-5 py-3">
-                    <Link to={p(`clients/${c.id}`)} className="font-medium text-white hover:text-gold">
+                    <Link to={p(`clients/${c.id}/overview`)} className="font-medium text-white hover:text-gold">
                       {c.full_name || c.email}
                     </Link>
                     <p className="text-xs text-slate-500">{c.email}</p>
