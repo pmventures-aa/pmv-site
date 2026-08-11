@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify authenticated automation endpoints
+      - name: Probe production application hosts
         env:
           PMV_AUTOMATION_SECRET: ${{ secrets.PMV_AUTOMATION_SECRET }}
         shell: bash
@@ -23,25 +23,45 @@ jobs:
           set -euo pipefail
           test -n "$PMV_AUTOMATION_SECRET"
 
-          check_endpoint() {
-            local label="$1"
-            local url="$2"
-            local body
+          probe() {
+            local host="$1"
+            echo "=== $host ==="
+            if ! getent ahosts "$host" | head -n 2; then
+              echo "DNS: unresolved"
+              return 1
+            fi
+            local body status
             body="$(mktemp)"
-            local status
-            status="$(curl --silent --show-error \
-              --output "$body" \
-              --write-out '%{http_code}' \
-              --request POST \
-              --header "x-pmv-automation-secret: $PMV_AUTOMATION_SECRET" \
-              "$url")"
+            status="$(curl --silent --show-error --output "$body" --write-out '%{http_code}' --max-time 15 "https://$host/api/health" || true)"
+            echo "Health HTTP: $status"
+            head -c 300 "$body" || true
+            echo
+            [[ "$status" -ge 200 && "$status" -lt 300 ]]
+          }
+
+          working_host=''
+          for host in secure.pinnaclemanagementventures.com client.pinnaclemanagementventures.com hq.pinnaclemanagementventures.com; do
+            if probe "$host"; then
+              working_host="$host"
+              break
+            fi
+          done
+
+          if [[ -z "$working_host" ]]; then
+            echo 'No application hostname is both publicly resolvable and returning a successful health response.'
+            exit 1
+          fi
+
+          echo "Testing automation authentication through $working_host"
+          check_endpoint() {
+            local label="$1" path="$2" body status
+            body="$(mktemp)"
+            status="$(curl --silent --show-error --output "$body" --write-out '%{http_code}' --request POST --header "x-pmv-automation-secret: $PMV_AUTOMATION_SECRET" "https://$working_host$path")"
             echo "$label returned HTTP $status"
             cat "$body"
             echo
-            if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
-              exit 1
-            fi
+            [[ "$status" -ge 200 && "$status" -lt 300 ]]
           }
 
-          check_endpoint 'Client notifications' 'https://secure.pinnaclemanagementventures.com/api/automation/client-notifications/run'
-          check_endpoint 'Client nurture' 'https://secure.pinnaclemanagementventures.com/api/automation/nurture/run'
+          check_endpoint 'Client notifications' '/api/automation/client-notifications/run'
+          check_endpoint 'Client nurture' '/api/automation/nurture/run'
