@@ -49,6 +49,7 @@ import { documentLifecycleAdminRoutes, documentLifecyclePublicRoutes } from '../
 import { documentOperationsAdminRoutes } from '../_lib/routes/documentOperations'
 import { documentPlatformV2AdminRoutes, documentPlatformV2AutomationRoutes, documentPlatformV2PublicRoutes } from '../_lib/routes/documentPlatformV2'
 import { documentSignerSecurityRoutes } from '../_lib/routes/documentSignerSecurity'
+import { documentSignerFileRoutes } from '../_lib/routes/documentSignerFiles'
 import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_lib/routes/internalDocuments'
 import { documentWorkspaceExtraRoutes } from '../_lib/routes/documentWorkspaceExtras'
 import { securitySessionRoutes } from '../_lib/routes/securitySessions'
@@ -67,6 +68,7 @@ app.route('/', vendorApplicationUploadRoutes)
 app.route('/', relationshipAutomationRoutes)
 app.route('/', documentPlatformV2AutomationRoutes)
 app.route('/', documentVerificationRoutes)
+app.route('/', documentSignerFileRoutes)
 app.route('/', documentSignerSecurityRoutes)
 app.route('/', documentPlatformV2PublicRoutes)
 app.route('/', documentLifecyclePublicRoutes)
