@@ -58,3 +58,36 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           npx wrangler pages deploy dist --project-name pmv-site --branch main
+
+      - name: Smoke test critical production routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin='https://pmv-site.pages.dev'
+
+          check_get() {
+            local path="$1" body status
+            body="$(mktemp)"
+            status="$(curl --silent --show-error --location --max-time 20 --output "$body" --write-out '%{http_code}' "$origin$path")"
+            echo "$path returned HTTP $status"
+            [[ "$status" -ge 200 && "$status" -lt 300 ]]
+            grep -q '<div id="root"></div>' "$body"
+          }
+
+          health="$(curl --fail --silent --show-error --max-time 20 "$origin/api/health")"
+          echo "$health" | jq -e '.ok == true and .service == "pmv-api"' >/dev/null
+
+          check_get '/portal/login'
+          check_get '/portal/signup?source=deploy-smoke'
+          check_get '/admin/login'
+          check_get '/terms'
+          check_get '/privacy'
+          check_get '/electronic-communications'
+          check_get '/accessibility'
+
+          recovery="$(curl --fail --silent --show-error --max-time 20 --request POST \
+            --header 'content-type: application/json' \
+            --data '{"email":"pmv-route-smoke@example.invalid","surface":"client"}' \
+            "$origin/api/auth/forgot-password")"
+          echo "$recovery" | jq -e '.ok == true' >/dev/null
+          echo 'Critical production route smoke tests passed.'
