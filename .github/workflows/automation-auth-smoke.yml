@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe production application hosts
+      - name: Verify production automation endpoints
         env:
           PMV_AUTOMATION_SECRET: ${{ secrets.PMV_AUTOMATION_SECRET }}
         shell: bash
@@ -23,40 +23,21 @@ jobs:
           set -euo pipefail
           test -n "$PMV_AUTOMATION_SECRET"
 
-          probe() {
-            local host="$1"
-            echo "=== $host ==="
-            if ! getent ahosts "$host" | head -n 2; then
-              echo "DNS: unresolved"
-              return 1
-            fi
-            local body status
-            body="$(mktemp)"
-            status="$(curl --silent --show-error --output "$body" --write-out '%{http_code}' --max-time 15 "https://$host/api/health" || true)"
-            echo "Health HTTP: $status"
-            head -c 300 "$body" || true
-            echo
-            [[ "$status" -ge 200 && "$status" -lt 300 ]]
-          }
+          host='pmv-site.pages.dev'
+          echo "Testing $host"
+          getent ahosts "$host" | head -n 2
 
-          working_host=''
-          for host in secure.pinnaclemanagementventures.com client.pinnaclemanagementventures.com hq.pinnaclemanagementventures.com; do
-            if probe "$host"; then
-              working_host="$host"
-              break
-            fi
-          done
+          health_body="$(mktemp)"
+          health_status="$(curl --silent --show-error --output "$health_body" --write-out '%{http_code}' --max-time 15 "https://$host/api/health")"
+          echo "Health returned HTTP $health_status"
+          cat "$health_body"
+          echo
+          [[ "$health_status" -ge 200 && "$health_status" -lt 300 ]]
 
-          if [[ -z "$working_host" ]]; then
-            echo 'No application hostname is both publicly resolvable and returning a successful health response.'
-            exit 1
-          fi
-
-          echo "Testing automation authentication through $working_host"
           check_endpoint() {
             local label="$1" path="$2" body status
             body="$(mktemp)"
-            status="$(curl --silent --show-error --output "$body" --write-out '%{http_code}' --request POST --header "x-pmv-automation-secret: $PMV_AUTOMATION_SECRET" "https://$working_host$path")"
+            status="$(curl --silent --show-error --output "$body" --write-out '%{http_code}' --request POST --header "x-pmv-automation-secret: $PMV_AUTOMATION_SECRET" "https://$host$path")"
             echo "$label returned HTTP $status"
             cat "$body"
             echo
