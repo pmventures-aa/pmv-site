@@ -8,15 +8,15 @@ export function Footer() {
         <div className="grid gap-10 lg:grid-cols-[1.25fr_.75fr_.8fr_1fr]">
           <div>
             <Logo />
-            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Hands-on professional support for business operations, projects, transitions, property and field needs, and defined mobile services.</p>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Practical help for property cleaning and care, inspections, eviction and REO support, documents, mobile services, and business operations.</p>
             <p className="mt-4 text-xs leading-5 text-slate-500">South Florida based. Remote consulting and project support are available nationwide when appropriate for the engagement.</p>
           </div>
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Services</p>
             <ul className="space-y-2.5 text-sm font-medium text-slate-400">
-              <li><Link to="/services/business-operations" className="hover:text-gold">Business &amp; Operations</Link></li>
-              <li><Link to="/services/property-field" className="hover:text-gold">Property &amp; Field</Link></li>
+              <li><Link to="/services/property-field" className="hover:text-gold">Property Care &amp; Field</Link></li>
               <li><Link to="/services/mobile-documents" className="hover:text-gold">Documents &amp; Mobile</Link></li>
+              <li><Link to="/services/business-operations" className="hover:text-gold">Business &amp; Operations</Link></li>
               <li><Link to="/services" className="hover:text-gold">All Services</Link></li>
             </ul>
           </div>

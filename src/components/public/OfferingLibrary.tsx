@@ -9,7 +9,7 @@ interface LiveOffering extends ServiceOffering {
 
 type OfferingResponse = { offerings?: LiveOffering[] }
 
-export function OfferingLibrary({ serviceKey }: { serviceKey: string }) {
+export function OfferingLibrary({ serviceKey, offeringPrefixes }: { serviceKey: string; offeringPrefixes?: string[] }) {
   const [offerings,setOfferings]=useState<LiveOffering[]>(()=>offeringsFor(serviceKey))
   const [query, setQuery] = useState('')
 
@@ -25,14 +25,16 @@ export function OfferingLibrary({ serviceKey }: { serviceKey: string }) {
     return()=>{active=false}
   },[serviceKey])
 
+  const scopedOfferings = useMemo(() => offeringPrefixes?.length ? offerings.filter((item) => offeringPrefixes.some((prefix) => item.id.startsWith(prefix))) : offerings, [offerings, offeringPrefixes])
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return offerings
-    return offerings.filter((item) => `${item.name} ${item.description} ${item.badge || ''}`.toLowerCase().includes(q))
-  }, [offerings, query])
+    if (!q) return scopedOfferings
+    return scopedOfferings.filter((item) => `${item.name} ${item.description} ${item.badge || ''}`.toLowerCase().includes(q))
+  }, [scopedOfferings, query])
 
   if (!offerings.length) return null
-  const prices=offerings.map(item=>item.startingPrice).filter((value):value is number=>typeof value==='number'&&Number.isFinite(value))
+  const prices=scopedOfferings.map(item=>item.startingPrice).filter((value):value is number=>typeof value==='number'&&Number.isFinite(value))
   const lowest=prices.length?Math.min(...prices):null
 
   return <section className="mt-14 border-t border-white/10 pt-10">
@@ -43,7 +45,7 @@ export function OfferingLibrary({ serviceKey }: { serviceKey: string }) {
         <p className="mt-3 text-sm leading-6 text-slate-400">These are common one-time and project scopes. Pricing shown is a starting point for standard local assignments; access, distance, urgency, size, complexity, third-party fees, or an expanded scope can change the final quote.</p>
         {lowest!==null&&<p className="mt-2 text-sm text-slate-300">Defined options in this area start at <strong className="text-white">${lowest.toLocaleString()}</strong>.</p>}
       </div>
-      {offerings.length > 10 && <label className="w-full sm:w-72"><span className="sr-only">Search services</span><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search this service menu…" className="w-full rounded-md border border-white/10 bg-white/[.03] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-gold/50 focus:outline-none"/></label>}
+      {scopedOfferings.length > 10 && <label className="w-full sm:w-72"><span className="sr-only">Search services</span><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search this service menu…" className="w-full rounded-md border border-white/10 bg-white/[.03] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-gold/50 focus:outline-none"/></label>}
     </div>
 
     <div className="mt-7 divide-y divide-white/10 border-y border-white/10">

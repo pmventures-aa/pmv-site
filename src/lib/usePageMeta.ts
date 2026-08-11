@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 
 const SITE_NAME = 'Pinnacle Management Ventures'
 const DEFAULT_DESCRIPTION =
-  'Pinnacle Management Ventures provides business consulting, operational coordination, POS and payment transition support, property and field support, and defined mobile professional services.'
+  'Pinnacle Management Ventures provides South Florida property cleaning, inspections, eviction and REO support, document and mobile services, administrative help, and business operations support.'
 
 // index.html sets the initial title and description. Public routes use this
 // lightweight helper to keep metadata accurate as visitors move through the
