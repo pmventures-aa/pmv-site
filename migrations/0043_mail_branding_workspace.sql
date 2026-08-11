@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS self_hosted_mail_outbox (
   from_address TEXT NOT NULL,
   headers_json TEXT,
   tags_json TEXT,
+  attachments_json TEXT,
   idempotency_key TEXT,
   status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','sending','sent','failed')),
   attempt_count INTEGER NOT NULL DEFAULT 0,
