@@ -2,7 +2,7 @@ import type { Env, SessionUser } from './types'
 import { uuid } from './crypto'
 
 const COOKIE = 'pmv_session'
-const TTL_SECONDS = 60 * 60 * 12 // 12h
+const TTL_SECONDS = 60 * 60 * 12
 const LAST_SEEN_THROTTLE_SECONDS = 5 * 60
 
 function cookieToken(request: Request): string | null {
@@ -36,8 +36,6 @@ async function recordSession(env: Env, sessionId: string, user: SessionUser, req
        VALUES(?,?,?,?,?,?,?,?,?)`,
     ).bind(sessionId, user.id, deviceLabel(ua), ua?.slice(0, 1000) || null, ip, geo.city, geo.region, geo.country, expiresAt).run()
   } catch (err) {
-    // Session creation remains available during a rolling deploy before the
-    // migration reaches D1. Once 0042 is applied, all new sessions are tracked.
     console.error('[session] metadata write failed', err)
   }
 }
@@ -69,15 +67,21 @@ export async function currentSessionId(env: Env, request: Request): Promise<stri
   return env.SESSIONS.get(`sessmeta:${token}`)
 }
 
-async function touchSession(env: Env, token: string, userId: string): Promise<void> {
+async function touchSession(env: Env, token: string, userId: string, request: Request): Promise<void> {
   const sessionId = await env.SESSIONS.get(`sessmeta:${token}`)
   if (!sessionId) return
   const key = `sessiontouch:${sessionId}`
   const marker = await env.SESSIONS.get(key)
   if (marker) return
+  const ua = request.headers.get('User-Agent') || null
+  const ip = request.headers.get('CF-Connecting-IP') || null
+  const geo = requestGeo(request)
   await Promise.all([
     env.SESSIONS.put(key, '1', { expirationTtl: LAST_SEEN_THROTTLE_SECONDS }),
-    env.DB.prepare("UPDATE auth_sessions SET last_seen_at=datetime('now') WHERE id=? AND user_id=? AND revoked_at IS NULL").bind(sessionId, userId).run().catch(() => undefined),
+    env.DB.prepare(
+      `UPDATE auth_sessions SET last_seen_at=datetime('now'),device_label=?,user_agent=?,ip_address=?,city=?,region=?,country=?
+       WHERE id=? AND user_id=? AND revoked_at IS NULL`,
+    ).bind(deviceLabel(ua), ua?.slice(0, 1000) || null, ip, geo.city, geo.region, geo.country, sessionId, userId).run().catch(() => undefined),
   ])
 }
 
@@ -93,7 +97,6 @@ export async function getUser(env: Env, request: Request): Promise<SessionUser |
     return null
   }
 
-  // KV carries the session, while D1 remains authoritative for account state.
   const live = await env.DB.prepare(
     `SELECT id,email,role,full_name,first_name,last_name,status FROM users WHERE id=?`,
   ).bind(cached.id).first<any>()
@@ -117,7 +120,7 @@ export async function getUser(env: Env, request: Request): Promise<SessionUser |
     first_name: live.first_name ?? null,
     last_name: live.last_name ?? null,
   }
-  await Promise.all([touchLastSeen(env, user.id), touchSession(env, token, user.id)])
+  await Promise.all([touchLastSeen(env, user.id), touchSession(env, token, user.id, request)])
   return user
 }
 
@@ -190,7 +193,7 @@ export async function revokeUserSessions(env: Env, userId: string, actorUserId?:
   } catch { /* rolling migration safety */ }
 }
 
-const ACTIVATION_TTL_SECONDS = 60 * 60 * 24 // 24h
+const ACTIVATION_TTL_SECONDS = 60 * 60 * 24
 
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
@@ -203,7 +206,6 @@ export async function createActivationToken(env: Env, userId: string): Promise<s
   const reverseKey = `activate-user:${userId}`
   const previous = await env.SESSIONS.get(reverseKey)
   if (previous) await env.SESSIONS.delete(`activate:${previous}`)
-
   const token = randomToken()
   await Promise.all([
     env.SESSIONS.put(`activate:${token}`, userId, { expirationTtl: ACTIVATION_TTL_SECONDS }),
