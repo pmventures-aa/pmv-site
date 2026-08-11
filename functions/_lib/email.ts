@@ -8,6 +8,7 @@ export function escapeHtml(s: string): string {
 }
 
 export interface EmailTag { name: string; value: string }
+export interface EmailAttachment { filename:string; content:string; contentType?:string }
 export interface SendEmailOptions {
   to: string
   subject: string
@@ -16,6 +17,7 @@ export interface SendEmailOptions {
   replyTo?: string
   idempotencyKey?: string
   tags?: EmailTag[]
+  attachments?: EmailAttachment[]
   alreadyBranded?: boolean
 }
 
@@ -34,8 +36,8 @@ async function queueMail(env: Env, opts: SendEmailOptions, html: string): Promis
     const existing = await env.DB.prepare('SELECT id FROM self_hosted_mail_outbox WHERE idempotency_key=?').bind(opts.idempotencyKey.slice(0,256)).first<{id:string}>().catch(()=>null)
     if (existing?.id) return existing.id
   }
-  await env.DB.prepare(`INSERT INTO self_hosted_mail_outbox(id,recipient_address,subject,html_body,text_body,reply_to,from_address,tags_json,idempotency_key,status) VALUES(?,?,?,?,?,?,?,?,?,'queued')`).bind(
-    id, opts.to.trim().toLowerCase(), opts.subject.slice(0,300), html, opts.text || null, opts.replyTo || null, from, JSON.stringify(opts.tags || []), opts.idempotencyKey?.slice(0,256) || null,
+  await env.DB.prepare(`INSERT INTO self_hosted_mail_outbox(id,recipient_address,subject,html_body,text_body,reply_to,from_address,tags_json,attachments_json,idempotency_key,status) VALUES(?,?,?,?,?,?,?,?,?,?,'queued')`).bind(
+    id, opts.to.trim().toLowerCase(), opts.subject.slice(0,300), html, opts.text || null, opts.replyTo || null, from, JSON.stringify(opts.tags || []), JSON.stringify(opts.attachments || []), opts.idempotencyKey?.slice(0,256) || null,
   ).run()
   return id
 }
@@ -62,6 +64,7 @@ async function attemptFirstPartyRelay(env: Env, outboxId: string): Promise<strin
         text: row.text_body,
         reply_to: row.reply_to,
         tags: JSON.parse(row.tags_json || '[]'),
+        attachments: JSON.parse(row.attachments_json || '[]'),
       }),
     })
     const payload = await res.json<any>().catch(()=>({}))
