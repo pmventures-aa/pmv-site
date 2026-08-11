@@ -57,6 +57,9 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
     full_name?: string
     vendor_category?: string
     company_name?: string
+    known_services?: string[]
+    recipient_context?: string
+    personal_note?: string
     lead_id?: string
     role_definition_id?: string | null
   }
@@ -76,9 +79,15 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
     if (inviteType === 'staff' && !['employee', 'either'].includes(role.party_type)) return c.json({ error: 'choose an employee role for a staff invitation' }, 400)
   }
 
+  const allowedServices = new Set(['property_field', 'mobile_notary', 'ron', 'document_courier', 'merchant_technology', 'business_operations', 'bookkeeping_financial', 'other'])
+  const knownServices = Array.isArray(body.known_services) ? [...new Set(body.known_services.map((value) => clean(value, 80)).filter((value) => allowedServices.has(value)))] : []
+  const recipientContext = ['flexible', 'person', 'business'].includes(body.recipient_context || '') ? body.recipient_context! : 'flexible'
   const metadata = {
     vendor_category: clean(body.vendor_category, 120) || undefined,
     company_name: clean(body.company_name, 200) || undefined,
+    known_services: inviteType === 'vendor' ? knownServices : undefined,
+    recipient_context: inviteType === 'vendor' ? recipientContext : undefined,
+    personal_note: inviteType === 'vendor' ? clean(body.personal_note, 800) || undefined : undefined,
     lead_id: clean(body.lead_id, 120) || undefined,
   }
   const invite = await createInvite(c.env, {
@@ -93,7 +102,7 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
   let emailStatus = 'sent'
   let emailError: string | null = null
   try {
-    await sendInviteEmail(c.env, { id: invite.id, invite_type: inviteType, email, full_name: fullName || null }, invite.token, invite.expiresAt)
+    await sendInviteEmail(c.env, { id: invite.id, invite_type: inviteType, email, full_name: fullName || null, metadata_json: JSON.stringify(metadata) }, invite.token, invite.expiresAt)
   } catch (err) {
     emailStatus = 'failed'
     emailError = err instanceof Error ? err.message : 'email failed'
