@@ -44,6 +44,7 @@ import { vendorApplicationUploadRoutes } from '../_lib/routes/vendorApplicationU
 import { serviceOfferingPublicRoutes, serviceOfferingAdminRoutes } from '../_lib/routes/serviceOfferings'
 import { relationshipAutomationRoutes, relationshipAutomationAdminRoutes } from '../_lib/routes/relationshipAutomation'
 import { fieldWorkRoutes } from '../_lib/routes/fieldWork'
+import { casesRoutes } from '../_lib/routes/cases'
 import { documentVerificationRoutes } from '../_lib/routes/documentVerification'
 import { documentLifecycleAdminRoutes, documentLifecyclePublicRoutes } from '../_lib/routes/documentLifecycle'
 import { documentOperationsAdminRoutes } from '../_lib/routes/documentOperations'
@@ -119,6 +120,7 @@ app.route('/admin', commsRoutes)
 app.route('/admin', crmWriteRoutes)
 app.route('/admin', crmRoutes)
 app.route('/admin', fieldWorkRoutes)
+app.route('/admin', casesRoutes)
 
 app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
 

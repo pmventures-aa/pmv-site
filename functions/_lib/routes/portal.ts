@@ -549,9 +549,15 @@ portalRoutes.post('/support', async (c) => {
   const priority = ['low', 'normal', 'high', 'urgent'].includes(body.priority ?? '') ? body.priority! : 'normal'
   const id = uuid()
   const subject = body.subject.trim().slice(0, 300)
-  const sla = { low: [480, 4320], normal: [240, 2880], high: [120, 1440], urgent: [30, 480] }[priority]!
-  const responseDue = new Date(Date.now() + sla[0] * 60_000).toISOString()
-  const resolutionDue = new Date(Date.now() + sla[1] * 60_000).toISOString()
+  // Read the current SLA targets from sla_policies (see migration 0046). If
+  // the row is missing for any reason we fall back to the original hardcoded
+  // defaults so a ticket submission never fails on missing policy config.
+  const HARD_FALLBACK: Record<string, [number, number]> = { low: [480, 4320], normal: [240, 2880], high: [120, 1440], urgent: [30, 480] }
+  const policy = await c.env.DB.prepare('SELECT response_minutes, resolution_minutes FROM sla_policies WHERE priority = ?').bind(priority).first<{ response_minutes: number; resolution_minutes: number }>()
+  const responseMinutes = policy?.response_minutes ?? HARD_FALLBACK[priority][0]
+  const resolutionMinutes = policy?.resolution_minutes ?? HARD_FALLBACK[priority][1]
+  const responseDue = new Date(Date.now() + responseMinutes * 60_000).toISOString()
+  const resolutionDue = new Date(Date.now() + resolutionMinutes * 60_000).toISOString()
   await c.env.DB.batch([
     c.env.DB.prepare(
       `INSERT INTO support_tickets (id, client_user_id, subject, category, priority, status, assigned_staff_user_id, service_key, property_id, details, response_due_at, resolution_due_at) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?)`,

@@ -88,6 +88,11 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 .pmv-orb__ring--b { animation:pmv-orb-spin-b 22s linear infinite; }
 .pmv-orb__ring--c { animation:pmv-orb-spin-c 34s linear infinite; opacity:.55; }
 @keyframes pmv-fade-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+/* Overdue SLA chip: subtle red pulse to draw attention without being a
+ * flashing distraction. Paired with .pmv-sla-overdue-pulse on the chip. */
+.pmv-sla-overdue-pulse { animation:pmv-sla-pulse 1.8s ease-in-out infinite; }
+@keyframes pmv-sla-pulse { 0%,100% { opacity:1; } 50% { opacity:.55; } }
+@media (prefers-reduced-motion:reduce) { .pmv-sla-overdue-pulse { animation:none; } }
 @keyframes pmv-orb-halo { 0%,100% { transform:scale(1); opacity:.85; } 50% { transform:scale(1.06); opacity:1; } }
 @keyframes pmv-orb-spin-a { to { transform:rotate(360deg); } }
 @keyframes pmv-orb-spin-b { to { transform:rotate(-360deg); } }
