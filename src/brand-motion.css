@@ -6,6 +6,40 @@
   contain: layout paint style;
 }
 
+/* Exact production crest silhouette, presented as a white-and-gold material.
+ * The underlying mark is used as the mask; no substitute geometry or generated
+ * logo artwork is introduced. */
+.pmv-white-gold-mark {
+  background: linear-gradient(132deg, #fff 4%, #fff 35%, #f5e7b2 47%, #d6b45a 67%, #fff 92%);
+  -webkit-mask: url('/logo-crest-transparent.png') center / contain no-repeat;
+  mask: url('/logo-crest-transparent.png') center / contain no-repeat;
+  filter: drop-shadow(0 22px 30px rgba(0,0,0,.34)) drop-shadow(0 0 26px rgba(214,180,90,.16));
+}
+
+.pmv-free-floating-mark {
+  position: relative;
+  isolation: isolate;
+  will-change: transform;
+}
+
+.pmv-free-floating-mark::before {
+  content: '';
+  position: absolute;
+  inset: 22% 12%;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(214,180,90,.18), transparent 68%);
+  filter: blur(30px);
+}
+
+.pmv-home-grid {
+  position: absolute;
+  inset: 0;
+  opacity: .19;
+  background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+
 .pmv-brand-gyro {
   transform-style: preserve-3d;
   transform-origin: 50% 52%;
