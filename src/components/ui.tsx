@@ -25,9 +25,13 @@ const ORIGINAL_CREST = '/logo-crest-transparent.png'
 
 function CrestArtwork({ size, tone = 'auto', className = '', decorative = false }: { size:number; tone?:CrestTone; className?:string; decorative?:boolean }) {
   const alt = decorative ? '' : 'Pinnacle Management Ventures crest'
-  if (tone === 'light') return <img src={ORIGINAL_CREST} alt={alt} aria-hidden={decorative || undefined} className={`pmv-crest-artwork pmv-crest-light object-contain ${className}`} style={{ width:size, height:size }}/>
+  if (tone === 'light') return <span className={`pmv-crest-switch pmv-crest-dark-surface relative inline-block shrink-0 ${className}`} style={{ width:size, height:size }} aria-hidden={decorative || undefined}>
+    <img src={ORIGINAL_CREST} alt="" aria-hidden="true" className="pmv-crest-artwork pmv-crest-outline absolute inset-0 h-full w-full object-contain"/>
+    <img src={ORIGINAL_CREST} alt={alt} className="pmv-crest-artwork pmv-crest-light absolute inset-0 h-full w-full object-contain"/>
+  </span>
   if (tone === 'dark') return <img src={ORIGINAL_CREST} alt={alt} aria-hidden={decorative || undefined} className={`pmv-crest-artwork object-contain ${className}`} style={{ width:size, height:size }}/>
   return <span className={`pmv-crest-switch pmv-crest-switch-auto relative inline-block shrink-0 ${className}`} style={{ width:size, height:size }} aria-hidden={decorative || undefined}>
+    <img src={ORIGINAL_CREST} alt="" aria-hidden="true" className="pmv-crest-artwork pmv-crest-outline pmv-crest-for-dark absolute inset-0 h-full w-full object-contain"/>
     <img src={ORIGINAL_CREST} alt={alt} className="pmv-crest-artwork pmv-crest-light pmv-crest-for-dark absolute inset-0 h-full w-full object-contain"/>
     <img src={ORIGINAL_CREST} alt={alt} className="pmv-crest-artwork pmv-crest-for-light absolute inset-0 h-full w-full object-contain"/>
   </span>
