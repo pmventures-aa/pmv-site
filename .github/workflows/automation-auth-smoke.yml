@@ -1,0 +1,47 @@
+name: Verify production automation authentication
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/automation-auth-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify authenticated automation endpoints
+        env:
+          PMV_AUTOMATION_SECRET: ${{ secrets.PMV_AUTOMATION_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PMV_AUTOMATION_SECRET"
+
+          check_endpoint() {
+            local label="$1"
+            local url="$2"
+            local body
+            body="$(mktemp)"
+            local status
+            status="$(curl --silent --show-error \
+              --output "$body" \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header "x-pmv-automation-secret: $PMV_AUTOMATION_SECRET" \
+              "$url")"
+            echo "$label returned HTTP $status"
+            cat "$body"
+            echo
+            if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
+              exit 1
+            fi
+          }
+
+          check_endpoint 'Client notifications' 'https://www.pinnaclemanagementventures.com/api/automation/client-notifications/run'
+          check_endpoint 'Client nurture' 'https://www.pinnaclemanagementventures.com/api/automation/nurture/run'
