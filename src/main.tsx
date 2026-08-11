@@ -26,12 +26,15 @@ import { LoadingScreen } from './components/LoadingScreen'
 
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
+const MailApp = lazy(() => import('./pages/mail/MailApp'))
 
 function SurfaceFallback() { return <LoadingScreen /> }
 
 const host = window.location.hostname
+const isMailHost = host.startsWith('mail.')
 const isSecureHost = host.startsWith('secure.')
-const surface: 'admin' | 'portal' | 'public' = (() => {
+const surface: 'admin' | 'portal' | 'public' | 'mail' = (() => {
+  if (isMailHost) return 'mail'
   if (isSecureHost) return window.location.pathname.startsWith('/hq') ? 'admin' : 'portal'
   if (host.startsWith('hq.')) return 'admin'
   if (host.startsWith('client.')) return 'portal'
@@ -43,6 +46,9 @@ document.documentElement.dataset.pmvSurface = surface
 installAudioUnlock()
 
 function App() {
+  if (surface === 'mail') {
+    return <Suspense fallback={<SurfaceFallback />}><MailApp /></Suspense>
+  }
   if (surface === 'admin') {
     return <Suspense fallback={<SurfaceFallback />}><Routes><Route path={`${secureBase}/*`} element={<AdminApp basePath={secureBase} />} /></Routes></Suspense>
   }
