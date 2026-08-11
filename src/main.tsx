@@ -32,7 +32,11 @@ import { LoadingScreen } from './components/LoadingScreen'
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
 
-function SurfaceFallback() { return <LoadingScreen /> }
+// Portal + HQ get the calmer ambient orb; the public site keeps the brand
+// mark loader so unauthenticated visitors see the recognizable logo first.
+function SurfaceFallback({ variant = 'brand', label = 'Loading…' }: { variant?: 'brand' | 'orb'; label?: string }) {
+  return <LoadingScreen variant={variant} label={label} />
+}
 
 const host = window.location.hostname
 const isSecureHost = host.startsWith('secure.')
@@ -49,10 +53,10 @@ installAudioUnlock()
 
 function App() {
   if (surface === 'admin') {
-    return <Suspense fallback={<SurfaceFallback />}><Routes><Route path={`${secureBase}/*`} element={<AdminApp basePath={secureBase} />} /></Routes></Suspense>
+    return <Suspense fallback={<SurfaceFallback variant="orb" label="Loading HQ…" />}><Routes><Route path={`${secureBase}/*`} element={<AdminApp basePath={secureBase} />} /></Routes></Suspense>
   }
   if (surface === 'portal') {
-    return <Suspense fallback={<SurfaceFallback />}><Routes><Route path="/*" element={<PortalApp basePath="" />} /></Routes></Suspense>
+    return <Suspense fallback={<SurfaceFallback variant="orb" label="Loading your portal…" />}><Routes><Route path="/*" element={<PortalApp basePath="" />} /></Routes></Suspense>
   }
   return (
     <Routes>

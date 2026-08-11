@@ -77,6 +77,23 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 .pmv-story-note-b { right:-1%; top:44%; animation:pmv-note-float-b 9s ease-in-out infinite; }
 .pmv-story-note-c { left:8%; bottom:4%; animation:pmv-note-float-c 7.5s ease-in-out infinite; }
 
+/* Ambient breathing orb — used by src/components/portal/PortalOrb.tsx as the
+ * portal loading state and the Command Center hero visual. Each ellipse gets
+ * its own slow rotation phase from the center so the three rings never fully
+ * align, producing an organic "thinking" motion instead of a spinner feel.
+ * The halo behind them softly breathes to give the whole shape a heartbeat. */
+.pmv-orb__halo { background:radial-gradient(circle at 50% 50%,rgba(245,199,110,.28),rgba(29,66,105,.14) 42%,transparent 72%); filter:blur(18px); animation:pmv-orb-halo 6s ease-in-out infinite; }
+.pmv-orb__ring { transform-origin:50% 50%; opacity:.9; }
+.pmv-orb__ring--a { animation:pmv-orb-spin-a 14s linear infinite; }
+.pmv-orb__ring--b { animation:pmv-orb-spin-b 22s linear infinite; }
+.pmv-orb__ring--c { animation:pmv-orb-spin-c 34s linear infinite; opacity:.55; }
+@keyframes pmv-fade-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+@keyframes pmv-orb-halo { 0%,100% { transform:scale(1); opacity:.85; } 50% { transform:scale(1.06); opacity:1; } }
+@keyframes pmv-orb-spin-a { to { transform:rotate(360deg); } }
+@keyframes pmv-orb-spin-b { to { transform:rotate(-360deg); } }
+@keyframes pmv-orb-spin-c { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .pmv-orb__halo,.pmv-orb__ring--a,.pmv-orb__ring--b,.pmv-orb__ring--c { animation:none; } }
+
 @keyframes pmv-brand-float { 0%,100% { transform:translateY(0) rotateY(-2deg); } 50% { transform:translateY(-12px) rotateY(3deg); } }
 @keyframes pmv-glow-breathe { 0%,100% { transform:scale(1); opacity:.8; } 50% { transform:scale(1.08); opacity:1; } }
 @keyframes pmv-orbit-spin { to { transform:rotate(360deg); } }
