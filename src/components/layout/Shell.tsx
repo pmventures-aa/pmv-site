@@ -12,7 +12,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  // Portal sidebar defaults CLOSED on first visit — the Command Center
+  // Portal sidebar defaults CLOSED on first visit - the Command Center
   // dashboard is the client's real navigation, so the sidebar is a
   // secondary control they can pin open if they prefer. Once they toggle
   // it, we remember their choice via localStorage on both directions.

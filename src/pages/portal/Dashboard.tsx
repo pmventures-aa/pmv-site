@@ -10,7 +10,7 @@ import { useAppPath } from '../../lib/basePath'
 import { PortalOrb } from '../../components/portal/PortalOrb'
 
 // -----------------------------------------------------------------------------
-// Command Center dashboard — the "courtyard" landing page. The Portal is
+// Command Center dashboard - the "courtyard" landing page. The Portal is
 // intentionally tile-first here: the sidebar keeps only Home / Requests /
 // Documents (see components/layout/nav.ts), so the tile grid on this page IS
 // the client's real navigation. Each tile shows whether the service is
@@ -51,7 +51,7 @@ interface Tile {
 // Static catalog of tiles we render regardless of what the account has
 // enabled. State (`active` | `discover` | `soon`) is decided at render time
 // based on `enabled_services` from the dashboard API. Order here IS the
-// tile order on screen — highest-value / most-used first.
+// tile order on screen - highest-value / most-used first.
 const TILE_BLUEPRINT: { key: string; label: string; hint: string; icon: typeof Building2; to: string; soon?: boolean; serviceKeys?: string[] }[] = [
   { key: 'requests', label: 'Requests & Cases', hint: 'Submit a new request or track open work', icon: HelpCircle, to: 'support' },
   { key: 'documents', label: 'Documents', hint: 'Uploads, signatures, and shared files', icon: FileText, to: 'documents' },
@@ -73,12 +73,12 @@ function greeting(hour: number): string {
 }
 
 // Rotating discovery pitches for the hero banner. Cycles every 8s so the
-// client sees a different Pinnacle capability each time they land — the
+// client sees a different Pinnacle capability each time they land - the
 // "have you tried this?" moment. Kept intentionally short and specific.
 const DISCOVERY_PITCHES = [
-  { title: 'Have you tried mobile notary?', body: 'A Pinnacle notary comes to you — home, office, or hospital — usually the same day.' },
+  { title: 'Have you tried mobile notary?', body: 'A Pinnacle notary comes to you - home, office, or hospital - usually the same day.' },
   { title: 'Remote Online Notarization', body: 'Sign notarized documents from anywhere with a live licensed notary.' },
-  { title: 'Property inspections on demand', body: 'Move-in, move-out, and periodic reports — photos + notes emailed within 24h.' },
+  { title: 'Property inspections on demand', body: 'Move-in, move-out, and periodic reports - photos + notes emailed within 24h.' },
   { title: 'A single admin partner', body: 'Delegate scheduling, filing, and follow-ups without hiring a new employee.' },
   { title: 'Certified audit trails', body: 'Every field visit produces a time-stamped, geo-located audit email you can save with your records.' },
 ]
@@ -153,7 +153,7 @@ export default function Dashboard() {
           {greeting(hour)}, {firstName}.
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-          Everything Pinnacle is handling for you lives here. Pick a tile to dive in — or explore new services in the panel to the right.
+          Everything Pinnacle is handling for you lives here. Pick a tile to dive in - or explore new services in the panel to the right.
         </p>
       </header>
 

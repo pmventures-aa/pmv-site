@@ -1,6 +1,6 @@
 // Ambient, breathing ring visual used both as the client-portal loading
 // state and as the hero-banner artwork on the Command Center dashboard.
-// Deliberately not a spinner — three overlapping stroke-only ellipses that
+// Deliberately not a spinner - three overlapping stroke-only ellipses that
 // each rotate at their own slow phase, plus a soft glowing halo, produce
 // a calm, organic motion the eye reads as "the app is thinking" without
 // the manic "please wait" feel of a circular progress spinner.
@@ -12,7 +12,7 @@
 interface Props {
   size?: number
   className?: string
-  /** When true, hides the accessible name — use inside decorative hero banners. */
+  /** When true, hides the accessible name - use inside decorative hero banners. */
   decorative?: boolean
 }
 
