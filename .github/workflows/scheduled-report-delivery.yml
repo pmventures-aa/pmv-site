@@ -1,0 +1,24 @@
+name: Deliver scheduled management reports
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run due management reports
+        env:
+          PMV_AUTOMATION_SECRET: ${{ secrets.PMV_AUTOMATION_SECRET }}
+        run: |
+          test -n "$PMV_AUTOMATION_SECRET"
+          curl --fail --silent --show-error \
+            --retry 2 --retry-all-errors \
+            -X POST \
+            -H "x-pmv-automation-secret: $PMV_AUTOMATION_SECRET" \
+            https://www.pinnaclemanagementventures.com/api/automation/reports/run
