@@ -51,11 +51,9 @@ export function AuthLayout({
 
       <aside className="auth-brand-panel hidden lg:flex">
         <div className="auth-brand-glow" aria-hidden="true" />
-        <div className="auth-brand-orbit auth-brand-orbit-one" aria-hidden="true" />
-        <div className="auth-brand-orbit auth-brand-orbit-two" aria-hidden="true" />
         <div className="relative z-10 flex h-full w-full max-w-xl flex-col justify-between py-10">
           <a href="https://pinnaclemanagementventures.com" className="inline-flex w-fit items-center gap-4" aria-label="Pinnacle Management Ventures home">
-            <BrandMark3D size={88} decorative className="shrink-0" />
+            <BrandMark3D size={92} decorative variant="spotlight" className="shrink-0" />
             <span>
               <span className="block text-xs font-bold uppercase tracking-[.2em] text-gold">Pinnacle</span>
               <span className="mt-1 block text-base font-semibold tracking-wide text-white">Management Ventures</span>
@@ -90,7 +88,7 @@ export function AuthLayout({
         <div className="w-full max-w-[520px]">
           <div className="mb-8 lg:hidden">
             <a href="https://pinnaclemanagementventures.com" className="inline-flex items-center gap-3">
-              <BrandMark3D size={70} decorative className="shrink-0" />
+              <BrandMark3D size={72} decorative variant="quiet" className="shrink-0" />
               <span>
                 <span className="block text-[10px] font-bold uppercase tracking-[.2em] text-gold">Pinnacle</span>
                 <span className="mt-1 block text-sm font-semibold text-white">Management Ventures</span>
