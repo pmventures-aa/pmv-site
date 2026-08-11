@@ -1,0 +1,45 @@
+name: Apply e-sign v2 type fix
+
+on:
+  push:
+    branches: [agent/esign-enterprise-v2]
+    paths:
+      - '.github/workflows/fix-esign-v2-types.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/esign-enterprise-v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Normalize bulk envelope ID typing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('functions/_lib/routes/documentPlatformV2.ts')
+          s=p.read_text()
+          old="const b=await c.req.json<any>().catch(()=>({})),ids=Array.isArray(b.envelope_ids)?[...new Set(b.envelope_ids.map(String))].slice(0,100):[],operation=String(b.operation||'')"
+          new="const b=await c.req.json<any>().catch(()=>({})),ids:string[]=Array.isArray(b.envelope_ids)?Array.from(new Set<string>(b.envelope_ids.map((v:any)=>String(v)))).slice(0,100):[],operation=String(b.operation||'')"
+          if old not in s: raise SystemExit('target expression not found')
+          p.write_text(s.replace(old,new))
+          PY
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Commit validated fix
+        run: |
+          git config user.name 'pmventures-aa'
+          git config user.email 'c.raymondjenkins@gmail.com'
+          git add functions/_lib/routes/documentPlatformV2.ts
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix e-sign bulk operation typing'
+          git push origin HEAD:agent/esign-enterprise-v2
