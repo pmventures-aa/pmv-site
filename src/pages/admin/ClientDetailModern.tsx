@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { Avatar } from '../../components/kit/Avatar'
@@ -117,10 +117,11 @@ function AssignServiceForm({ clientId, catalog, taken, onAssigned }: { clientId:
 }
 
 export default function ClientDetailModern() {
-  const { id } = useParams<{ id: string }>()
+  const { id, section } = useParams<{ id: string; section?: string }>()
   const p = useAppPath()
+  const navigate = useNavigate()
   const [data, setData] = useState<Bundle | null>(null)
-  const [tab, setTab] = useState<Tab>('overview')
+  const tab:Tab = (['overview','activity','services','work','documents','billing','details'] as Tab[]).includes(section as Tab) ? section as Tab : 'overview'
   const [note, setNote] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -140,6 +141,7 @@ export default function ClientDetailModern() {
   }, [id, loadedTabs, tab])
 
   useEffect(() => { load(tab).catch(() => setData(null)) }, [tab])
+  useEffect(() => { if(id&&!section)navigate(p(`clients/${id}/overview`),{replace:true}) },[id,section,navigate,p])
 
   const timeline = useMemo(() => {
     if (!data) return []
@@ -217,7 +219,7 @@ export default function ClientDetailModern() {
         <div className="flex flex-wrap gap-2">
           <Link to={`${p('communications')}?client=${encodeURIComponent(account.id)}`} className={btnPrimary}>Email client</Link>
           <Link to={p('messages')} className={btnOutline}>Messages</Link>
-          <button onClick={() => setTab('activity')} className={btnOutline}>Add note</button>
+          <Link to={p(`clients/${account.id}/activity`)} className={btnOutline}>Add note</Link>
           <Link to={p(`clients/${account.id}/manage`)} className={btnOutline}>Manage records</Link>
         </div>
       </div>
@@ -230,7 +232,7 @@ export default function ClientDetailModern() {
     </header>
 
     <nav className="mt-5 flex gap-6 overflow-x-auto border-b border-white/10" aria-label="Client profile sections">
-      {([['overview','Overview'],['activity','Activity'],['services','Services'],['work','Work'],['documents','Documents'],['billing','Billing'],['details','Details']] as const).map(([key, label]) => <button key={key} onClick={() => setTab(key)} className={`shrink-0 border-b-2 pb-3 text-sm font-medium transition ${tab === key ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{label}</button>)}
+      {([['overview','Overview'],['activity','Activity & Notes'],['services','Services'],['work','Work'],['documents','Documents'],['billing','Billing'],['details','Profile']] as const).map(([key, label]) => <Link key={key} to={p(`clients/${account.id}/${key}`)} className={`shrink-0 border-b-2 pb-3 text-sm font-medium transition ${tab === key ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{label}</Link>)}
     </nav>
 
     {tab === 'overview' && <div className="mt-7 grid gap-9 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -253,7 +255,7 @@ export default function ClientDetailModern() {
       </main>
 
       <aside className="xl:border-l xl:border-white/10 xl:pl-7">
-        <SectionTitle eyebrow="Relationship history" title="Latest activity" action={<button onClick={() => setTab('activity')} className="text-xs font-medium text-gold hover:underline">View all</button>} />
+        <SectionTitle eyebrow="Relationship history" title="Latest activity" action={<Link to={p(`clients/${account.id}/activity`)} className="text-xs font-medium text-gold hover:underline">View all</Link>} />
         <Timeline rows={timeline.slice(0, 8)} />
         <div className="mt-8 border-t border-white/10 pt-6"><p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">Next appointment</p>{nextAppointment ? <div className="mt-3"><p className="text-sm font-medium text-white">{nextAppointment.title || 'Appointment'}</p><p className="mt-1 text-xs text-slate-400">{displayDate(nextAppointment.starts_at)}</p></div> : <p className="mt-3 text-sm text-slate-500">Nothing scheduled.</p>}</div>
         <div className="mt-6 border-t border-white/10 pt-6"><p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">Open balance</p><p className="mt-2 font-display text-2xl text-white">{money(openBalance)}</p><p className="mt-1 text-xs text-slate-500">Across {openInvoices.length} open invoice{openInvoices.length === 1 ? '' : 's'}</p></div>
