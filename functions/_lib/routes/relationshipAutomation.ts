@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { requireOwner, requireUser } from '../mid'
+import { requireOwner, requireStaff, requireUser } from '../mid'
 import { runDueClientNurture } from '../relationshipAutomation'
 import { runClientNotificationOutbox } from '../clientNotificationOutbox'
+import { runDueScheduledReports } from '../scheduledReports'
 import { uuid } from '../crypto'
 
 export const relationshipAutomationRoutes = new Hono<AppEnv>()
@@ -11,6 +12,7 @@ export const relationshipAutomationAdminRoutes = new Hono<AppEnv>()
 const AUTOMATIONS = {
   client_notifications: { label: 'Client event notifications', cadence: 'Every 10 minutes', intervalMinutes: 10, description: 'Processes queued client-facing event notifications and records delivery outcomes.' },
   client_nurture: { label: 'Client nurture campaign', cadence: 'Daily at 10:20 AM ET', intervalMinutes: 1440, description: 'Processes due client nurture steps and records successful, skipped, or failed delivery work.' },
+  scheduled_reports: { label: 'Scheduled management reports', cadence: 'Hourly', intervalMinutes: 60, description: 'Generates due saved reports, emails authorized recipients, and records report-delivery outcomes.' },
 } as const
 
 type AutomationKey = keyof typeof AUTOMATIONS
@@ -42,6 +44,10 @@ function nextDailyEastern(hour: number, minute: number) {
   return target.toISOString()
 }
 
+function nextHourly() {
+  const next=new Date();next.setUTCMinutes(0,0,0);next.setUTCHours(next.getUTCHours()+1);return next.toISOString()
+}
+
 async function executeAutomation(c: any, key: AutomationKey, triggerType: 'scheduled'|'manual', actorUserId?: string) {
   const runId = uuid()
   await c.env.DB.prepare(
@@ -51,12 +57,14 @@ async function executeAutomation(c: any, key: AutomationKey, triggerType: 'sched
   try {
     const result = key === 'client_notifications'
       ? await runClientNotificationOutbox(c.env, 75)
-      : await runDueClientNurture(c.env, 50)
+      : key === 'client_nurture'
+        ? await runDueClientNurture(c.env, 50)
+        : await runDueScheduledReports(c.env, 20)
     const processed = Number(result.processed || 0)
     const succeeded = Number((result as any).sent || 0)
     const failed = Number((result as any).failed || 0)
     const skipped = Number((result as any).skipped || 0)
-    const status = failed > 0 ? 'partial' : 'success'
+    const status = failed > 0 && succeeded > 0 ? 'partial' : failed > 0 ? 'failed' : 'success'
     await c.env.DB.prepare(
       `UPDATE automation_runs SET status=?,items_processed=?,items_succeeded=?,items_failed=?,detail_json=?,finished_at=datetime('now') WHERE id=?`,
     ).bind(status, processed, succeeded, failed, JSON.stringify({ ...result, skipped }), runId).run()
@@ -120,9 +128,8 @@ relationshipAutomationAdminRoutes.get('/automation-center', requireOwner, async 
       const now = new Date(); const minute = now.getUTCMinutes(); const next = new Date(now)
       next.setUTCSeconds(0,0); next.setUTCMinutes(minute - (minute % 10) + 10)
       nextRunAt = next.toISOString()
-    } else if (key === 'client_nurture') {
-      nextRunAt = nextDailyEastern(10,20)
-    }
+    } else if (key === 'client_nurture') nextRunAt = nextDailyEastern(10,20)
+    else if(key==='scheduled_reports') nextRunAt=nextHourly()
     return { key, ...meta, last_run: last, next_run_at: nextRunAt }
   })
   return c.json({ automations, runs: runs.results || [] })
@@ -137,32 +144,32 @@ relationshipAutomationAdminRoutes.post('/automation-center/:key/run', requireOwn
   return c.json({ ok:true, ...result })
 })
 
-relationshipAutomationAdminRoutes.get('/notification-center', requireOwner, async (c) => {
+relationshipAutomationAdminRoutes.get('/notification-center', requireStaff, async (c) => {
   const user=c.get('user')
   const events=await c.env.DB.prepare(
     `SELECT nec.*,
             COALESCE(nup.in_app_enabled,nec.default_in_app) in_app_enabled,
             COALESCE(nup.email_enabled,nec.default_email) email_enabled,
+            COALESCE(nup.desktop_enabled,0) desktop_enabled,
+            COALESCE(nup.sound_enabled,0) sound_enabled,
             nto.subject,nto.preheader,nto.eyebrow,nto.title,nto.body_html,nto.cta_label,COALESCE(nto.enabled,1) template_enabled
      FROM notification_event_catalog nec
      LEFT JOIN notification_user_preferences nup ON nup.event_key=nec.event_key AND nup.user_id=?
      LEFT JOIN notification_template_overrides nto ON nto.event_key=nec.event_key
      WHERE nec.active=1 ORDER BY nec.category,nec.sort_order,nec.label`,
   ).bind(user.id).all()
-  return c.json({events:rowsSafe(events.results)})
+  return c.json({events:Array.isArray(events.results)?events.results:[]})
 })
 
-function rowsSafe(rows: unknown) { return Array.isArray(rows) ? rows : [] }
-
-relationshipAutomationAdminRoutes.patch('/notification-center/preferences', requireOwner, async (c) => {
+relationshipAutomationAdminRoutes.patch('/notification-center/preferences', requireStaff, async (c) => {
   const user=c.get('user')
-  type Body={preferences?:Array<{event_key?:string;in_app_enabled?:boolean;email_enabled?:boolean}>}
+  type Body={preferences?:Array<{event_key?:string;in_app_enabled?:boolean;email_enabled?:boolean;desktop_enabled?:boolean;sound_enabled?:boolean}>}
   const body=await c.req.json<Body>().catch(()=>({} as Body))
   const statements=(body.preferences||[]).map((pref)=>c.env.DB.prepare(
-    `INSERT INTO notification_user_preferences(user_id,event_key,in_app_enabled,email_enabled,updated_at)
-     SELECT ?,event_key,?,?,datetime('now') FROM notification_event_catalog WHERE event_key=?
-     ON CONFLICT(user_id,event_key) DO UPDATE SET in_app_enabled=excluded.in_app_enabled,email_enabled=excluded.email_enabled,updated_at=datetime('now')`,
-  ).bind(user.id,pref.in_app_enabled===false?0:1,pref.email_enabled===true?1:0,String(pref.event_key||'').slice(0,100)))
+    `INSERT INTO notification_user_preferences(user_id,event_key,in_app_enabled,email_enabled,desktop_enabled,sound_enabled,updated_at)
+     SELECT ?,event_key,?,?,?,?,datetime('now') FROM notification_event_catalog WHERE event_key=?
+     ON CONFLICT(user_id,event_key) DO UPDATE SET in_app_enabled=excluded.in_app_enabled,email_enabled=excluded.email_enabled,desktop_enabled=excluded.desktop_enabled,sound_enabled=excluded.sound_enabled,updated_at=datetime('now')`,
+  ).bind(user.id,pref.in_app_enabled===false?0:1,pref.email_enabled===true?1:0,pref.desktop_enabled===true?1:0,pref.sound_enabled===true?1:0,String(pref.event_key||'').slice(0,100)))
   if(statements.length) await c.env.DB.batch(statements)
   return c.json({ok:true})
 })
@@ -200,5 +207,9 @@ relationshipAutomationRoutes.post('/automation/nurture/run', requireAutomationCr
 })
 relationshipAutomationRoutes.post('/automation/client-notifications/run', requireAutomationCron, async (c) => {
   const result=await executeAutomation(c,'client_notifications','scheduled')
+  return c.json({ok:true,...result})
+})
+relationshipAutomationRoutes.post('/automation/reports/run', requireAutomationCron, async (c) => {
+  const result=await executeAutomation(c,'scheduled_reports','scheduled')
   return c.json({ok:true,...result})
 })
