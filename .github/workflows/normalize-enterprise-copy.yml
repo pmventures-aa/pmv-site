@@ -1,0 +1,42 @@
+name: Normalize enterprise copy
+
+on:
+  push:
+    branches:
+      - agent/hq-enterprise-controls-public-polish
+
+permissions:
+  contents: write
+
+concurrency:
+  group: normalize-enterprise-copy
+  cancel-in-progress: true
+
+jobs:
+  normalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/hq-enterprise-controls-public-polish
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Normalize copy
+        run: node scripts/normalize-enterprise-copy.mjs
+      - name: Commit normalized source
+        shell: bash
+        run: |
+          if git diff --quiet -- src; then
+            echo "No copy normalization changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src
+          git commit -m "normalize enterprise copy punctuation"
+          git push origin HEAD:agent/hq-enterprise-controls-public-polish
