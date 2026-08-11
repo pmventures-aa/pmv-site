@@ -40,13 +40,15 @@ export function inviteExpiry(hours = 24): string {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
 }
 
-const SECURE_BASE = 'https://secure.pinnaclemanagementventures.com'
+const PUBLIC_BASE = 'https://www.pinnaclemanagementventures.com'
+const CLIENT_BASE = `${PUBLIC_BASE}/portal`
+const HQ_BASE = `${PUBLIC_BASE}/admin`
 
 export function inviteUrl(type: InviteType, token: string): string {
-  if (type === 'vendor') return `${SECURE_BASE}/hq/vendor-signup?invite=${encodeURIComponent(token)}`
-  if (type === 'trusted_contact') return `${SECURE_BASE}/trusted-invite/${encodeURIComponent(token)}`
-  if (type === 'client') return `${SECURE_BASE}/signup?invite=${encodeURIComponent(token)}`
-  return `${SECURE_BASE}/hq/invite/${encodeURIComponent(token)}`
+  if (type === 'vendor') return `${HQ_BASE}/vendor-signup?invite=${encodeURIComponent(token)}`
+  if (type === 'trusted_contact') return `${CLIENT_BASE}/trusted-invite/${encodeURIComponent(token)}`
+  if (type === 'client') return `${CLIENT_BASE}/signup?invite=${encodeURIComponent(token)}`
+  return `${HQ_BASE}/invite/${encodeURIComponent(token)}`
 }
 
 export async function createInvite(

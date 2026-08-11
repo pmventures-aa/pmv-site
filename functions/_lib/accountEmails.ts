@@ -37,12 +37,12 @@ interface TrackedSendInput {
   metadata?: Record<string, unknown>
 }
 
-// Post-auth surfaces live behind secure.pinnaclemanagementventures.com. The
-// legacy hq. and client. hosts continue to work while the DNS cutover settles;
-// see DEPLOY.md → "Domain layout".
-export const CLIENT_PORTAL_URL = 'https://secure.pinnaclemanagementventures.com/'
-export const CLIENT_LOGIN_URL = 'https://secure.pinnaclemanagementventures.com/login'
-export const HQ_LOGIN_URL = 'https://secure.pinnaclemanagementventures.com/hq/login'
+// Use the public site's routed application surfaces until the dedicated
+// secure. hostname finishes DNS activation. These routes are first-class app
+// entry points and keep account emails usable throughout the DNS cutover.
+export const CLIENT_PORTAL_URL = 'https://www.pinnaclemanagementventures.com/portal/'
+export const CLIENT_LOGIN_URL = 'https://www.pinnaclemanagementventures.com/portal/login'
+export const HQ_LOGIN_URL = 'https://www.pinnaclemanagementventures.com/admin/login'
 
 function eventKind(kind: AccountEmailKind, status: AccountEmailStatus): string {
   if (status === 'failed' || status === 'skipped') return 'account_email_failed'

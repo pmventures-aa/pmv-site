@@ -103,7 +103,7 @@ export default function Contact() {
               <li className="text-slate-400">On-site services in South Florida</li>
             </ul>
             <div className="mt-6 border-t border-white/10 pt-4">
-              <a href="https://secure.pinnaclemanagementventures.com/login" className="text-sm font-medium text-gold hover:underline">Already a client? Sign in</a>
+              <a href="/portal/login" className="text-sm font-medium text-gold hover:underline">Already a client? Sign in</a>
             </div>
           </div>
         </div>

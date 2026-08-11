@@ -7,7 +7,7 @@ import { usePageMeta } from '../lib/usePageMeta'
 import { BrandMark3D } from '../components/ui'
 import { Icon, type IconName } from '../components/kit/Icon'
 
-const CLIENT_SIGNUP='https://secure.pinnaclemanagementventures.com/signup?source=home'
+const CLIENT_SIGNUP='/portal/signup?source=home'
 const pathways:{n:string;icon:IconName;title:string;body:string;to:string;note:string}[]=[
   {n:'01',icon:'briefcase',title:'Business Consulting & Transitions',body:'Move operational changes from decision to implementation: POS and payment migrations, process improvement, vendor changes, administrative projects, data coordination, and follow-through.',to:'/services/business-operations',note:'Strategy + implementation'},
   {n:'02',icon:'building',title:'Property & Field Support',body:'Put dependable local execution behind remote ownership and operations with inspections, vendor coordination, field verification, access support, and documented follow-up.',to:'/services/property-field',note:'South Florida field coverage'},

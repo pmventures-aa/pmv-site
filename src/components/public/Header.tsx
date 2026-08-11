@@ -10,8 +10,8 @@ const serviceLinks=[
   {to:'/services/property-field',label:'Property & Field Support',body:'Inspections, vendor coordination, field verification, access support, and documented local execution.'},
   {to:'/services/mobile-documents',label:'Documents & Mobile Services',body:'Mobile notary, courier, signing support, and defined local document assignments.'},
 ]
-const CLIENT_LOGIN='https://secure.pinnaclemanagementventures.com/login'
-const CLIENT_SIGNUP='https://secure.pinnaclemanagementventures.com/signup?source=header'
+const CLIENT_LOGIN='/portal/login'
+const CLIENT_SIGNUP='/portal/signup?source=header'
 
 export function Header(){
   const[open,setOpen]=useState(false);const[servicesOpen,setServicesOpen]=useState(false);const linkCls=({isActive}:{isActive:boolean})=>`${isActive?'text-gold':'hover:text-gold'} font-semibold transition-colors duration-200`

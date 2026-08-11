@@ -278,8 +278,8 @@ authRoutes.post('/forgot-password', async (c) => {
   const token = await createPasswordResetToken(c.env, user.id)
   const isStaff = user.role === 'staff' || user.role === 'admin'
   const resetUrl = isStaff
-    ? `https://secure.pinnaclemanagementventures.com/hq/reset-password?token=${encodeURIComponent(token)}`
-    : `https://secure.pinnaclemanagementventures.com/reset-password?token=${encodeURIComponent(token)}`
+    ? `https://www.pinnaclemanagementventures.com/admin/reset-password?token=${encodeURIComponent(token)}`
+    : `https://www.pinnaclemanagementventures.com/portal/reset-password?token=${encodeURIComponent(token)}`
   const firstName = user.first_name || String(user.full_name || '').split(/\s+/)[0] || 'there'
   const html = renderPinnacleEmailLayout({
     preheader: 'Reset your Pinnacle password',

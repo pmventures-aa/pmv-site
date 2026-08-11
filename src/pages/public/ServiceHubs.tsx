@@ -7,7 +7,7 @@ import { BrandMark3D } from '../../components/ui'
 import { services, type ServiceInfo } from '../../data/services'
 import { usePageMeta } from '../../lib/usePageMeta'
 
-const CLIENT_SIGNUP = 'https://secure.pinnaclemanagementventures.com/signup'
+const CLIENT_SIGNUP = '/portal/signup'
 
 type HubConfig = {
   eyebrow: string

@@ -8,7 +8,7 @@ import { services } from '../../data/services'
 import { usePageMeta } from '../../lib/usePageMeta'
 import { Icon, type IconName } from '../../components/kit/Icon'
 
-const CLIENT_SIGNUP='https://secure.pinnaclemanagementventures.com/signup?source=services-overview'
+const CLIENT_SIGNUP='/portal/signup?source=services-overview'
 const hubs:{n:string;icon:IconName;title:string;body:string;to:string;includes:string}[]=[
   {n:'01',icon:'briefcase',title:'Business Consulting & Operations',body:'For operational changes that need both judgment and implementation support: system and vendor transitions, POS and payments, process improvement, administrative projects, data coordination, and recurring operating support.',to:'/services/business-operations',includes:'Consulting · POS & payments · Process · Implementation'},
   {n:'02',icon:'building',title:'Property & Field Support',body:'A dependable local operating layer for owners, managers, and remote teams that need inspections, field verification, access coordination, vendor follow-up, and documented completion.',to:'/services/property-field',includes:'Owner support · Inspections · Field work · Vendors'},

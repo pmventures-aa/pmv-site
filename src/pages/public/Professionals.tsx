@@ -6,7 +6,7 @@ import { CtaBand, btnOutline, btnPrimary } from '../../components/public/ui'
 import { Icon, type IconName } from '../../components/kit/Icon'
 import { usePageMeta } from '../../lib/usePageMeta'
 
-const VENDOR_SIGNUP='https://secure.pinnaclemanagementventures.com/hq/vendor-signup'
+const VENDOR_SIGNUP='/admin/vendor-signup'
 const providerGroups:{icon:IconName;title:string;body:string}[]=[
   {icon:'briefcase',title:'Licensed and regulated professionals',body:'Attorneys, notaries, tax and accounting professionals, inspectors, and other providers whose work may require active credentials.'},
   {icon:'building',title:'Property and field professionals',body:'Inspectors, photographers, contractors, trades, property managers, field representatives, repair vendors, and local property support.'},
