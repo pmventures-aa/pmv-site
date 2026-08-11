@@ -6,14 +6,20 @@ import {
 
 export interface NavItem { key:string;label:string;to:string;icon:LucideIcon;section?:string }
 
+// The Command Center dashboard IS the client's real navigation - the tile
+// grid there surfaces every service the client can access, so the sidebar
+// intentionally stays minimal (just the three destinations the client will
+// jump back to independent of context). Everything else is discovered
+// through the dashboard's tile grid + discovery panel.
 export const portalNav: NavItem[] = [
   {key:'dashboard',label:'Command Center',to:'',icon:Home},
   {key:'support',label:'Requests & Cases',to:'support',icon:HelpCircle},
   {key:'documents',label:'Documents',to:'documents',icon:FileText},
-  {key:'messages',label:'Messages',to:'messages',icon:MessageSquare},
-  {key:'billing',label:'Billing',to:'billing',icon:Receipt},
-  {key:'services',label:'Services',to:'services',icon:Layers},
 ]
+// Persona-based extras. Only added when the account has services in that
+// category - a landlord sees "My Properties" appear, an admin-heavy account
+// sees "Projects & Tasks", a funding client sees "Funding". Never all three
+// at once, so the sidebar stays under four items for most people.
 export function clientPortalNav(serviceKeys: string[]): NavItem[] {
   const keys = new Set(serviceKeys)
   const contextual: NavItem[] = []
