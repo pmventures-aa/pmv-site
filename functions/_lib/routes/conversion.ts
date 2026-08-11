@@ -32,16 +32,17 @@ async function conversionPreview(env:AppEnv['Bindings'],id:string){
 }
 
 conversionRoutes.get('/inquiries/:id/conversion-preview', requireStaff, async(c)=>{
-  const preview=await conversionPreview(c.env,c.req.param('id'))
+  const id=c.req.param('id')??''
+  if(!id)return c.json({error:'not found'},404)
+  const preview=await conversionPreview(c.env,id)
   if(!preview)return c.json({error:'not found'},404)
   return c.json({preview:{ready:preview.ready,blockers:preview.blockers,transfer:preview.transfer,attribution:preview.attribution,lead:{id:preview.inquiry.id,name:preview.inquiry.name,email:preview.inquiry.email,phone:preview.inquiry.phone,company_name:preview.inquiry.company_name,service_key:preview.inquiry.service_key},existing_user:preview.existing_user}})
 })
 
-// Atomic lead -> client conversion. Existing notes, activity and email rows are
-// re-keyed rather than copied, so one source of truth survives the lifecycle transition.
 conversionRoutes.post('/inquiries/:id/convert', requireStaff, async (c) => {
   const user = c.get('user')
-  const id = c.req.param('id')!
+  const id = c.req.param('id')??''
+  if(!id)return c.json({error:'not found'},404)
   const preview=await conversionPreview(c.env,id)
   if(!preview)return c.json({error:'not found'},404)
   if(!preview.ready)return c.json({error:preview.blockers[0],blockers:preview.blockers},409)
@@ -87,7 +88,8 @@ conversionRoutes.post('/inquiries/:id/convert', requireStaff, async (c) => {
 })
 
 conversionRoutes.get('/inquiries/:id/conversion', requireStaff, async (c) => {
-  const id = c.req.param('id')!
+  const id = c.req.param('id')??''
+  if(!id)return c.json({error:'not found'},404)
   const row = await c.env.DB.prepare(
     `SELECT lc.*, u.full_name AS converted_by_name, u.email AS converted_by_email
      FROM lead_conversions lc JOIN users u ON u.id = lc.converted_by WHERE lc.inquiry_id = ?`,
