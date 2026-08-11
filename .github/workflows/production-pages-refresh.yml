@@ -1,11 +1,26 @@
-name: Refresh Cloudflare Pages production
+name: Deploy Cloudflare Pages production
 
 on:
   push:
     branches: [main]
     paths:
+      - 'src/**'
+      - 'functions/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - 'vite.config.ts'
+      - 'tsconfig*.json'
+      - 'wrangler.toml'
       - '.github/workflows/production-pages-refresh.yml'
   workflow_dispatch:
+
+concurrency:
+  group: pmv-production-pages
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -13,17 +28,25 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out current main
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
-      - run: npm run build
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate production source
+        run: |
+          npm test
+          npm run typecheck
+          npm run build
 
       - name: Deploy current main to Cloudflare Pages production
         env:
