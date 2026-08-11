@@ -11,6 +11,7 @@ import { MailBell } from '../kit/MailBell'
 import { Avatar } from '../kit/Avatar'
 
 const LIVE_REFRESH_MS = 3_000
+const MOBILE_MEDIA = '(max-width: 767px), (pointer: coarse)'
 
 export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
@@ -32,22 +33,42 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const canOpenSettings = nav.some((item) => item.key === 'settings')
 
   useEffect(() => {
+    const mobileQuery = window.matchMedia(MOBILE_MEDIA)
+    let timer: number | null = null
+
     const pulse = () => {
       if (document.visibilityState !== 'visible') return
       // Non-destructive refresh signal only. Consumers refetch their own data
       // without unmounting routes, resetting component state, moving scroll,
       // closing drawers, or touching an employee's in-progress form values.
-      window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'live' } }))
+      window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'live', silent: true } }))
     }
-    const timer = window.setInterval(pulse, LIVE_REFRESH_MS)
+
+    const syncTimer = () => {
+      if (timer !== null) {
+        window.clearInterval(timer)
+        timer = null
+      }
+      // Mobile HQ must never repaint the workspace on a fixed cadence. Mobile
+      // revalidates when the app regains focus/visibility and targeted widgets
+      // continue their own lightweight polling. Desktop keeps the fast live pulse.
+      if (!mobileQuery.matches) timer = window.setInterval(pulse, LIVE_REFRESH_MS)
+    }
+
     const onFocus = () => pulse()
     const onVisibility = () => { if (document.visibilityState === 'visible') pulse() }
+    const onMediaChange = () => syncTimer()
+
+    syncTimer()
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
+    mobileQuery.addEventListener('change', onMediaChange)
+
     return () => {
-      window.clearInterval(timer)
+      if (timer !== null) window.clearInterval(timer)
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
+      mobileQuery.removeEventListener('change', onMediaChange)
     }
   }, [])
 
@@ -75,7 +96,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
     }`
 
   function refreshPage() {
-    window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } }))
+    window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual', silent: false } }))
   }
 
   const grouped: { section: string | null; items: NavItem[] }[] = []
@@ -173,7 +194,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
             <GlobalSearch className="w-full max-w-md" />
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <span className="mr-2 hidden text-[10px] font-medium uppercase tracking-[.12em] text-slate-600 xl:inline">Background sync · 3s</span>
+            <span className="mr-2 hidden text-[10px] font-medium uppercase tracking-[.12em] text-slate-600 xl:inline">Live background sync</span>
             <button onClick={refreshPage} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-gold" title="Refresh this page" aria-label="Refresh this HQ page"><RotateCw size={14} /></button>
             <MailBell />
             <NotificationBell />
