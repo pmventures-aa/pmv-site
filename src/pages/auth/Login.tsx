@@ -78,7 +78,7 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
         <Field label="Email Address">
           <input className={inputCls} type="email" autoComplete="email" inputMode="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
         </Field>
-        <Field label="Password" hint={<Link to={`../forgot-password${forgotQuery}`} className="font-semibold text-gold hover:text-gold-300">Forgot password?</Link> as unknown as string}>
+        <Field label="Password" hint={<Link to={`../forgot-password${forgotQuery}`} className="font-semibold text-gold hover:text-gold-300">Forgot password?</Link>}>
           <div className="relative">
             <input className={`${inputCls} pr-12`} type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
             <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-500 transition hover:text-gold" aria-label={showPassword ? 'Hide password' : 'Show password'}>
@@ -94,7 +94,7 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
           <div className="flex items-start gap-3">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold/10 text-gold"><Sparkles size={16} /></span>
             <div>
-              <p className="text-sm font-bold text-white">Not sure where to begin?</p>
+              <p className="text-sm font-bold text-white">Not Sure Where to Begin?</p>
               <p className="mt-1 text-xs leading-5 text-slate-400">Create your account and tell us what you are trying to solve. You do not need to know the exact service before you start.</p>
               <Link to={`../signup${signupQuery}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-gold hover:text-gold-300"><LockKeyhole size={13} /> Start Your Journey</Link>
             </div>
