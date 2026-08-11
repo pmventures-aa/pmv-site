@@ -6,10 +6,9 @@ export interface Quote {
 }
 
 // Pinnacle Briefings intentionally avoid a live quote API. A third-party feed
-// would add latency, availability risk, questionable attribution, and copy that
-// has little relationship to the work. This library mixes original operating
-// principles with a small set of short public-domain lines that have enduring
-// relevance to service, judgment, and execution.
+// would add latency, availability risk, questionable attribution, and generic
+// copy with little relationship to the work. The briefing library is original
+// operating copy written for Pinnacle's service, judgment, and execution model.
 export const quotes: Quote[] = [
   { text: 'Make the next step obvious enough that nobody has to chase it.', author: 'Pinnacle Field Note', theme: 'service', prompt: 'What can you make easier to act on today?' },
   { text: 'The handoff is part of the work. Own it until the next person can actually move.', author: 'Pinnacle Operating Principle', theme: 'business', prompt: 'Which handoff needs a cleaner owner?' },
@@ -35,14 +34,14 @@ export const quotes: Quote[] = [
   { text: 'Measure what helps someone decide, not what is easiest to count.', author: 'Pinnacle Management Note', theme: 'perspective', prompt: 'Which metric should lead to an action?' },
   { text: 'The client experience is the sum of what happens between milestones.', author: 'Pinnacle Service Standard', theme: 'service', prompt: 'What happens in the quiet middle of this engagement?' },
   { text: 'A clean close matters as much as a strong start.', author: 'Pinnacle Project Rule', theme: 'progress', prompt: 'What should be confirmed, delivered, or archived before this is done?' },
-  { text: 'Well done is better than well said.', author: 'Benjamin Franklin', theme: 'business', prompt: 'What can move from discussion to finished today?' },
-  { text: 'Nothing great was ever achieved without enthusiasm.', author: 'Ralph Waldo Emerson', theme: 'progress', prompt: 'Where would more energy change the quality of the work?' },
-  { text: 'Waste no more time arguing what a good person should be. Be one.', author: 'Marcus Aurelius', theme: 'perspective', prompt: 'What does the right action look like without another meeting?' },
-  { text: 'No act of kindness, no matter how small, is ever wasted.', author: 'Aesop', theme: 'kindness', prompt: 'Whose day can you make easier with a small action?' },
-  { text: 'It is not that we have a short time to live, but that we waste much of it.', author: 'Seneca', theme: 'perspective', prompt: 'What deserves your best hour today?' },
-  { text: 'The secret of getting ahead is getting started.', author: 'Mark Twain', theme: 'progress', prompt: 'What is the smallest useful first move?' },
-  { text: 'What you do speaks so loudly that I cannot hear what you say.', author: 'Ralph Waldo Emerson', theme: 'service', prompt: 'Which action will demonstrate the standard better than another promise?' },
-  { text: 'Lost time is never found again.', author: 'Benjamin Franklin', theme: 'progress', prompt: 'Which delay can you remove now?' },
+  { text: 'Be the person who turns “someone should” into a named owner and a date.', author: 'Pinnacle Management Note', theme: 'business', prompt: 'Which vague commitment can become a real assignment?' },
+  { text: 'Enthusiasm is useful when it survives contact with the checklist.', author: 'Pinnacle Field Note', theme: 'progress', prompt: 'What deserves both energy and discipline today?' },
+  { text: 'Character shows up in the unglamorous follow-through.', author: 'Pinnacle Service Standard', theme: 'perspective', prompt: 'What small follow-through says the most about your standard?' },
+  { text: 'Kindness becomes operational when it removes friction for someone else.', author: 'Pinnacle Service Standard', theme: 'kindness', prompt: 'What friction can you quietly remove today?' },
+  { text: 'Time gets expensive when a decision has no owner.', author: 'Pinnacle Management Note', theme: 'perspective', prompt: 'Which stalled decision needs one accountable person?' },
+  { text: 'Start small enough to start now, but clear enough to know when it is done.', author: 'Pinnacle Project Rule', theme: 'progress', prompt: 'What is the smallest complete move you can make?' },
+  { text: 'Clients remember what happened after the promise.', author: 'Pinnacle Service Standard', theme: 'service', prompt: 'What action will make the promise tangible?' },
+  { text: 'Protect tomorrow by closing what should not still be open tonight.', author: 'Pinnacle Field Note', theme: 'progress', prompt: 'Which loose end is worth finishing before you stop?' },
 ]
 
 function hashSeed(seed: string): number {
