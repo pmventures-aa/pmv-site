@@ -1,0 +1,32 @@
+name: Process document envelope automation
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Process reminders expirations and retention
+        env:
+          PMV_AUTOMATION_SECRET: ${{ secrets.PMV_AUTOMATION_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PMV_AUTOMATION_SECRET"
+          body="$(mktemp)"
+          status="$(curl --silent --show-error --max-time 60 \
+            --request POST \
+            --header "x-pmv-automation-secret: $PMV_AUTOMATION_SECRET" \
+            --header 'content-type: application/json' \
+            --output "$body" \
+            --write-out '%{http_code}' \
+            'https://www.pinnaclemanagementventures.com/api/automation/document-envelopes/run')"
+          cat "$body" | jq . || cat "$body"
+          test "$status" -ge 200 -a "$status" -lt 300
