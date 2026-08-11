@@ -21,10 +21,14 @@ const crestClass = 'pmv-crest-adaptive object-contain'
 
 type BrandMarkVariant = 'standard' | 'spotlight' | 'quiet'
 
+export function WhiteGoldBrandMark({ size = 120, className = '', decorative = false }: { size?: number; className?: string; decorative?: boolean }) {
+  return <div role={decorative ? undefined : 'img'} aria-label={decorative ? undefined : 'Pinnacle Management Ventures crest'} aria-hidden={decorative || undefined} className={`pmv-white-gold-mark ${className}`} style={{ width: size, height: size }} />
+}
+
 export function Logo({ className = '', showText = true, markSize = 62 }: { className?: string; showText?: boolean; markSize?: number }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <BrandMark3D size={markSize} decorative variant="quiet" className="shrink-0" />
+      <WhiteGoldBrandMark size={markSize} decorative className="shrink-0" />
       {showText && <div className="leading-tight"><div className="text-[15px] font-bold tracking-[.025em] text-white">PINNACLE</div><div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">Management Ventures</div></div>}
     </div>
   )
