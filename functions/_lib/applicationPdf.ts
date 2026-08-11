@@ -35,7 +35,7 @@ export interface ApplicationPdfInput {
   evictionDisclaimer?: string | null
   mayRequireAttorneyCoordination?: boolean
   logoBytes?: ArrayBuffer | Uint8Array | null
-  signature: { name: string; signedAt: string; ip: string }
+  signature?: { name: string; signedAt: string; ip: string } | null
 }
 
 const PAGE_WIDTH = 612
@@ -180,9 +180,14 @@ export async function renderApplicationPdf(input: ApplicationPdfInput): Promise<
   else input.attachments.forEach((attachment, index) => line(`${index + 1}. ${attachment.file_name || 'Uploaded file'}`, { indent: 6 }))
 
   section('Electronic signature')
-  labelValue('Signed by', input.signature.name)
-  labelValue('Signed at', `${input.signature.signedAt} (IP ${input.signature.ip})`)
-  line('By typing their name and submitting this form, the signer certified the information above was accurate to the best of their knowledge.', { size: 8, color: SLATE, gap: 5 })
+  if (input.signature) {
+    labelValue('Signed by', input.signature.name)
+    labelValue('Signed at', `${input.signature.signedAt} (IP ${input.signature.ip})`)
+    line('By typing their name and submitting this form, the signer certified the information above was accurate to the best of their knowledge.', { size: 8, color: SLATE, gap: 5 })
+  } else {
+    labelValue('Signature status', 'No electronic signature was captured for this application record.')
+    line('This can occur for historical, staff-entered, or imported applications. The absence of a signature does not prevent generation of the internal application record.', { size: 8, color: SLATE, gap: 5 })
+  }
 
   section('Internal staff block')
   labelValue('Assigned representative', input.assignedRep || 'Unassigned')
