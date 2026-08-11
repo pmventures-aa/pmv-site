@@ -59,27 +59,27 @@ export default function CasesAdmin() {
   const [filters, setFilters] = useState({ status: 'open,in_progress', priority: '', waiting_on: '', over_sla: false, search: '' })
   const [showSlaEditor, setShowSlaEditor] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     // Server does the coarse filter; we do search + over_sla client-side so
     // the free-text and live SLA state don't need a round-trip per keystroke.
     const params = new URLSearchParams()
     if (filters.priority) params.set('priority', filters.priority)
     if (filters.waiting_on) params.set('waiting_on', filters.waiting_on)
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const res = await api.get<{ cases: CaseRow[] }>(`/admin/cases?${params.toString()}`)
       setCases(res.cases)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not load cases.')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [filters.priority, filters.waiting_on])
 
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
-    const timer = window.setInterval(() => { void load() }, REFRESH_MS)
+    const timer = window.setInterval(() => { void load(true) }, REFRESH_MS)
     return () => window.clearInterval(timer)
   }, [load])
 
