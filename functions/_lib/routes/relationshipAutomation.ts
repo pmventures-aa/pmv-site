@@ -9,8 +9,8 @@ export const relationshipAutomationRoutes = new Hono<AppEnv>()
 export const relationshipAutomationAdminRoutes = new Hono<AppEnv>()
 
 const AUTOMATIONS = {
-  client_notifications: { label: 'Client event notifications', cadence: 'Every 10 minutes', intervalMinutes: 10 },
-  client_nurture: { label: 'Client nurture campaign', cadence: 'Daily at 10:20 AM ET', intervalMinutes: 1440 },
+  client_notifications: { label: 'Client event notifications', cadence: 'Every 10 minutes', intervalMinutes: 10, description: 'Processes queued client-facing event notifications and records delivery outcomes.' },
+  client_nurture: { label: 'Client nurture campaign', cadence: 'Daily at 10:20 AM ET', intervalMinutes: 1440, description: 'Processes due client nurture steps and records successful, skipped, or failed delivery work.' },
 } as const
 
 type AutomationKey = keyof typeof AUTOMATIONS
@@ -30,6 +30,18 @@ async function requireAutomationCron(c: any, next: any) {
   await next()
 }
 
+function nextDailyEastern(hour: number, minute: number) {
+  const now = new Date()
+  const easternParts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(now)
+  const values = Object.fromEntries(easternParts.map((part) => [part.type, part.value]))
+  const local = new Date(`${values.year}-${values.month}-${values.day}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00`)
+  const probe = new Date(local.toLocaleString('en-US', { timeZone:'America/New_York' }))
+  const offset = local.getTime() - probe.getTime()
+  let target = new Date(local.getTime() + offset)
+  if (target.getTime() <= now.getTime()) target = new Date(target.getTime() + 86400000)
+  return target.toISOString()
+}
+
 async function executeAutomation(c: any, key: AutomationKey, triggerType: 'scheduled'|'manual', actorUserId?: string) {
   const runId = uuid()
   await c.env.DB.prepare(
@@ -43,14 +55,17 @@ async function executeAutomation(c: any, key: AutomationKey, triggerType: 'sched
     const processed = Number(result.processed || 0)
     const succeeded = Number((result as any).sent || 0)
     const failed = Number((result as any).failed || 0)
+    const skipped = Number((result as any).skipped || 0)
+    const status = failed > 0 ? 'partial' : 'success'
     await c.env.DB.prepare(
       `UPDATE automation_runs SET status=?,items_processed=?,items_succeeded=?,items_failed=?,detail_json=?,finished_at=datetime('now') WHERE id=?`,
-    ).bind(failed > 0 ? 'partial' : 'success', processed, succeeded, failed, JSON.stringify(result), runId).run()
-    return result
+    ).bind(status, processed, succeeded, failed, JSON.stringify({ ...result, skipped }), runId).run()
+    return { run_id: runId, status, ...result }
   } catch (err) {
+    const message = err instanceof Error ? err.message : 'automation failed'
     await c.env.DB.prepare(
       `UPDATE automation_runs SET status='failed',detail_json=?,finished_at=datetime('now') WHERE id=?`,
-    ).bind(JSON.stringify({ error: err instanceof Error ? err.message : 'automation failed' }), runId).run()
+    ).bind(JSON.stringify({ error: message }), runId).run()
     throw err
   }
 }
@@ -105,6 +120,8 @@ relationshipAutomationAdminRoutes.get('/automation-center', requireOwner, async 
       const now = new Date(); const minute = now.getUTCMinutes(); const next = new Date(now)
       next.setUTCSeconds(0,0); next.setUTCMinutes(minute - (minute % 10) + 10)
       nextRunAt = next.toISOString()
+    } else if (key === 'client_nurture') {
+      nextRunAt = nextDailyEastern(10,20)
     }
     return { key, ...meta, last_run: last, next_run_at: nextRunAt }
   })
@@ -114,6 +131,8 @@ relationshipAutomationAdminRoutes.get('/automation-center', requireOwner, async 
 relationshipAutomationAdminRoutes.post('/automation-center/:key/run', requireOwner, async (c) => {
   const key = c.req.param('key') as AutomationKey
   if (!(key in AUTOMATIONS)) return c.json({ error:'unknown automation' },404)
+  const running = await c.env.DB.prepare("SELECT id FROM automation_runs WHERE automation_key=? AND status='running' ORDER BY started_at DESC LIMIT 1").bind(key).first()
+  if (running) return c.json({ error:'this automation is already running' },409)
   const result = await executeAutomation(c, key, 'manual', c.get('user').id)
   return c.json({ ok:true, ...result })
 })
@@ -130,8 +149,10 @@ relationshipAutomationAdminRoutes.get('/notification-center', requireOwner, asyn
      LEFT JOIN notification_template_overrides nto ON nto.event_key=nec.event_key
      WHERE nec.active=1 ORDER BY nec.category,nec.sort_order,nec.label`,
   ).bind(user.id).all()
-  return c.json({events:events.results||[]})
+  return c.json({events:rowsSafe(events.results)})
 })
+
+function rowsSafe(rows: unknown) { return Array.isArray(rows) ? rows : [] }
 
 relationshipAutomationAdminRoutes.patch('/notification-center/preferences', requireOwner, async (c) => {
   const user=c.get('user')
