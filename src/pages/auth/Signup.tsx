@@ -4,6 +4,7 @@ import { useAuth, isApiError } from '../../lib/auth'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { services } from '../../data/services'
+import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
 
 const MIN_PASSWORD = 10
@@ -52,11 +53,11 @@ export default function Signup() {
       if (!form.email.includes('@')) return 'Enter a valid email address.'
       if (!form.phone.trim()) return 'Enter a phone number so your Pinnacle team can reach you.'
     }
-    if (step === 'business' && next === 'account' && !form.client_type) return 'Choose the option that best describes you.'
+    if (step === 'business' && next === 'account' && !form.client_type) return 'Choose the option that best describes what brought you to Pinnacle.'
     if (step === 'account') {
       if (form.password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters.`
       if (form.password !== form.confirm) return 'Passwords do not match.'
-      if (!tosAccepted) return 'Accept the Terms of Service to create your account.'
+      if (!tosAccepted) return 'Please review and accept the account terms to continue.'
     }
     return null
   }
@@ -70,6 +71,7 @@ export default function Signup() {
   }
 
   async function submit() {
+    primeAudio()
     setError(null)
     const message = validate()
     if (message) return setError(message)
@@ -78,11 +80,12 @@ export default function Signup() {
     try {
       await signup({ email: form.email, password: form.password, first_name: form.first_name, last_name: form.last_name, phone: form.phone, business_name: form.business_name || undefined, tos_accepted: true })
       if (inviteToken) await api.post(`/invite/${encodeURIComponent(inviteToken)}/complete-existing`, {}).catch(() => {})
+      playWelcomeSound('client')
       const query = requestedService
         ? `?service=${encodeURIComponent(requestedService.key)}${offeringId ? `&offering=${encodeURIComponent(offeringId)}` : ''}&welcome=1`
         : '?welcome=1'
       navigate(`${p('onboarding')}${query}`, { replace: true })
-    } catch (err) { setError(isApiError(err) ? err.message : 'Something went wrong. Try again.') }
+    } catch (err) { setError(isApiError(err) ? err.message : 'We could not create your account. Please try again.') }
     finally { setBusy(false) }
   }
 
@@ -90,48 +93,58 @@ export default function Signup() {
     ? `?service=${encodeURIComponent(requestedService.key)}${offeringId ? `&offering=${encodeURIComponent(offeringId)}` : ''}`
     : ''
 
+  const title = step === 'contact' ? 'Start Your Journey' : step === 'business' ? 'Tell Us What Brought You Here' : 'Secure Your Account'
+  const subtitle = step === 'contact'
+    ? 'Start with the basics. You do not need to know the exact service or have everything figured out before you begin.'
+    : step === 'business'
+      ? 'A little context helps us organize the right next steps without making you navigate a wall of services.'
+      : 'One final step. Then we will continue into your private workspace and learn about the work itself.'
+
   return (
     <AuthLayout
-      eyebrow={inviteToken ? "Pinnacle invitation" : requestedService ? "Your Pinnacle journey" : "Client portal"}
-      title={step === "contact" ? "Start with you" : step === "business" ? "A little context" : "Secure your account"}
-      subtitle={step === "contact" ? "Just the basics. We’ll learn about the actual work after you’re inside." : step === "business" ? "One quick choice helps us make the portal feel relevant from the start." : "Last step. Then we’ll pick up the service or situation that brought you here."}
-      footer={<>Already have an account? <Link to={`../login${loginQuery}`} className="font-medium text-gold hover:underline">Sign in</Link></>}
+      surface="client"
+      eyebrow={inviteToken ? 'Private Pinnacle Invitation' : requestedService ? 'Your Pinnacle Journey' : 'New Client'}
+      title={title}
+      subtitle={subtitle}
+      footer={<>Already have an account? <Link to={`../login${loginQuery}`} className="font-bold text-gold hover:text-gold-300">Sign In</Link></>}
+      sideTitle="Start with the situation. We will help organize the path forward."
+      sideBody="Pinnacle is designed for real work that crosses systems, vendors, documents, deadlines, and people. Your account gives that work one organized starting point."
     >
-      <div className="mb-6">
-        <div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {index + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all" style={{width:`${progress}%`}}/></div>
-        {progress >= 67 && <p className="mt-2 text-right text-[11px] text-emerald-300">Almost done</p>}
+      <div className="mb-7">
+        <div className="flex items-center justify-between text-xs"><span className="font-bold text-white">Step {index + 1} of {steps.length}</span><span className="font-semibold text-gold">{progress}% Complete</span></div>
+        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all duration-300" style={{width:`${progress}%`}}/></div>
       </div>
 
-      {inviteLoading && <p className="mb-4 text-sm text-slate-400">Loading invitation…</p>}
-      {requestedService && !inviteToken && <div className="mb-5 border-l-2 border-gold pl-4"><p className="text-sm font-medium text-white">We’ll remember what brought you here.</p><p className="mt-1 text-xs leading-5 text-slate-400">{requestedService.shortDescription}</p></div>}
-      {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-lg border border-gold/20 bg-gold/[0.05] p-3 text-xs text-slate-400">Connected to your private Pinnacle invitation · expires {new Date(invite.expires_at).toLocaleString()}.</div>}
+      {inviteLoading && <p className="mb-4 text-sm text-slate-400">Loading your invitation…</p>}
+      {requestedService && !inviteToken && <div className="mb-5 rounded-xl border border-gold/15 bg-gold/[.04] p-4"><p className="text-sm font-bold text-white">We Remember What Brought You Here</p><p className="mt-1 text-xs leading-5 text-slate-400">{requestedService.shortDescription}</p></div>}
+      {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-xl border border-gold/20 bg-gold/[0.05] p-3 text-xs text-slate-400">Connected to your private Pinnacle invitation. Expires {new Date(invite.expires_at).toLocaleString()}.</div>}
       <ErrorBanner message={error} />
 
-      {step === 'contact' && <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3"><Field label="First name"><input className={inputCls} autoComplete="given-name" value={form.first_name} onChange={(e)=>set('first_name',e.target.value)}/></Field><Field label="Last name"><input className={inputCls} autoComplete="family-name" value={form.last_name} onChange={(e)=>set('last_name',e.target.value)}/></Field></div>
-        <Field label="Email"><input className={inputCls} type="email" autoComplete="email" readOnly={!!inviteToken} value={form.email} onChange={(e)=>set('email',e.target.value)}/></Field>
-        <Field label="Mobile phone"><input className={inputCls} type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e)=>set('phone',e.target.value)}/></Field>
-        <button type="button" className="btn-gold w-full" onClick={()=>go('business')}>Continue</button>
+      {step === 'contact' && <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2"><Field label="First Name"><input className={inputCls} autoComplete="given-name" value={form.first_name} onChange={(e)=>set('first_name',e.target.value)} placeholder="First name"/></Field><Field label="Last Name"><input className={inputCls} autoComplete="family-name" value={form.last_name} onChange={(e)=>set('last_name',e.target.value)} placeholder="Last name"/></Field></div>
+        <Field label="Email Address"><input className={inputCls} type="email" autoComplete="email" readOnly={!!inviteToken} value={form.email} onChange={(e)=>set('email',e.target.value)} placeholder="you@example.com"/></Field>
+        <Field label="Mobile Phone"><input className={inputCls} type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e)=>set('phone',e.target.value)} placeholder="(555) 555-5555"/></Field>
+        <button type="button" className="btn-gold min-h-12 w-full" onClick={()=>go('business')}>Continue</button>
       </div>}
 
       {step === 'business' && <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">What best describes you?</p>
-        <div className="divide-y divide-white/10 border-y border-white/10">{[
-          ['business','I’m here for a business','Consulting, payments/POS, funding, admin support, or another business need.'],
-          ['property','I’m here for a property','Property coordination, inspection, vendor, field, or owner support.'],
-          ['personal','I need a mobile/professional service','Notary, courier, document, or another defined personal/professional need.'],
-        ].map(([value,title,body])=><button key={value} type="button" onClick={()=>set('client_type',value)} className={`flex w-full items-start gap-3 px-2 py-4 text-left transition ${form.client_type===value?'bg-gold/[.07]':'hover:bg-white/[.025]'}`}><span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border ${form.client_type===value?'border-gold bg-gold text-navy-950':'border-white/20'}`}>{form.client_type===value?'✓':''}</span><span><span className="block text-sm font-medium text-white">{title}</span><span className="mt-1 block text-xs leading-5 text-slate-500">{body}</span></span></button>)}</div>
-        {(form.client_type==='business'||form.client_type==='property')&&<div className="mt-5"><Field label="Business / property company name (optional)"><input className={inputCls} autoComplete="organization" value={form.business_name} onChange={(e)=>set('business_name',e.target.value)}/></Field></div>}
-        <div className="mt-6 flex gap-2"><button type="button" className="btn-outline flex-1" onClick={()=>setStep('contact')}>Back</button><button type="button" className="btn-gold flex-[1.5]" onClick={()=>go('account')}>Continue</button></div>
+        <p className="mb-3 text-sm font-bold text-slate-200">What Best Describes Your Situation?</p>
+        <div className="space-y-2">{[
+          ['business','Business or Operational Support','Consulting, POS or payment transitions, project coordination, administrative support, funding navigation, or another business need.'],
+          ['property','Property or Field Support','Property coordination, inspection, vendor, field verification, access, or owner support.'],
+          ['personal','Mobile or Professional Service','Notary, courier, document support, or another defined professional need.'],
+        ].map(([value,itemTitle,body])=><button key={value} type="button" onClick={()=>set('client_type',value)} className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${form.client_type===value?'border-gold/45 bg-gold/[.07]':'border-white/10 bg-white/[.018] hover:border-white/20 hover:bg-white/[.035]'}`}><span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-bold ${form.client_type===value?'border-gold bg-gold text-navy-950':'border-white/20 text-transparent'}`}>✓</span><span><span className="block text-sm font-bold text-white">{itemTitle}</span><span className="mt-1 block text-xs leading-5 text-slate-400">{body}</span></span></button>)}</div>
+        {(form.client_type==='business'||form.client_type==='property')&&<div className="mt-5"><Field label="Business or Property Company Name" hint="Optional"><input className={inputCls} autoComplete="organization" value={form.business_name} onChange={(e)=>set('business_name',e.target.value)} placeholder="Company or property entity"/></Field></div>}
+        <div className="mt-6 flex gap-3"><button type="button" className="btn-outline flex-1" onClick={()=>setStep('contact')}>Back</button><button type="button" className="btn-gold flex-[1.5]" onClick={()=>go('account')}>Continue</button></div>
       </div>}
 
-      {step === 'account' && <div className="space-y-4">
-        <div className="rounded-lg border border-white/10 bg-white/[.02] p-4 text-xs leading-5 text-slate-400"><strong className="text-white">Next:</strong> once your account is created, we’ll ask a few short questions about {requestedService ? requestedService.title : 'what brought you to Pinnacle'} and request documents only when that service actually needs them.</div>
-        <Field label={`Password (at least ${MIN_PASSWORD} characters)`}><input className={inputCls} type="password" autoComplete="new-password" value={form.password} onChange={(e)=>set('password',e.target.value)}/></Field>
-        <Field label="Confirm password"><input className={inputCls} type="password" autoComplete="new-password" value={form.confirm} onChange={(e)=>set('confirm',e.target.value)}/></Field>
-        <label className="flex items-start gap-2.5 text-xs text-slate-400"><input type="checkbox" checked={tosAccepted} onChange={(e)=>setTosAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-white/[0.04] accent-gold"/><span>I agree to the <a href="https://pinnaclemanagementventures.com/terms" target="_blank" rel="noreferrer" className="font-medium text-gold hover:underline">Terms of Service</a> and to be contacted by Pinnacle Management Ventures about my services.</span></label>
-        <div className="flex gap-2"><button type="button" className="btn-outline flex-1" onClick={()=>setStep('business')}>Back</button><button type="button" disabled={busy||inviteLoading|| (!!inviteToken&&invite?.status!=='pending')} className="btn-gold flex-[1.5] disabled:opacity-60" onClick={()=>void submit()}>{busy?'Creating account…':'Create my account'}</button></div>
+      {step === 'account' && <div className="space-y-5">
+        <div className="rounded-xl border border-white/10 bg-white/[.025] p-4 text-xs leading-5 text-slate-400"><strong className="font-bold text-white">What Happens Next:</strong> once your account is created, we will ask a few focused questions about {requestedService ? requestedService.title : 'what brought you to Pinnacle'} and request documents only when the work actually needs them.</div>
+        <Field label="Password" hint={`${MIN_PASSWORD}+ characters`}><input className={inputCls} type="password" autoComplete="new-password" value={form.password} onChange={(e)=>set('password',e.target.value)} placeholder="Create a strong password"/></Field>
+        <Field label="Confirm Password"><input className={inputCls} type="password" autoComplete="new-password" value={form.confirm} onChange={(e)=>set('confirm',e.target.value)} placeholder="Enter it again"/></Field>
+        <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[.018] p-3.5 text-xs leading-5 text-slate-400"><input type="checkbox" checked={tosAccepted} onChange={(e)=>setTosAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-white/[0.04] accent-gold"/><span>I agree to the <a href="https://pinnaclemanagementventures.com/terms" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Terms of Service</a>, acknowledge the <a href="https://pinnaclemanagementventures.com/privacy" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Privacy Policy</a>, and consent to the <a href="https://pinnaclemanagementventures.com/electronic-communications" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Electronic Communications Disclosure</a> for account and service-related communications.</span></label>
+        <p className="text-[11px] leading-5 text-slate-500">Creating an account does not require consent to promotional marketing. Marketing messages, if offered, use separate opt-in and opt-out controls.</p>
+        <div className="flex gap-3"><button type="button" className="btn-outline flex-1" onClick={()=>setStep('business')}>Back</button><button type="button" disabled={busy||inviteLoading|| (!!inviteToken&&invite?.status!=='pending')} className="btn-gold flex-[1.5] disabled:opacity-60" onClick={()=>void submit()}>{busy?'Creating Your Workspace…':'Create My Account'}</button></div>
       </div>}
     </AuthLayout>
   )
