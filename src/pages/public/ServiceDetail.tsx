@@ -45,7 +45,7 @@ export default function ServiceDetail() {
           </div>
         </div>
 
-        <OfferingLibrary serviceKey={service.key} />
+        <OfferingLibrary serviceKey={service.key} offeringPrefixes={service.offeringPrefixes} />
 
         <div className="mt-16">
           <p className="eyebrow mb-4">You may also want to explore</p>

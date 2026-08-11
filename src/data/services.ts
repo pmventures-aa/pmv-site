@@ -8,6 +8,7 @@ export interface ServiceInfo {
   heroDescription: string
   highlights: string[]
   idealFor: string[]
+  offeringPrefixes?: string[]
 }
 
 export const services: ServiceInfo[] = [
@@ -80,34 +81,54 @@ export const services: ServiceInfo[] = [
   {
     slug: 'property-management',
     key: 'property_management',
-    title: 'Property Owner Support',
+    title: 'Property Care, Preservation & Owner Support',
     tag: 'Property Services',
-    shortDescription: 'Help coordinating property work, vendors, documentation, and owner follow-up.',
+    popular: true,
+    shortDescription: 'Cleaning, turnovers, REO and vacant-property support, eviction coordination, vendors, access, and owner follow-through.',
     heroDescription:
-      'Pinnacle helps property owners stay on top of the practical work around a property, including vendor scheduling, issue follow-up, documentation, field coordination, and owner-requested projects.',
+      'Pinnacle helps owners, landlords, investors, agents, and asset teams handle the practical work around a property. That can be as simple as scheduling a deep clean or as involved as coordinating an eviction-related turnover, vacant-property preservation, multiple vendors, and documented completion.',
     highlights: [
-      'Vendor and maintenance coordination',
-      'Property communication and follow-up',
-      'Owner documentation and project tracking',
-      'Support for local and out-of-area owners',
+      'Standard, move-out, turnover, and deep-clean coordination',
+      'REO, vacant-property, securing, debris, and preservation support',
+      'Tenant placement, full-service management, and portfolio-level support through the appropriate licensed scope',
+      'Eviction notices, document preparation, filing, attorney coordination, lockout, and post-possession turnover support within the permitted scope',
+      'Vendor access, maintenance follow-up, before-and-after photos, and project tracking',
     ],
-    idealFor: ['Investment property owners', 'Owners coordinating multiple vendors or projects', 'Out-of-area owners who need local support'],
+    idealFor: ['Landlords, investors, agents, and property managers', 'Banks, servicers, asset managers, and REO teams', 'Local or out-of-area owners who need dependable South Florida follow-through'],
   },
   {
     slug: 'property-inspections',
     key: 'property_inspections',
     title: 'Property Inspections',
     tag: 'Property Services',
-    shortDescription: 'Documented property condition checks and field reporting for owners and businesses.',
+    shortDescription: 'Documented inspections, occupancy checks, progress photos, property condition observations, and field reporting.',
     heroDescription:
       'Pinnacle provides documented field observations when an owner or business needs a current view of a property for routine oversight, project follow-up, or another defined purpose.',
     highlights: [
       'Condition observations with photo documentation',
-      'Routine, project, and owner-requested field checks',
+      'Occupancy, move-in/move-out, rent-ready, progress, insurance-photo, commercial, and owner-requested field checks',
       'Written reporting with practical observations',
       'Scheduling based on the needs of the assignment',
     ],
     idealFor: ['Owners monitoring property condition', 'Out-of-area owners needing local field support', 'Businesses needing documented site observations'],
+  },
+  {
+    slug: 'document-preparation',
+    key: 'admin_support',
+    title: 'Document Preparation & Filing Support',
+    tag: 'Document Services',
+    popular: true,
+    shortDescription: 'Practical help organizing information, preparing non-lawyer documents, assembling packets, and coordinating filing or delivery.',
+    heroDescription:
+      'Pinnacle helps turn scattered information into an organized, ready-to-use document package. We can assist with client-directed forms, business and property records, administrative packets, document delivery, and filing coordination while clearly identifying when legal advice or attorney-prepared work is required.',
+    highlights: [
+      'Client-directed form completion and document formatting',
+      'Property, business, vendor, and administrative document packages',
+      'Eviction-related administrative preparation subject to Florida law and scope review',
+      'Courier, courthouse or agency delivery, filing confirmation, and secure record organization',
+    ],
+    idealFor: ['Owners who need paperwork organized and moved forward', 'Property and business professionals managing repeat documents', 'People who need administrative document help without a full consulting project'],
+    offeringPrefixes: ['document-'],
   },
   {
     slug: 'document-courier',
