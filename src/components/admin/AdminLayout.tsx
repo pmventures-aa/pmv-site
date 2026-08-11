@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Menu, X, Search, RotateCw, PanelLeftClose, PanelLeftOpen, Settings, LogOut, ChevronDown, ChevronRight } from 'lucide-react'
+import { Menu, X, Search, RotateCw, PanelLeftClose, PanelLeftOpen, Settings, LogOut, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
@@ -34,9 +34,6 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
   useEffect(() => {
     const pulse = () => {
       if (document.visibilityState !== 'visible') return
-      // Non-destructive refresh signal only. Consumers refetch their own data
-      // without unmounting routes, resetting component state, moving scroll,
-      // closing drawers, or touching an employee's in-progress form values.
       window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'live' } }))
     }
     const timer = window.setInterval(pulse, LIVE_REFRESH_MS)
@@ -108,7 +105,12 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
                     {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                   </button>
                 )}
-                {!collapsed && group.items.map((item) => (
+                {!collapsed && group.items.map((item) => item.externalHref ? (
+                  <a key={item.key} href={item.externalHref} target="_blank" rel="noreferrer" className={linkCls({isActive:false})} onClick={() => setMobileOpen(false)}>
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[.025] text-slate-400 transition group-hover:text-gold"><item.icon size={17} strokeWidth={1.8} /></span>
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span><ExternalLink size={12} className="shrink-0 text-slate-600 group-hover:text-gold" />
+                  </a>
+                ) : (
                   <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[.025] text-slate-400 transition group-hover:text-gold"><item.icon size={17} strokeWidth={1.8} /></span>
                     <span className="truncate">{item.label}</span>
