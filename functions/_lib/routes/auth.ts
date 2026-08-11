@@ -262,7 +262,8 @@ authRoutes.post('/set-password', async (c) => {
 
 // ---------- password recovery ----------
 authRoutes.post('/forgot-password', async (c) => {
-  const body = await c.req.json<{ email?: string; surface?: 'client' | 'staff' }>().catch(() => ({}))
+  const body = await c.req.json<{ email?: string; surface?: 'client' | 'staff' }>()
+    .catch(() => ({} as { email?: string; surface?: 'client' | 'staff' }))
   const email = norm(body.email || '')
   const ip = c.req.header('CF-Connecting-IP') || 'unknown'
   const generic = { ok: true, message: 'If an active Pinnacle account matches that email, a reset link is on the way.' }
@@ -307,7 +308,8 @@ authRoutes.post('/forgot-password', async (c) => {
 })
 
 authRoutes.post('/reset-password', async (c) => {
-  const body = await c.req.json<{ token?: string; password?: string }>().catch(() => ({}))
+  const body = await c.req.json<{ token?: string; password?: string }>()
+    .catch(() => ({} as { token?: string; password?: string }))
   const token = String(body.token || '')
   const password = String(body.password || '')
   if (!token || !password) return c.json({ error: 'reset token and new password are required' }, 400)
