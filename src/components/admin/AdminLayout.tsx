@@ -15,7 +15,10 @@ import { MailWorkspaceLauncher } from './MailWorkspaceLauncher'
 const LIVE_REFRESH_MS = 3_000
 const MOBILE_MEDIA = '(max-width: 767px), (pointer: coarse)'
 
-export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
+// `badge` prop kept for callers that still pass it but no longer rendered
+// anywhere in the layout - it was showing as "STAFF CONSOLE" chrome the
+// user asked to remove.
+export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: string }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
@@ -113,10 +116,6 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
     <>
       <div className="shrink-0 px-1 pb-5">
         <Logo />
-        <div className="mt-3 flex items-center gap-2 px-2">
-          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.12em] text-emerald-300">Live</span>
-          <span className="text-[11px] font-medium uppercase tracking-[.12em] text-slate-500">{badge}</span>
-        </div>
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
@@ -200,7 +199,6 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
           <div className="flex shrink-0 items-center gap-2">
             <SlaAlertChip />
             <span className="hidden lg:inline-flex"><MailWorkspaceLauncher /></span>
-            <span className="mr-1 hidden text-[10px] font-medium uppercase tracking-[.12em] text-slate-600 xl:inline">Live background sync</span>
             <button onClick={refreshPage} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-gold" title="Refresh this page" aria-label="Refresh this HQ page"><RotateCw size={14} /></button>
             <MailBell />
             <NotificationBell />

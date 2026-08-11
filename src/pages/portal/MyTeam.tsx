@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../../lib/api'
 import { Card, PageHeader, EmptyState } from '../../components/ui'
 import { Avatar } from '../../components/kit/Avatar'
+import { PresenceDot } from '../../components/kit/PresenceDot'
+import { usePresence, humanizePresence, humanizeLastSeen } from '../../lib/presence'
 
 interface TeamMember {
   id: string
@@ -46,6 +48,9 @@ export default function MyTeam() {
     load()
   }, [load])
 
+  const memberIds = useMemo(() => team.map((m) => m.id), [team])
+  const presence = usePresence(memberIds, 'portal')
+
   return (
     <div>
       <PageHeader eyebrow="Your Pinnacle team" title="My Team" subtitle="The people assigned to your account." />
@@ -66,13 +71,23 @@ export default function MyTeam() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {team.map((m) => (
+          {team.map((m) => {
+            const entry = presence[m.id]
+            return (
             <Card key={m.id}>
               <div className="flex items-center gap-3">
-                <Avatar userId={m.id} name={m.full_name} size={44} />
-                <div>
+                <div className="relative">
+                  <Avatar userId={m.id} name={m.full_name} size={44} />
+                  <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-navy-900 p-0.5">
+                    <PresenceDot entry={entry} size={10} />
+                  </span>
+                </div>
+                <div className="min-w-0">
                   <p className="text-base font-semibold text-white">{m.full_name || m.email}</p>
                   <p className="text-sm text-gold">{m.title || (m.staff_role ? ROLE_LABELS[m.staff_role] ?? m.staff_role : 'Team member')}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {humanizePresence(entry?.status)}{entry?.last_seen_at ? ` · ${humanizeLastSeen(entry.last_seen_at)}` : ''}
+                  </p>
                 </div>
               </div>
               <div className="mt-3 space-y-1 text-sm text-slate-400">
@@ -86,7 +101,8 @@ export default function MyTeam() {
                 )}
               </div>
             </Card>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

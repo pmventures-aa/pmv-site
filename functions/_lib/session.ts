@@ -84,6 +84,10 @@ async function touchSession(env: Env, token: string, userId: string, request: Re
       `UPDATE auth_sessions SET last_seen_at=datetime('now'),device_label=?,user_agent=?,ip_address=?,city=?,region=?,country=?
        WHERE id=? AND user_id=? AND revoked_at IS NULL`,
     ).bind(deviceLabel(ua), ua?.slice(0, 1000) || null, ip, geo.city, geo.region, geo.country, sessionId, userId).run().catch(() => undefined),
+    // Presence heartbeat: mirror the touch on the users row so the presence
+    // endpoint can compute green/yellow/red without joining across every
+    // active session (see migration 0048_user_presence.sql).
+    env.DB.prepare("UPDATE users SET last_seen_at=datetime('now') WHERE id=?").bind(userId).run().catch(() => undefined),
   ])
 }
 
