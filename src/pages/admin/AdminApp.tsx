@@ -37,7 +37,8 @@ import InvitationsAdmin from './InvitationsAdmin'
 import RolesPermissionsAdmin from './RolesPermissionsAdmin'
 import DocumentOperationsDashboard from './DocumentOperationsDashboard'
 import CommunityDocuments from './CommunityDocuments'
-import EnvelopeWorkspace from './EnvelopeWorkspace'
+import EnvelopeWorkspaceEnterprise from './EnvelopeWorkspaceEnterprise'
+import ESignPlatformAdmin from './ESignPlatformAdmin'
 import FieldWorkAdmin from './FieldWorkAdmin'
 import FieldWorkDetail, { FieldWorkList } from './FieldWorkVendor'
 
@@ -51,7 +52,7 @@ function AdminShell(){
   if(caps.can_view_reports){visible.add('reports');visible.add('management')}
   if(caps.can_manage_communications)visible.add('communications')
   if(caps.can_manage_invitations)visible.add('invitations')
-  if(caps.can_manage_documents){visible.add('document-center');visible.add('community-documents');visible.add('envelopes')}
+  if(caps.can_manage_documents){visible.add('document-center');visible.add('community-documents');visible.add('envelopes');visible.add('esign-platform')}
   if(caps.can_manage_team)visible.add('employees')
   if(caps.is_owner){visible.add('roles');visible.add('automation-center')}
   const nav=user?.role==='admin'?adminNav.filter(item=>(item.key!=='roles'&&item.key!=='automation-center')||caps.is_owner):adminNav.filter(item=>visible.has(item.key))
@@ -68,7 +69,7 @@ export default function AdminApp({basePath}:{basePath:string}){
     <Route path="vendor-signup" element={<VendorSignup/>}/>
     <Route path="invite/:token" element={<StaffInvite/>}/>
     <Route element={<ProtectedRoute allow={['staff','admin']}/>}><Route element={<AdminShell/>}>
-      <Route index element={<AdminDashboard/>}/><Route path="pipelines" element={<PipelinesAdmin/>}/><Route path="clients" element={<ClientsList/>}/><Route path="clients/:id" element={<ClientDetailModern/>}/><Route path="clients/:id/manage" element={<ClientDetail/>}/><Route path="inquiries" element={<CRMRecordsAdmin/>}/><Route path="leads/:id" element={<LeadDetail/>}/><Route path="messages" element={<MessagesAdmin/>}/><Route path="activity" element={<ActivityAdmin/>}/><Route path="service-assignments" element={<ServiceAssignmentsAdmin/>}/><Route path="field-work" element={<FieldWorkAdmin/>}/><Route path="field-work/mine" element={<FieldWorkList/>}/><Route path="field-work/:id" element={<FieldWorkDetail/>}/><Route path="invoices" element={<InvoicesAdmin/>}/><Route path="document-center" element={<DocumentOperationsDashboard/>}/><Route path="community-documents" element={<CommunityDocuments/>}/><Route path="envelopes" element={<EnvelopeWorkspace/>}/><Route path="audit-log" element={<AuditLogAdmin/>}/><Route path="management" element={<ManagementCenter/>}/><Route path="reports" element={<ReportingCenter/>}/><Route path="communications" element={<CommunicationsCRMAdmin/>}/><Route path="automation-center" element={<AutomationCenter/>}/><Route path="security-center" element={<SecurityCenter/>}/><Route path="employees" element={<EmployeesAdmin/>}/><Route path="open-items/:type" element={<OpenItemsAdmin/>}/><Route path="open-items" element={<OpenItemsAdmin/>}/><Route path="invitations" element={<InvitationsAdmin/>}/><Route path="roles" element={<RolesPermissionsAdmin/>}/><Route path="users" element={<UsersAdmin/>}/><Route path="assignments" element={<AssignmentsAdmin/>}/><Route path="settings" element={<SettingsAdmin/>}/>
+      <Route index element={<AdminDashboard/>}/><Route path="pipelines" element={<PipelinesAdmin/>}/><Route path="clients" element={<ClientsList/>}/><Route path="clients/:id" element={<ClientDetailModern/>}/><Route path="clients/:id/manage" element={<ClientDetail/>}/><Route path="inquiries" element={<CRMRecordsAdmin/>}/><Route path="leads/:id" element={<LeadDetail/>}/><Route path="messages" element={<MessagesAdmin/>}/><Route path="activity" element={<ActivityAdmin/>}/><Route path="service-assignments" element={<ServiceAssignmentsAdmin/>}/><Route path="field-work" element={<FieldWorkAdmin/>}/><Route path="field-work/mine" element={<FieldWorkList/>}/><Route path="field-work/:id" element={<FieldWorkDetail/>}/><Route path="invoices" element={<InvoicesAdmin/>}/><Route path="document-center" element={<DocumentOperationsDashboard/>}/><Route path="esign-platform" element={<ESignPlatformAdmin/>}/><Route path="community-documents" element={<CommunityDocuments/>}/><Route path="envelopes" element={<EnvelopeWorkspaceEnterprise/>}/><Route path="audit-log" element={<AuditLogAdmin/>}/><Route path="management" element={<ManagementCenter/>}/><Route path="reports" element={<ReportingCenter/>}/><Route path="communications" element={<CommunicationsCRMAdmin/>}/><Route path="automation-center" element={<AutomationCenter/>}/><Route path="security-center" element={<SecurityCenter/>}/><Route path="employees" element={<EmployeesAdmin/>}/><Route path="open-items/:type" element={<OpenItemsAdmin/>}/><Route path="open-items" element={<OpenItemsAdmin/>}/><Route path="invitations" element={<InvitationsAdmin/>}/><Route path="roles" element={<RolesPermissionsAdmin/>}/><Route path="users" element={<UsersAdmin/>}/><Route path="assignments" element={<AssignmentsAdmin/>}/><Route path="settings" element={<SettingsAdmin/>}/>
     </Route></Route><Route path="*" element={<CatchAll/>}/>
   </Routes></BasePathProvider>
 }
