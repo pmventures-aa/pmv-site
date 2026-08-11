@@ -6,14 +6,11 @@
   contain: layout paint style;
 }
 
-/* Exact production crest silhouette, presented as a white-and-gold material.
- * The underlying mark is used as the mask; no substitute geometry or generated
- * logo artwork is introduced. */
+/* Render the production crest artwork directly. The previous mask treatment
+ * flattened its white and transparent interior details into solid shapes. */
 .pmv-white-gold-mark {
-  background: linear-gradient(132deg, #fff 4%, #fff 35%, #f5e7b2 47%, #d6b45a 67%, #fff 92%);
-  -webkit-mask: url('/logo-crest-transparent.png') center / contain no-repeat;
-  mask: url('/logo-crest-transparent.png') center / contain no-repeat;
-  filter: drop-shadow(0 22px 30px rgba(0,0,0,.34)) drop-shadow(0 0 26px rgba(214,180,90,.16));
+  display: block;
+  filter: drop-shadow(0 22px 30px rgba(0,0,0,.32)) drop-shadow(0 0 22px rgba(214,180,90,.12));
 }
 
 .pmv-free-floating-mark {
