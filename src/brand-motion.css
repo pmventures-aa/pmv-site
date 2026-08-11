@@ -1,0 +1,142 @@
+/* Pinnacle kinetic brand system. Motion stays compositor-friendly: transform + opacity only. */
+.pmv-brand-object {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+  isolation: isolate;
+  contain: layout paint style;
+}
+
+.pmv-brand-gyro {
+  transform-style: preserve-3d;
+  transform-origin: 50% 52%;
+  animation: pmv-brand-gyro 13s cubic-bezier(.45,.05,.55,.95) infinite;
+  will-change: transform;
+}
+
+.pmv-brand-depth {
+  transform-style: preserve-3d;
+  transition: transform 480ms cubic-bezier(.2,.75,.2,1);
+}
+
+.pmv-brand-object:hover .pmv-brand-depth {
+  transform: rotate3d(.25,.9,.08,7deg) scale(1.025);
+}
+
+.pmv-brand-object-quiet .pmv-brand-gyro {
+  animation-duration: 18s;
+}
+
+.pmv-brand-object-quiet:hover .pmv-brand-depth {
+  transform: rotate3d(.15,.8,.04,5deg) scale(1.018);
+}
+
+.pmv-brand-object-spotlight .pmv-brand-gyro {
+  animation-duration: 11s;
+}
+
+.pmv-brand-face {
+  transform: translateZ(12px);
+  backface-visibility: hidden;
+}
+
+.pmv-brand-depth-layer {
+  backface-visibility: hidden;
+}
+
+.pmv-brand-aura {
+  border-radius: 42% 58% 61% 39% / 54% 44% 56% 46%;
+  background:
+    radial-gradient(ellipse at 36% 42%, rgba(229,204,116,.18), transparent 42%),
+    linear-gradient(122deg, transparent 22%, rgba(201,162,39,.1) 48%, transparent 72%);
+  filter: blur(13px);
+  opacity: .72;
+  transform: rotate(-8deg) scale(.96);
+  animation: pmv-brand-aura-shift 12s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.pmv-brand-specular {
+  overflow: hidden;
+  border-radius: 30%;
+  mix-blend-mode: screen;
+  opacity: .58;
+  transform: translateZ(18px);
+}
+
+.pmv-brand-specular::before {
+  content: '';
+  position: absolute;
+  inset: -40% -75%;
+  background: linear-gradient(108deg, transparent 39%, rgba(255,255,255,.02) 45%, rgba(255,247,213,.38) 50%, rgba(255,255,255,.05) 55%, transparent 61%);
+  transform: translate3d(-28%,0,0) rotate(4deg);
+  animation: pmv-brand-specular 8.5s cubic-bezier(.4,0,.2,1) infinite;
+  will-change: transform, opacity;
+}
+
+.pmv-brand-rim {
+  border-radius: 28%;
+  background: linear-gradient(135deg, rgba(255,255,255,.15), transparent 31%, transparent 69%, rgba(201,162,39,.15));
+  mix-blend-mode: screen;
+  opacity: .32;
+  transform: translateZ(15px);
+}
+
+@keyframes pmv-brand-gyro {
+  0%,100% { transform: rotate3d(.25,.8,.08,-4deg); }
+  27% { transform: rotate3d(-.18,.95,.04,5deg); }
+  54% { transform: rotate3d(.38,-.7,.06,3deg); }
+  78% { transform: rotate3d(-.12,-.85,.03,-4deg); }
+}
+
+@keyframes pmv-brand-specular {
+  0%,18% { transform: translate3d(-30%,0,0) rotate(4deg); opacity:0; }
+  28% { opacity:.8; }
+  48% { transform: translate3d(30%,0,0) rotate(4deg); opacity:.55; }
+  58%,100% { transform: translate3d(34%,0,0) rotate(4deg); opacity:0; }
+}
+
+@keyframes pmv-brand-aura-shift {
+  0%,100% { transform: rotate(-8deg) scale(.96); opacity:.58; }
+  50% { transform: rotate(7deg) scale(1.03); opacity:.8; }
+}
+
+/* Light mode is a distinct white-and-gold material, not a dark asset dropped onto cream. */
+:root[data-theme='light'] .pmv-brand-face.pmv-crest-adaptive {
+  filter: brightness(1.9) contrast(.88) saturate(.52) sepia(.08) drop-shadow(0 12px 18px rgba(88,70,20,.15));
+}
+
+:root[data-theme='light'] .pmv-brand-depth-layer {
+  filter: sepia(.48) saturate(1.35) brightness(1.06) contrast(.92);
+  opacity: .12 !important;
+}
+
+:root[data-theme='light'] .pmv-brand-rim {
+  background: linear-gradient(135deg, rgba(255,255,255,.75), rgba(255,255,255,.08) 38%, transparent 62%, rgba(169,134,27,.28));
+  opacity: .58;
+}
+
+:root[data-theme='light'] .pmv-brand-specular::before {
+  background: linear-gradient(108deg, transparent 39%, rgba(255,255,255,.08) 45%, rgba(255,255,255,.9) 49%, rgba(215,180,70,.22) 54%, transparent 61%);
+}
+
+:root[data-theme='light'] .pmv-brand-aura {
+  background:
+    radial-gradient(ellipse at 36% 42%, rgba(201,162,39,.13), transparent 42%),
+    linear-gradient(122deg, transparent 22%, rgba(255,255,255,.78) 48%, transparent 72%);
+  opacity:.62;
+}
+
+@media (max-width: 767px) {
+  .pmv-brand-gyro { animation-duration: 16s; }
+  .pmv-brand-object:hover .pmv-brand-depth { transform:none; }
+  .pmv-brand-specular { opacity:.42; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pmv-brand-gyro,
+  .pmv-brand-aura,
+  .pmv-brand-specular::before {
+    animation: none !important;
+  }
+  .pmv-brand-object:hover .pmv-brand-depth { transform:none; }
+}

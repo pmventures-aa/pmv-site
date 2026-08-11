@@ -19,10 +19,12 @@ export function StatusBadge({ children, tone = 'slate' }: { children: React.Reac
 
 const crestClass = 'pmv-crest-adaptive object-contain'
 
+type BrandMarkVariant = 'standard' | 'spotlight' | 'quiet'
+
 export function Logo({ className = '', showText = true, markSize = 62 }: { className?: string; showText?: boolean; markSize?: number }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <BrandMark3D size={markSize} decorative className="shrink-0" />
+      <BrandMark3D size={markSize} decorative variant="quiet" className="shrink-0" />
       {showText && <div className="leading-tight"><div className="text-[15px] font-bold tracking-[.025em] text-white">PINNACLE</div><div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-gold">Management Ventures</div></div>}
     </div>
   )
@@ -32,15 +34,20 @@ export function Crest({ size = 96, className = '' }: { size?: number; className?
   return <img src="/logo-crest-transparent.png" alt="Pinnacle Management Ventures crest" style={{ width: size, height: size }} className={`${crestClass} ${className}`} />
 }
 
-export function BrandMark3D({ size = 120, className = '', decorative = false }: { size?: number; className?: string; decorative?: boolean }) {
-  const shadows = Array.from({ length: 7 })
+export function BrandMark3D({ size = 120, className = '', decorative = false, variant = 'standard' }: { size?: number; className?: string; decorative?: boolean; variant?: BrandMarkVariant }) {
+  const depth = Array.from({ length: variant === 'quiet' ? 3 : 6 })
   return (
-    <div className={`relative [perspective:800px] ${className}`} style={{ width: size, height: size }} aria-hidden={decorative || undefined}>
-      <div className="pmv-brand-stage absolute inset-[-14%] rounded-full" aria-hidden="true" />
-      <div className="brand-mark-3d relative h-full w-full [transform-style:preserve-3d] will-change-transform">
-        {shadows.map((_, i) => <img key={i} src="/logo-crest-transparent.png" alt="" aria-hidden="true" className="pmv-crest-depth absolute inset-0 h-full w-full object-contain opacity-20" style={{ transform: `translate3d(${7 - i}px, ${7 - i}px, ${-7 + i}px)` }} />)}
-        <img src="/logo-crest-transparent.png" alt={decorative ? '' : 'Pinnacle Management Ventures crest'} className={`absolute inset-0 h-full w-full drop-shadow-[0_20px_24px_rgba(0,0,0,.34)] ${crestClass}`} style={{ transform: 'translateZ(8px)' }} />
-        <div className="pointer-events-none absolute inset-[5%] rounded-full bg-gradient-to-br from-white/30 via-transparent to-gold/20 opacity-50 mix-blend-screen" aria-hidden="true" />
+    <div className={`pmv-brand-object pmv-brand-object-${variant} relative ${className}`} style={{ width: size, height: size }} aria-hidden={decorative || undefined}>
+      {variant === 'spotlight' && <div className="pmv-brand-aura absolute inset-[-16%]" aria-hidden="true" />}
+      <div className="pmv-brand-gyro relative h-full w-full">
+        <div className="pmv-brand-depth relative h-full w-full">
+          {depth.map((_, i) => (
+            <img key={i} src="/logo-crest-transparent.png" alt="" aria-hidden="true" className="pmv-crest-depth pmv-brand-depth-layer absolute inset-0 h-full w-full object-contain" style={{ transform: `translate3d(${depth.length - i}px, ${Math.max(1, depth.length - i - 1)}px, ${-10 + i * 2}px)`, opacity: Math.max(.06, .18 - i * .018) }} />
+          ))}
+          <img src="/logo-crest-transparent.png" alt={decorative ? '' : 'Pinnacle Management Ventures crest'} className={`pmv-brand-face absolute inset-0 h-full w-full drop-shadow-[0_18px_24px_rgba(0,0,0,.28)] ${crestClass}`} />
+          <div className="pmv-brand-specular pointer-events-none absolute inset-[3%]" aria-hidden="true" />
+          <div className="pmv-brand-rim pointer-events-none absolute inset-[4%]" aria-hidden="true" />
+        </div>
       </div>
     </div>
   )
@@ -51,7 +58,7 @@ export function PageHeader({ eyebrow, title, subtitle, action }: { eyebrow: stri
 }
 
 export function EmptyState({ label }: { label: string }) {
-  return <div className="rounded-lg border border-dashed border-white/10 py-10 text-center"><BrandMark3D size={46} decorative className="mx-auto mb-3 opacity-70"/><p className="text-sm text-slate-500">{label}</p></div>
+  return <div className="rounded-lg border border-dashed border-white/10 py-10 text-center"><BrandMark3D size={46} decorative variant="quiet" className="mx-auto mb-3 opacity-70"/><p className="text-sm text-slate-500">{label}</p></div>
 }
 
 export function StatCard({ label, value }: { label: string; value: React.ReactNode }) { return <Card className="p-5"><p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p><p className="mt-2 text-3xl font-bold text-white">{value}</p></Card> }
