@@ -10,6 +10,7 @@ import { GlobalSearch } from './GlobalSearch'
 import { MailBell } from '../kit/MailBell'
 import { Avatar } from '../kit/Avatar'
 import { SlaAlertChip } from './SlaAlertChip'
+import { MailWorkspaceLauncher } from './MailWorkspaceLauncher'
 
 const LIVE_REFRESH_MS = 3_000
 const MOBILE_MEDIA = '(max-width: 767px), (pointer: coarse)'
@@ -169,6 +170,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
           <Logo />
           <div className="flex items-center gap-1.5">
             <SlaAlertChip />
+            <span className="hidden lg:inline-flex"><MailWorkspaceLauncher /></span>
             <button onClick={() => setMobileSearchOpen((v) => !v)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5" aria-label="Search"><Search size={17} /></button>
             <button onClick={refreshPage} className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 hover:text-gold" aria-label="Refresh page"><RotateCw size={15} /></button>
             <MailBell />
@@ -197,6 +199,7 @@ export function AdminLayout({ nav, badge }: { nav: NavItem[]; badge: string }) {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <SlaAlertChip />
+            <span className="hidden lg:inline-flex"><MailWorkspaceLauncher /></span>
             <span className="mr-1 hidden text-[10px] font-medium uppercase tracking-[.12em] text-slate-600 xl:inline">Live background sync</span>
             <button onClick={refreshPage} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-gold" title="Refresh this page" aria-label="Refresh this HQ page"><RotateCw size={14} /></button>
             <MailBell />

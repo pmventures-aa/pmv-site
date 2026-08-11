@@ -7,6 +7,7 @@ import './auth-light-fix.css'
 import './mobile-enterprise.css'
 import './public-motion.css'
 import './brand-motion.css'
+import './mail-workspace.css'
 import Home from './pages/Home'
 import ServicesOverview from './pages/public/ServicesOverview'
 import ServiceDetail from './pages/public/ServiceDetail'
@@ -31,6 +32,7 @@ import { LoadingScreen } from './components/LoadingScreen'
 
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
+const MailApp = lazy(() => import('./pages/mail/MailApp'))
 
 // Portal + HQ get the calmer ambient orb; the public site keeps the brand
 // mark loader so unauthenticated visitors see the recognizable logo first.
@@ -39,8 +41,13 @@ function SurfaceFallback({ variant = 'brand', label = 'Loading…' }: { variant?
 }
 
 const host = window.location.hostname
+// mail. is a self-contained Pinnacle communications + signing workspace
+// that shares this SPA bundle but presents a completely different shell.
+// Detected FIRST so it wins over any other subdomain routing.
+const isMailHost = host.startsWith('mail.')
 const isSecureHost = host.startsWith('secure.')
-const surface: 'admin' | 'portal' | 'public' = (() => {
+const surface: 'admin' | 'portal' | 'public' | 'mail' = (() => {
+  if (isMailHost) return 'mail'
   if (isSecureHost) return window.location.pathname.startsWith('/hq') ? 'admin' : 'portal'
   if (host.startsWith('hq.')) return 'admin'
   if (host.startsWith('client.')) return 'portal'
@@ -52,6 +59,9 @@ document.documentElement.dataset.pmvSurface = surface
 installAudioUnlock()
 
 function App() {
+  if (surface === 'mail') {
+    return <Suspense fallback={<SurfaceFallback variant="orb" label="Loading Mail Workspace…" />}><MailApp /></Suspense>
+  }
   if (surface === 'admin') {
     return <Suspense fallback={<SurfaceFallback variant="orb" label="Loading HQ…" />}><Routes><Route path={`${secureBase}/*`} element={<AdminApp basePath={secureBase} />} /></Routes></Suspense>
   }
