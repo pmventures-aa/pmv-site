@@ -18,6 +18,7 @@ import { employeeRoutes } from '../_lib/routes/employees'
 import { reportRoutes } from '../_lib/routes/reports'
 import { reportExportRoutes } from '../_lib/routes/reportExports'
 import { scheduledReportRoutes } from '../_lib/routes/scheduledReportRoutes'
+import { managementInsightRoutes } from '../_lib/routes/managementInsights'
 import { searchRoutes } from '../_lib/routes/search'
 import { commsRoutes } from '../_lib/routes/comms'
 import { crmRoutes } from '../_lib/routes/crm'
@@ -93,6 +94,7 @@ app.route('/admin', roleAdminRoutes)
 app.route('/admin', teamManagementRoutes)
 app.route('/admin', reportExportRoutes)
 app.route('/admin', scheduledReportRoutes)
+app.route('/admin', managementInsightRoutes)
 app.route('/admin', documentWorkspaceExtraRoutes)
 app.route('/admin', documentLifecycleAdminRoutes)
 app.route('/admin', internalDocumentAdminRoutes)
@@ -111,12 +113,6 @@ app.route('/admin', fieldWorkRoutes)
 app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
 
 app.notFound((c) => c.json({ error: 'not found' }, 404))
-
-app.onError((err, c) => {
-  console.error('unhandled API error', err)
-  return c.json({ error: 'internal error' }, 500)
-})
-
+app.onError((err, c) => { console.error('unhandled API error', err); return c.json({ error: 'internal error' }, 500) })
 export const onRequest = handle(app)
-
 void getUser
