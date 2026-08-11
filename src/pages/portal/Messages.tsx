@@ -99,7 +99,7 @@ export default function Messages() {
             <p className="p-4 text-sm text-slate-400">Loading…</p>
           ) : threads.length === 0 ? (
             <div className="p-4">
-              <EmptyState label="No messages yet — start one above." />
+              <EmptyState label="No messages yet: start one above." />
             </div>
           ) : (
             <ul className="divide-y divide-white/5">

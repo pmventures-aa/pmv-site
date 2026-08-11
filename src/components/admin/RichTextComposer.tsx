@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { btnOutline } from './ui'
 
-// Lightweight in-house rich text editor for Communications Center drafts —
-// bold/italic/underline/link/image/signature. Deliberately not a full WYSIWYG
+// Lightweight in-house rich text editor for Communications Center drafts: // bold/italic/underline/link/image/signature. Deliberately not a full WYSIWYG
 // library: this repo has no existing rich-text dependency anywhere (message
 // threads and notes are plain textareas), and the ask here is "plain text
 // but with images and a signature", not a full editor. Uses contentEditable

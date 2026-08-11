@@ -25,14 +25,14 @@ interface Props {
   placeholder?: string
   inputClassName?: string
   label?: string
-  countryCodes?: string   // comma-separated ISO codes, e.g. "us,ca" — defaults to US
+  countryCodes?: string   // comma-separated ISO codes, e.g. "us,ca": defaults to US
   autoComplete?: string
   disabled?: boolean
   id?: string
 }
 
 // Lightweight predictive-address input backed by the free Nominatim
-// (OpenStreetMap) endpoint — good enough for form assistance without pulling
+// (OpenStreetMap) endpoint: good enough for form assistance without pulling
 // in a paid Places API or a client SDK. Debounced, silent-fail (so the
 // input keeps working as a plain text field when the network is offline),
 // and only queries after 4+ characters so we don't spam the endpoint for

@@ -2,15 +2,15 @@ import { createContext, useContext, type ReactNode } from 'react'
 
 // AdminApp/PortalApp are mounted two different ways: at the true root on the
 // hq./client. subdomains (base ""), or under /admin/*, /portal/* for local
-// dev and preview deploys (base "/admin", "/portal") — see main.tsx.
+// dev and preview deploys (base "/admin", "/portal"): see main.tsx.
 //
 // Internal links inside these apps need to know which mode they're in for
 // two reasons:
 //   1. A hardcoded "/admin/clients/123" link is flat wrong on the hq.
-//      subdomain, where the correct path is just "/clients/123" — it
+//      subdomain, where the correct path is just "/clients/123": it
 //      silently redirects to the dashboard instead of navigating.
 //   2. A bare relative `to="clients"` NavLink/Link resolves unreliably once
-//      nested under this app's outer splat route (`/admin/*`) — React
+//      nested under this app's outer splat route (`/admin/*`): React
 //      Router v6 resolves it relative to whatever page is CURRENTLY
 //      rendered, not this app's own root, so from /admin/pipelines it
 //      produces /admin/pipelines/clients instead of /admin/clients.

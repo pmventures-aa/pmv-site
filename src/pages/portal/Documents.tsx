@@ -96,11 +96,11 @@ export default function Documents() {
             <tbody>{docs.map((doc) => (
               <tr key={doc.id} className="border-b border-white/5 last:border-0">
                 <td className="px-5 py-3">
-                  {doc.r2_key ? <a href={`/api/portal/documents/${doc.id}/file`} target="_blank" rel="noreferrer" className="font-medium text-gold hover:underline">{doc.file_name ?? 'Open document'}</a> : <span className="text-slate-200">{doc.file_name ?? '—'}</span>}
+                  {doc.r2_key ? <a href={`/api/portal/documents/${doc.id}/file`} target="_blank" rel="noreferrer" className="font-medium text-gold hover:underline">{doc.file_name ?? 'Open document'}</a> : <span className="text-slate-200">{doc.file_name ?? 'Not provided'}</span>}
                   {doc.size_bytes ? <span className="ml-2 text-xs text-slate-500">{sizeLabel(doc.size_bytes)}</span> : null}
                 </td>
-                <td className="px-5 py-3 text-slate-200">{doc.category?.replace(/_/g, ' ') ?? '—'}</td>
-                <td className="px-5 py-3 text-slate-200">{doc.tax_year ?? '—'}</td>
+                <td className="px-5 py-3 text-slate-200">{doc.category?.replace(/_/g, ' ') ?? 'Not provided'}</td>
+                <td className="px-5 py-3 text-slate-200">{doc.tax_year ?? 'Not provided'}</td>
                 <td className="px-5 py-3"><StatusBadge tone={doc.review_status === 'approved' ? 'green' : doc.review_status === 'rejected' ? 'red' : 'gold'}>{doc.review_status}</StatusBadge></td>
               </tr>
             ))}</tbody>

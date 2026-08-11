@@ -23,4 +23,4 @@ export function LeadConversionDialog({leadId,leadName,onClose,onConverted}:{lead
     </div>:<p className="text-sm text-rose-300">{error||'Conversion review is unavailable.'}</p>}
   </DialogContent></Dialog>
 }
-function Fact({label,value}:{label:string;value:string|null|undefined}){return <div><p className="text-[10px] uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-sm text-slate-200">{value||'—'}</p></div>}
+function Fact({label,value}:{label:string;value:string|null|undefined}){return <div><p className="text-[10px] uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-sm text-slate-200">{value||'Not provided'}</p></div>}

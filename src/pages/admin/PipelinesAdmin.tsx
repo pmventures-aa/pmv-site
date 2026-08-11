@@ -14,7 +14,7 @@ const LEAD_COLUMNS:KanbanColumn[]=[{key:'new',label:'New'},{key:'contacted',labe
 const MODULE_TABS=[{key:'inquiries',label:'Leads & Prospects'},{key:'service_applications',label:'Service Applications'},{key:'matters',label:'Matters'},{key:'tasks',label:'Tasks'},{key:'funding',label:'Funding'}] as const
 type ModuleKey=(typeof MODULE_TABS)[number]['key']
 const PATCH_PATH:Record<'matters'|'tasks'|'funding',string>={matters:'/portal/matters',tasks:'/portal/tasks',funding:'/portal/funding'}
-function money(cents?:number|null){return typeof cents==='number'?`$${(cents/100).toLocaleString()}`:'—'}
+function money(cents?:number|null){return typeof cents==='number'?`$${(cents/100).toLocaleString()}`:'Not provided'}
 function lifecycleTone(stage:string):'gold'|'green'|'blue'|'slate'|'red'{if(stage==='opportunity')return'gold';if(stage==='prospect')return'blue';if(stage==='lost')return'red';if(stage==='converted')return'green';return'slate'}
 
 export default function PipelinesAdmin(){

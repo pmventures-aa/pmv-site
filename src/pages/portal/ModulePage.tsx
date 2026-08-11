@@ -185,7 +185,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                 <tr key={row.id ?? i} className="border-b border-white/5 last:border-0">
                   {config.columns.map((col) => (
                     <td key={col.key} className="whitespace-nowrap px-5 py-3 text-slate-200">
-                      {col.render ? col.render(row) : String(row[col.key] ?? '—')}
+                      {col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')}
                     </td>
                   ))}
                   {config.statusField && (
@@ -205,7 +205,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                           </select>
                         ) : (
                           <StatusBadge tone={statusTone(row[config.statusField])}>
-                            {String(row[config.statusField] ?? '—').replace(/_/g, ' ')}
+                            {String(row[config.statusField] ?? 'Not provided').replace(/_/g, ' ')}
                           </StatusBadge>
                         )}
                         {!isStaff &&

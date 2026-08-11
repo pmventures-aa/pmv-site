@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { ServiceInfo } from '../../data/services'
 
-// Motion helpers for the public marketing site only — deliberately not used
+// Motion helpers for the public marketing site only: deliberately not used
 // in the portal/admin apps, which favor instant, no-frills interactions.
 
 export function Reveal({ children, delay = 0, className = '' }: { children: ReactNode; delay?: number; className?: string }) {

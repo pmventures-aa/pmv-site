@@ -7,7 +7,7 @@ import { toast } from '../../components/kit/toast'
 
 interface SessionRow {id:string;user_id:string;device_label:string|null;user_agent:string|null;ip_address:string|null;city:string|null;region:string|null;country:string|null;created_at:string;last_seen_at:string;expires_at:string;revoked_at:string|null;revoke_reason:string|null;full_name:string|null;email:string;role:string;current:boolean;active:boolean}
 interface SecurityResponse {scope:'mine'|'all';owner:boolean;current_user_id:string;current_session_id:string|null;sessions:SessionRow[];summary:{active_sessions:number;failed_logins_24h:number;exports_24h:number;privileged_events_24h:number}}
-function when(value:string|null){return value?new Date(value).toLocaleString():'—'}
+function when(value:string|null){return value?new Date(value).toLocaleString():'Not provided'}
 function location(row:SessionRow){return [row.city,row.region,row.country].filter(Boolean).join(', ')||'Location unavailable'}
 
 export default function SecurityCenter(){

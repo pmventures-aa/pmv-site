@@ -40,7 +40,7 @@ const CATEGORIES: { key: CatalogEntry['category']; label: string }[] = [
 const KPI_KEYS = ['total_leads', 'conversion_rate', 'active_clients', 'outstanding_invoices']
 
 function formatValue(value: unknown, type?: Column['type']): string {
-  if (value === null || value === undefined) return '—'
+  if (value === null || value === undefined) return 'Not provided'
   if (type === 'money') return `$${((value as number) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   if (type === 'percent') return `${value}%`
   if (typeof value === 'number') return value.toLocaleString()

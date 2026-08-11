@@ -9,7 +9,7 @@ function initialsOf(name?: string | null): string {
 }
 
 // Shared across admin, portal, and (via ClientDetail) the client-on-staff's-
-// behalf case — self-styled like the rest of src/components/kit/ so it
+// behalf case: self-styled like the rest of src/components/kit/ so it
 // doesn't pull in any one surface's design tokens.
 export function Avatar({
   userId,

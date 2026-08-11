@@ -38,7 +38,7 @@ const statusTone: Record<string, 'gold' | 'green' | 'blue' | 'slate' | 'red'> = 
 }
 
 function fmt(d: string | null) {
-  if (!d) return '—'
+  if (!d) return 'Not provided'
   return new Date(d).toLocaleString()
 }
 
@@ -94,7 +94,7 @@ export default function CommunicationsAdmin() {
 
   function insertSignature() {
     if (!signature.trim()) {
-      window.alert('You have not saved a signature yet — set one below first.')
+      window.alert('You have not saved a signature yet: set one below first.')
       return
     }
     setBodyHtml((html) => `${html}<br>${signature}`)
@@ -167,7 +167,7 @@ export default function CommunicationsAdmin() {
   if (loading) {
     return (
       <div>
-        <PageIntro kicker="HQ" title="Communications Center" subtitle="Email employees and vendors — one-off sends or scheduled campaigns." />
+        <PageIntro kicker="HQ" title="Communications Center" subtitle="Email employees and vendors: one-off sends or scheduled campaigns." />
         <SkeletonTable rows={5} cols={5} />
       </div>
     )
@@ -178,7 +178,7 @@ export default function CommunicationsAdmin() {
       <PageIntro
         kicker="HQ"
         title="Communications Center"
-        subtitle="Email employees and vendors — one-off sends or scheduled/recurring campaigns. Built on Resend."
+        subtitle="Email employees and vendors: one-off sends or scheduled/recurring campaigns. Built on Resend."
       />
       {error && <p className="mb-4 text-sm text-rose-300">{error}</p>}
 

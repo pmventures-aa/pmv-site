@@ -5,7 +5,7 @@ export interface KanbanColumn {
   label: string
 }
 
-// Native HTML5 drag-and-drop board — no extra dependency. Columns are fixed
+// Native HTML5 drag-and-drop board: no extra dependency. Columns are fixed
 // (passed in), cards move between them by dragging or by whatever fallback
 // the caller's renderCard provides (e.g. a select, for keyboard/touch users).
 export function KanbanBoard<T extends { id: string }>({
@@ -77,7 +77,7 @@ export function KanbanBoard<T extends { id: string }>({
   )
 }
 
-// Compact status dropdown fallback shown inside a card — drag works with a
+// Compact status dropdown fallback shown inside a card: drag works with a
 // mouse, but this keeps the board usable on touch devices and for keyboard
 // navigation without requiring a second interaction model to build.
 export function StageSelect({

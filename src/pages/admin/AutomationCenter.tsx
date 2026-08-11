@@ -28,7 +28,7 @@ const tone: Record<string, 'green'|'gold'|'red'|'blue'|'slate'> = {
 }
 const fmt = (v: string | null) => v ? new Date(v).toLocaleString() : 'Not yet run'
 const duration = (r: RunRow | null) => {
-  if (!r?.finished_at) return r?.started_at ? 'In progress' : '—'
+  if (!r?.finished_at) return r?.started_at ? 'In progress' : 'Not provided'
   const ms = new Date(r.finished_at).getTime() - new Date(r.started_at).getTime()
   return ms < 1000 ? '<1 sec' : `${Math.round(ms / 1000)} sec`
 }
@@ -95,7 +95,7 @@ export default function AutomationCenter() {
           <div><dt className="text-xs uppercase tracking-wide text-slate-500">Items processed</dt><dd className="mt-1 text-xl font-semibold text-white">{a.last_run?.items_processed ?? 0}</dd></div>
           <div><dt className="text-xs uppercase tracking-wide text-slate-500">Succeeded / failed</dt><dd className="mt-1 text-xl font-semibold text-white">{a.last_run ? `${a.last_run.items_succeeded} / ${a.last_run.items_failed}` : '0 / 0'}</dd></div>
           <div><dt className="text-xs uppercase tracking-wide text-slate-500">Duration</dt><dd className="mt-1 text-slate-200">{duration(a.last_run)}</dd></div>
-          <div><dt className="text-xs uppercase tracking-wide text-slate-500">Trigger</dt><dd className="mt-1 capitalize text-slate-200">{a.last_run?.trigger_type || '—'}</dd></div>
+          <div><dt className="text-xs uppercase tracking-wide text-slate-500">Trigger</dt><dd className="mt-1 capitalize text-slate-200">{a.last_run?.trigger_type || 'Not provided'}</dd></div>
         </dl>
         <div className="mt-5 flex flex-wrap gap-2"><button className={btnPrimary} disabled={busyKey === a.key} onClick={() => runNow(a.key)}>{busyKey === a.key ? 'Running…' : 'Run now'}</button><button className={btnOutline} onClick={() => void load()}>Refresh</button></div>
       </Panel>)}

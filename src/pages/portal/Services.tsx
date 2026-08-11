@@ -119,7 +119,7 @@ export default function Services() {
                         : `Submitted ${new Date(app.submitted_at || app.created_at).toLocaleString()}`}
                     </p>
                     {app.status === 'draft' && app.submission_source === 'staff_assigned' && (
-                      <p className="mt-1 text-xs font-medium text-sky-300">Started by your Pinnacle team — review and sign to submit</p>
+                      <p className="mt-1 text-xs font-medium text-sky-300">Started by your Pinnacle team: review and sign to submit</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -154,7 +154,7 @@ export default function Services() {
         {loading ? (
           <p className="text-sm text-slate-400">Loading…</p>
         ) : enrolled.length === 0 ? (
-          <EmptyState label="No active services yet — start a journey below." />
+          <EmptyState label="No active services yet: start a journey below." />
         ) : (
           <ul className="space-y-3">
             {enrolled.map((e) => {

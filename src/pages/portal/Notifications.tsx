@@ -37,7 +37,7 @@ export default function Notifications() {
         </Card>
 
         <h2 className="mb-3 text-base font-semibold text-white">Recent updates</h2>
-        {events.length === 0 ? <Card><EmptyState label="Nothing yet — you'll see updates here as your work progresses." /></Card> : <Card className="divide-y divide-white/5 !p-0">{events.map((e) => <div key={e.id} className="px-5 py-4 text-sm"><p className="text-slate-200">{describeActivity(e)}</p><p className="mt-1 text-xs text-slate-500">{timeAgo(e.created_at)}</p></div>)}</Card>}
+        {events.length === 0 ? <Card><EmptyState label="Nothing yet: you'll see updates here as your work progresses." /></Card> : <Card className="divide-y divide-white/5 !p-0">{events.map((e) => <div key={e.id} className="px-5 py-4 text-sm"><p className="text-slate-200">{describeActivity(e)}</p><p className="mt-1 text-xs text-slate-500">{timeAgo(e.created_at)}</p></div>)}</Card>}
       </>}
     </div>
   )

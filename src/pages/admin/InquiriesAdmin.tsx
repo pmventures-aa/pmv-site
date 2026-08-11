@@ -86,7 +86,7 @@ export default function InquiriesAdmin() {
     setConverting(i.id)
     try {
       await api.post(`/admin/inquiries/${i.id}/convert`)
-      toast.success(`${i.name} is now a client — notes, emails, and activity carried over automatically.`)
+      toast.success(`${i.name} is now a client: notes, emails, and activity carried over automatically.`)
       setInquiries((rows) => rows.filter((r) => r.id !== i.id))
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not convert this lead.')
@@ -205,7 +205,7 @@ export default function InquiriesAdmin() {
               <div key={i.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
                 <div>
                   <p className="text-sm font-medium text-white">
-                    {i.name} <span className="font-normal text-slate-400">— {i.email}</span>
+                    {i.name} <span className="font-normal text-slate-400">: {i.email}</span>
                   </p>
                   {i.phone && <p className="text-xs text-slate-500">{i.phone}</p>}
                   {i.service_name && <p className="mt-1 text-xs text-gold">{i.service_name}</p>}
@@ -248,7 +248,7 @@ export default function InquiriesAdmin() {
           {conversions.map((c) => (
             <div key={c.id} className="px-5 py-4">
               <p className="text-sm font-medium text-white">
-                {c.lead_name} <span className="font-normal text-slate-400">— {c.lead_email}</span>
+                {c.lead_name} <span className="font-normal text-slate-400">: {c.lead_email}</span>
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 Converted by {c.converted_by_name || c.converted_by_email} · {timeAgo(c.created_at)}

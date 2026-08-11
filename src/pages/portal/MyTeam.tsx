@@ -62,7 +62,7 @@ export default function MyTeam() {
         </Card>
       ) : team.length === 0 ? (
         <Card>
-          <EmptyState label="No one's been assigned yet — we'll introduce your team shortly." />
+          <EmptyState label="No one's been assigned yet: we'll introduce your team shortly." />
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
