@@ -27,6 +27,6 @@ jobs:
             --header 'content-type: application/json' \
             --output "$body" \
             --write-out '%{http_code}' \
-            'https://www.pinnaclemanagementventures.com/api/automation/document-envelopes/run')"
+            'https://pmv-site.pages.dev/api/automation/document-envelopes/run')"
           cat "$body" | jq . || cat "$body"
           test "$status" -ge 200 -a "$status" -lt 300
