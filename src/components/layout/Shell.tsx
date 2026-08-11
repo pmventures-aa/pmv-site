@@ -12,16 +12,18 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const sidebarStorageKey = badge === 'Client Portal' ? 'pmv_client_sidebar_open' : 'pmv_hq_sidebar_open'
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true
-    return window.localStorage.getItem('pmv_sidebar_open') !== '0'
+    const saved = window.localStorage.getItem(sidebarStorageKey)
+    return saved === null ? badge !== 'Client Portal' : saved === '1'
   })
   const p = useAppPath()
 
   function toggleSidebar() {
     setSidebarOpen((open) => {
       const next = !open
-      window.localStorage.setItem('pmv_sidebar_open', next ? '1' : '0')
+      window.localStorage.setItem(sidebarStorageKey, next ? '1' : '0')
       return next
     })
   }
