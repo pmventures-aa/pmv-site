@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Building2, FileText, MessageSquare, Receipt, Calendar, HelpCircle,
-  Scale, Layers, ShieldCheck, Users, ArrowRight, Sparkles, Clock,
+  Scale, Layers, ShieldCheck, Users, ArrowRight, Sparkles,
 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import { PortalOrb } from '../../components/portal/PortalOrb'
+import { SlaClock } from '../../components/kit/SlaClock'
 
 // -----------------------------------------------------------------------------
 // Command Center dashboard - the "courtyard" landing page. The Portal is
@@ -83,21 +84,7 @@ const DISCOVERY_PITCHES = [
   { title: 'Certified audit trails', body: 'Every field visit produces a time-stamped, geo-located audit email you can save with your records.' },
 ]
 
-function SlaClock({ due, complete }: { due: string | null; complete?: boolean }) {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer) }, [])
-  if (complete || !due) return <span className="text-emerald-300">Response logged</span>
-  const remaining = new Date(due).getTime() - now
-  const mins = Math.max(0, Math.floor(Math.abs(remaining) / 60000))
-  const hours = Math.floor(mins / 60)
-  const tone = remaining < 0 ? 'text-rose-300' : remaining < 3600000 ? 'text-amber-300' : 'text-slate-400'
-  return (
-    <span className={`inline-flex items-center gap-1 tabular-nums ${tone}`}>
-      <Clock size={11} />
-      {remaining < 0 ? 'Overdue ' : ''}{hours ? `${hours}h ` : ''}{mins % 60}m
-    </span>
-  )
-}
+// SlaClock is now shared with HQ via components/kit/SlaClock.tsx.
 
 export default function Dashboard() {
   const { user } = useAuth()
