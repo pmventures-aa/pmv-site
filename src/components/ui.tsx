@@ -31,7 +31,7 @@ export function Logo({ className = '', showText = true, markSize = 62 }: { class
 }
 
 export function Crest({ size = 96, className = '' }: { size?: number; className?: string }) {
-  return <img src="/logo-mark-white-gold.svg" alt="Pinnacle Management Ventures mark" style={{ width: size, height: size }} className={`${className}`} />
+  return <img src="/logo-crest-transparent.png" alt="Pinnacle Management Ventures crest" style={{ width: size, height: size }} className={`${crestClass} ${className}`} />
 }
 
 export function BrandMark3D({ size = 120, className = '', decorative = false, variant = 'standard' }: { size?: number; className?: string; decorative?: boolean; variant?: BrandMarkVariant }) {
@@ -42,9 +42,9 @@ export function BrandMark3D({ size = 120, className = '', decorative = false, va
       <div className="pmv-brand-gyro relative h-full w-full">
         <div className="pmv-brand-depth relative h-full w-full">
           {depth.map((_, i) => (
-            <img key={i} src="/logo-mark-white-gold.svg" alt="" aria-hidden="true" className="pmv-crest-depth pmv-brand-depth-layer absolute inset-0 h-full w-full object-contain" style={{ transform: `translate3d(${depth.length - i}px, ${Math.max(1, depth.length - i - 1)}px, ${-10 + i * 2}px)`, opacity: Math.max(.06, .18 - i * .018) }} />
+            <img key={i} src="/logo-crest-transparent.png" alt="" aria-hidden="true" className="pmv-crest-depth pmv-brand-depth-layer absolute inset-0 h-full w-full object-contain" style={{ transform: `translate3d(${depth.length - i}px, ${Math.max(1, depth.length - i - 1)}px, ${-10 + i * 2}px)`, opacity: Math.max(.06, .18 - i * .018) }} />
           ))}
-          <img src="/logo-mark-white-gold.svg" alt={decorative ? '' : 'Pinnacle Management Ventures mark'} className="pmv-brand-face absolute inset-0 h-full w-full object-contain drop-shadow-[0_18px_24px_rgba(0,0,0,.28)]" />
+          <img src="/logo-crest-transparent.png" alt={decorative ? '' : 'Pinnacle Management Ventures crest'} className={`pmv-brand-face absolute inset-0 h-full w-full drop-shadow-[0_18px_24px_rgba(0,0,0,.28)] ${crestClass}`} />
           <div className="pmv-brand-specular pointer-events-none absolute inset-[3%]" aria-hidden="true" />
           <div className="pmv-brand-rim pointer-events-none absolute inset-[4%]" aria-hidden="true" />
         </div>
