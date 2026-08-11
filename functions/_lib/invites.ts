@@ -42,7 +42,7 @@ export function inviteExpiry(hours = 24): string {
 
 const PUBLIC_BASE = 'https://www.pinnaclemanagementventures.com'
 const CLIENT_BASE = `${PUBLIC_BASE}/portal`
-const HQ_BASE = `${PUBLIC_BASE}/admin`
+const HQ_BASE = 'https://hq.pinnaclemanagementventures.com'
 
 export function inviteUrl(type: InviteType, token: string): string {
   if (type === 'vendor') return `${HQ_BASE}/vendor-signup?invite=${encodeURIComponent(token)}`
@@ -108,14 +108,50 @@ export async function rotateInviteToken(env: Env, inviteId: string): Promise<{ t
   return { token, expiresAt }
 }
 
-function inviteCopy(type: InviteType, clientName?: string | null): { subject:string; eyebrow:string; title:string; body:string; cta:string } {
-  if (type === 'vendor') return {
-    subject: 'Pinnacle provider application invitation',
+const providerServiceLabels: Record<string, string> = {
+  property_field: 'property and field services',
+  mobile_notary: 'mobile notary and signing work',
+  ron: 'Remote Online Notarization (RON)',
+  document_courier: 'document courier and mobile support',
+  merchant_technology: 'merchant services, POS, and payment technology',
+  business_operations: 'business operations and administrative support',
+  bookkeeping_financial: 'bookkeeping and financial support',
+  other: 'other professional services',
+}
+
+function parseInviteMetadata(value?: string | null): Record<string, unknown> {
+  if (!value) return {}
+  try { return JSON.parse(value) as Record<string, unknown> } catch { return {} }
+}
+
+export function providerInviteCopy(metadata: Record<string, unknown> = {}): { subject:string; eyebrow:string; title:string; body:string; cta:string } {
+  const knownServices = Array.isArray(metadata.known_services)
+    ? metadata.known_services.map(String).filter((key) => providerServiceLabels[key])
+    : []
+  const labels = knownServices.map((key) => providerServiceLabels[key])
+  const notaryKnown = knownServices.includes('mobile_notary') || knownServices.includes('ron')
+  const specialty = typeof metadata.vendor_category === 'string' ? metadata.vendor_category.trim() : ''
+  const personalNote = typeof metadata.personal_note === 'string' ? metadata.personal_note.trim() : ''
+  const knownContext = labels.length
+    ? `Based on what I already know about your experience with ${labels.join(', ')}, I thought you could be a strong addition to the professional network we are building at Pinnacle Management Ventures.`
+    : specialty
+      ? `Based on what I know about your work in ${specialty}, I thought you could be a strong addition to the professional network we are building at Pinnacle Management Ventures.`
+      : 'I am reaching out because I believe your professional experience could be a strong fit for the network we are building at Pinnacle Management Ventures.'
+  const prefill = labels.length
+    ? `I preselected ${labels.join(', ')} based on what I know today. Please review those selections, change anything that is not accurate, and add every other service you would like us to consider.`
+    : 'The application lets you choose every service you would like us to consider and the locations or types of assignments you are available to accept.'
+
+  return {
+    subject: notaryKnown ? 'An invitation to join Pinnacle’s notary and professional network' : 'An invitation to join Pinnacle’s professional network',
     eyebrow: 'Pinnacle Professional Network',
-    title: 'Complete your provider application',
-    body: 'Pinnacle would like to review your services and qualifications for our professional network. Approved providers may be contacted for specific client assignments based on specialty, location, availability, credentials, and fit.\n\nJoining the network is not an employment offer and does not guarantee assignment volume. The application helps us understand the work you are qualified and available to perform.',
-    cta: 'Open Provider Application',
+    title: notaryKnown ? 'Your notary experience could be a strong fit for Pinnacle.' : 'I would like to learn more about the work you do.',
+    body: `${knownContext}${personalNote ? `\n\n${personalNote}` : ''}\n\nPinnacle supports business owners, property owners, landlords, and professionals with operational support, documents and signing, notary services, property and field work, and coordinated provider assignments. When a client needs a qualified professional, I want to be able to turn to people who communicate clearly, protect the relationship, document the work, and follow through.\n\n${prefill}\n\nYou can apply as an individual or sole proprietor, or register your LLC, corporation, partnership, nonprofit, or other business. This invitation is connected to you, but it does not lock you into one business structure.\n\nApproved providers may be contacted when an assignment matches their services, location, availability, credentials, and fit. Joining the network is not an employment offer and does not guarantee assignment volume, but it gives us the information we need to consider you for the right opportunities.`,
+    cta: 'Review & Start Application',
   }
+}
+
+function inviteCopy(type: InviteType, clientName?: string | null, metadata: Record<string, unknown> = {}): { subject:string; eyebrow:string; title:string; body:string; cta:string } {
+  if (type === 'vendor') return providerInviteCopy(metadata)
   if (type === 'trusted_contact') return {
     subject: `${clientName || 'A Pinnacle client'} invited you as a Trusted Contact`,
     eyebrow: 'Trusted Contact access',
@@ -141,18 +177,18 @@ function inviteCopy(type: InviteType, clientName?: string | null): { subject:str
 
 export async function sendInviteEmail(
   env: Env,
-  row: { id: string; invite_type: InviteType; email: string; full_name?: string | null; client_name?: string | null },
+  row: { id: string; invite_type: InviteType; email: string; full_name?: string | null; client_name?: string | null; metadata_json?: string | null },
   token: string,
   expiresAt: string,
 ): Promise<string> {
   const url = inviteUrl(row.invite_type, token)
-  const copy = inviteCopy(row.invite_type, row.client_name)
+  const copy = inviteCopy(row.invite_type, row.client_name, parseInviteMetadata(row.metadata_json))
   const firstName = (row.full_name || '').trim().split(/\s+/)[0] || 'there'
   const rendered = renderRelationshipEvent({
     eventKey: `invite_${row.invite_type}`,
     firstName,
     subject: copy.subject,
-    preheader: 'Your private Pinnacle invitation expires in 24 hours.',
+    preheader: row.invite_type === 'vendor' ? 'A personal invitation to apply to Pinnacle’s professional provider network.' : 'Your private Pinnacle invitation expires in 24 hours.',
     eyebrow: copy.eyebrow,
     title: copy.title,
     body: `${copy.body}\n\nThis private invitation expires in 24 hours. If you were not expecting it, you can ignore this message or contact Pinnacle before creating an account.`,
