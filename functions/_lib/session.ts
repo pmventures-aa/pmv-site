@@ -4,6 +4,8 @@ import { uuid } from './crypto'
 const COOKIE = 'pmv_session'
 const TTL_SECONDS = 60 * 60 * 12
 const LAST_SEEN_THROTTLE_SECONDS = 5 * 60
+const ACTIVATION_TTL_SECONDS = 60 * 60 * 24
+const PASSWORD_RESET_TTL_SECONDS = 30 * 60
 
 function cookieToken(request: Request): string | null {
   const cookie = request.headers.get('Cookie') ?? ''
@@ -193,8 +195,6 @@ export async function revokeUserSessions(env: Env, userId: string, actorUserId?:
   } catch { /* rolling migration safety */ }
 }
 
-const ACTIVATION_TTL_SECONDS = 60 * 60 * 24
-
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
   let s = ''
@@ -221,6 +221,30 @@ export async function consumeActivationToken(env: Env, token: string): Promise<s
   const current = await env.SESSIONS.get(reverseKey)
   await Promise.all([
     env.SESSIONS.delete(`activate:${token}`),
+    current === token ? env.SESSIONS.delete(reverseKey) : Promise.resolve(),
+  ])
+  return userId
+}
+
+export async function createPasswordResetToken(env: Env, userId: string): Promise<string> {
+  const reverseKey = `pwreset-user:${userId}`
+  const previous = await env.SESSIONS.get(reverseKey)
+  if (previous) await env.SESSIONS.delete(`pwreset:${previous}`)
+  const token = randomToken()
+  await Promise.all([
+    env.SESSIONS.put(`pwreset:${token}`, userId, { expirationTtl: PASSWORD_RESET_TTL_SECONDS }),
+    env.SESSIONS.put(reverseKey, token, { expirationTtl: PASSWORD_RESET_TTL_SECONDS }),
+  ])
+  return token
+}
+
+export async function consumePasswordResetToken(env: Env, token: string): Promise<string | null> {
+  const userId = await env.SESSIONS.get(`pwreset:${token}`)
+  if (!userId) return null
+  const reverseKey = `pwreset-user:${userId}`
+  const current = await env.SESSIONS.get(reverseKey)
+  await Promise.all([
+    env.SESSIONS.delete(`pwreset:${token}`),
     current === token ? env.SESSIONS.delete(reverseKey) : Promise.resolve(),
   ])
   return userId
