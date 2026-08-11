@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion } from 'motion/react'
 import { Menu, X, Search, RotateCw, PanelLeftClose, PanelLeftOpen, Settings, LogOut, ChevronDown, ChevronRight } from 'lucide-react'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
@@ -12,6 +13,7 @@ import { Avatar } from '../kit/Avatar'
 import { SlaAlertChip } from './SlaAlertChip'
 import { MailWorkspaceLauncher } from './MailWorkspaceLauncher'
 import { AdminPageBoundary } from './AdminPageBoundary'
+import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 
 const LIVE_REFRESH_MS = 3_000
 const MOBILE_MEDIA = '(max-width: 767px), (pointer: coarse)'
@@ -36,6 +38,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
     } catch { return new Set() }
   })
   const p = useAppPath()
+  const location = useLocation()
   const canOpenSettings = nav.some((item) => item.key === 'settings')
 
   useEffect(() => {
@@ -149,12 +152,12 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p><p className="truncate text-xs text-slate-500">{user?.email}</p></div>
           <ChevronDown size={14} className={`shrink-0 text-slate-500 transition ${profileOpen ? 'rotate-180' : ''}`} />
         </button>
-        {profileOpen && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-lg border border-white/10 bg-navy-900 shadow-2xl">
+        <AnimatePresence initial={false}>{profileOpen && (
+          <motion.div initial={{opacity:0,y:6,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:5,scale:.985}} transition={pmvMotion.ui} className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-lg border border-white/10 bg-navy-900 shadow-2xl">
             {canOpenSettings && <NavLink to={p('settings')} onClick={() => { setProfileOpen(false); setMobileOpen(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"><Settings size={15} /> Settings</NavLink>}
             <button onClick={() => logout()} className={`flex w-full items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white ${canOpenSettings ? 'border-t border-white/10' : ''}`}><LogOut size={15} /> Sign out</button>
-          </div>
-        )}
+          </motion.div>
+        )}</AnimatePresence>
       </div>
     </>
   )
@@ -178,18 +181,20 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <button onClick={() => setMobileOpen(true)} className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white" aria-label="Open navigation"><Menu size={18} /></button>
           </div>
         </div>
-        {mobileSearchOpen && <div className="border-t border-white/10 px-4 py-3"><GlobalSearch /></div>}
+        <AnimatePresence initial={false}>{mobileSearchOpen && <motion.div initial={{opacity:0,y:-5}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-5}} transition={pmvMotion.ui} className="border-t border-white/10 px-4 py-3"><GlobalSearch /></motion.div>}</AnimatePresence>
       </header>
 
+      <AnimatePresence initial={false}>
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-[86vw] max-w-[320px] min-h-0 flex-col border-r border-white/10 bg-navy-950 p-4 shadow-2xl">
+        <motion.div className="fixed inset-0 z-50 lg:hidden" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={pmvMotion.snap}>
+          <motion.div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <motion.aside initial={{x:'-100%'}} animate={{x:0}} exit={{x:'-100%'}} transition={pmvMotion.ui} className="absolute inset-y-0 left-0 flex w-[86vw] max-w-[320px] min-h-0 flex-col border-r border-white/10 bg-navy-950 p-4 shadow-2xl" role="dialog" aria-modal="true" aria-label="HQ navigation">
             <div className="flex shrink-0 justify-end pb-2"><button onClick={() => setMobileOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-300 hover:bg-white/5 hover:text-white" aria-label="Close navigation"><X size={17} /></button></div>
             <div className="flex min-h-0 flex-1 flex-col">{sidebarContent}</div>
-          </aside>
-        </div>
+          </motion.aside>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <div className="hidden h-14 items-center justify-between gap-4 border-b border-white/10 bg-navy-900/70 px-6 backdrop-blur lg:flex print:hidden">
@@ -205,7 +210,9 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <NotificationBell />
           </div>
         </div>
-        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><AdminPageBoundary><Outlet /></AdminPageBoundary></main>
+        <AnimatePresence mode="sync" initial={false}>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
+        </AnimatePresence>
       </div>
     </div>
   )

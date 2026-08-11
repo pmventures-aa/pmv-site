@@ -1,34 +1,29 @@
-import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { AnimatePresence, motion, useInView, useReducedMotion, type Variants } from 'motion/react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { ServiceInfo } from '../../data/services'
+import { pmvFadeUp, pmvMotion, pmvStagger } from '../../lib/motionTheme'
 
-// Motion helpers for the public marketing site only: deliberately not used
-// in the portal/admin apps, which favor instant, no-frills interactions.
+// Editorial helpers for the public site. Shared product transitions live in
+// lib/motionTheme so the portal and HQ can use the same timing more quietly.
 
 export function Reveal({ children, delay = 0, className = '' }: { children: ReactNode; delay?: number; className?: string }) {
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 24 }}
+      initial={{ opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-80px' }}
-      transition={{ duration: 0.5, delay, ease: 'easeOut' }}
+      transition={{ ...pmvMotion.gentle, delay }}
     >
       {children}
     </motion.div>
   )
 }
 
-const staggerContainer: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.08 } },
-}
+const staggerContainer: Variants = pmvStagger
 
-export const staggerItem: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
-}
+export const staggerItem: Variants = pmvFadeUp
 
 export function StaggerGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
@@ -48,22 +43,21 @@ export function StaggerOnMount({ children, className = '' }: { children: ReactNo
 
 export function AmbientGlow({ className = '' }: { className?: string }) {
   const reduceMotion = useReducedMotion()
+  const ref = useRef<HTMLDivElement>(null)
+  const inView = useInView(ref, { margin: '160px 0px 160px 0px' })
+  const shouldMove = !reduceMotion && inView
+
   return (
-    <div className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`} aria-hidden="true">
+    <div ref={ref} className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`} aria-hidden="true">
       <motion.div
-        className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-gold/25 blur-3xl"
-        animate={reduceMotion ? undefined : { x: [0, 50, 0], y: [0, 36, 0] }}
-        transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+        className="pmv-ambient-field pmv-ambient-field-gold absolute -left-40 -top-40 h-[34rem] w-[34rem]"
+        animate={shouldMove ? { x: [0, 34, 0], y: [0, 22, 0], scale: [1, 1.035, 1] } : { x: 0, y: 0, scale: 1 }}
+        transition={shouldMove ? { ...pmvMotion.ambient, repeat: Infinity } : pmvMotion.snap}
       />
       <motion.div
-        className="absolute -right-16 top-1/3 h-96 w-96 rounded-full bg-blue-500/12 blur-3xl"
-        animate={reduceMotion ? undefined : { x: [0, -40, 0], y: [0, -50, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-gold/10 blur-3xl"
-        animate={reduceMotion ? undefined : { x: [0, 30, -20, 0], y: [0, -24, 10, 0] }}
-        transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
+        className="pmv-ambient-field pmv-ambient-field-blue absolute -right-48 top-[18%] h-[38rem] w-[38rem]"
+        animate={shouldMove ? { x: [0, -28, 0], y: [0, -30, 0], scale: [1, 1.025, 1] } : { x: 0, y: 0, scale: 1 }}
+        transition={shouldMove ? { ...pmvMotion.ambient, duration: 16, repeat: Infinity } : pmvMotion.snap}
       />
     </div>
   )
@@ -100,7 +94,7 @@ export function ServiceRotator({ items }: { items: ServiceInfo[] }) {
           initial={reduceMotion ? undefined : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={reduceMotion ? undefined : { opacity: 0, y: -10 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
+          transition={pmvMotion.gentle}
           className="mt-4 min-h-[6.5rem]"
         >
           <h3 className="font-display text-2xl font-medium text-white">{current.title}</h3>
@@ -166,7 +160,7 @@ export function SpecialtyRotator({ items }: { items: SpecialtySpotlightItem[] })
               initial={reduceMotion ? undefined : { opacity: 0, x: 14 }}
               animate={{ opacity: 1, x: 0 }}
               exit={reduceMotion ? undefined : { opacity: 0, x: -14 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
+              transition={pmvMotion.gentle}
             >
               <p className="eyebrow">{current.eyebrow}</p>
               <h2 className="mt-2 font-display text-2xl font-medium text-white sm:text-3xl">{current.title}</h2>
