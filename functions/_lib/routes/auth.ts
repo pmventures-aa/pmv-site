@@ -13,7 +13,7 @@ import {
   revokeUserSessions,
   getUser,
 } from '../session'
-import { activityInsert } from '../activity'
+import { activityInsert, logActivity } from '../activity'
 import { logAudit, actorIp, actorUserAgent, actorGeo } from '../auditLog'
 import { notifyStaff, escapeHtml, sendEmail } from '../email'
 import { renderPinnacleEmailLayout } from '../emailTemplates/layout'
@@ -303,6 +303,15 @@ authRoutes.post('/forgot-password', async (c) => {
     entityType: 'user',
     entityId: user.id,
     after: { requested_surface: body.surface || null },
+  }))
+  // Emit an activity event so the reset request lands in the HQ
+  // notification bell (categorized as security-red). Owners specifically
+  // asked for a heads-up on every reset attempt so they can see unusual
+  // patterns without opening the audit log.
+  c.executionCtx.waitUntil(logActivity(c.env, {
+    actorUserId: user.id,
+    kind: 'password_reset',
+    detail: { email: user.email, ip, surface: body.surface || null, target_name: user.full_name || null },
   }))
   return c.json(generic)
 })

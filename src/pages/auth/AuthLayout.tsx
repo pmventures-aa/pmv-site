@@ -22,9 +22,9 @@ const surfaceCopy = {
   },
   staff: {
     label: 'Pinnacle HQ',
-    title: 'A focused operating workspace built for the work behind the relationship.',
-    body: 'Manage clients, pipeline, communications, documents, reporting, field work, security, and follow-through from one controlled workspace.',
-    points: ['Role-based access and audit history', 'Client and operational command center', 'Security controls built into the workflow'],
+    title: 'Sign in to continue.',
+    body: 'Every sign-in is encrypted in transit, logged with IP + device, and expires automatically. Forgot your password? The reset link on the sign-in form notifies the owner so unusual attempts get an extra set of eyes.',
+    points: [] as string[],
   },
   general: {
     label: 'Pinnacle Secure Access',
