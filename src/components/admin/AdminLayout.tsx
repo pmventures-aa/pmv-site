@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Menu, X, Search, RotateCw, PanelLeftClose, PanelLeftOpen, Settings, LogOut, ChevronDown, ChevronRight } from 'lucide-react'
@@ -14,9 +14,6 @@ import { SlaAlertChip } from './SlaAlertChip'
 import { MailWorkspaceLauncher } from './MailWorkspaceLauncher'
 import { AdminPageBoundary } from './AdminPageBoundary'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
-
-const LIVE_REFRESH_MS = 3_000
-const MOBILE_MEDIA = '(max-width: 767px), (pointer: coarse)'
 
 // `badge` prop kept for callers that still pass it but no longer rendered
 // anywhere in the layout - it was showing as "STAFF CONSOLE" chrome the
@@ -40,46 +37,6 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   const p = useAppPath()
   const location = useLocation()
   const canOpenSettings = nav.some((item) => item.key === 'settings')
-
-  useEffect(() => {
-    const mobileQuery = window.matchMedia(MOBILE_MEDIA)
-    let timer: number | null = null
-
-    const pulse = () => {
-      if (document.visibilityState !== 'visible') return
-      // Non-destructive refresh signal only. Consumers refetch their own data
-      // without unmounting routes, resetting component state, moving scroll,
-      // closing drawers, or touching an employee's in-progress form values.
-      window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'live', silent: true } }))
-    }
-
-    const syncTimer = () => {
-      if (timer !== null) {
-        window.clearInterval(timer)
-        timer = null
-      }
-      // Mobile HQ must never repaint the workspace on a fixed cadence. Mobile
-      // revalidates when the app regains focus/visibility and targeted widgets
-      // continue their own lightweight polling. Desktop keeps the fast live pulse.
-      if (!mobileQuery.matches) timer = window.setInterval(pulse, LIVE_REFRESH_MS)
-    }
-
-    const onFocus = () => pulse()
-    const onVisibility = () => { if (document.visibilityState === 'visible') pulse() }
-    const onMediaChange = () => syncTimer()
-
-    syncTimer()
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onVisibility)
-    mobileQuery.addEventListener('change', onMediaChange)
-
-    return () => {
-      if (timer !== null) window.clearInterval(timer)
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVisibility)
-      mobileQuery.removeEventListener('change', onMediaChange)
-    }
-  }, [])
 
   function toggleSidebar() {
     setSidebarOpen((open) => {

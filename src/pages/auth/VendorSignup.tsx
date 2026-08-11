@@ -20,7 +20,7 @@ interface InviteData {
     full_name: string | null
     status: string
     expires_at: string
-    metadata?: { vendor_category?: string; company_name?: string }
+    metadata?: { vendor_category?: string; company_name?: string; known_services?: string[]; recipient_context?: string }
   }
 }
 interface UploadedFile { id:string; document_type:string; file_name:string; size_bytes:number }
@@ -66,12 +66,16 @@ export default function VendorSignup() {
         if (response.invite.invite_type !== 'vendor') throw new Error('This is not a provider invitation.')
         setInvite(response.invite)
         const invited = (response.invite.full_name || '').trim().split(/\s+/).filter(Boolean)
+        const knownServices = Array.isArray(response.invite.metadata?.known_services)
+          ? response.invite.metadata.known_services.filter((key): key is EnrollmentKey => enrollments.some((item) => item.key === key))
+          : []
         setForm((current) => ({
           ...current,
           first_name: invited[0] || current.first_name,
           last_name: invited.slice(1).join(' ') || current.last_name,
           email: response.invite.email || current.email,
           company_name: response.invite.metadata?.company_name || current.company_name,
+          enrollments: knownServices.length ? knownServices : current.enrollments,
         }))
         if (response.invite.status !== 'pending') setError(`This invitation is ${response.invite.status}.`)
       })
@@ -232,7 +236,7 @@ export default function VendorSignup() {
     <AuthLayout eyebrow={inviteToken ? 'Private Pinnacle provider invitation' : 'Pinnacle Professional Network'} title={step === 'contact' ? 'Provider application' : step === 'services' ? 'What are you enrolling for?' : step === 'questions' ? 'Professional details' : step === 'documents' ? 'Identity & business verification' : 'Secure your account'} subtitle={step === 'contact' ? 'Start with your contact and business identity.' : step === 'services' ? 'Choose every service category you may accept assignments for. Your next questions and requirements adjust automatically.' : step === 'questions' ? 'We only ask the questions that apply to the services you selected.' : step === 'documents' ? 'Upload verification documents through Pinnacle’s private document intake.' : 'Create the password you will use after approval.'} footer={<>Already approved? <Link to="../login" className="font-medium text-gold hover:underline">Sign in</Link></>}>
       <div className="mb-6"><div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {stepIndex + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all" style={{ width:`${progress}%` }}/></div></div>
       {inviteLoading && <p className="mb-4 text-sm text-slate-400">Loading your invitation…</p>}
-      {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-lg border border-gold/20 bg-gold/[.05] p-3 text-xs text-slate-400">Private invitation verified · expires {new Date(invite.expires_at).toLocaleString()}</div>}
+      {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-lg border border-gold/20 bg-gold/[.05] p-3 text-xs leading-5 text-slate-400"><span className="font-semibold text-gold">Private invitation verified</span> · expires {new Date(invite.expires_at).toLocaleString()}. You can apply as an individual or register your business, and you may change or add services before submitting.</div>}
       <ErrorBanner message={error}/>
 
       {step === 'contact' && <div className="space-y-4">

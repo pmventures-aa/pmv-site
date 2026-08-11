@@ -6,11 +6,11 @@
   contain: layout paint style;
 }
 
-/* Dedicated light-on-navy production asset. It preserves every element of the
- * source crest while translating the original dark palette to white and gold. */
+/* The light treatment is the original crest with a surface-only color filter.
+ * The artwork itself never changes between public, HQ, client, and email use. */
 .pmv-white-gold-mark {
   display: block;
-  filter: contrast(1.03) drop-shadow(0 22px 30px rgba(0,0,0,.28)) drop-shadow(0 0 24px rgba(214,180,90,.18));
+  filter: brightness(0) invert(1) contrast(.96) drop-shadow(0 22px 30px rgba(0,0,0,.28));
 }
 
 .pmv-free-floating-mark {
@@ -162,21 +162,16 @@
  * brightness / drop-shadow filter tuned for the glossy tile stops applying
  * here. Give the standalone crest a subtle warm-tone drop shadow instead
  * and drop the extra brightness that made it feel washed-out on dark navy. */
-.pmv-auth-crest.pmv-crest-adaptive {
-  filter: drop-shadow(0 10px 22px rgba(0,0,0,.35)) drop-shadow(0 0 22px rgba(201,162,39,.14));
+.pmv-auth-crest.pmv-crest-light,
+.pmv-auth-crest .pmv-crest-light {
+  filter: brightness(0) invert(1) contrast(.96) drop-shadow(0 10px 22px rgba(0,0,0,.35));
 }
-:root[data-theme='light'] .pmv-auth-crest.pmv-crest-adaptive {
-  filter: drop-shadow(0 8px 18px rgba(88,70,20,.18));
-}
-
-/* Light mode is a distinct white-and-gold material, not a dark asset dropped onto cream. */
-:root[data-theme='light'] .pmv-brand-face.pmv-crest-adaptive {
-  filter: brightness(1.9) contrast(.88) saturate(.52) sepia(.08) drop-shadow(0 12px 18px rgba(88,70,20,.15));
+.pmv-auth-crest.pmv-crest-switch {
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,.24));
 }
 
 :root[data-theme='light'] .pmv-brand-depth-layer {
-  filter: sepia(.48) saturate(1.35) brightness(1.06) contrast(.92);
-  opacity: .12 !important;
+  display:none;
 }
 
 :root[data-theme='light'] .pmv-brand-rim {

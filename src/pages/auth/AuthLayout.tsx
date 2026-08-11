@@ -53,7 +53,7 @@ export function AuthLayout({
         <div className="auth-brand-glow" aria-hidden="true" />
         <div className="relative z-10 flex h-full w-full max-w-xl flex-col justify-between py-10">
           <a href="https://pinnaclemanagementventures.com" className="inline-flex w-fit items-center gap-4" aria-label="Pinnacle Management Ventures home">
-            <Crest size={72} className="pmv-auth-crest shrink-0" />
+            <Crest size={72} tone="light" className="pmv-auth-crest shrink-0" />
             <span>
               <span className="block text-xs font-bold uppercase tracking-[.2em] text-gold">Pinnacle</span>
               <span className="mt-1 block text-base font-semibold tracking-wide text-white">Management Ventures</span>

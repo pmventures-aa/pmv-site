@@ -137,6 +137,8 @@ export default function FieldWorkAdmin() {
 function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
   const [clients, setClients] = useState<ClientOption[]>([])
   const [vendors, setVendors] = useState<StaffOption[]>([])
+  const [clientMode, setClientMode] = useState<'existing' | 'new'>('existing')
+  const [newClient, setNewClient] = useState({ full_name: '', email: '', phone: '', business_name: '' })
   const [form, setForm] = useState({
     kind: 'field' as 'field' | 'ron',
     service_key: 'mobile_notary',
@@ -163,14 +165,58 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
   const availableVendors = useMemo(() => vendors.filter((v) => v.party_type === 'vendor'), [vendors])
 
   async function submit() {
-    if (!form.client_user_id || !form.vendor_user_id || !form.service_key) {
-      toast.error('Choose a client, a provider, and a service.')
+    if (!form.vendor_user_id || !form.service_key) {
+      toast.error('Choose a provider and enter the service.')
+      return
+    }
+    if (clientMode === 'existing' && !form.client_user_id) {
+      toast.error('Choose an existing client or add the new caller.')
+      return
+    }
+    if (clientMode === 'new' && (!newClient.full_name.trim() || !newClient.email.trim())) {
+      toast.error('Add the new client’s name and email so Pinnacle can create their profile.')
       return
     }
     setSaving(true)
     try {
+      let clientUserId = form.client_user_id
+      if (clientMode === 'new') {
+        const normalizedEmail = newClient.email.trim().toLowerCase()
+        const existing = clients.find((client) => client.email.toLowerCase() === normalizedEmail)
+        if (existing) {
+          clientUserId = existing.id
+          toast.success(`${existing.full_name || existing.email} was already in Pinnacle, so this request was connected to that profile.`)
+        } else {
+          const created = await api.post<{
+            user: { id: string; email: string; full_name: string | null }
+            email_delivery?: { status: string }
+          }>('/admin/account-users', {
+            role: 'client',
+            full_name: newClient.full_name.trim(),
+            email: normalizedEmail,
+            phone: newClient.phone.trim() || undefined,
+            business_name: newClient.business_name.trim() || undefined,
+            services_enrolled: [form.service_key],
+          })
+          clientUserId = created.user.id
+          setClients((current) => [{
+            id: created.user.id,
+            full_name: created.user.full_name,
+            email: created.user.email,
+            business_name: newClient.business_name.trim() || null,
+          }, ...current])
+          const delivery = created.email_delivery?.status
+          if (delivery === 'sent' || delivery === 'delivered') {
+            toast.success(`Client profile created and secure portal setup sent to ${created.user.email}.`)
+          } else {
+            toast.success('Client profile created. Portal access can be resent from Users when you are ready.')
+          }
+        }
+        setForm((current) => ({ ...current, client_user_id: clientUserId }))
+      }
       await api.post('/admin/field-assignments', {
         ...form,
+        client_user_id: clientUserId,
         site_lat: form.site_lat ? Number(form.site_lat) : null,
         site_lng: form.site_lng ? Number(form.site_lng) : null,
         scheduled_at: form.scheduled_at || null,
@@ -189,7 +235,26 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
       <div className="grid gap-4 sm:grid-cols-2">
         <label><span className="mb-1 block text-xs text-slate-400">Assignment kind</span><select className={inputCls} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as 'field' | 'ron', service_key: e.target.value === 'ron' ? 'ron' : form.service_key })}><option value="field">Field visit (Property Management / Mobile Notary)</option><option value="ron">Remote Online Notarization</option></select></label>
         <label><span className="mb-1 block text-xs text-slate-400">Service</span><input className={inputCls} placeholder="e.g. mobile_notary, property_management, ron" value={form.service_key} onChange={(e) => setForm({ ...form, service_key: e.target.value })}/></label>
-        <label><span className="mb-1 block text-xs text-slate-400">Client</span><select className={inputCls} value={form.client_user_id} onChange={(e) => setForm({ ...form, client_user_id: e.target.value })}><option value="">Choose a client…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.full_name || c.email}{c.business_name ? `: ${c.business_name}` : ''}</option>)}</select></label>
+        <div className="sm:col-span-2 rounded-xl border border-white/10 bg-white/[.018] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div><span className="block text-xs font-semibold text-slate-200">Who requested the work?</span><p className="mt-1 text-xs leading-5 text-slate-500">Use a client already in Pinnacle, or create the caller’s profile without leaving this assignment.</p></div>
+            <div className="inline-flex w-fit rounded-lg border border-white/10 bg-navy-950/45 p-1">
+              <button type="button" onClick={() => setClientMode('existing')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${clientMode === 'existing' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>Existing client</button>
+              <button type="button" onClick={() => setClientMode('new')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${clientMode === 'new' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>New caller</button>
+            </div>
+          </div>
+          {clientMode === 'existing' ? (
+            <label className="mt-4 block"><span className="mb-1 block text-xs text-slate-400">Client profile</span><select className={inputCls} value={form.client_user_id} onChange={(e) => setForm({ ...form, client_user_id: e.target.value })}><option value="">Choose a client…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.full_name || c.email}{c.business_name ? `: ${c.business_name}` : ''}</option>)}</select></label>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label><span className="mb-1 block text-xs text-slate-400">Name</span><input className={inputCls} required value={newClient.full_name} onChange={(e) => setNewClient((current) => ({ ...current, full_name: e.target.value }))} placeholder="Caller’s full name" /></label>
+              <label><span className="mb-1 block text-xs text-slate-400">Email</span><input className={inputCls} type="email" required value={newClient.email} onChange={(e) => setNewClient((current) => ({ ...current, email: e.target.value }))} placeholder="For their secure client access" /></label>
+              <label><span className="mb-1 block text-xs text-slate-400">Phone <span className="text-slate-600">(optional)</span></span><input className={inputCls} type="tel" value={newClient.phone} onChange={(e) => setNewClient((current) => ({ ...current, phone: e.target.value }))} /></label>
+              <label><span className="mb-1 block text-xs text-slate-400">Business / property entity <span className="text-slate-600">(optional)</span></span><input className={inputCls} value={newClient.business_name} onChange={(e) => setNewClient((current) => ({ ...current, business_name: e.target.value }))} /></label>
+              <p className="text-xs leading-5 text-slate-500 sm:col-span-2">Pinnacle will create the client profile, connect this assignment to it, and send secure portal setup. More details can be added later.</p>
+            </div>
+          )}
+        </div>
         <label><span className="mb-1 block text-xs text-slate-400">Provider</span><select className={inputCls} value={form.vendor_user_id} onChange={(e) => setForm({ ...form, vendor_user_id: e.target.value })}><option value="">Choose a provider…</option>{availableVendors.map((v) => <option key={v.id} value={v.id}>{v.full_name || v.email}{v.vendor_category ? `: ${v.vendor_category}` : ''}</option>)}</select></label>
         <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Title</span><input className={inputCls} placeholder='e.g. "Loan signing: Boca Raton office"' value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Scheduled for</span><input className={inputCls} type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}/></label>

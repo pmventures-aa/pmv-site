@@ -50,9 +50,13 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 .theme-toggle-compact:hover { border-color:rgba(201,162,39,.45); color:#c9a227; }
 .theme-indicator { color:#c9a227; font-size:10px; }
 
-.pmv-crest-adaptive { filter:contrast(1.03) drop-shadow(0 0 12px rgba(201,162,39,.18)); }
+.pmv-crest-adaptive { filter:contrast(1.03) drop-shadow(0 8px 18px rgba(0,0,0,.22)); }
+.pmv-crest-light { filter:brightness(0) invert(1) contrast(.96) drop-shadow(0 8px 18px rgba(0,0,0,.28)); }
+.pmv-crest-switch { vertical-align:middle; }
+.pmv-crest-for-light { display:none; }
+:root[data-theme='light'] .pmv-crest-switch-auto .pmv-crest-for-dark { display:none; }
+:root[data-theme='light'] .pmv-crest-switch-auto .pmv-crest-for-light { display:block; filter:contrast(1.06) saturate(.9) drop-shadow(0 6px 14px rgba(15,23,42,.12)); }
 .pmv-logo-halo { background:radial-gradient(circle,rgba(201,162,39,.18),rgba(201,162,39,.045) 48%,transparent 72%); filter:blur(5px); }
-.pmv-crest-depth { filter:brightness(.85) sepia(.18) saturate(1.1); }
 .pmv-brand-stage { background:radial-gradient(circle,rgba(201,162,39,.22),rgba(201,162,39,.065) 38%,transparent 68%); filter:blur(12px); }
 .brand-mark-3d { animation:pmv-brand-float 7s ease-in-out infinite; }
 
