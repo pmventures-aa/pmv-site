@@ -1,0 +1,74 @@
+/* Mobile enterprise hardening for PMV HQ, mail, document, and dashboard surfaces. */
+@media (max-width: 767px) {
+  html, body, #root { max-width: 100%; overflow-x: hidden; }
+
+  [data-pmv-surface='admin'] button,
+  [data-pmv-surface='admin'] a,
+  [data-pmv-surface='admin'] input,
+  [data-pmv-surface='admin'] select {
+    min-height: 44px;
+  }
+
+  [data-pmv-surface='admin'] textarea { min-height: 96px; }
+
+  [data-pmv-surface='admin'] table {
+    font-size: 12px;
+  }
+
+  [data-pmv-surface='admin'] .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  [data-pmv-surface='admin'] iframe {
+    max-width: 100%;
+  }
+
+  [role='dialog'] {
+    max-height: calc(100dvh - 1rem);
+    max-width: calc(100vw - 1rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .container-pmv {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Rich email and document editors should never force desktop width. */
+  [contenteditable='true'],
+  .ProseMirror {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere;
+  }
+
+  /* Horizontal workspace controls remain usable without wrapping every action. */
+  .pmv-mobile-action-strip {
+    display: flex;
+    gap: .5rem;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: .25rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pmv-mobile-action-strip > * { flex: 0 0 auto; }
+}
+
+@media (max-width: 420px) {
+  .container-pmv { padding-left: .8rem; padding-right: .8rem; }
+  [data-pmv-surface='admin'] input,
+  [data-pmv-surface='admin'] select,
+  [data-pmv-surface='admin'] textarea { font-size: 16px; }
+}
+
+@supports (padding: max(0px)) {
+  @media (max-width: 767px) {
+    body {
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+  }
+}
