@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
+import { motion, useReducedMotion } from 'motion/react'
+import { X } from 'lucide-react'
+import { pmvMotion } from '../../lib/motionTheme'
 
 // Shared Dialog primitive (Radix under the hood, for correct focus-trap /
 // Escape / click-outside behavior): used by the public site, client
@@ -32,22 +35,32 @@ export function DialogContent({
   description?: string
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
 }) {
+  const reduceMotion = useReducedMotion()
   return (
     <RadixDialog.Portal>
-      <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
+      <RadixDialog.Overlay asChild>
+        <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={pmvMotion.snap} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px]" />
+      </RadixDialog.Overlay>
       <RadixDialog.Content
-        className={`fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] ${SIZE_CLASS[size]} -translate-x-1/2 -translate-y-1/2 rounded-md border border-white/10 bg-navy-900 p-6 shadow-2xl focus:outline-none ${className}`}
+        asChild
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <RadixDialog.Title className="text-lg font-semibold text-white">{title}</RadixDialog.Title>
-            {description && <RadixDialog.Description className="mt-1 text-sm text-slate-400">{description}</RadixDialog.Description>}
+        <motion.div
+          initial={reduceMotion ? {opacity:0,x:'-50%',y:'-50%'} : {opacity:0,x:'-50%',y:'calc(-50% + 10px)',scale:.985}}
+          animate={{opacity:1,x:'-50%',y:'-50%',scale:1}}
+          transition={pmvMotion.ui}
+          className={`fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] ${SIZE_CLASS[size]} rounded-md border border-white/10 bg-navy-900 p-6 shadow-2xl focus:outline-none ${className}`}
+        >
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <RadixDialog.Title className="text-lg font-semibold text-white">{title}</RadixDialog.Title>
+              {description && <RadixDialog.Description className="mt-1 text-sm text-slate-400">{description}</RadixDialog.Description>}
+            </div>
+            <RadixDialog.Close className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-white/5 hover:text-white" aria-label="Close">
+              <X size={15} />
+            </RadixDialog.Close>
           </div>
-          <RadixDialog.Close className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white" aria-label="Close">
-            ✕
-          </RadixDialog.Close>
-        </div>
-        {children}
+          {children}
+        </motion.div>
       </RadixDialog.Content>
     </RadixDialog.Portal>
   )
