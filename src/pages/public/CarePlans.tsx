@@ -87,7 +87,8 @@ function CarePlanIntake({family,initialTier}:{family:PlanFamilyKey;initialTier:s
   async function submit(){
     if(!tier)return setError('Choose a plan tier above.')
     if(!contact.contact_name.trim())return setError('Enter your name.')
-    if(!contact.email.includes('@'))return setError('Enter a valid email.')
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contact.email.trim()))return setError('Enter a valid email address (e.g. you@example.com).')
+    if(contact.phone.trim() && contact.phone.replace(/\D/g,'').length<10)return setError('Phone number needs at least 10 digits.')
     setBusy(true);setError('')
     try{
       const response=await api.post<{confirmation_url:string}>('/care-plan-leads',{

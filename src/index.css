@@ -87,10 +87,8 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 .pmv-hero-logo-shell { position:relative; display:grid; place-items:center; width:min(100%,520px); min-height:420px; isolation:isolate; }
 .pmv-hero-brand { filter:drop-shadow(0 24px 48px rgba(0,0,0,.32)); }
 
-.pmv-story-orbit { position:absolute; width:380px; height:380px; border-radius:999px; background:radial-gradient(circle,rgba(201,162,39,.07) 0%,rgba(201,162,39,.02) 45%,transparent 72%); }
-.pmv-story-orbit::before,.pmv-story-orbit::after { display:none; }
-.pmv-story-orbit-animated { animation:none; }
-.pmv-story-orbit-animated-secondary { width:318px; height:318px; opacity:.5; background:radial-gradient(circle,rgba(255,255,255,.04) 0%,transparent 65%); }
+.pmv-story-orbit, .pmv-story-orbit-animated, .pmv-story-orbit-animated-secondary { display:none; }
+.pmv-story-orbit::before, .pmv-story-orbit::after { display:none; }
 .pmv-story-note { position:absolute; z-index:30; width:190px; border-left:2px solid rgba(201,162,39,.65); background:rgba(6,17,31,.9); padding:10px 12px; box-shadow:0 16px 34px rgba(0,0,0,.18); backdrop-filter:blur(8px); }
 .pmv-story-note span { display:block; font-size:9px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#c9a227; }
 .pmv-story-note strong { display:block; margin-top:4px; color:#f8fafc; font-size:12px; line-height:1.45; }
