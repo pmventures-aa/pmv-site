@@ -345,24 +345,30 @@ quoteAdminRoutes.post('/quotes/:id/send', requireStaff, async (c) => {
     '<p>Reply to this email or call (561) 388-7879 with any questions.</p>',
   ].join('')
 
-  try {
-    await sendEmailStrict(c.env, {
-      to: quote.recipient_email,
-      subject: `Your Pinnacle quote ${quote.quote_number} - ${amount}`,
-      html,
-      text: `Pinnacle quote ${quote.quote_number}: ${quote.title}, ${amount}. Review and accept at ${url}`,
-      replyTo: 'orders@pinnaclemanagementventures.com',
-      idempotencyKey: `quote/${quote.id}/${new Date().toISOString().slice(0, 16)}`,
-      tags: [{ name: 'type', value: 'quote' }],
-    })
-  } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : 'could not send the quote email' }, 502)
+  // Without an email provider the quote still goes live on its public link so
+  // staff can share it manually; the response tells the UI no email was sent.
+  let emailed = false
+  if (c.env.RESEND_API_KEY) {
+    try {
+      await sendEmailStrict(c.env, {
+        to: quote.recipient_email,
+        subject: `Your Pinnacle quote ${quote.quote_number} - ${amount}`,
+        html,
+        text: `Pinnacle quote ${quote.quote_number}: ${quote.title}, ${amount}. Review and accept at ${url}`,
+        replyTo: 'orders@pinnaclemanagementventures.com',
+        idempotencyKey: `quote/${quote.id}/${new Date().toISOString().slice(0, 16)}`,
+        tags: [{ name: 'type', value: 'quote' }],
+      })
+      emailed = true
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : 'could not send the quote email' }, 502)
+    }
   }
 
   await c.env.DB.prepare("UPDATE service_quotes SET status = 'sent', sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").bind(quote.id).run()
-  await insertEvent(c, quote.id, 'sent', `staff:${actor.id}`, quote.recipient_email)
-  await logActivity(c.env, { actorUserId: actor.id, kind: 'quote_sent', detail: { quote_id: quote.id, quote_number: quote.quote_number, total_cents: quote.total_cents } })
-  return c.json({ ok: true, url })
+  await insertEvent(c, quote.id, 'sent', `staff:${actor.id}`, emailed ? quote.recipient_email : 'link only (email not configured)')
+  await logActivity(c.env, { actorUserId: actor.id, kind: 'quote_sent', detail: { quote_id: quote.id, quote_number: quote.quote_number, total_cents: quote.total_cents, emailed } })
+  return c.json({ ok: true, url, emailed })
 })
 
 quoteAdminRoutes.patch('/quotes/:id/status', requireStaff, async (c) => {

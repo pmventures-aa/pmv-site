@@ -54,7 +54,7 @@ const PROPERTY_SERVICES: PlanService[] = [
   { key:'insp_recurring', category:'Inspections & Reports', label:'30/60/90-day rental inspection', detail:'Recurring interior check for lease compliance, condition, and early issue detection.', priceHint:'From $85/visit' },
   { key:'insp_vacant', category:'Inspections & Reports', label:'Vacant property check', detail:'Weekly, bi-weekly, or monthly check on vacant / seasonal / investor-hold properties.', priceHint:'From $65/visit' },
   { key:'insp_damage', category:'Inspections & Reports', label:'Damage assessment report', detail:'Focused report after suspected damage, break-in, or tenant-reported issue.', priceHint:'$185-425' },
-  { key:'bpo_support', category:'Broker / Association', label:'BPO support & broker coordination', detail:'Coordinated with our partnering broker for Broker Price Opinion assignments.', priceHint:'$95-225' },
+  { key:'bpo_support', category:'Broker / Association', label:'BPO support & broker coordination', detail:'BPO photo sets from $79; licensed BPOs via our partnering broker.', priceHint:'$79-265' },
   { key:'cam_liaison', category:'Broker / Association', label:'CAM / association liaison', detail:'Community-association coordination through our credentialed CAM partner.', priceHint:'By hour' },
 ]
 
