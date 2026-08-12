@@ -6,6 +6,7 @@ import { ThemeToggle } from '../../components/ThemeToggle'
 import { inputCls } from '../auth/AuthLayout'
 import { LoadingScreen } from '../../components/LoadingScreen'
 import { useAppPath } from '../../lib/basePath'
+import { clientWorkspace, onboardingWorldCopy, resolveWorld, worldFromServiceParam } from '../../lib/workspace'
 
 interface Service {
   key: string
@@ -32,7 +33,7 @@ export default function OnboardingWizard() {
   const [params] = useSearchParams()
   const intentService = params.get('service') || ''
   const intentOffering = params.get('offering') || ''
-  const isFreshWelcome = params.get('welcome') === '1'
+  const welcome = params.get('welcome') === '1'
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState<Step>('services')
   const [catalog, setCatalog] = useState<Service[]>([])
@@ -86,6 +87,24 @@ export default function OnboardingWizard() {
   const currentQuestions = currentService ? grouped.get(currentService.key) || [] : []
   const totalJourneySteps = Math.max(3, selectedServices.length + 2)
   const progressStep = step === 'services' ? 1 : step === 'review' ? totalJourneySteps : Math.min(totalJourneySteps - 1, questionServiceIndex + 2)
+  const intentWorld = worldFromServiceParam(intentService) || resolveWorld(Array.from(selected))
+  const worldCopy = onboardingWorldCopy(intentWorld)
+  const catalogByWorld = useMemo(() => {
+    const buckets: Record<string, Service[]> = { property: [], documents: [], business: [], funding: [], other: [] }
+    for (const service of catalog) {
+      const world = resolveWorld([service.key])
+      if (world === 'general') buckets.other.push(service)
+      else buckets[world].push(service)
+    }
+    return [
+      { key: 'property', label: 'Property & field', items: buckets.property },
+      { key: 'documents', label: 'Documents & signing', items: buckets.documents },
+      { key: 'business', label: 'Business operations', items: buckets.business },
+      { key: 'funding', label: 'Funding', items: buckets.funding },
+      { key: 'other', label: 'Other', items: buckets.other },
+    ].filter((group) => group.items.length)
+      .sort((a, b) => Number(b.key === intentWorld) - Number(a.key === intentWorld))
+  }, [catalog, intentWorld])
 
   function toggleService(key: string) {
     setSelected((previous) => {
@@ -160,9 +179,9 @@ export default function OnboardingWizard() {
 
         <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
           <aside className="lg:pt-3">
-            <p className="eyebrow">Your Pinnacle journey</p>
-            <h1 className="mt-2 text-2xl font-semibold text-white">{isFreshWelcome ? 'Welcome. Start with what brought you here.' : 'A little context goes a long way.'}</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-400">You do not need to map every service or explain everything at once. We’ll gather enough to understand the situation, then your portal stays open for the rest of the journey.</p>
+            <p className="eyebrow">{clientWorkspace([intentService].filter(Boolean)).badge}</p>
+            <h1 className="mt-2 text-2xl font-semibold text-white">{welcome ? 'Welcome. ' : ''}{worldCopy.title}</h1>
+            <p className="mt-3 text-sm leading-6 text-slate-400">{worldCopy.body}</p>
             <div className="mt-6 border-l border-white/10 pl-4">
               <p className="text-xs font-semibold text-white">Step {progressStep} of {totalJourneySteps}</p>
               <p className="mt-1 text-xs text-slate-500">{step === 'services' ? 'What brought you here' : step === 'questions' ? `A little about ${currentService?.name || 'your needs'}` : 'Confirm and enter your portal'}</p>
@@ -176,22 +195,27 @@ export default function OnboardingWizard() {
             {step === 'services' && (
               <Card className="!p-0">
                 <div className="border-b border-white/10 px-5 py-5 sm:px-6">
-                  <h2 className="text-lg font-semibold text-white">What are you working through right now?</h2>
-                  <p className="mt-1 text-sm text-slate-400">Choose what feels relevant. This is a starting point, not a commitment to buy every service you select.</p>
+                  <h2 className="text-lg font-semibold text-white">Which operating world are you in right now?</h2>
+                  <p className="mt-1 text-sm text-slate-400">Choose the work in front of you. Your portal, mobile tabs, and next steps will follow that world.</p>
                 </div>
                 <div className="divide-y divide-white/10">
-                  {catalog.map((service) => {
-                    const checked = selected.has(service.key)
-                    return (
-                      <label key={service.key} className={`flex cursor-pointer items-start gap-4 px-5 py-4 transition sm:px-6 ${checked ? 'bg-gold/[0.06]' : 'hover:bg-white/[0.025]'}`}>
-                        <input type="checkbox" className="mt-1 h-4 w-4 accent-gold" checked={checked} onChange={() => toggleService(service.key)} />
-                        <span className="flex-1">
-                          <span className="flex flex-wrap items-center gap-2"><span className="font-medium text-white">{service.name}</span>{service.key === intentService && <span className="text-[10px] font-semibold uppercase tracking-wide text-gold">What brought you here</span>}</span>
-                          <span className="mt-1 block text-xs leading-5 text-slate-400">{service.description}</span>
-                        </span>
-                      </label>
-                    )
-                  })}
+                  {catalogByWorld.map((group) => (
+                    <div key={group.key}>
+                      <p className="px-5 pt-4 text-[10px] font-semibold uppercase tracking-[.16em] text-gold/80 sm:px-6">{group.label}</p>
+                      {group.items.map((service) => {
+                        const checked = selected.has(service.key)
+                        return (
+                          <label key={service.key} className={`flex cursor-pointer items-start gap-4 px-5 py-4 transition sm:px-6 ${checked ? 'bg-gold/[0.06]' : 'hover:bg-white/[0.025]'}`}>
+                            <input type="checkbox" className="mt-1 h-4 w-4 accent-gold" checked={checked} onChange={() => toggleService(service.key)} />
+                            <span className="flex-1">
+                              <span className="flex flex-wrap items-center gap-2"><span className="font-medium text-white">{service.name}</span>{service.key === intentService && <span className="text-[10px] font-semibold uppercase tracking-wide text-gold">What brought you here</span>}</span>
+                              <span className="mt-1 block text-xs leading-5 text-slate-400">{service.description}</span>
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  ))}
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t border-white/10 px-5 py-4 sm:px-6">
                   <button type="button" onClick={() => navigate(p(), { replace: true })} className="text-sm text-slate-400 hover:text-white">Explore the portal first</button>
@@ -241,7 +265,7 @@ export default function OnboardingWizard() {
                 <h2 className="mt-2 text-xl font-semibold text-white">We have enough to start the conversation.</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">Your selections help Pinnacle understand where to begin. They do not lock you into a package. From here you can message us, upload documents, track work, and discover other support only when it becomes useful.</p>
                 <div className="mt-5 flex flex-wrap gap-2">{selectedServices.map((service) => <StatusBadge key={service.key} tone="gold">{service.name}</StatusBadge>)}</div>
-                <div className="mt-7 border-l-2 border-gold pl-4"><p className="text-sm font-medium text-white">What happens next</p><p className="mt-1 text-xs leading-5 text-slate-400">We’ll review what you shared, route it appropriately, and follow up if anything needs clarification. {intentService && intentOffering ? 'Next, we’ll open the exact service option you selected so you can complete its specific requirements.' : 'Your dashboard will keep the next action visible without making you learn the whole portal at once.'}</p></div>
+                <div className="mt-7 border-l-2 border-gold pl-4"><p className="text-sm font-medium text-white">What happens next</p><p className="mt-1 text-xs leading-5 text-slate-400">We will review what you shared, route it appropriately, and follow up if anything needs clarification. {intentService && intentOffering ? 'Next, we will open the exact service option you selected so you can complete its specific requirements.' : 'Your dashboard will keep the next action visible without making you learn the whole portal at once.'}</p></div>
                 <div className="mt-7 flex items-center justify-between gap-3"><button onClick={() => { setQuestionServiceIndex(Math.max(0, selectedServices.length - 1)); setStep(questions.length ? 'questions' : 'services') }} className="btn-outline">Back</button><button onClick={submit} disabled={busy} className="btn-gold disabled:opacity-60">{busy ? 'Saving…' : intentService && intentOffering ? 'Continue to my service' : 'Enter my portal'}</button></div>
               </Card>
             )}

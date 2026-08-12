@@ -29,6 +29,12 @@ invitationPublicRoutes.get('/invite/:token', async (c) => {
   let metadata: Record<string, unknown> = {}
   try { metadata = JSON.parse(invite.metadata_json || '{}') as Record<string, unknown> } catch { metadata = {} }
 
+  let roleName: string | null = null
+  if (invite.role_definition_id) {
+    const role = await c.env.DB.prepare('SELECT name FROM role_definitions WHERE id = ?').bind(invite.role_definition_id).first<{ name: string }>()
+    roleName = role?.name || null
+  }
+
   return c.json({
     invite: {
       id: invite.id,
@@ -38,6 +44,7 @@ invitationPublicRoutes.get('/invite/:token', async (c) => {
       status: invite.status,
       expires_at: invite.expires_at,
       client_name: clientName,
+      role_name: roleName,
       metadata,
     },
   })

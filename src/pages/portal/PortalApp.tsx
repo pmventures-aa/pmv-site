@@ -1,11 +1,10 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { Shell } from '../../components/layout/Shell'
-import { useEffect, useState } from 'react'
 import { clientPortalNav } from '../../components/layout/nav'
-import { api } from '../../lib/api'
 import { BasePathProvider, useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
+import { clientWorkspace } from '../../lib/workspace'
 import Login from '../auth/Login'
 import Signup from '../auth/Signup'
 import ForgotPassword from '../auth/ForgotPassword'
@@ -31,13 +30,10 @@ import { ModulePage } from './ModulePage'
 import { callsConfig, mattersConfig, tasksConfig, calendarConfig, fundingConfig, propertyConfig, taxConfig } from './moduleConfigs'
 
 function ClientShell() {
-  const [keys, setKeys] = useState<string[]>([])
-  useEffect(() => {
-    api.get<{ services: { service_key: string }[] }>('/portal/services')
-      .then((result) => setKeys(result.services.map((service) => service.service_key)))
-      .catch(() => setKeys([]))
-  }, [])
-  return <Shell nav={clientPortalNav(keys)} badge="Client Portal" />
+  const { workspace } = useAuth()
+  const keys = workspace.service_keys
+  const copy = clientWorkspace(keys)
+  return <Shell nav={clientPortalNav(keys)} badge={copy.badge} mobilePrimary={copy.mobilePrimary} />
 }
 
 function PortalRoot() {

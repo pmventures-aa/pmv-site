@@ -5,6 +5,7 @@ import { api, ApiError } from '../../lib/api'
 import { AuthLayout, ErrorBanner, Field, inputCls } from './AuthLayout'
 import { DocumentUpload, type UploadedDocument } from '../../components/forms/DocumentUpload'
 import { PROVIDER_AGREEMENT_URL, PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
+import { vendorApplicationCopy } from '../../lib/workspace'
 
 const MIN_PASSWORD = 10
 
@@ -42,12 +43,14 @@ const areaOptions = ['Broward County', 'Palm Beach County', 'Miami-Dade County',
 export default function VendorSignup() {
   const [params] = useSearchParams()
   const inviteToken = params.get('invite') || ''
+  const trackParam = params.get('track') || params.get('enrollment') || ''
+  const initialTrack = enrollments.some((item) => item.key === trackParam) ? [trackParam as EnrollmentKey] : []
   const [invite, setInvite] = useState<InviteData['invite'] | null>(null)
   const [inviteLoading, setInviteLoading] = useState(!!inviteToken)
   const [step, setStep] = useState<Step>('contact')
   const [form, setForm] = useState({
     first_name:'', last_name:'', email:'', phone:'', company_name:'', entity_type:'', has_ein:'' as ''|'yes'|'no',
-    enrollments:[] as EnrollmentKey[], service_area:[] as string[], years_experience:'', travel_radius:'',
+    enrollments: initialTrack as EnrollmentKey[], service_area:[] as string[], years_experience:'', travel_radius:'',
     commission_state:'Florida', commission_number:'', commission_expiration:'', ron_provider:'',
     license_status:'' as ''|'yes'|'no'|'unsure', insurance_status:'' as ''|'yes'|'no',
     technology_platforms:'', accounting_credentials:'', other_service:'', notes:'', password:'', confirm:'',
@@ -98,6 +101,7 @@ export default function VendorSignup() {
   const progress = Math.round(((stepIndex + 1) / steps.length) * 100)
   const fullName = `${form.first_name.trim()} ${form.last_name.trim()}`.trim()
   const selectedTitles = useMemo(() => form.enrollments.map((key) => enrollments.find((item) => item.key === key)?.title || key), [form.enrollments])
+  const trackCopy = vendorApplicationCopy(form.enrollments)
   const notarySelected = form.enrollments.includes('mobile_notary') || form.enrollments.includes('ron')
   const ronSelected = form.enrollments.includes('ron')
   const propertySelected = form.enrollments.includes('property_field') || form.enrollments.includes('document_courier')
@@ -239,15 +243,26 @@ export default function VendorSignup() {
   }
 
   if (done) return (
-    <AuthLayout eyebrow="Pinnacle Professional Network" title="Application received" subtitle="Your provider profile is now in review.">
+    <AuthLayout surface="staff" eyebrow={trackCopy.eyebrow} title="Application received" subtitle="Your provider profile is now in review." sideLabel={trackCopy.badge} sideTitle={trackCopy.sideTitle} sideBody={trackCopy.sideBody}>
       <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.05] p-4 text-sm leading-6 text-slate-300"><div className="mb-2 flex items-center gap-2 font-semibold text-emerald-300"><ShieldCheck size={16}/> Secure application submitted</div>Pinnacle will review your enrollment answers, identity documents, and qualifications before access or assignments are enabled.</div>
       {documentWarning && <div className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs leading-5 text-amber-100">Your profile was received, but one or more documents may not have attached correctly. Pinnacle can request them again during review.</div>}
       <Link to="../login" className="btn-outline mt-6 inline-block w-full text-center">Back to sign in</Link>
     </AuthLayout>
   )
 
+  const stepTitle = step === 'contact' ? trackCopy.title : step === 'services' ? 'What work can you accept?' : step === 'questions' ? 'Professional details for this track' : step === 'documents' ? 'Identity and business verification' : 'Secure your account'
+  const stepSubtitle = step === 'contact'
+    ? 'Start with your contact and business identity. The rest of this application changes with the work you enroll for.'
+    : step === 'services'
+      ? 'Choose every service category you may accept assignments for. Questions, documents, and review requirements adjust automatically.'
+      : step === 'questions'
+        ? 'We only ask the questions that apply to the services you selected.'
+        : step === 'documents'
+          ? 'Upload verification documents through Pinnacle private document intake.'
+          : 'Create the password you will use after approval.'
+
   return (
-    <AuthLayout eyebrow={inviteToken ? 'Private Pinnacle provider invitation' : 'Pinnacle Professional Network'} title={step === 'contact' ? 'Provider application' : step === 'services' ? 'What are you enrolling for?' : step === 'questions' ? 'Professional details' : step === 'documents' ? 'Identity & business verification' : 'Secure your account'} subtitle={step === 'contact' ? 'Start with your contact and business identity.' : step === 'services' ? 'Choose every service category you may accept assignments for. Your next questions and requirements adjust automatically.' : step === 'questions' ? 'We only ask the questions that apply to the services you selected.' : step === 'documents' ? 'Upload verification documents through Pinnacle’s private document intake.' : 'Create the password you will use after approval.'} footer={<>Already approved? <Link to="../login" className="font-medium text-gold hover:underline">Sign in</Link></>}>
+    <AuthLayout surface="staff" eyebrow={inviteToken ? 'Private Pinnacle provider invitation' : trackCopy.eyebrow} title={stepTitle} subtitle={stepSubtitle} sideLabel={trackCopy.badge} sideTitle={trackCopy.sideTitle} sideBody={trackCopy.sideBody} footer={<>Already approved? <Link to="../login" className="font-medium text-gold hover:underline">Sign in</Link></>}>
       <div className="mb-6"><div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {stepIndex + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all" style={{ width:`${progress}%` }}/></div></div>
       {inviteLoading && <p className="mb-4 text-sm text-slate-400">Loading your invitation…</p>}
       {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-lg border border-gold/20 bg-gold/[.05] p-3 text-xs leading-5 text-slate-400"><span className="font-semibold text-gold">Private invitation verified</span> · expires {new Date(invite.expires_at).toLocaleString()}. You can apply as an individual or register your business, and you may change or add services before submitting.</div>}

@@ -11,6 +11,8 @@ interface AuthLayoutProps {
   surface?: 'client' | 'staff' | 'general'
   sideTitle?: string
   sideBody?: string
+  sideLabel?: string
+  sidePoints?: string[]
 }
 
 const surfaceCopy = {
@@ -43,8 +45,11 @@ export function AuthLayout({
   surface = 'general',
   sideTitle,
   sideBody,
+  sideLabel,
+  sidePoints,
 }: AuthLayoutProps) {
   const copy = surfaceCopy[surface]
+  const points = sidePoints ?? copy.points
   return (
     <div className="auth-shell min-h-screen bg-navy-950 text-slate-100">
       <div className="absolute right-4 top-4 z-30 sm:right-6 sm:top-6"><ThemeToggle compact /></div>
@@ -62,14 +67,14 @@ export function AuthLayout({
 
           <div className="py-10">
             <div className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/[.06] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.16em] text-gold">
-              <Sparkles size={13} /> {copy.label}
+              <Sparkles size={13} /> {sideLabel || copy.label}
             </div>
             <h2 className="mt-6 max-w-lg font-display text-4xl font-semibold leading-[1.08] tracking-[-.025em] text-white xl:text-5xl">
               {sideTitle || copy.title}
             </h2>
             <p className="mt-5 max-w-lg text-[15px] leading-7 text-slate-300">{sideBody || copy.body}</p>
             <div className="mt-8 space-y-3">
-              {copy.points.map((point) => (
+              {points.map((point) => (
                 <div key={point} className="flex items-center gap-3 text-sm font-medium text-slate-200">
                   <CheckCircle2 size={17} className="text-gold" /> {point}
                 </div>

@@ -7,6 +7,7 @@ import { DashboardWelcome } from '../../components/DashboardWelcome'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
 import { useLiveRefresh } from '../../lib/liveRefresh'
+import { hqEmployeeExperience, hqWorkspaceCopy } from '../../lib/workspace'
 import { Icon } from '../../components/kit/Icon'
 
 interface Stats {
@@ -29,7 +30,9 @@ function money(cents:number):string { return `$${(cents/100).toLocaleString(unde
 function StatLink({label,value,to}:{label:string;value:number|string;to?:string}) { const content=<StatCard label={label} value={value}/>; return to?<Link to={to} className="block">{content}</Link>:content }
 
 export default function AdminDashboard(){
-  const {user}=useAuth(); const p=useAppPath(); const[data,setData]=useState<DashboardResponse|null>(null); const[createOpen,setCreateOpen]=useState(false); const[loadError,setLoadError]=useState<string|null>(null)
+  const {user,workspace}=useAuth(); const p=useAppPath(); const[data,setData]=useState<DashboardResponse|null>(null); const[createOpen,setCreateOpen]=useState(false); const[loadError,setLoadError]=useState<string|null>(null)
+  const hqCopy = hqWorkspaceCopy(workspace.party_type, workspace.vendor_category, workspace.role_name)
+  const experience = hqEmployeeExperience(workspace.role_name)
   const load=useCallback(async()=>{try{const next=await api.get<DashboardResponse>('/admin/dashboard');setData(next);setLoadError(null)}catch(error){setLoadError(error instanceof ApiError?error.message:'The HQ overview could not load.')}},[])
   useEffect(()=>{void load()},[load])
   useLiveRefresh(load)
@@ -39,13 +42,12 @@ export default function AdminDashboard(){
   return <div className="pb-24 lg:pb-0">
     {loadError&&<div role="alert" className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[.04] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-amber-100">Overview data is temporarily unavailable</p><p className="mt-1 text-xs text-slate-400">{loadError} Existing navigation and tools remain available.</p></div><button type="button" onClick={()=>void load()} className="shrink-0 rounded-lg border border-amber-300/25 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-300/10">Try again</button></div>}
     <div className="mb-7 rounded-2xl border border-white/[.08] bg-gradient-to-br from-white/[.035] to-transparent p-5 sm:p-6">
-      <DashboardWelcome name={user?.first_name||user?.full_name} userId={user?.id} variant="admin" subtitle={user?.role==='admin'?'Here’s the firm-wide picture and the work that needs attention next.':'Here’s your assigned client work and the next items that need attention.'}/>
+      <DashboardWelcome name={user?.first_name||user?.full_name} userId={user?.id} variant="admin" subtitle={hqCopy.homeSubtitle}/>
       <div className="mt-5 hidden flex-wrap items-center gap-2 border-t border-white/[.07] pt-4 sm:flex">
         <span className="mr-1 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">Quick actions</span>
-        <Link to={p('leads/new')} className={quick}><Icon name="plus" size={13}/>Add lead</Link>
-        <Link to={p('service-assignments')} className={quick}><Icon name="services" size={13}/>Assign service</Link>
-        <Link to={p('invoices')} className={quick}><Icon name="billing" size={13}/>New invoice</Link>
-        <Link to={p('communications')} className={quick}><Icon name="communications" size={13}/>Communications</Link>
+        {experience.quickActions.map((action) => (
+          <Link key={action.to} to={p(action.to)} className={quick}><Icon name={action.icon} size={13}/>{action.label}</Link>
+        ))}
       </div>
     </div>
 
@@ -81,11 +83,11 @@ export default function AdminDashboard(){
     <div className="fixed right-4 z-40 lg:hidden" style={{bottom:'calc(env(safe-area-inset-bottom) + 1rem)'}}>
       {createOpen&&<div className="mb-3 w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-white/10 bg-navy-900/98 p-1.5 shadow-2xl shadow-black/40 backdrop-blur-xl">
         <div className="px-3 pb-2 pt-2"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">Quick Actions</p><p className="mt-1 text-xs text-slate-500">Start the next HQ task without leaving your place.</p></div>
-        <Link to={p('leads/new')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-200 transition hover:bg-white/[.05] hover:text-gold"><span className="grid h-9 w-9 place-items-center rounded-lg bg-gold/10 text-gold"><Icon name="plus" size={16}/></span><span><strong className="block font-semibold">Add Lead</strong><small className="text-xs text-slate-500">Create a CRM lead and optionally send their account invite.</small></span></Link>
-        <Link to={p('service-assignments')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-200 transition hover:bg-white/[.05] hover:text-gold"><span className="grid h-9 w-9 place-items-center rounded-lg bg-white/[.04] text-gold"><Icon name="services" size={16}/></span><span><strong className="block font-semibold">Assign Service</strong><small className="text-xs text-slate-500">Open service assignment workflow.</small></span></Link>
-        <Link to={p('invoices')} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-200 transition hover:bg-white/[.05] hover:text-gold"><span className="grid h-9 w-9 place-items-center rounded-lg bg-white/[.04] text-gold"><Icon name="billing" size={16}/></span><span><strong className="block font-semibold">New Invoice</strong><small className="text-xs text-slate-500">Move directly into billing.</small></span></Link>
+        {experience.quickActions.slice(0, 3).map((action) => (
+          <Link key={action.to} to={p(action.to)} onClick={()=>setCreateOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-200 transition hover:bg-white/[.05] hover:text-gold"><span className="grid h-9 w-9 place-items-center rounded-lg bg-gold/10 text-gold"><Icon name={action.icon} size={16}/></span><span><strong className="block font-semibold">{action.label}</strong><small className="text-xs text-slate-500">{action.detail}</small></span></Link>
+        ))}
       </div>}
-      <button type="button" onClick={()=>setCreateOpen(v=>!v)} className="ml-auto flex h-12 items-center gap-2 rounded-full border border-gold/30 bg-gold px-4 text-sm font-bold text-navy-950 shadow-2xl shadow-black/30 transition active:scale-[.98]" aria-expanded={createOpen} aria-label="Create new item"><Icon name={createOpen?'close':'plus'} size={17}/><span>{createOpen?'Close':'Create'}</span></button>
+      <button type="button" onClick={()=>setCreateOpen(v=>!v)} className="ml-auto flex h-12 items-center gap-2 rounded-full border border-gold/30 bg-gold px-4 text-sm font-bold text-navy-950 shadow-2xl shadow-black/30 transition active:scale-[.98]" aria-expanded={createOpen} aria-label="Create new item"><Icon name={createOpen?'close':'plus'} size={17}/><span>{createOpen?'Close':experience.createLabel}</span></button>
     </div>
   </div>
 }

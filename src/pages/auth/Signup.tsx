@@ -6,6 +6,7 @@ import { useAppPath } from '../../lib/basePath'
 import { services } from '../../data/services'
 import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
+import { clientTypeForWorld, clientWorkspaceForWorld, rememberedWorld, worldFromClientType, worldFromServiceParam } from '../../lib/workspace'
 
 const MIN_PASSWORD = 10
 type Step = 'contact' | 'business' | 'account'
@@ -25,12 +26,13 @@ export default function Signup() {
   const serviceKey = scopeServiceKey || directServiceKey
   const offeringId = scopeOfferingId || params.get('offering') || ''
   const requestedService = useMemo(() => services.find((service) => service.key === serviceKey), [serviceKey])
+  const intentWorld = worldFromServiceParam(serviceKey) || rememberedWorld() || 'general'
   const [step, setStep] = useState<Step>('contact')
   const [invite, setInvite] = useState<InviteResponse['invite'] | null>(null)
   const [inviteLoading, setInviteLoading] = useState(!!inviteToken)
   const [scopeLoading,setScopeLoading]=useState(!!scopeToken)
   const [scopeLabel,setScopeLabel]=useState('')
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', business_name: '', client_type: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', business_name: '', client_type: clientTypeForWorld(worldFromServiceParam(directServiceKey) || rememberedWorld() || 'general'), password: '', confirm: '' })
   const [tosAccepted, setTosAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -55,7 +57,7 @@ export default function Signup() {
       const full=response.request.contact_name.trim().split(/\s+/).filter(Boolean)
       const key=response.request.service_key||''
       setScopeServiceKey(key);setScopeOfferingId(response.request.offering_id||'');setScopeLabel(response.job_label)
-      const clientType=key==='property_management'||key==='property_inspections'?'property':key==='consulting'||key==='merchant_services'||key==='admin_support'?'business':'personal'
+      const clientType=clientTypeForWorld(worldFromServiceParam(key) || 'general') || (key==='property_management'||key==='property_inspections'?'property':key==='consulting'||key==='merchant_services'||key==='admin_support'?'business':'personal')
       setForm(current=>({...current,first_name:full[0]||current.first_name,last_name:full.slice(1).join(' ')||current.last_name,email:response.request.email||current.email,phone:response.request.phone||current.phone,client_type:clientType}))
     }).catch(err=>setError(err instanceof ApiError?err.message:'Could not load the request details.')).finally(()=>setScopeLoading(false))
   },[scopeToken])
@@ -112,22 +114,35 @@ export default function Signup() {
     ? `?service=${encodeURIComponent(requestedService.key)}${offeringId ? `&offering=${encodeURIComponent(offeringId)}` : ''}`
     : ''
 
-  const title = step === 'contact' ? 'Start Your Journey' : step === 'business' ? 'Tell Us What Brought You Here' : 'Secure Your Account'
+  const activeWorld = worldFromClientType(form.client_type) || intentWorld
+  const copy = clientWorkspaceForWorld(activeWorld)
+  const title = step === 'contact' ? 'Start this workspace' : step === 'business' ? 'Confirm the operating world' : 'Secure your account'
   const subtitle = step === 'contact'
-    ? 'Start with the basics. You do not need to know the exact service or have everything figured out before you begin.'
+    ? copy.loginBody
     : step === 'business'
-      ? 'A little context helps us organize the right next steps without making you navigate a wall of services.'
-      : 'One final step. Then we will continue into your private workspace and learn about the work itself.'
+      ? 'This choice shapes login, dashboard, and mobile tabs. You can add another world later without opening a new relationship.'
+      : 'One final step. Then we continue into the workspace that matches the work in front of you.'
+  const situationOptions:[string,string,string][] = [
+    ['property','Property or field support','Inspections, cleaning, turnovers, vendors, access, and documented visits.'],
+    ['business','Business or operations support','Capacity, systems, POS, project coordination, or funding navigation.'],
+    ['personal','Documents, signing, or mobile work','Notary, RON, courier, filing, or another defined professional need.'],
+  ]
+  const preferredType = clientTypeForWorld(intentWorld)
+  const orderedSituations = preferredType
+    ? [...situationOptions.filter((item) => item[0] === preferredType), ...situationOptions.filter((item) => item[0] !== preferredType)]
+    : situationOptions
 
   return (
     <AuthLayout
       surface="client"
-      eyebrow={inviteToken ? 'Private Pinnacle Invitation' : scopeToken ? 'Continue Your Request' : requestedService ? 'Your Pinnacle Journey' : 'New Client'}
+      eyebrow={inviteToken ? 'Private Pinnacle invitation' : scopeToken ? 'Continue your request' : copy.loginEyebrow}
       title={title}
       subtitle={subtitle}
+      sideLabel={copy.badge}
+      sideTitle={copy.loginTitle}
+      sideBody={copy.loginBody}
+      sidePoints={copy.loginPoints}
       footer={<>Already have an account? <Link to={`../login${loginQuery}`} className="font-bold text-gold hover:text-gold-300">Sign In</Link></>}
-      sideTitle="Start with the situation. We will help organize the path forward."
-      sideBody="Pinnacle is designed for real work that crosses systems, vendors, documents, deadlines, and people. Your account gives that work one organized starting point."
     >
       <div className="mb-7">
         <div className="flex items-center justify-between text-xs"><span className="font-bold text-white">Step {index + 1} of {steps.length}</span><span className="font-semibold text-gold">{progress}% Complete</span></div>
@@ -149,18 +164,14 @@ export default function Signup() {
       </div>}
 
       {step === 'business' && <div>
-        <p className="mb-3 text-sm font-bold text-slate-200">What Best Describes Your Situation?</p>
-        <div className="space-y-2">{[
-          ['business','Business or Operational Support','Consulting, POS or payment transitions, project coordination, administrative support, funding navigation, or another business need.'],
-          ['property','Property or Field Support','Property coordination, inspection, vendor, field verification, access, or owner support.'],
-          ['personal','Mobile or Professional Service','Notary, courier, document support, or another defined professional need.'],
-        ].map(([value,itemTitle,body])=><button key={value} type="button" onClick={()=>set('client_type',value)} className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${form.client_type===value?'border-gold/45 bg-gold/[.07]':'border-white/10 bg-white/[.018] hover:border-white/20 hover:bg-white/[.035]'}`}><span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-bold ${form.client_type===value?'border-gold bg-gold text-navy-950':'border-white/20 text-transparent'}`}>✓</span><span><span className="block text-sm font-bold text-white">{itemTitle}</span><span className="mt-1 block text-xs leading-5 text-slate-400">{body}</span></span></button>)}</div>
+        <p className="mb-3 text-sm font-bold text-slate-200">Which operating world are you in right now?</p>
+        <div className="space-y-2">{orderedSituations.map(([value,itemTitle,body])=><button key={value} type="button" onClick={()=>set('client_type',value)} className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${form.client_type===value?'border-gold/45 bg-gold/[.07]':'border-white/10 bg-white/[.018] hover:border-white/20 hover:bg-white/[.035]'}`}><span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-bold ${form.client_type===value?'border-gold bg-gold text-navy-950':'border-white/20 text-transparent'}`}>✓</span><span><span className="block text-sm font-bold text-white">{itemTitle}</span><span className="mt-1 block text-xs leading-5 text-slate-400">{body}</span></span></button>)}</div>
         {(form.client_type==='business'||form.client_type==='property')&&<div className="mt-5"><Field label="Business or Property Company Name" hint="Optional"><input className={inputCls} autoComplete="organization" value={form.business_name} onChange={(e)=>set('business_name',e.target.value)} placeholder="Company or property entity"/></Field></div>}
         <div className="mt-6 flex gap-3"><button type="button" className="btn-outline flex-1" onClick={()=>setStep('contact')}>Back</button><button type="button" className="btn-gold flex-[1.5]" onClick={()=>go('account')}>Continue</button></div>
       </div>}
 
       {step === 'account' && <div className="space-y-5">
-        <div className="rounded-xl border border-white/10 bg-white/[.025] p-4 text-xs leading-5 text-slate-400"><strong className="font-bold text-white">What Happens Next:</strong> once your account is created, we will ask a few focused questions about {requestedService ? requestedService.title : 'what brought you to Pinnacle'} and request documents only when the work actually needs them.</div>
+        <div className="rounded-xl border border-white/10 bg-white/[.025] p-4 text-xs leading-5 text-slate-400"><strong className="font-bold text-white">What happens next:</strong> we will ask a few focused questions about {requestedService ? requestedService.title : copy.badge.toLowerCase()} and request documents only when the work actually needs them.</div>
         <Field label="Password" hint={`${MIN_PASSWORD}+ characters`}><input className={inputCls} type="password" autoComplete="new-password" value={form.password} onChange={(e)=>set('password',e.target.value)} placeholder="Create a strong password"/></Field>
         <Field label="Confirm Password"><input className={inputCls} type="password" autoComplete="new-password" value={form.confirm} onChange={(e)=>set('confirm',e.target.value)} placeholder="Enter it again"/></Field>
         <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[.018] p-3.5 text-xs leading-5 text-slate-400"><input type="checkbox" checked={tosAccepted} onChange={(e)=>setTosAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-white/[0.04] accent-gold"/><span>I agree to the <a href="https://pinnaclemanagementventures.com/terms" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Terms of Service</a>, acknowledge the <a href="https://pinnaclemanagementventures.com/privacy" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Privacy Policy</a>, and consent to the <a href="https://pinnaclemanagementventures.com/electronic-communications" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Electronic Communications Disclosure</a> for account and service-related communications.</span></label>

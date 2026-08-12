@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import {
-  ArrowRight, Building2, Calendar, FileText, MessageSquare, Receipt, ShieldCheck, Users,
+  ArrowRight, Building2, Calendar, FileText, Gauge, MessageSquare, Receipt, ShieldCheck, Users,
 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
@@ -10,6 +10,7 @@ import { useAppPath } from '../../lib/basePath'
 import { SlaClock } from '../../components/kit/SlaClock'
 import { GetStartedPrompt } from '../../components/portal/GetStartedPrompt'
 import { pmvFadeUp, pmvStagger } from '../../lib/motionTheme'
+import { clientWorkspace } from '../../lib/workspace'
 
 interface DashboardData {
   stats: {
@@ -41,8 +42,9 @@ function waitingOnYou(waitingOn: string) {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth()
+  const { user, workspace } = useAuth()
   const p = useAppPath()
+  const copy = clientWorkspace(workspace.service_keys)
   const [data, setData] = useState<DashboardData | null>(null)
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -124,14 +126,17 @@ export default function Dashboard() {
     }
   }, [loaded, needsYou, stats, nextAppointment, p])
 
-  const shortcuts = [
-    { label: 'Documents', to: p('documents'), icon: FileText, note: stats?.pending_documents },
-    { label: 'Messages', to: p('messages'), icon: MessageSquare },
-    { label: 'Billing', to: p('billing'), icon: Receipt, note: stats?.open_invoices },
-    { label: 'Calendar', to: p('calendar'), icon: Calendar },
-    { label: 'My Team', to: p('my-team'), icon: Users },
-    { label: 'Account', to: p('business-profile'), icon: ShieldCheck },
-  ]
+  const shortcutCatalog = {
+    properties: { label: 'Properties', to: p('property-management'), icon: Building2, note: data?.properties.length },
+    documents: { label: 'Documents', to: p('documents'), icon: FileText, note: stats?.pending_documents },
+    messages: { label: 'Messages', to: p('messages'), icon: MessageSquare, note: undefined as number | undefined },
+    billing: { label: 'Billing', to: p('billing'), icon: Receipt, note: stats?.open_invoices },
+    calendar: { label: 'Calendar', to: p('calendar'), icon: Calendar, note: undefined as number | undefined },
+    team: { label: 'My Team', to: p('my-team'), icon: Users, note: undefined as number | undefined },
+    account: { label: 'Account', to: p('business-profile'), icon: ShieldCheck, note: undefined as number | undefined },
+    funding: { label: 'Funding', to: p('funding'), icon: Gauge, note: undefined as number | undefined },
+  }
+  const shortcuts = copy.shortcutKeys.map((key) => shortcutCatalog[key])
 
   return (
     <motion.div className="pb-8 lg:pb-4" initial="hidden" animate="show" variants={pmvStagger}>
@@ -139,17 +144,17 @@ export default function Dashboard() {
 
       <motion.header variants={pmvFadeUp} className="border-b border-white/10 pb-7">
         <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-gold/75">
-          {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+          {copy.homeEyebrow} · {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
         <h1 className="mt-2 font-display text-3xl font-medium tracking-[-.02em] text-white sm:text-4xl">
           {greeting(hour)}, {firstName}.
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-          See what is moving, what Pinnacle owns, and where you are needed. Then jump straight into that work.
+          {copy.homeSubtitle}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link to={p('support')} className="btn-gold">Start a request</Link>
-          <Link to={p('messages')} className="btn-outline">Message your team</Link>
+          <Link to={p(copy.primaryCta.to)} className="btn-gold">{copy.primaryCta.label}</Link>
+          <Link to={p(copy.secondaryCta.to)} className="btn-outline">{copy.secondaryCta.label}</Link>
         </div>
       </motion.header>
 
@@ -170,7 +175,7 @@ export default function Dashboard() {
             <div className="mb-3 flex items-end justify-between gap-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-slate-500">In motion</p>
-                <h2 className="mt-1 text-lg font-semibold text-white">Active requests</h2>
+                <h2 className="mt-1 text-lg font-semibold text-white">{copy.workHeading}</h2>
               </div>
               <Link to={p('support')} className="text-xs font-semibold text-gold hover:underline">View all</Link>
             </div>
@@ -240,7 +245,7 @@ export default function Dashboard() {
             <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Relationship pulse</p>
             <dl className="mt-3 divide-y divide-white/[.08] border-y border-white/[.08]">
               {[
-                ['Open work', loaded ? `${stats?.open_tickets ?? 0} request${(stats?.open_tickets ?? 0) === 1 ? '' : 's'}` : '…'],
+                [copy.pulseOpenLabel, loaded ? `${stats?.open_tickets ?? 0} request${(stats?.open_tickets ?? 0) === 1 ? '' : 's'}` : '…'],
                 ['Needs you', loaded ? `${clientActions} item${clientActions === 1 ? '' : 's'}` : '…'],
                 ['Next visit', nextAppointment ? new Date(nextAppointment.starts_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Nothing scheduled'],
                 ['Open invoices', loaded ? String(stats?.open_invoices ?? 0) : '…'],
@@ -308,7 +313,8 @@ export default function Dashboard() {
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-slate-500">More from Pinnacle</p>
-              <h2 className="mt-1 font-display text-xl font-medium text-white">Bring another need into this relationship</h2>
+              <h2 className="mt-1 font-display text-xl font-medium text-white">{copy.discoveryTitle}</h2>
+              <p className="mt-1 max-w-xl text-sm text-slate-500">{copy.discoveryBody}</p>
             </div>
             <Link to={p('services')} className="text-xs font-semibold text-gold hover:underline">See everything</Link>
           </div>

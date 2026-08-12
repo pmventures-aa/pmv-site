@@ -14,7 +14,7 @@ import { portalMobilePrimary, type NavItem } from './nav'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { AdminPageBoundary } from '../admin/AdminPageBoundary'
 
-export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
+export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: { nav: NavItem[]; badge: string; mobilePrimary?: string[] }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -123,7 +123,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
     </>
   )
 
-  const mobilePrimary = nav.filter((item) => (portalMobilePrimary as readonly string[]).includes(item.key))
+  const mobileItems = nav.filter((item) => mobilePrimary.includes(item.key))
 
   return (
     <div className="min-h-screen bg-navy-radial lg:flex">
@@ -162,7 +162,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[.08] bg-navy-950/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl lg:hidden" aria-label="Primary client destinations">
         <div className="grid grid-cols-5 gap-1">
-          {mobilePrimary.map((item) => (
+          {mobileItems.map((item) => (
             <NavLink
               key={item.key}
               to={p(item.to)}

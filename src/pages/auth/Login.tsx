@@ -1,10 +1,11 @@
 import { Eye, EyeOff, LockKeyhole, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth, isApiError } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
+import { clientWorkspaceForWorld, hqWorkspaceCopy, rememberOperatingWorld, rememberedHqParty, rememberedWorld, worldFromServiceParam } from '../../lib/workspace'
 
 export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const { login, logout } = useAuth()
@@ -18,6 +19,14 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  const clientWorld = useMemo(() => worldFromServiceParam(serviceKey) || rememberedWorld() || 'general', [serviceKey])
+  const clientCopy = clientWorkspaceForWorld(clientWorld)
+  const hqCopy = hqWorkspaceCopy(rememberedHqParty())
+
+  useEffect(() => {
+    if (surface === 'client' && clientWorld !== 'general') rememberOperatingWorld(clientWorld)
+  }, [surface, clientWorld])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -62,16 +71,20 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   return (
     <AuthLayout
       surface={surface}
-      eyebrow={surface === 'staff' ? 'Pinnacle HQ' : serviceKey ? 'Continue Your Journey' : 'Client Portal'}
-      title={surface === 'staff' ? 'Welcome Back to HQ' : 'Welcome Back'}
+      eyebrow={surface === 'staff' ? hqCopy.loginEyebrow : clientCopy.loginEyebrow}
+      title="Welcome back"
       subtitle={surface === 'staff'
-        ? 'Sign in to your secure operating workspace.'
+        ? hqCopy.loginBody
         : serviceKey
           ? 'Sign in and we will return you to the service you were exploring.'
-          : 'Your documents, messages, services, and next steps are ready when you are.'}
+          : clientCopy.loginBody}
+      sideLabel={surface === 'staff' ? hqCopy.badge : clientCopy.badge}
+      sideTitle={surface === 'staff' ? hqCopy.loginTitle : clientCopy.loginTitle}
+      sideBody={surface === 'staff' ? hqCopy.loginBody : clientCopy.loginBody}
+      sidePoints={surface === 'staff' ? undefined : clientCopy.loginPoints}
       footer={surface === 'client'
-        ? <span>New to Pinnacle? <Link to={`../signup${signupQuery}`} className="font-bold text-gold transition hover:text-gold-300">Start Your Journey</Link></span>
-        : <span className="text-slate-500">HQ access is provisioned by Pinnacle administrators.</span>}
+        ? <span>New to Pinnacle? <Link to={`../signup${signupQuery}`} className="font-bold text-gold transition hover:text-gold-300">Start your workspace</Link></span>
+        : <span className="text-slate-500">HQ and provider access is provisioned by Pinnacle.</span>}
     >
       <ErrorBanner message={error} />
       <form onSubmit={onSubmit} className="space-y-5">
@@ -86,7 +99,7 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
             </button>
           </div>
         </Field>
-        <button type="submit" disabled={busy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter Pinnacle HQ' : 'Open My Portal'}</button>
+        <button type="submit" disabled={busy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
       </form>
 
       {surface === 'client' && (
@@ -94,9 +107,9 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
           <div className="flex items-start gap-3">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold/10 text-gold"><Sparkles size={16} /></span>
             <div>
-              <p className="text-sm font-bold text-white">Not Sure Where to Begin?</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Create your account and tell us what you are trying to solve. You do not need to know the exact service before you start.</p>
-              <Link to={`../signup${signupQuery}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-gold hover:text-gold-300"><LockKeyhole size={13} /> Start Your Journey</Link>
+              <p className="text-sm font-bold text-white">Need a different kind of help?</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Property, documents, operations, and funding each have their own workspace. Start from the work in front of you.</p>
+              <Link to={`../signup${signupQuery}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-gold hover:text-gold-300"><LockKeyhole size={13} /> Start your workspace</Link>
             </div>
           </div>
         </div>
