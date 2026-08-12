@@ -18,6 +18,7 @@ import { logAudit, actorIp, actorUserAgent, actorGeo } from '../auditLog'
 import { notifyStaff, escapeHtml, sendEmail } from '../email'
 import { renderPinnacleEmailLayout } from '../emailTemplates/layout'
 import { CLIENT_PORTAL_URL, sendAccountWelcome, sendVendorApplicationReceived } from '../accountEmails'
+import { PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -151,6 +152,9 @@ authRoutes.post('/vendor-signup', async (c) => {
     company_name?: string
     vendor_category?: string
     notes?: string
+    provider_agreement_version?: string
+    provider_agreement_accepted?: boolean
+    provider_signature_name?: string
   }>().catch(() => null)
   if (!body) return c.json({ error: 'invalid request body' }, 400)
 
@@ -164,6 +168,13 @@ authRoutes.post('/vendor-signup', async (c) => {
   if (!e || !e.includes('@')) return c.json({ error: 'a valid email is required' }, 400)
   if (!fullName) return c.json({ error: 'your name is required' }, 400)
   if (!vendorCategory) return c.json({ error: 'please describe what you provide' }, 400)
+  if (!body.provider_agreement_accepted || body.provider_agreement_version !== PROVIDER_AGREEMENT_VERSION) {
+    return c.json({ error: 'accept the current Independent Provider Network Agreement to apply' }, 400)
+  }
+  const signatureName = cleanName(body.provider_signature_name)
+  if (!signatureName || normalizeProviderSignature(signatureName) !== normalizeProviderSignature(fullName)) {
+    return c.json({ error: 'your electronic signature must match your full legal name' }, 400)
+  }
   if (!body.password || body.password.length < MIN_PASSWORD) {
     return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
   }
@@ -189,6 +200,11 @@ authRoutes.post('/vendor-signup', async (c) => {
       `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category)
        VALUES (?, ?, 'support_specialist', ?, 'vendor', ?)`,
     ).bind(uuid(), id, title, vendorCategory),
+    c.env.DB.prepare(
+      `INSERT INTO provider_agreement_acceptances
+       (id, user_id, agreement_version, signature_name, ip_address, user_agent, acceptance_method)
+       VALUES (?, ?, ?, ?, ?, ?, 'provider_application')`,
+    ).bind(uuid(), id, PROVIDER_AGREEMENT_VERSION, signatureName, actorIp(c.req.raw), actorUserAgent(c.req.raw)),
     activityInsert(c.env, { actorUserId: id, kind: 'vendor_signup_submitted', detail: { email: e, full_name: fullName, vendor_category: vendorCategory, company_name: companyName || undefined } }),
   ])
 

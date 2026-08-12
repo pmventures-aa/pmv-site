@@ -22,6 +22,7 @@ import Terms from './pages/public/Terms'
 import Privacy from './pages/public/Privacy'
 import ElectronicCommunications from './pages/public/ElectronicCommunications'
 import Accessibility from './pages/public/Accessibility'
+import ProviderAgreement from './pages/public/ProviderAgreement'
 import VerifyDocument from './pages/public/VerifyDocument'
 import SignerExperience from './pages/public/SignerExperience'
 import SharedDocument from './pages/public/SharedDocument'
@@ -93,6 +94,7 @@ function App() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/electronic-communications" element={<ElectronicCommunications />} />
       <Route path="/accessibility" element={<Accessibility />} />
+      <Route path="/provider-agreement" element={<ProviderAgreement />} />
       <Route path="/verify" element={<VerifyDocument />} />
       <Route path="/sign/:token" element={<SignerExperience />} />
       <Route path="/shared/:token" element={<SharedDocument />} />

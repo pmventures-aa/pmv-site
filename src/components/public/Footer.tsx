@@ -42,7 +42,7 @@ export function Footer() {
         <div className="mt-10 border-t border-white/[.07] pt-6">
           <div className="flex flex-col gap-4 text-xs text-slate-500 lg:flex-row lg:items-center lg:justify-between">
             <span>&copy; {new Date().getFullYear()} Pinnacle Management Ventures. All rights reserved.</span>
-            <nav className="flex flex-wrap gap-x-5 gap-y-2 font-semibold"><Link to="/terms" className="hover:text-gold">Terms</Link><Link to="/privacy" className="hover:text-gold">Privacy</Link><Link to="/electronic-communications" className="hover:text-gold">Electronic Records</Link><Link to="/accessibility" className="hover:text-gold">Accessibility</Link></nav>
+            <nav className="flex flex-wrap gap-x-5 gap-y-2 font-semibold"><Link to="/terms" className="hover:text-gold">Terms</Link><Link to="/provider-agreement" className="hover:text-gold">Provider Agreement</Link><Link to="/privacy" className="hover:text-gold">Privacy</Link><Link to="/electronic-communications" className="hover:text-gold">Electronic Records</Link><Link to="/accessibility" className="hover:text-gold">Accessibility</Link></nav>
           </div>
           <p className="mt-4 max-w-5xl text-xs leading-6 text-slate-500">Pinnacle Management Ventures is a professional services and coordination company. We are not automatically acting as a law firm, lender, tax or accounting firm, real estate broker, contractor, engineer, or licensed property manager because an engagement touches one of those areas. Regulated or licensed work is performed only when the applicable qualified provider and scope are specifically identified. Notarial acts are performed only by a duly commissioned notary acting within the notary’s authorized scope.</p>
         </div>

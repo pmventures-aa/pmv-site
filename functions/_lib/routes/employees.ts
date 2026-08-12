@@ -56,7 +56,7 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
   ).bind(id).first()
   if (!employee) return c.json({ error: 'not found' }, 404)
 
-  const [logins, tasks, networkNotes, dispatch, notes, avgResponse, vendorDocuments] = await Promise.all([
+  const [logins, tasks, networkNotes, dispatch, notes, avgResponse, vendorDocuments, agreementAcceptances] = await Promise.all([
     c.env.DB.prepare("SELECT created_at, actor_ip, actor_user_agent FROM audit_log WHERE actor_user_id = ? AND action = 'login' ORDER BY created_at DESC LIMIT 20").bind(id).all(),
     c.env.DB.prepare(
       `SELECT t.id,t.title,t.status,t.due_date,t.created_at,u.full_name client_name,u.email client_email
@@ -85,6 +85,10 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
       `SELECT id, document_type, file_name, content_type, size_bytes, created_at
        FROM vendor_application_documents WHERE user_id = ? ORDER BY created_at`,
     ).bind(id).all(),
+    c.env.DB.prepare(
+      `SELECT agreement_version, signature_name, accepted_at, acceptance_method
+       FROM provider_agreement_acceptances WHERE user_id = ? ORDER BY accepted_at DESC`,
+    ).bind(id).all(),
   ])
 
   let vendorApplication: unknown = null
@@ -102,6 +106,7 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
     notes: notes.results ?? [],
     vendor_documents: vendorDocuments.results ?? [],
     vendor_application: vendorApplication,
+    provider_agreements: agreementAcceptances.results ?? [],
     network_notes: networkNotes.results ?? [],
     dispatch_history: dispatch.results ?? [],
     avg_response_hours: avgResponse?.avg_hours ?? null,
