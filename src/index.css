@@ -51,8 +51,9 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 .theme-indicator { color:#c9a227; font-size:10px; }
 
 .pmv-crest-adaptive { filter:contrast(1.03) drop-shadow(0 8px 18px rgba(0,0,0,.22)); }
-.pmv-crest-light { filter:brightness(1.22) contrast(1.07) saturate(1.04) drop-shadow(0 8px 18px rgba(0,0,0,.3)); }
-.pmv-crest-outline { filter:brightness(0) invert(1); opacity:.46; transform:scale(1.012); transform-origin:center; }
+.pmv-crest-light { filter:brightness(1.28) contrast(1.1) saturate(1.05) drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
+.pmv-crest-outline { filter:brightness(0) invert(1) drop-shadow(0 0 3px rgba(255,255,255,.35)); opacity:.32; transform:scale(1.02); transform-origin:center; }
+.pmv-crest-dark-surface { filter:drop-shadow(0 0 12px rgba(201,162,39,.22)); }
 .pmv-crest-switch { vertical-align:middle; }
 .pmv-crest-for-light { display:none; }
 :root[data-theme='light'] .pmv-crest-switch-auto .pmv-crest-for-dark { display:none; }

@@ -21,17 +21,18 @@ export default function ServiceDetail() {
   return (
     <div className="min-h-screen bg-navy-950">
       <Header />
-      <section className="container-pmv py-14 sm:py-16">
-        <Link to="/services" className="text-sm text-slate-400 hover:text-gold">← All services</Link>
-        <div className="mt-5"><TagLine tag={service.tag} popular={service.popular} /></div>
-        <h1 className="mt-2 max-w-4xl font-display text-4xl font-medium text-white sm:text-5xl">{service.title}</h1>
-        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-300">{service.heroDescription}</p>
+      <div className="border-b border-white/[.06] bg-navy-900/40"><div className="container-pmv flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><Link to="/services" className="inline-flex items-center gap-1.5 font-semibold text-slate-400 transition hover:text-gold"><span aria-hidden="true">←</span> All services</Link><Link to={requestUrl} className="font-semibold text-gold hover:text-gold-300">Start a request for this service →</Link></div></div>
+      <section className="container-pmv py-12 sm:py-16">
+        <div><TagLine tag={service.tag} popular={service.popular} /></div>
+        <h1 className="mt-3 max-w-4xl font-display text-4xl font-bold leading-[1.05] tracking-[-.03em] text-white sm:text-5xl lg:text-6xl">{service.title}</h1>
+        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-300">{service.heroDescription}</p>
         <PriceAnchor serviceKey={service.key} offeringPrefixes={service.offeringPrefixes} />
-        <div className="mt-7 flex flex-wrap gap-3">
-          <Link to={requestUrl} className={btnPrimary}>Scope this service</Link>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link to={requestUrl} className={btnPrimary}>Request this service</Link>
+          <Link to={`/instant-quote?service=${encodeURIComponent(service.key)}`} className={btnOutline}>Get an instant estimate</Link>
           <a href="tel:+15613887879" className={btnOutline}>Call (561) 388-7879</a>
         </div>
-        <p className="mt-3 max-w-2xl text-xs leading-5 text-slate-500">No account is required. Tell us the location, timing, and outcome first; create a client workspace afterward only if it is useful.</p>
+        <p className="mt-4 flex max-w-2xl items-center gap-2 text-xs leading-5 text-slate-400"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"/>No account required to start. A real person replies within two business hours.</p>
 
         <div className="mt-12 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 lg:grid-cols-2">
           <div className={`${panelCls} rounded-none border-0`}>
