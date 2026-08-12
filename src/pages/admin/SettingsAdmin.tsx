@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell, BriefcaseBusiness, Building2, ChevronRight, Palette, Search, Settings2, ShieldCheck, SlidersHorizontal, Trash2, Users } from 'lucide-react'
+import { Bell, BriefcaseBusiness, Building2, ChevronRight, Files, Palette, Search, Settings2, ShieldCheck, SlidersHorizontal, Trash2, Users } from 'lucide-react'
 import { PageIntro, NoAccess, Panel, inputCls } from '../../components/admin/ui'
 import { useCapabilities } from '../../lib/capabilities'
 import { useAppPath } from '../../lib/basePath'
@@ -11,6 +11,7 @@ import ServiceCatalogSettings from './settings/ServiceCatalogSettings'
 import ServiceOfferingsSettings from './settings/ServiceOfferingsSettings'
 import StaffSettings from './settings/StaffSettings'
 import NotificationSettings from './settings/NotificationSettings'
+import ManagedTemplatesSettings from './settings/ManagedTemplatesSettings'
 
 const TABS = [
   { key: 'general', label: 'General', short: 'Firm identity, contact details, communications, and compliance copy.', icon: Building2, terms: 'business firm address phone hours marketing compliance application' },
@@ -19,6 +20,7 @@ const TABS = [
   { key: 'offerings', label: 'Service Offerings', short: 'Control which services are available and how they are presented.', icon: SlidersHorizontal, terms: 'services offerings enabled availability pricing scope' },
   { key: 'staff', label: 'Network Access & Permissions', short: 'Manage internal access, provider roles, responsibilities, and permissions.', icon: Users, terms: 'staff users roles access permissions team providers professionals network' },
   { key: 'notifications', label: 'Notifications', short: 'Choose how operational events reach you across HQ, email, desktop, and sound.', icon: Bell, terms: 'notifications email desktop sound alerts events' },
+  { key: 'templates', label: 'Templates', short: 'Edit, version, review, and publish Pinnacle agreements and reusable master copy.', icon: Files, terms: 'templates agreement provider version publish document legal' },
   { key: 'deletions', label: 'Permanent Deletions', short: 'Owner-only irreversible record deletion and impact review.', icon: Trash2, terms: 'delete danger purge permanent owner archive' },
 ] as const
 
@@ -56,7 +58,7 @@ export default function SettingsAdmin() {
     return TABS.some(item => item.key === stored) ? stored! : 'general'
   })
   const [query, setQuery] = useState('')
-  const visibleTabs = useMemo(() => TABS.filter((item) => item.key !== 'deletions' || caps.is_owner), [caps.is_owner])
+  const visibleTabs = useMemo(() => TABS.filter((item) => !['deletions', 'templates'].includes(item.key) || caps.is_owner), [caps.is_owner])
   const matchingTabs = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return visibleTabs
@@ -118,6 +120,7 @@ export default function SettingsAdmin() {
           {tab === 'offerings' && <ServiceOfferingsSettings />}
           {tab === 'staff' && <StaffSettings />}
           {tab === 'notifications' && <NotificationSettings />}
+          {tab === 'templates' && (caps.is_owner ? <ManagedTemplatesSettings /> : <NoAccess label="Templates" />)}
           {tab === 'deletions' && (caps.is_owner ? <div className="rounded-xl border border-rose-400/20 bg-rose-400/[.025] p-1"><div className="px-4 pb-2 pt-4"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-rose-300">Danger Zone</p><p className="mt-1 text-sm text-slate-400">Permanent deletion is restricted to the owner and requires dependency review before execution.</p></div><PermanentDeletions /></div> : <NoAccess label="Permanent Deletions" />)}
         </section>
       </div>

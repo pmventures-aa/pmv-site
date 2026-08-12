@@ -4,6 +4,7 @@ import { Building2, CheckCircle2, Mail, Phone, ShieldCheck, User } from 'lucide-
 import { api, ApiError } from '../../lib/api'
 import { AuthLayout, ErrorBanner, Field, inputCls } from './AuthLayout'
 import { DocumentUpload, type UploadedDocument } from '../../components/forms/DocumentUpload'
+import { PROVIDER_AGREEMENT_URL, PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
 
 const MIN_PASSWORD = 10
 
@@ -50,6 +51,7 @@ export default function VendorSignup() {
     commission_state:'Florida', commission_number:'', commission_expiration:'', ron_provider:'',
     license_status:'' as ''|'yes'|'no'|'unsure', insurance_status:'' as ''|'yes'|'no',
     technology_platforms:'', accounting_credentials:'', other_service:'', notes:'', password:'', confirm:'',
+    provider_agreement_accepted:false, signature_name:'',
   })
   const [uploadToken, setUploadToken] = useState('')
   const [files, setFiles] = useState<UploadedFile[]>([])
@@ -58,6 +60,13 @@ export default function VendorSignup() {
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
   const [documentWarning, setDocumentWarning] = useState(false)
+  const [agreementVersion, setAgreementVersion] = useState(PROVIDER_AGREEMENT_VERSION)
+
+  useEffect(() => {
+    api.get<{ template: { version_label?: string } }>('/managed-templates/provider-agreement')
+      .then((response) => { if (response.template?.version_label) setAgreementVersion(response.template.version_label) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!inviteToken) return
@@ -138,6 +147,8 @@ export default function VendorSignup() {
     if (step === 'account') {
       if (form.password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters.`
       if (form.password !== form.confirm) return 'Passwords do not match.'
+      if (!form.provider_agreement_accepted) return 'Review and accept the Independent Provider Network Agreement.'
+      if (normalizeProviderSignature(form.signature_name) !== normalizeProviderSignature(fullName)) return 'Type your full legal name exactly as entered above to sign the Provider Agreement.'
     }
     return null
   }
@@ -213,6 +224,9 @@ export default function VendorSignup() {
         vendor_category:selectedTitles.join(', '),
         notes:`Enrollments: ${selectedTitles.join(', ')}\nService area: ${form.service_area.join(', ')}\nEntity: ${form.entity_type}\nYears experience: ${form.years_experience}${form.notes ? `\nNotes: ${form.notes}` : ''}`,
         password:form.password,
+        provider_agreement_version:agreementVersion,
+        provider_agreement_accepted:form.provider_agreement_accepted,
+        provider_signature_name:form.signature_name,
       })
       if (uploadToken) {
         try { await api.post(`/vendor-application/session/${uploadToken}/finalize`, { email:form.email, application_data:applicationData }) }
@@ -282,7 +296,14 @@ export default function VendorSignup() {
       {step === 'account' && <div className="space-y-4">
         <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Application summary</p><p className="mt-2 text-sm text-white">{selectedTitles.join(' · ')}</p><p className="mt-1 text-xs text-slate-500">{form.service_area.join(', ')} · {files.length} secure document{files.length===1?'':'s'} attached</p></div>
         <Field label={`Password (at least ${MIN_PASSWORD} characters)`}><input className={inputCls} type="password" value={form.password} onChange={(e)=>set('password',e.target.value)}/></Field><Field label="Confirm password"><input className={inputCls} type="password" value={form.confirm} onChange={(e)=>set('confirm',e.target.value)}/></Field>
-        <p className="text-xs leading-5 text-slate-500">Submitting starts Pinnacle's provider review. Access remains pending until a Pinnacle administrator approves the application.</p>
+        <div className="rounded-xl border border-gold/20 bg-gold/[.04] p-4">
+          <p className="text-xs font-semibold uppercase tracking-[.12em] text-gold">Provider relationship</p>
+          <p className="mt-2 text-xs leading-5 text-slate-400">The agreement covers your participation in Pinnacle's network. Every accepted assignment will still have its own scope, timing, compensation, access instructions, and deliverables.</p>
+          <a href={PROVIDER_AGREEMENT_URL} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-xs font-bold text-gold hover:text-gold-300">Read the Independent Provider Network Agreement →</a>
+          <label className="mt-4 flex items-start gap-3 border-t border-white/[.08] pt-4 text-xs leading-5 text-slate-300"><input type="checkbox" checked={form.provider_agreement_accepted} onChange={(e)=>set('provider_agreement_accepted',e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-gold"/><span>I have reviewed and agree to the Independent Provider Network Agreement dated {agreementVersion}, and I consent to electronic records and signatures for my provider application and assignments.</span></label>
+          <div className="mt-4"><Field label="Electronic signature: Type your full legal name"><input className={inputCls} autoComplete="name" placeholder={fullName || 'Your full legal name'} value={form.signature_name} onChange={(e)=>set('signature_name',e.target.value)}/></Field></div>
+        </div>
+        <p className="text-xs leading-5 text-slate-500">Submitting starts Pinnacle's provider review. Access remains pending until a Pinnacle administrator approves the application. Your acceptance time and security record are retained with your application.</p>
         <div className="flex gap-2"><button onClick={()=>setStep('documents')} className="btn-outline flex-1">Back</button><button disabled={busy||inviteLoading|| (!!inviteToken && invite?.status!=='pending')} onClick={()=>void submit()} className="btn-gold flex-[1.5] disabled:opacity-60">{busy?'Submitting securely…':'Submit application'}</button></div>
       </div>}
     </AuthLayout>

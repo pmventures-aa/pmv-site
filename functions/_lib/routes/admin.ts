@@ -9,6 +9,7 @@ import { activityInsert, logActivity } from '../activity'
 import { hasCapability, requireCapability } from '../capabilities'
 import { sendEmail, escapeHtml } from '../email'
 import { getService, getQuestions, prefillForQuestions, persistAnswers } from './serviceApplications'
+import { toDisplayCase } from '../../../shared/displayCase'
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -159,7 +160,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   // Client profiles are intentionally sectional. HQ asks only for the active
   // subpage instead of pulling the entire relationship history on every open.
   const section = c.req.query('section')
-  if (section && ['overview', 'activity', 'services', 'work', 'documents', 'billing', 'details'].includes(section)) {
+  if (section && ['overview', 'activity', 'services', 'work', 'documents', 'billing', 'relationships', 'details'].includes(section)) {
     const [account, profile, assignedStaff] = await Promise.all([
       c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
       c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
@@ -382,11 +383,11 @@ adminRoutes.patch('/clients/:id/profile', requireStaff, async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>)
   const profileFields: Record<string, string | null> = {}
   for (const key of ['business_name', 'entity_type', 'ein', 'state'] as const) {
-    if (typeof body[key] === 'string') profileFields[key] = (body[key] as string).trim().slice(0, 200) || null
+    if (typeof body[key] === 'string') profileFields[key] = key === 'ein' ? (body[key] as string).trim().slice(0, 200) || null : toDisplayCase(body[key]).slice(0, 200) || null
   }
   const userFields: Record<string, string | null> = {}
   for (const key of ['full_name', 'phone'] as const) {
-    if (typeof body[key] === 'string') userFields[key] = (body[key] as string).trim().slice(0, 200) || null
+    if (typeof body[key] === 'string') userFields[key] = key === 'full_name' ? toDisplayCase(body[key]).slice(0, 200) || null : (body[key] as string).trim().slice(0, 200) || null
   }
   const profileCols = Object.keys(profileFields)
   const userCols = Object.keys(userFields)
@@ -404,6 +405,40 @@ adminRoutes.patch('/clients/:id/profile', requireStaff, async (c) => {
       c.env.DB.prepare(`UPDATE users SET ${userCols.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`)
         .bind(...userCols.map((k) => userFields[k]), id),
     )
+  }
+  const current = await c.env.DB.prepare(
+    `SELECT cp.primary_party_id,cp.business_party_id,cp.business_name,cp.entity_type,cp.ein,cp.state,
+            u.full_name,u.email,u.phone,u.first_name,u.last_name
+     FROM client_profiles cp JOIN users u ON u.id=cp.user_id WHERE cp.user_id=?`,
+  ).bind(id).first<any>()
+  let personPartyId = current?.primary_party_id || ''
+  if (!personPartyId && current) {
+    personPartyId = uuid()
+    stmts.push(
+      c.env.DB.prepare("INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,'person',?,?,?,?,?)").bind(personPartyId,userFields.full_name || current.full_name || current.email,current.email,userFields.phone ?? current.phone,user.id),
+      c.env.DB.prepare('INSERT INTO relationship_people(party_id,first_name,last_name) VALUES (?,?,?)').bind(personPartyId,current.first_name,current.last_name),
+      c.env.DB.prepare("INSERT INTO account_parties(user_id,party_id,access_role,is_primary) VALUES (?,?,'self',1)").bind(id,personPartyId),
+      c.env.DB.prepare('UPDATE client_profiles SET primary_party_id=? WHERE user_id=?').bind(personPartyId,id),
+    )
+  } else if (personPartyId && current) {
+    stmts.push(c.env.DB.prepare('UPDATE relationship_parties SET display_name=?,phone=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(userFields.full_name || current.full_name || current.email,userFields.phone ?? current.phone,personPartyId))
+  }
+  const nextBusinessName = Object.prototype.hasOwnProperty.call(profileFields, 'business_name') ? profileFields.business_name : current?.business_name
+  if (nextBusinessName && personPartyId) {
+    const businessPartyId = current?.business_party_id || uuid()
+    if (!current?.business_party_id) {
+      stmts.push(
+        c.env.DB.prepare("INSERT INTO relationship_parties(id,party_type,display_name,created_by_user_id) VALUES (?,'business',?,?)").bind(businessPartyId,nextBusinessName,user.id),
+        c.env.DB.prepare('INSERT INTO relationship_businesses(party_id,legal_name,entity_type,ein,state,primary_contact_party_id) VALUES (?,?,?,?,?,?)').bind(businessPartyId,nextBusinessName,profileFields.entity_type ?? current?.entity_type,profileFields.ein ?? current?.ein,profileFields.state ?? current?.state,personPartyId),
+        c.env.DB.prepare("INSERT INTO party_relationships(id,from_party_id,to_party_id,relationship_type,label,created_by_user_id) VALUES (?,?,?,'primary_contact','Primary Contact',?)").bind(uuid(),personPartyId,businessPartyId,user.id),
+        c.env.DB.prepare('UPDATE client_profiles SET business_party_id=? WHERE user_id=?').bind(businessPartyId,id),
+      )
+    } else {
+      stmts.push(
+        c.env.DB.prepare('UPDATE relationship_parties SET display_name=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(nextBusinessName,businessPartyId),
+        c.env.DB.prepare('UPDATE relationship_businesses SET legal_name=?,entity_type=?,ein=?,state=?,primary_contact_party_id=? WHERE party_id=?').bind(nextBusinessName,profileFields.entity_type ?? current?.entity_type,profileFields.ein ?? current?.ein,profileFields.state ?? current?.state,personPartyId,businessPartyId),
+      )
+    }
   }
   stmts.push(activityInsert(c.env, { actorUserId: user.id, clientUserId: id, kind: 'client_profile_updated', detail: { ...profileFields, ...userFields } }))
   await c.env.DB.batch(stmts)
@@ -735,14 +770,16 @@ adminRoutes.post('/users', requireStaff, async (c) => {
   if (exists) return c.json({ error: 'a user with that email already exists' }, 409)
 
   const id = uuid()
-  const fn = body.full_name || [body.first_name, body.last_name].filter(Boolean).join(' ') || null
+  const firstName = toDisplayCase(body.first_name) || null
+  const lastName = toDisplayCase(body.last_name) || null
+  const fn = toDisplayCase(body.full_name || [firstName, lastName].filter(Boolean).join(' ')) || null
   const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) || null : null
 
   const stmts = [
     c.env.DB.prepare(
       `INSERT INTO users (id, email, password_hash, role, full_name, first_name, last_name, phone, two_factor_enabled, status)
        VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 0, 'active')`,
-    ).bind(id, e, r, fn, body.first_name ?? null, body.last_name ?? null, phone),
+    ).bind(id, e, r, fn, firstName, lastName, phone),
   ]
   if (r === 'client') {
     stmts.push(
@@ -752,10 +789,10 @@ adminRoutes.post('/users', requireStaff, async (c) => {
       ).bind(
         uuid(),
         id,
-        body.business_name ?? null,
-        body.entity_type ?? null,
+        toDisplayCase(body.business_name) || null,
+        toDisplayCase(body.entity_type) || null,
         body.ein ?? null,
-        body.state ?? null,
+        toDisplayCase(body.state) || null,
         Array.isArray(body.services_enrolled) ? JSON.stringify(body.services_enrolled) : null,
       ),
     )

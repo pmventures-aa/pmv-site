@@ -57,6 +57,8 @@ import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_l
 import { documentWorkspaceExtraRoutes } from '../_lib/routes/documentWorkspaceExtras'
 import { securitySessionRoutes } from '../_lib/routes/securitySessions'
 import { scopeFunnelPublicRoutes, scopeFunnelAdminRoutes } from '../_lib/routes/scopeFunnel'
+import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib/routes/managedTemplates'
+import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -78,6 +80,7 @@ app.route('/', documentPlatformV2PublicRoutes)
 app.route('/', documentLifecyclePublicRoutes)
 app.route('/', internalDocumentPublicRoutes)
 app.route('/', scopeFunnelPublicRoutes)
+app.route('/', managedTemplatePublicRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
 
@@ -129,6 +132,8 @@ app.route('/admin', casesRoutes)
 app.route('/admin', communicationBrandingAdminRoutes)
 app.route('/admin', presenceRoutes)
 app.route('/admin', scopeFunnelAdminRoutes)
+app.route('/admin', managedTemplateAdminRoutes)
+app.route('/admin', clientRelationshipRoutes)
 // Public endpoint serves branded font files by id for the mail workspace
 // preview + rendered signer experience; no auth required so <link rel="preload">
 // and @font-face fetches work in an unauthenticated recipient's browser.
