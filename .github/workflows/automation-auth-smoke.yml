@@ -1,10 +1,9 @@
 name: Verify production automation authentication
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/automation-auth-smoke.yml'
+  workflow_run:
+    workflows: ['Deploy Cloudflare Pages production']
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -12,6 +11,7 @@ permissions:
 
 jobs:
   smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
