@@ -67,14 +67,21 @@ export default function CommunicationsHub() {
     <div className="space-y-6">
       <PageIntro kicker="Communications Hub" title="One view. Every channel." subtitle="Client threads, staff DMs, outbound email, and per-user notification settings in one place. Deep-link into the Email Center or Inbox for their full toolset." />
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/10">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`relative px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'text-gold' : 'text-slate-400 hover:text-white'}`}>
-            {t.label}
-            {tab === t.id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-t-full bg-gold"/>}
-          </button>
-        ))}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+      <div className="border-b border-white/10">
+        <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {TABS.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`relative shrink-0 px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'text-gold' : 'text-slate-400 hover:text-white'}`}>
+              {t.label}
+              {tab === t.id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-t-full bg-gold"/>}
+            </button>
+          ))}
+          <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex">
+            <Link to={p('communications/email')} className={btnSecondary}><Send size={14}/>Email Center</Link>
+            <Link to={p('messages')} className={btnSecondary}><Inbox size={14}/>Inbox</Link>
+            <button className={btnSecondary} onClick={() => void loadOverview()}><RefreshCw size={14}/>Refresh</button>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 pb-2 sm:hidden">
           <Link to={p('communications/email')} className={btnSecondary}><Send size={14}/>Email Center</Link>
           <Link to={p('messages')} className={btnSecondary}><Inbox size={14}/>Inbox</Link>
           <button className={btnSecondary} onClick={() => void loadOverview()}><RefreshCw size={14}/>Refresh</button>
@@ -218,17 +225,19 @@ function NotificationsTab() {
           <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/80">{category}</p>
           <div className="mt-4 divide-y divide-white/10 border-y border-white/10">
             {list.map((event) => (
-              <div key={event.event_key} className="grid gap-4 py-4 lg:grid-cols-[1.6fr_repeat(4,minmax(90px,1fr))] lg:items-center">
+              <div key={event.event_key} className="grid gap-3 py-4 lg:grid-cols-[1.6fr_repeat(4,minmax(90px,1fr))] lg:items-center">
                 <div>
                   <p className="text-sm font-bold text-white">{event.label}</p>
                   {event.description && <p className="mt-1 text-xs leading-5 text-slate-500">{event.description}</p>}
                 </div>
-                {(['in_app_enabled', 'email_enabled', 'desktop_enabled', 'sound_enabled'] as const).map((field) => (
-                  <label key={field} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[.02] px-3 py-2 text-xs font-semibold text-slate-300 lg:justify-center">
-                    <span className="lg:hidden">{fieldLabel(field)}</span>
-                    <input type="checkbox" className="accent-gold" checked={event[field] === 1} onChange={(e) => toggle(event.event_key, field, e.target.checked)}/>
-                  </label>
-                ))}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:contents">
+                  {(['in_app_enabled', 'email_enabled', 'desktop_enabled', 'sound_enabled'] as const).map((field) => (
+                    <label key={field} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[.02] px-3 py-2 text-xs font-semibold text-slate-300 lg:justify-center">
+                      <span className="lg:hidden">{fieldLabel(field)}</span>
+                      <input type="checkbox" className="accent-gold" checked={event[field] === 1} onChange={(e) => toggle(event.event_key, field, e.target.checked)}/>
+                    </label>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
