@@ -1,25 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
 import {
-  Building2, FileText, MessageSquare, Receipt, Calendar, HelpCircle,
-  Scale, Layers, ShieldCheck, Users, ArrowRight, Sparkles,
+  ArrowRight, Building2, Calendar, FileText, MessageSquare, Receipt, ShieldCheck, Users,
 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import { SlaClock } from '../../components/kit/SlaClock'
-import { WhiteGoldBrandMark } from '../../components/ui'
-import { pmvFadeUp, pmvMotion, pmvPanel, pmvStagger } from '../../lib/motionTheme'
-
-// -----------------------------------------------------------------------------
-// Command Center dashboard - the "courtyard" landing page. The Portal is
-// intentionally tile-first here: the sidebar keeps only Home / Requests /
-// Documents (see components/layout/nav.ts), so the tile grid on this page IS
-// the client's real navigation. Each tile shows whether the service is
-// active, discoverable, or "coming soon" so the client can feel the breadth
-// of the platform without being overwhelmed by a huge sidebar.
-// -----------------------------------------------------------------------------
+import { GetStartedPrompt } from '../../components/portal/GetStartedPrompt'
+import { pmvFadeUp, pmvStagger } from '../../lib/motionTheme'
 
 interface DashboardData {
   stats: {
@@ -39,33 +29,6 @@ interface DashboardData {
 
 interface CatalogItem { key: string; name: string; category: string }
 
-type TileState = 'active' | 'discover' | 'soon'
-
-interface Tile {
-  key: string
-  label: string
-  hint: string
-  icon: typeof Building2
-  to: string
-  state: TileState
-  badgeCount?: number
-}
-
-// Static catalog used to build a personal workspace. Only active modules are
-// promoted into the main grid; the service catalog handles discovery below.
-const TILE_BLUEPRINT: { key: string; label: string; hint: string; icon: typeof Building2; to: string; soon?: boolean; serviceKeys?: string[] }[] = [
-  { key: 'requests', label: 'Requests & Cases', hint: 'Submit a new request or track open work', icon: HelpCircle, to: 'support' },
-  { key: 'documents', label: 'Documents', hint: 'Uploads, signatures, and shared files', icon: FileText, to: 'documents' },
-  { key: 'properties', label: 'My Properties', hint: 'Field visits, inspections, maintenance', icon: Building2, to: 'property-management', serviceKeys: ['property_management', 'property_inspections'] },
-  { key: 'matters', label: 'Projects & Matters', hint: 'Ongoing legal, admin, or advisory work', icon: Scale, to: 'matters' },
-  { key: 'messages', label: 'Messages', hint: 'Secure back-and-forth with your team', icon: MessageSquare, to: 'messages' },
-  { key: 'billing', label: 'Billing', hint: 'Invoices, receipts, and payment methods', icon: Receipt, to: 'billing' },
-  { key: 'calendar', label: 'Calendar', hint: 'Appointments and site visits', icon: Calendar, to: 'calendar' },
-  { key: 'team', label: 'My Team', hint: 'Your Pinnacle advisors and vendors', icon: Users, to: 'my-team' },
-  { key: 'business-profile', label: 'Account Profile', hint: 'Your contact and organization details on file', icon: Layers, to: 'business-profile' },
-  { key: 'security', label: 'Security', hint: 'Password, sessions, trusted devices', icon: ShieldCheck, to: 'security' },
-]
-
 function greeting(hour: number): string {
   if (hour < 5) return 'Good evening'
   if (hour < 12) return 'Good morning'
@@ -73,250 +36,299 @@ function greeting(hour: number): string {
   return 'Good evening'
 }
 
-// Rotating capability notes for the discovery panel. They stay short and
-// outcome-led so service discovery feels useful rather than promotional.
-const DISCOVERY_PITCHES = [
-  { category: 'Mobile notary', title: 'A notary, where you need one.', body: 'Home, office, hospital, or another agreed location - coordinated through the same Pinnacle relationship.' },
-  { category: 'Remote signing', title: 'Close the distance.', body: 'Meet a commissioned online notary and complete eligible documents without crossing town.' },
-  { category: 'Property & field', title: 'Know what happened on site.', body: 'Request an inspection with organized photos, notes, and documented follow-through.' },
-  { category: 'Operations support', title: 'Capacity without another full-time seat.', body: 'Put scheduling, filing, follow-up, and project coordination in experienced hands.' },
-  { category: 'Documented work', title: 'Proof that stays with the request.', body: 'Keep time-stamped activity, files, field evidence, and completion records together.' },
-]
-
-// SlaClock is now shared with HQ via components/kit/SlaClock.tsx.
+function waitingOnYou(waitingOn: string) {
+  return waitingOn === 'you' || waitingOn === 'client'
+}
 
 export default function Dashboard() {
   const { user } = useAuth()
   const p = useAppPath()
-  const reduceMotion = useReducedMotion()
   const [data, setData] = useState<DashboardData | null>(null)
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
-  const [pitchIndex, setPitchIndex] = useState(0)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    api.get<DashboardData>('/portal/dashboard').then(setData).catch(() => setData(null))
-    api.get<{ services: CatalogItem[] }>('/portal/services-catalog').then((r) => setCatalog(r.services)).catch(() => {})
+    Promise.all([
+      api.get<DashboardData>('/portal/dashboard').then(setData).catch(() => setData(null)),
+      api.get<{ services: CatalogItem[] }>('/portal/services-catalog').then((r) => setCatalog(r.services)).catch(() => {}),
+    ]).finally(() => setLoaded(true))
   }, [])
 
-  useEffect(() => {
-    if (reduceMotion) return
-    const timer = window.setInterval(() => setPitchIndex((current) => (current + 1) % DISCOVERY_PITCHES.length), 8000)
-    return () => window.clearInterval(timer)
-  }, [reduceMotion])
-
   const enabledKeys = useMemo(() => new Set((data?.enabled_services ?? []).map((service) => service.service_key)), [data])
-
-  const tiles = useMemo<Tile[]>(() => {
-    return TILE_BLUEPRINT.map((blueprint) => {
-      const hasLiveModuleData = (blueprint.key === 'properties' && !!data?.properties.length)
-        || (blueprint.key === 'matters' && !!data?.stats.open_matters)
-      const state: TileState = blueprint.key === 'requests' || blueprint.key === 'documents' || blueprint.key === 'messages' || blueprint.key === 'billing' || blueprint.key === 'calendar' || blueprint.key === 'team' || blueprint.key === 'business-profile' || blueprint.key === 'security' || hasLiveModuleData
-        ? 'active'
-        : blueprint.serviceKeys?.some((key) => enabledKeys.has(key))
-          ? 'active'
-          : 'discover'
-      let badge: number | undefined
-      if (blueprint.key === 'requests') badge = data?.stats.open_tickets
-      else if (blueprint.key === 'documents') badge = data?.stats.pending_documents
-      else if (blueprint.key === 'billing') badge = data?.stats.open_invoices
-      else if (blueprint.key === 'matters') badge = data?.stats.open_matters
-      else if (blueprint.key === 'properties') badge = data?.properties.length
-      return { key: blueprint.key, label: blueprint.label, hint: blueprint.hint, icon: blueprint.icon, to: p(blueprint.to), state, badgeCount: badge && badge > 0 ? badge : undefined }
-    })
-  }, [enabledKeys, data, p])
-
   const undiscoveredServices = useMemo(() => {
     if (!catalog.length) return [] as CatalogItem[]
-    return catalog.filter((item) => !enabledKeys.has(item.key)).slice(0, 6)
+    return catalog.filter((item) => !enabledKeys.has(item.key)).slice(0, 4)
   }, [catalog, enabledKeys])
-
-  // Client navigation stays personal: modules only become primary workspace
-  // tiles when the account actually uses them. New capabilities remain easy
-  // to discover in the separate service section below.
-  const workspaceTiles = useMemo(() => tiles.filter((tile) => tile.state === 'active'), [tiles])
 
   const firstName = (user?.first_name || user?.full_name || '').split(' ')[0] || 'there'
   const hour = new Date().getHours()
-  const pitch = DISCOVERY_PITCHES[pitchIndex]
+  const stats = data?.stats
+  const cases = data?.active_cases ?? []
+  const needsYou = cases.filter((item) => waitingOnYou(item.waiting_on))
+  const nextAppointment = data?.upcoming_appointments?.[0]
+  const clientActions = (stats?.pending_documents ?? 0) + (stats?.open_invoices ?? 0) + (stats?.open_tasks ?? 0) + needsYou.length
+
+  const nextMove = useMemo(() => {
+    if (!loaded) return null
+    if (needsYou[0]) {
+      return {
+        eyebrow: 'Waiting on you',
+        title: needsYou[0].subject,
+        body: 'Pinnacle cannot move this request forward until you respond or send what was asked for.',
+        to: p('support'),
+        label: 'Open request',
+      }
+    }
+    if ((stats?.pending_documents ?? 0) > 0) {
+      return {
+        eyebrow: 'Your next step',
+        title: 'A document needs attention',
+        body: `${stats!.pending_documents} ${stats!.pending_documents === 1 ? 'file is' : 'files are'} waiting in Documents.`,
+        to: p('documents'),
+        label: 'Open documents',
+      }
+    }
+    if ((stats?.open_invoices ?? 0) > 0) {
+      return {
+        eyebrow: 'Billing',
+        title: 'You have an open invoice',
+        body: 'Review the amount, due date, and payment methods listed by your Pinnacle team.',
+        to: p('billing'),
+        label: 'Review billing',
+      }
+    }
+    if (nextAppointment) {
+      return {
+        eyebrow: 'Coming up',
+        title: nextAppointment.title,
+        body: new Date(nextAppointment.starts_at).toLocaleString(),
+        to: p('calendar'),
+        label: 'View calendar',
+      }
+    }
+    if ((stats?.open_tickets ?? 0) > 0) {
+      return {
+        eyebrow: 'In motion',
+        title: 'Pinnacle is working with you',
+        body: 'Follow status, add context, or send a message from Requests.',
+        to: p('support'),
+        label: 'View requests',
+      }
+    }
+    return {
+      eyebrow: 'Ready when you are',
+      title: 'Nothing needs you right now',
+      body: 'Start a request when something comes up. Your files, messages, and team stay in one place.',
+      to: p('support'),
+      label: 'Start a request',
+    }
+  }, [loaded, needsYou, stats, nextAppointment, p])
+
+  const shortcuts = [
+    { label: 'Documents', to: p('documents'), icon: FileText, note: stats?.pending_documents },
+    { label: 'Messages', to: p('messages'), icon: MessageSquare },
+    { label: 'Billing', to: p('billing'), icon: Receipt, note: stats?.open_invoices },
+    { label: 'Calendar', to: p('calendar'), icon: Calendar },
+    { label: 'My Team', to: p('my-team'), icon: Users },
+    { label: 'Account', to: p('business-profile'), icon: ShieldCheck },
+  ]
 
   return (
-    <motion.div className="pb-16" initial="hidden" animate="show" variants={pmvStagger}>
-      {/* Personalized greeting */}
-      <motion.header variants={pmvFadeUp} className="mb-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[.22em] text-gold/75">Command Center</p>
+    <motion.div className="pb-8 lg:pb-4" initial="hidden" animate="show" variants={pmvStagger}>
+      <GetStartedPrompt className="mb-6" />
+
+      <motion.header variants={pmvFadeUp} className="border-b border-white/10 pb-7">
+        <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-gold/75">
+          {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+        </p>
         <h1 className="mt-2 font-display text-3xl font-medium tracking-[-.02em] text-white sm:text-4xl">
           {greeting(hour)}, {firstName}.
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-          Your active work, files, appointments, and Pinnacle contacts are organized here. Open what you need, or bring another request into the same relationship.
+          See what is moving, what Pinnacle owns, and where you are needed — then jump straight into that work.
         </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link to={p('support')} className="btn-gold">Start a request</Link>
+          <Link to={p('messages')} className="btn-outline">Message your team</Link>
+        </div>
       </motion.header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-        {/* LEFT: tile grid = the real nav */}
-        <section aria-labelledby="tiles-heading">
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div>
-              <h2 id="tiles-heading" className="text-[11px] font-semibold uppercase tracking-[.18em] text-slate-500">Your workspace</h2>
-              <p className="mt-1 text-sm text-slate-300">What is active for you</p>
-            </div>
-          </div>
-          <motion.div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" variants={pmvStagger}>
-            {workspaceTiles.map((tile) => (
-              <TileCard key={tile.key} tile={tile} />
-            ))}
-          </motion.div>
-        </section>
-
-        {/* RIGHT: service discovery + live activity */}
-        <aside className="space-y-6">
-          <div className="relative overflow-hidden rounded-2xl border border-white/[.08] bg-gradient-to-b from-white/[.045] to-white/[.01] p-6">
-            <motion.div className="pointer-events-none absolute -right-7 -top-9 opacity-[.13]" animate={reduceMotion?undefined:{y:[0,-5,0],rotate:[-.5,.5,-.5]}} transition={{duration:10,repeat:Infinity,ease:'easeInOut'}}><WhiteGoldBrandMark size={190} decorative /></motion.div>
-            <div className="relative">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-gold/25 bg-gold/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.14em] text-gold">
-                <Sparkles size={11} /> Available through Pinnacle
-              </div>
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div key={pitchIndex} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="min-h-[132px]">
-                  <p className="mt-4 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">{pitch.category}</p>
-                  <h3 className="mt-2 max-w-[250px] font-display text-xl font-medium leading-snug text-white sm:text-2xl">{pitch.title}</h3>
-                  <p className="mt-2 max-w-[310px] text-sm leading-6 text-slate-300">{pitch.body}</p>
-                </motion.div>
-              </AnimatePresence>
-              <Link
-                to={p('services')}
-                className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-navy-950 shadow-[0_10px_30px_rgba(0,0,0,.35)] transition hover:bg-white"
-              >
-                Explore Pinnacle services <ArrowRight size={14} />
+      <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+        <div className="min-w-0 space-y-8">
+          {nextMove && (
+            <motion.section variants={pmvFadeUp} className="rounded-2xl border border-gold/20 bg-gradient-to-br from-gold/[.08] via-white/[.02] to-transparent p-5 sm:p-6">
+              <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-gold/80">{nextMove.eyebrow}</p>
+              <h2 className="mt-2 font-display text-xl font-medium text-white sm:text-2xl">{nextMove.title}</h2>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">{nextMove.body}</p>
+              <Link to={nextMove.to} className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-gold hover:underline">
+                {nextMove.label} <ArrowRight size={14} />
               </Link>
-            </div>
-          </div>
-
-          {data?.active_cases?.length ? (
-            <div className="rounded-2xl border border-white/[.08] bg-white/[.02] p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Live work</p>
-                  <h3 className="mt-1 text-sm font-semibold text-white">Active requests</h3>
-                </div>
-                <Link to={p('support')} className="text-xs font-semibold text-gold hover:underline">View all →</Link>
-              </div>
-              <motion.ul layout className="divide-y divide-white/5">
-                {data.active_cases.slice(0, 3).map((item) => (
-                  <motion.li layout="position" initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} transition={pmvMotion.ui} key={item.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-white">{item.subject}</p>
-                      <p className="mt-0.5 text-[11px] text-slate-500">Waiting on {item.waiting_on === 'pinnacle' ? 'Pinnacle' : 'you'} · {item.status.replace('_', ' ')}</p>
-                    </div>
-                    <SlaClock due={item.response_due_at} complete={item.status !== 'open'} />
-                  </motion.li>
-                ))}
-              </motion.ul>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[.04] p-5">
-              <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-emerald-300/80">All clear</p>
-              <p className="mt-1 text-sm font-medium text-white">No open cases right now.</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Something come up? <Link to={p('support')} className="font-semibold text-gold hover:underline">Start a request →</Link></p>
-            </div>
+            </motion.section>
           )}
 
-          {data?.upcoming_appointments?.length ? (
-            <div className="rounded-2xl border border-white/[.08] bg-white/[.02] p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Next up</p>
-                <Link to={p('calendar')} className="text-xs font-semibold text-gold hover:underline">Calendar →</Link>
+          <motion.section variants={pmvFadeUp}>
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-slate-500">In motion</p>
+                <h2 className="mt-1 text-lg font-semibold text-white">Active requests</h2>
               </div>
-              <ul className="space-y-2">
-                {data.upcoming_appointments.slice(0, 2).map((appointment) => (
-                  <li key={appointment.id} className="text-sm">
-                    <p className="font-medium text-white">{appointment.title}</p>
+              <Link to={p('support')} className="text-xs font-semibold text-gold hover:underline">View all</Link>
+            </div>
+            {!loaded ? (
+              <div className="h-28 animate-pulse rounded-xl border border-white/[.06] bg-white/[.02]" />
+            ) : cases.length === 0 ? (
+              <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] px-5 py-4">
+                <p className="text-sm font-medium text-white">No open requests right now.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">Something come up? <Link to={p('support')} className="font-semibold text-gold hover:underline">Start a request</Link></p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-white/[.08] border-y border-white/[.08]">
+                {cases.slice(0, 4).map((item) => {
+                  const yours = waitingOnYou(item.waiting_on)
+                  return (
+                    <li key={item.id}>
+                      <Link to={p('support')} className="grid gap-2 py-4 sm:grid-cols-[1fr_150px_auto] sm:items-center">
+                        <span>
+                          <strong className="block text-sm font-semibold text-white">{item.subject}</strong>
+                          <span className="mt-0.5 block text-xs text-slate-500">
+                            {item.status.replace('_', ' ')} · waiting on {yours ? 'you' : 'Pinnacle'}
+                          </span>
+                        </span>
+                        <span className={`text-xs ${yours ? 'font-semibold text-gold' : 'text-slate-400'}`}>
+                          {yours ? 'Action needed' : 'Pinnacle owns this'}
+                        </span>
+                        <SlaClock due={item.response_due_at} complete={item.status !== 'open'} />
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </motion.section>
+
+          {!!data?.properties?.length && (
+            <motion.section variants={pmvFadeUp}>
+              <div className="mb-3 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-slate-500">Properties</p>
+                  <h2 className="mt-1 text-lg font-semibold text-white">Your properties</h2>
+                </div>
+                <Link to={p('property-management')} className="text-xs font-semibold text-gold hover:underline">View all</Link>
+              </div>
+              <ul className="divide-y divide-white/[.08] border-y border-white/[.08]">
+                {data.properties.slice(0, 4).map((property) => (
+                  <li key={property.id}>
+                    <Link to={p('property-management')} className="flex items-center justify-between gap-3 py-3.5">
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2 text-sm font-medium text-white">
+                          <Building2 size={14} className="shrink-0 text-gold/80" />
+                          <span className="truncate">{property.address}</span>
+                        </span>
+                        <span className="mt-0.5 block pl-6 text-xs text-slate-500">{property.property_type || 'Property'} · {property.status.replace('_', ' ')}</span>
+                      </span>
+                      <ArrowRight size={14} className="shrink-0 text-slate-600" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </motion.section>
+          )}
+        </div>
+
+        <aside className="space-y-6">
+          <motion.section variants={pmvFadeUp} className="rounded-2xl border border-white/[.08] bg-white/[.02] p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Relationship pulse</p>
+            <dl className="mt-3 divide-y divide-white/[.08] border-y border-white/[.08]">
+              {[
+                ['Open work', loaded ? `${stats?.open_tickets ?? 0} request${(stats?.open_tickets ?? 0) === 1 ? '' : 's'}` : '…'],
+                ['Needs you', loaded ? `${clientActions} item${clientActions === 1 ? '' : 's'}` : '…'],
+                ['Next visit', nextAppointment ? new Date(nextAppointment.starts_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Nothing scheduled'],
+                ['Open invoices', loaded ? String(stats?.open_invoices ?? 0) : '…'],
+              ].map(([label, value]) => (
+                <div key={label} className="flex items-center justify-between gap-4 py-3 text-sm">
+                  <dt className="text-slate-500">{label}</dt>
+                  <dd className="text-right font-medium text-slate-200">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </motion.section>
+
+          {nextAppointment ? (
+            <motion.section variants={pmvFadeUp} className="rounded-2xl border border-white/[.08] bg-white/[.02] p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Coming up</p>
+                <Link to={p('calendar')} className="text-xs font-semibold text-gold hover:underline">Calendar</Link>
+              </div>
+              <ul className="space-y-3">
+                {(data?.upcoming_appointments ?? []).slice(0, 3).map((appointment) => (
+                  <li key={appointment.id}>
+                    <p className="text-sm font-medium text-white">{appointment.title}</p>
                     <p className="mt-0.5 text-xs text-slate-400">{new Date(appointment.starts_at).toLocaleString()}</p>
                   </li>
                 ))}
               </ul>
-            </div>
+            </motion.section>
           ) : null}
+
+          {!!data?.enabled_services?.length && (
+            <motion.section variants={pmvFadeUp} className="rounded-2xl border border-white/[.08] bg-white/[.02] p-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Connected services</p>
+              <ul className="mt-3 space-y-2">
+                {data.enabled_services.slice(0, 5).map((service) => (
+                  <li key={service.service_key} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate text-slate-200">{service.name}</span>
+                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-emerald-300/80">{service.status.replace('_', ' ')}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.section>
+          )}
         </aside>
       </div>
 
-      {/* Full-width service discovery strip */}
+      <motion.section variants={pmvFadeUp} className="mt-10">
+        <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-slate-500">Jump to</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {shortcuts.map((item) => (
+            <Link
+              key={item.label}
+              to={item.to}
+              className="inline-flex items-center gap-2 rounded-full border border-white/[.08] bg-white/[.02] px-3.5 py-2 text-sm text-slate-300 transition hover:border-gold/30 hover:bg-gold/[.04] hover:text-white"
+            >
+              <item.icon size={14} className="text-gold/80" />
+              {item.label}
+              {item.note ? <span className="rounded-full bg-gold px-1.5 text-[10px] font-bold text-navy-950">{item.note}</span> : null}
+            </Link>
+          ))}
+        </div>
+      </motion.section>
+
       {undiscoveredServices.length > 0 && (
-        <section className="mt-10 border-t border-white/[.06] pt-8">
+        <motion.section variants={pmvFadeUp} className="mt-10 border-t border-white/[.06] pt-8">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-slate-500">One relationship, more ways to help</p>
-              <h2 className="mt-1 font-display text-xl font-medium text-white">Bring another need into your workspace</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-slate-500">More from Pinnacle</p>
+              <h2 className="mt-1 font-display text-xl font-medium text-white">Bring another need into this relationship</h2>
             </div>
-            <Link to={p('services')} className="text-xs font-semibold text-gold hover:underline">See everything →</Link>
+            <Link to={p('services')} className="text-xs font-semibold text-gold hover:underline">See everything</Link>
           </div>
-          <motion.div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" initial="hidden" whileInView="show" viewport={{once:true,margin:'-60px'}} variants={pmvStagger}>
+          <div className="grid gap-3 sm:grid-cols-2">
             {undiscoveredServices.map((service) => (
-              <motion.div key={service.key} variants={pmvFadeUp}>
-                <Link
-                  to={p(`services/${service.key}/apply`)}
-                  className="group relative block rounded-xl border border-white/[.06] bg-white/[.015] p-4 transition hover:-translate-y-px hover:border-gold/25 hover:bg-white/[.03]"
-                >
-                  <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-slate-500">{service.category || 'Service'}</p>
-                  <p className="mt-1.5 text-sm font-semibold text-white">{service.name}</p>
-                  <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-gold opacity-0 transition group-hover:opacity-100">
-                    Get started <ArrowRight size={11} />
-                  </p>
-                </Link>
-              </motion.div>
+              <Link
+                key={service.key}
+                to={p(`services/${service.key}/apply`)}
+                className="group flex items-center justify-between gap-3 rounded-xl border border-white/[.06] bg-white/[.015] px-4 py-3.5 transition hover:border-gold/25 hover:bg-white/[.03]"
+              >
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-semibold uppercase tracking-[.14em] text-slate-500">{service.category || 'Service'}</span>
+                  <span className="mt-1 block truncate text-sm font-semibold text-white">{service.name}</span>
+                </span>
+                <ArrowRight size={14} className="shrink-0 text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-gold" />
+              </Link>
             ))}
-          </motion.div>
-        </section>
+          </div>
+        </motion.section>
       )}
-    </motion.div>
-  )
-}
-
-// ---- Tile card ---------------------------------------------------------------
-
-function TileCard({ tile }: { tile: Tile }) {
-  const isActive = tile.state === 'active'
-  const isDiscover = tile.state === 'discover'
-
-  const stateBadge = isActive
-    ? { label: 'Active', className: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/25' }
-    : isDiscover
-      ? { label: 'Explore', className: 'bg-white/5 text-slate-300 border-white/10' }
-      : { label: 'Coming soon', className: 'bg-white/5 text-slate-500 border-white/10' }
-
-  return (
-    <motion.div layout="position" variants={pmvFadeUp}>
-      <Link
-        to={tile.to}
-        className="group relative block overflow-hidden rounded-xl border border-white/[.06] bg-gradient-to-b from-white/[.03] to-white/[.008] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-gold/25 hover:from-white/[.05] hover:shadow-[0_16px_36px_rgba(0,0,0,.18)]"
-      >
-      {/* Top gold accent that fades in on hover */}
-      <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-gold/0 to-transparent transition group-hover:via-gold/50" />
-
-      <div className="flex items-start justify-between gap-3">
-        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${isActive ? 'bg-gold/10 text-gold' : 'bg-white/[.04] text-slate-500'} transition group-hover:text-gold group-hover:bg-gold/15`}>
-          <tile.icon size={20} strokeWidth={1.75} />
-        </span>
-        <div className="flex items-center gap-2">
-          {tile.badgeCount ? (
-            <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gold px-1.5 text-[10px] font-bold text-navy-950">
-              {tile.badgeCount > 99 ? '99+' : tile.badgeCount}
-            </span>
-          ) : null}
-          {isActive && <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.7)]" aria-hidden />}
-        </div>
-      </div>
-
-      <p className="mt-4 text-[15px] font-semibold text-white">{tile.label}</p>
-      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{tile.hint}</p>
-
-      <div className="mt-4 flex items-center justify-between">
-        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${stateBadge.className}`}>
-          {stateBadge.label}
-        </span>
-        <ArrowRight size={13} className="text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-gold" />
-      </div>
-      </Link>
     </motion.div>
   )
 }

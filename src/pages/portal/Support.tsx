@@ -90,6 +90,11 @@ export default function Support() {
     await load()
   }
 
+  const ordered = [...tickets].sort((a, b) => {
+    const score = (t: Ticket) => (t.status !== 'closed' && (t.waiting_on === 'you' || t.waiting_on === 'client') ? 0 : t.status === 'closed' ? 2 : 1)
+    return score(a) - score(b)
+  })
+
   return (
     <div>
       <PageHeader
@@ -149,15 +154,18 @@ export default function Support() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {tickets.map((t) => (
-            <Card key={t.id} className="!p-0">
+          {ordered.map((t) => {
+            const yours = t.status !== 'closed' && (t.waiting_on === 'you' || t.waiting_on === 'client')
+            return (
+            <Card key={t.id} className={`!p-0 ${yours ? 'border-gold/30' : ''}`}>
               <button onClick={() => openThread(t.id)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
                 <div>
+                  {yours && <p className="mb-1 text-[10px] font-semibold uppercase tracking-[.14em] text-gold">Action needed</p>}
                   <p className="text-sm font-medium text-white">{t.subject}</p>
                   <p className="mt-1 text-xs text-slate-500">Case {t.id.slice(0, 8).toUpperCase()} · {t.category?.replace('_', ' ') || 'General'} · {new Date(t.created_at).toLocaleString()}</p>
-                  <p className="mt-1 text-[11px] text-slate-400">{t.status === 'open' && t.response_due_at ? `Response due ${new Date(t.response_due_at).toLocaleString()}` : t.status === 'closed' ? 'Completed' : `In progress · waiting on ${t.waiting_on === 'pinnacle' ? 'Pinnacle' : t.waiting_on || 'Pinnacle'}`}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">{t.status === 'open' && t.response_due_at ? `Response due ${new Date(t.response_due_at).toLocaleString()}` : t.status === 'closed' ? 'Completed' : `In progress · waiting on ${yours ? 'you' : 'Pinnacle'}`}</p>
                 </div>
-                <StatusBadge tone={t.status === 'closed' ? 'green' : t.status === 'in_progress' ? 'blue' : 'gold'}>{t.status}</StatusBadge>
+                <StatusBadge tone={t.status === 'closed' ? 'green' : yours ? 'gold' : t.status === 'in_progress' ? 'blue' : 'gold'}>{yours ? 'waiting on you' : t.status}</StatusBadge>
               </button>
               {openId === t.id && (
                 <div className="border-t border-white/10 p-5">
@@ -196,7 +204,7 @@ export default function Support() {
                 </div>
               )}
             </Card>
-          ))}
+          )})}
         </div>
       )}
     </div>

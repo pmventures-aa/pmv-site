@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-import { Panel, EmptyState, StatCard } from '../../components/admin/ui'
+import { Panel, EmptyState, StatCard, SkeletonStatCard } from '../../components/admin/ui'
 import { DashboardWelcome } from '../../components/DashboardWelcome'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
@@ -55,12 +55,14 @@ export default function AdminDashboard(){
         <div className="hidden gap-3 text-xs text-slate-500 sm:flex"><Link to={p('clients')} className="hover:text-gold">Clients</Link><Link to={p('pipelines')} className="hover:text-gold">Pipeline</Link><Link to={p('reports')} className="hover:text-gold">Reports</Link></div>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <StatLink label="Clients" value={stats?.clients??'Not provided'} to={p('clients')}/>
-        <StatLink label="Open Tickets" value={stats?.open_tickets??'Not provided'} to={p('open-items/tickets')}/>
-        <StatLink label="Open Matters" value={stats?.open_matters??'Not provided'} to={p('open-items/matters')}/>
-        <StatLink label="Pending Tasks" value={stats?.pending_tasks??'Not provided'} to={p('open-items/tasks')}/>
-        <StatLink label="Calls Pending" value={stats?.pending_calls??'Not provided'} to={p('open-items/calls')}/>
-        <StatLink label="Open Invoices" value={stats?.open_invoices??'Not provided'} to={p('invoices')}/>
+        {!data ? Array.from({length:6}).map((_,i)=><SkeletonStatCard key={i}/>) : <>
+          <StatLink label="Clients" value={stats?.clients??0} to={p('clients')}/>
+          <StatLink label="Open Tickets" value={stats?.open_tickets??0} to={p('open-items/tickets')}/>
+          <StatLink label="Open Matters" value={stats?.open_matters??0} to={p('open-items/matters')}/>
+          <StatLink label="Pending Tasks" value={stats?.pending_tasks??0} to={p('open-items/tasks')}/>
+          <StatLink label="Calls Pending" value={stats?.pending_calls??0} to={p('open-items/calls')}/>
+          <StatLink label="Open Invoices" value={stats?.open_invoices??0} to={p('invoices')}/>
+        </>}
       </div>
     </section>
 
