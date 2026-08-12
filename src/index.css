@@ -53,34 +53,42 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 .pmv-crest-adaptive { filter:contrast(1.03) drop-shadow(0 8px 18px rgba(0,0,0,.22)); }
 .pmv-crest-light { filter:contrast(1.03) drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
 .pmv-crest-outline { display:none; }
-/* Cream tile - wraps the real navy+gold crest so it reads cleanly on
-   any dark surface (HQ sidebar, portal chrome, public hero). Sized as a
-   padded card with a soft gold-tinted shadow; the crest keeps its
-   proper colors. */
-.pmv-crest-tile {
-  display:grid; place-items:center; padding:6px;
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:12px;
-  background:linear-gradient(180deg,#f5efe0 0%,#eae1c8 100%);
-  box-shadow:0 2px 12px rgba(0,0,0,.32), inset 0 0 0 1px rgba(0,0,0,.05);
+
+/* Gold silhouette of the ORIGINAL crest artwork, produced by using the
+   PNG's alpha channel as a CSS mask and painting gold behind it. No
+   asset generation, no invert filter, no pixelation - the mask keeps
+   the exact shape of your logo and just recolors every visible pixel
+   to a solid gold tone that reads clean on any dark surface. */
+.pmv-crest-gold {
+  display:inline-block;
+  background:linear-gradient(180deg,#e6c56a 0%,#c9a227 55%,#a68116 100%);
+  -webkit-mask:url('/logo-crest-transparent.png') center / contain no-repeat;
+          mask:url('/logo-crest-transparent.png') center / contain no-repeat;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.35));
 }
-/* Auto: tile only appears on dark themes; on light theme the crest sits bare */
-.pmv-crest-switch-auto { display:grid; place-items:center; padding:0; }
-:root:not([data-theme='light']) .pmv-crest-switch-auto {
-  padding:6px;
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:12px;
-  background:linear-gradient(180deg,#f5efe0 0%,#eae1c8 100%);
-  box-shadow:0 2px 12px rgba(0,0,0,.32);
+
+/* Auto tone: gold silhouette on dark themes, original artwork on light. */
+.pmv-crest-switch-auto {
+  display:inline-block;
+  background-image:linear-gradient(180deg,#e6c56a 0%,#c9a227 55%,#a68116 100%);
+  -webkit-mask:url('/logo-crest-transparent.png') center / contain no-repeat;
+          mask:url('/logo-crest-transparent.png') center / contain no-repeat;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.35));
 }
-:root[data-theme='dark'] .pmv-crest-switch-auto {
-  padding:6px;
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:12px;
-  background:linear-gradient(180deg,#f5efe0 0%,#eae1c8 100%);
-  box-shadow:0 2px 12px rgba(0,0,0,.32);
+:root[data-theme='light'] .pmv-crest-switch-auto {
+  background-image:none;
+  -webkit-mask:none;
+          mask:none;
+  filter:none;
 }
+:root[data-theme='light'] .pmv-crest-switch-auto::after {
+  content:'';
+  display:block; width:100%; height:100%;
+  background:url('/logo-crest-transparent.png') center / contain no-repeat;
+}
+
 .pmv-crest-dark-surface { filter:none; }
+.pmv-crest-tile { display:contents; } /* legacy class - no-op now */
 .pmv-crest-switch { vertical-align:middle; }
 .pmv-crest-for-light { display:none; }
 :root[data-theme='light'] .pmv-crest-switch-auto .pmv-crest-for-dark { display:none; }
