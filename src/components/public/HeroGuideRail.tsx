@@ -27,63 +27,52 @@ export function HeroGuideRail() {
   }, [reduce, paused, index])
 
   const guide = guides[index]
-  const next = guides[(index + 1) % guides.length]
 
   return (
-    <div className="relative">
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <Crest size={72} tone="light" decorative />
-        <p className="max-w-[12rem] text-right text-[11px] leading-5 text-slate-500">Live project guides. Hover to hold a topic.</p>
+    <div className="relative flex min-h-[440px] items-end pt-16 sm:pt-20">
+      <div className="pointer-events-none absolute -top-6 right-0 opacity-40 sm:-top-10 sm:right-2" aria-hidden="true">
+        <Crest size={160} tone="light" decorative />
       </div>
-
       <div
-        className="relative overflow-hidden rounded-xl border border-white/10 bg-navy-950/80"
+        className="relative z-10 w-full overflow-hidden rounded-2xl border border-white/10 bg-navy-950/70 p-6 backdrop-blur-xl sm:p-7"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         onFocus={() => setPaused(true)}
         onBlur={() => setPaused(false)}
       >
-        <div key={guide.to} className="h-[2px] overflow-hidden bg-white/[.06]">
+        <div key={guide.to} className="absolute inset-x-0 top-0 h-[2px] overflow-hidden bg-white/[.06]">
           <div className={`pmv-guide-progress h-full bg-gold ${paused || reduce ? 'is-paused' : ''}`} />
         </div>
-
-        <div className="p-6 sm:p-7">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-gold">
-              Project guide {String(index + 1).padStart(2, '0')} of {String(guides.length).padStart(2, '0')}
-            </p>
-            <div className="flex gap-1.5">
-              {guides.map((item, i) => (
-                <button
-                  key={item.to}
-                  type="button"
-                  aria-label={`Show ${item.eyebrow}`}
-                  onClick={() => setIndex(i)}
-                  className={`h-1.5 rounded-full transition-all ${i === index ? 'w-6 bg-gold' : 'w-1.5 bg-white/20 hover:bg-white/40'}`}
-                />
-              ))}
-            </div>
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">Project guide {String(index + 1).padStart(2, '0')}</p>
+          <div className="flex gap-1.5">
+            {guides.map((item, i) => (
+              <button
+                key={item.to}
+                type="button"
+                aria-label={`Show project guide ${i + 1}`}
+                onClick={() => setIndex(i)}
+                className={`h-1.5 rounded-full transition-all ${i === index ? 'w-7 bg-gold' : 'w-1.5 bg-white/20'}`}
+              />
+            ))}
           </div>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={guide.to}
-              initial={reduce ? undefined : { opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={reduce ? undefined : { opacity: 0, y: -10 }}
-              transition={pmvMotion.gentle}
-            >
-              <p className="mt-6 text-xs font-semibold uppercase tracking-[.12em] text-slate-500">{guide.eyebrow}</p>
-              <h2 className="mt-3 font-display text-2xl font-semibold leading-tight tracking-[-.02em] text-white sm:text-3xl">{guide.title}</h2>
-              <Link to={guide.to} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-gold hover:text-gold-300">
-                Open this guide <span aria-hidden="true">→</span>
-              </Link>
-            </motion.div>
-          </AnimatePresence>
         </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={guide.to}
+            initial={reduce ? undefined : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduce ? undefined : { opacity: 0, y: -8 }}
+            transition={pmvMotion.gentle}
+          >
+            <p className="mt-7 text-xs font-bold uppercase tracking-[.13em] text-slate-500">{guide.eyebrow}</p>
+            <h2 className="mt-3 font-display text-3xl font-bold leading-tight tracking-[-.03em] text-white">{guide.title}</h2>
+            <Link to={guide.to} className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-gold">
+              Open this guide <span>→</span>
+            </Link>
+          </motion.div>
+        </AnimatePresence>
       </div>
-
-      <p className="mt-3 text-[11px] text-slate-600">Up next: {next.eyebrow}</p>
     </div>
   )
 }
