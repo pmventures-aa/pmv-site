@@ -6,6 +6,7 @@ import { PageIntro, Panel, Tag, btnSecondary, btnPrimary, inputCls } from '../..
 import { toast } from '../../components/kit/toast'
 import { useAppPath } from '../../lib/basePath'
 import { ConversationsPanel } from './ConversationsPanel'
+import { EmailThreadsPanel } from './EmailThreadsPanel'
 
 type Overview = {
   unread_threads: number
@@ -37,11 +38,12 @@ type ReportingResponse = {
   aging_threads: Array<{ id: string; subject: string; client_name: string; client_email: string; last_message_at: string }>
 }
 
-type Tab = 'overview' | 'threads' | 'notifications' | 'reporting'
+type Tab = 'overview' | 'threads' | 'email' | 'notifications' | 'reporting'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'threads', label: 'Threads' },
+  { id: 'threads', label: 'DM Threads' },
+  { id: 'email', label: 'Email' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'reporting', label: 'Reporting' },
 ]
@@ -92,6 +94,7 @@ export default function CommunicationsHub() {
 
       {tab === 'overview' && <OverviewTab overview={overview} loading={loading}/>}
       {tab === 'threads' && <ConversationsPanel/>}
+      {tab === 'email' && <EmailThreadsPanel/>}
       {tab === 'notifications' && <NotificationsTab/>}
       {tab === 'reporting' && <ReportingTab/>}
     </div>

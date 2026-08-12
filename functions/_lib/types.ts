@@ -28,6 +28,13 @@ export interface SessionUser {
   full_name: string | null
   first_name?: string | null
   last_name?: string | null
+  // Impersonation context: when set, the caller is actually the owner
+  // acting AS this user via an active impersonation session. All auth
+  // checks below still treat user.id as the effective user, but audit
+  // paths write the owner id (impersonated_by_user_id) so nothing done
+  // during impersonation looks like the target user did it themselves.
+  impersonated_by_user_id?: string | null
+  impersonation_session_id?: string | null
 }
 
 export interface Vars {

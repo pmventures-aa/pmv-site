@@ -11,21 +11,31 @@ export interface EmailTag {
 }
 
 export interface SendEmailOptions {
-  to: string
+  to: string | string[]
+  cc?: string | string[]
+  bcc?: string | string[]
+  from?: string
   subject: string
   html: string
   text?: string
   replyTo?: string
   idempotencyKey?: string
   tags?: EmailTag[]
+  // Extra RFC-822 headers to attach on outbound. Used by the email-thread
+  // path to inject Message-ID / In-Reply-To / References so provider
+  // replies can be threaded back to our email_messages rows.
+  headers?: Record<string, string>
 }
 
 export async function sendEmailStrict(env: Env, opts: SendEmailOptions): Promise<string> {
   if (!env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured')
-  const from = env.RESEND_FROM_EMAIL || 'Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>'
+  const from = opts.from || env.RESEND_FROM_EMAIL || 'Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>'
   const body: Record<string, unknown> = { from, to: opts.to, subject: opts.subject, html: opts.html }
+  if (opts.cc) body.cc = opts.cc
+  if (opts.bcc) body.bcc = opts.bcc
   if (typeof opts.text === 'string') body.text = opts.text
   if (opts.replyTo) body.reply_to = opts.replyTo
+  if (opts.headers && Object.keys(opts.headers).length) body.headers = opts.headers
   if (opts.tags?.length) body.tags = opts.tags.slice(0, 10).map((tag) => ({ name: tag.name, value: tag.value }))
   const headers: Record<string, string> = { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' }
   if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey.slice(0, 256)

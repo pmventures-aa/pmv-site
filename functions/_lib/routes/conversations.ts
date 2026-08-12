@@ -3,6 +3,7 @@ import type { AppEnv, Env, SessionUser } from '../types'
 import { requireUser } from '../mid'
 import { uuid } from '../crypto'
 import { logActivity } from '../activity'
+import { pushNotification } from '../notificationFeed'
 
 export const conversationRoutes = new Hono<AppEnv>()
 conversationRoutes.use('*', requireUser)
@@ -298,6 +299,39 @@ conversationRoutes.post('/conversations/:id/messages', async (c) => {
   ]
   for (const uid of mentionedIds) stmts.push(c.env.DB.prepare(`INSERT OR IGNORE INTO message_mentions (message_id, mentioned_user_id) VALUES (?, ?)`).bind(messageId, uid))
   await c.env.DB.batch(stmts)
+
+  // Notify @mentioned users + every other active participant (except the
+  // sender). Mentions dedupe against themselves so a burst of replies
+  // to the same person on the same conversation only pings once/60s.
+  c.executionCtx.waitUntil((async () => {
+    const participants = await c.env.DB.prepare(
+      `SELECT user_id FROM conversation_participants WHERE conversation_id = ? AND removed_at IS NULL AND user_id != ?`
+    ).bind(gate.conversation.id, user.id).all()
+    const participantIds = new Set(((participants.results as any[]) || []).map((r) => r.user_id))
+    const deepLink = `/hq/communications?tab=threads&conv=${gate.conversation.id}`
+    const senderName = user.full_name || user.email
+    // Skip mentioned-user notifications for clients/vendors on internal notes.
+    for (const uid of mentionedIds) {
+      if (isInternalNote && !participantIds.has(uid)) continue
+      await pushNotification(c.env, {
+        userId: uid, kind: 'conversation.mention',
+        subjectType: 'conversation', subjectId: gate.conversation.id,
+        title: `${senderName} mentioned you`,
+        body: `${gate.conversation.subject}: ${bodyMd.slice(0, 180)}`,
+        deepLinkPath: deepLink, actorUserId: user.id, dedupeWindowSeconds: 60,
+      })
+      participantIds.delete(uid)
+    }
+    for (const uid of participantIds) {
+      await pushNotification(c.env, {
+        userId: uid, kind: isInternalNote ? 'conversation.internal_note' : 'conversation.message',
+        subjectType: 'conversation', subjectId: gate.conversation.id,
+        title: `${senderName} in ${gate.conversation.subject}`,
+        body: bodyMd.slice(0, 200),
+        deepLinkPath: deepLink, actorUserId: user.id, dedupeWindowSeconds: 60,
+      })
+    }
+  })())
 
   return c.json({ ok: true, id: messageId }, 201)
 })

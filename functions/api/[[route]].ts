@@ -60,10 +60,22 @@ import { scopeFunnelPublicRoutes, scopeFunnelAdminRoutes } from '../_lib/routes/
 import { carePlanPublicRoutes } from '../_lib/routes/carePlans'
 import { communicationsHubRoutes } from '../_lib/routes/communicationsHub'
 import { conversationRoutes } from '../_lib/routes/conversations'
+import { emailThreadRoutes } from '../_lib/routes/emailThreads'
+import { notificationFeedRoutes } from '../_lib/routes/notificationFeed'
+import { clientBannerAdminRoutes, clientBannerSelfRoutes } from '../_lib/routes/clientBanners'
+import { impersonationRoutes } from '../_lib/routes/impersonation'
+import { denyDuringImpersonation, impersonationGuard } from '../_lib/impersonationGuard'
 import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib/routes/managedTemplates'
 import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
 
 const app = new Hono<AppEnv>().basePath('/api')
+
+// Impersonation audit + destructive-action guard. Both wrap the whole
+// app: guard 403s a denylisted path before the handler runs;
+// impersonationGuard runs after and logs the request into
+// impersonation_events (no-op for non-impersonation traffic).
+app.use('*', denyDuringImpersonation)
+app.use('*', impersonationGuard)
 
 app.route('/auth', authRoutes)
 app.route('/', publicRoutes)
@@ -103,6 +115,12 @@ app.route('/admin', relationshipAutomationAdminRoutes)
 app.route('/admin', communicationsHubRoutes)
 app.route('/admin', conversationRoutes)
 app.route('/portal', conversationRoutes)
+app.route('/admin', emailThreadRoutes)
+app.route('/admin', notificationFeedRoutes)
+app.route('/portal', notificationFeedRoutes)
+app.route('/admin', clientBannerAdminRoutes)
+app.route('/portal', clientBannerSelfRoutes)
+app.route('/admin', impersonationRoutes)
 app.route('/admin', securitySessionRoutes)
 app.route('/admin', serviceOfferingAdminRoutes)
 app.route('/admin', intakeCatalogAdminRoutes)

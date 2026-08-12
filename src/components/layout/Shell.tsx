@@ -7,6 +7,9 @@ import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import { Avatar } from '../kit/Avatar'
 import { MailBell } from '../kit/MailBell'
+import { NotificationFeedPanel } from '../kit/NotificationFeedPanel'
+import { LoginBanner } from '../kit/LoginBanner'
+import { ImpersonationBanner } from '../kit/ImpersonationBanner'
 import type { NavItem } from './nav'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { AdminPageBoundary } from '../admin/AdminPageBoundary'
@@ -74,13 +77,15 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
 
   return (
     <div className="min-h-screen bg-navy-radial lg:flex">
+      <ImpersonationBanner />
+      <LoginBanner />
       <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/[.07] bg-navy-950/75 backdrop-blur-xl transition-[width,padding] duration-200 lg:flex ${sidebarOpen ? 'w-64 border-r p-4' : 'w-0 p-0'}`}>
         <div className="flex h-full w-64 min-h-0 shrink-0 flex-col">{sidebarContent}</div>
       </aside>
 
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[.07] bg-navy-950/90 px-4 py-3 backdrop-blur-xl lg:hidden">
         <Logo compact />
-        <div className="flex items-center gap-2"><MailBell /><button onClick={() => setMobileOpen(true)} className="grid h-9 w-9 place-items-center rounded-lg border border-white/[.08] text-white" aria-label="Open menu"><Menu size={18} /></button></div>
+        <div className="flex items-center gap-2"><NotificationFeedPanel surface="portal"/><MailBell /><button onClick={() => setMobileOpen(true)} className="grid h-9 w-9 place-items-center rounded-lg border border-white/[.08] text-white" aria-label="Open menu"><Menu size={18} /></button></div>
       </header>
 
       <AnimatePresence initial={false}>
@@ -98,7 +103,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <div className="hidden h-14 items-center justify-between gap-4 border-b border-white/[.07] bg-navy-950/45 px-6 backdrop-blur lg:flex">
           <button onClick={toggleSidebar} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/[.04] hover:text-white" aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>{sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}</button>
-          <div className="flex items-center gap-3"><MailBell /><span className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">{badge}</span></div>
+          <div className="flex items-center gap-3"><NotificationFeedPanel surface="portal"/><MailBell /><span className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">{badge}</span></div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
           <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>

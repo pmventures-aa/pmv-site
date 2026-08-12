@@ -7,6 +7,8 @@ import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import type { NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
+import { NotificationFeedPanel } from '../kit/NotificationFeedPanel'
+import { ImpersonationBanner } from '../kit/ImpersonationBanner'
 import { GlobalSearch } from './GlobalSearch'
 import { MailBell } from '../kit/MailBell'
 import { EmailCenterBell } from '../kit/EmailCenterBell'
@@ -122,6 +124,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
 
   return (
     <div className="min-h-screen bg-navy-950 lg:flex">
+      <ImpersonationBanner />
       <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/10 bg-navy-900/95 backdrop-blur transition-[width,padding] duration-200 lg:flex print:hidden ${sidebarOpen ? 'w-64 border-r p-4' : 'w-0 p-0'}`}>
         <div className="flex h-full w-64 min-h-0 shrink-0 flex-col">{sidebarContent}</div>
       </aside>
@@ -139,6 +142,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <span className="hidden sm:inline-flex"><EmailCenterBell /></span>
             <MailBell />
             <NotificationBell />
+            <NotificationFeedPanel surface="admin" />
             <button onClick={() => setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-white/[.04] text-white transition hover:bg-white/[.08]" aria-label="Open navigation"><Menu size={20} /></button>
           </div>
         </div>
@@ -170,6 +174,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <EmailCenterBell />
             <MailBell />
             <NotificationBell />
+            <NotificationFeedPanel surface="admin" />
           </div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
