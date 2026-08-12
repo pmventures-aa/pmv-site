@@ -77,7 +77,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   const sidebarContent = (
     <>
       <div className="shrink-0 px-1 pb-5">
-        <Logo />
+        <Logo compact />
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
@@ -128,7 +128,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
 
       <header className="sticky top-0 z-30 border-b border-white/10 bg-navy-900/95 backdrop-blur lg:hidden print:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3">
-          <Logo />
+          <Logo compact />
           <div className="flex items-center gap-1.5">
             <SlaAlertChip />
             <span className="hidden lg:inline-flex"><MailWorkspaceLauncher /></span>

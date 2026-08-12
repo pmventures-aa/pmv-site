@@ -43,7 +43,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const sidebarContent = (
     <>
       <div className="shrink-0 px-1 pb-5">
-        <Logo />
+        <Logo compact />
         <div className="mt-3 flex items-center gap-2 px-2">
           <span className="rounded-full border border-gold/20 bg-gold/[.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.12em] text-gold/80">Secure</span>
           <span className="text-[11px] font-medium uppercase tracking-[.12em] text-slate-600">{badge}</span>
@@ -79,7 +79,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
       </aside>
 
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[.07] bg-navy-950/90 px-4 py-3 backdrop-blur-xl lg:hidden">
-        <Logo />
+        <Logo compact />
         <div className="flex items-center gap-2"><MailBell /><button onClick={() => setMobileOpen(true)} className="grid h-9 w-9 place-items-center rounded-lg border border-white/[.08] text-white" aria-label="Open menu"><Menu size={18} /></button></div>
       </header>
 

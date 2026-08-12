@@ -43,7 +43,20 @@ export function WhiteGoldBrandMark({ size = 120, className = '', decorative = fa
   return <CrestArtwork size={size} tone="light" decorative={decorative} className={`pmv-white-gold-mark ${className}`}/>
 }
 
-export function Logo({ className = '', showText = true, markSize = 54, tone = 'auto' }: { className?: string; showText?: boolean; markSize?: number; tone?:CrestTone }) {
+export function Logo({ className = '', showText = true, markSize = 54, tone = 'auto', compact = false }: { className?: string; showText?: boolean; markSize?: number; tone?:CrestTone; compact?: boolean }) {
+  // Compact mode drops the crest entirely and renders a clean typographic
+  // mark with a gold accent bar. The full crest has too much detail to read
+  // at 48-54px in a sidebar corner - a wordmark scales cleanly at any size
+  // and stops fighting the dark background.
+  if (compact) return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <span aria-hidden="true" className="block h-8 w-1 rounded-full bg-gradient-to-b from-gold via-gold-300 to-gold/40 shadow-[0_0_10px_rgba(201,162,39,.55)]"/>
+      <div className="leading-tight">
+        <div className="font-display text-[15px] font-extrabold tracking-[.04em] text-white">PINNACLE</div>
+        <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.24em] text-gold-400">Management Ventures</div>
+      </div>
+    </div>
+  )
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <CrestArtwork size={markSize} tone={tone} decorative />
