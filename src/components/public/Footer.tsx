@@ -18,6 +18,7 @@ export function Footer() {
               <li><Link to="/services/property-field" className="hover:text-gold">Property Care &amp; Field</Link></li>
               <li><Link to="/services/mobile-documents" className="hover:text-gold">Documents &amp; Mobile</Link></li>
               <li><Link to="/services/business-operations" className="hover:text-gold">Business &amp; Operations</Link></li>
+              <li><Link to="/care-plans" className="hover:text-gold">Care Plans (Monthly)</Link></li>
               <li><Link to="/services" className="hover:text-gold">All Services</Link></li>
             </ul>
           </div>

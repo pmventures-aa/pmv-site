@@ -57,6 +57,7 @@ import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_l
 import { documentWorkspaceExtraRoutes } from '../_lib/routes/documentWorkspaceExtras'
 import { securitySessionRoutes } from '../_lib/routes/securitySessions'
 import { scopeFunnelPublicRoutes, scopeFunnelAdminRoutes } from '../_lib/routes/scopeFunnel'
+import { carePlanPublicRoutes } from '../_lib/routes/carePlans'
 import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib/routes/managedTemplates'
 import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
 
@@ -80,6 +81,7 @@ app.route('/', documentPlatformV2PublicRoutes)
 app.route('/', documentLifecyclePublicRoutes)
 app.route('/', internalDocumentPublicRoutes)
 app.route('/', scopeFunnelPublicRoutes)
+app.route('/', carePlanPublicRoutes)
 app.route('/', managedTemplatePublicRoutes)
 
 app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
