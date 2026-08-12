@@ -126,8 +126,59 @@ export async function getUser(env: Env, request: Request): Promise<SessionUser |
     first_name: live.first_name ?? null,
     last_name: live.last_name ?? null,
   }
+
+  // Impersonation swap: if this cookie has an active impersonation record
+  // in KV, load the target user and return that user with the owner's
+  // id preserved in impersonated_by_user_id. Auth in every route stays
+  // written against `user.id` which is now the target's id.
+  const impersonationId = await env.SESSIONS.get(`impersonate:${token}`)
+  if (impersonationId) {
+    const imp = await env.DB.prepare(
+      `SELECT id, owner_user_id, target_user_id, expires_at, ended_at
+       FROM impersonation_sessions WHERE id = ?`
+    ).bind(impersonationId).first<any>()
+    if (imp && !imp.ended_at && new Date(imp.expires_at).getTime() > Date.now() && imp.owner_user_id === user.id) {
+      const target = await env.DB.prepare(
+        `SELECT id,email,role,full_name,first_name,last_name,status FROM users WHERE id=?`
+      ).bind(imp.target_user_id).first<any>()
+      if (target && target.status === 'active') {
+        const impersonatedUser: SessionUser = {
+          id: target.id,
+          email: target.email,
+          role: target.role,
+          full_name: target.full_name ?? null,
+          first_name: target.first_name ?? null,
+          last_name: target.last_name ?? null,
+          impersonated_by_user_id: user.id,
+          impersonation_session_id: imp.id,
+        }
+        // Presence + session heartbeat remains on the OWNER so their
+        // real activity graph stays intact; audit log below.
+        await touchSession(env, token, user.id, request)
+        return impersonatedUser
+      }
+    }
+    // Expired / target invalid / stale KV row - clean it up.
+    await env.SESSIONS.delete(`impersonate:${token}`)
+  }
+
   await Promise.all([touchLastSeen(env, user.id), touchSession(env, token, user.id, request)])
   return user
+}
+
+// Public helper for impersonation routes - fetches the owner's cached
+// SessionUser directly from KV without applying the impersonation swap.
+// Used by /admin/impersonate/end so the caller can still be recognized
+// as the owner even while their cookie has active impersonation on it.
+export async function getRawOwnerFromCookie(env: Env, request: Request): Promise<{ token: string; owner: SessionUser } | null> {
+  const token = cookieToken(request)
+  if (!token) return null
+  const raw = await env.SESSIONS.get(`sess:${token}`)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as SessionUser
+    return { token, owner: parsed }
+  } catch { return null }
 }
 
 async function touchLastSeen(env: Env, userId: string): Promise<void> {

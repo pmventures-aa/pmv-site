@@ -5,6 +5,8 @@ import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, Tag, EmptyState, NoAccess, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { services } from '../../data/services'
 import { toast } from '../../components/kit/toast'
+import { ImpersonateButton } from '../../components/kit/ImpersonateButton'
+import { useAuth } from '../../lib/auth'
 
 const ROLE_OPTIONS = ['all', 'client', 'staff', 'admin']
 const STATUS_OPTIONS = ['all', 'active', 'suspended']
@@ -68,6 +70,7 @@ function emailTone(status: string | null): 'green' | 'red' | 'gold' | 'slate' {
 }
 
 export default function UsersAdmin() {
+  const { user: me } = useAuth()
   const [searchParams] = useSearchParams()
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -218,7 +221,7 @@ export default function UsersAdmin() {
 
       <Panel className="overflow-x-auto !p-0">
         {loading ? <div className="p-6 text-sm text-slate-400">Loading…</div> : filtered.length === 0 ? <div className="p-6"><EmptyState label={users.length === 0 ? 'No users yet.' : 'No users match your search.'} /></div> : (
-          <table className="w-full min-w-[820px] text-sm"><thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500"><th className="px-5 py-3 font-medium">Name</th><th className="px-5 py-3 font-medium">Role</th><th className="px-5 py-3 font-medium">Status</th><th className="px-5 py-3 font-medium">Account email</th><th className="px-5 py-3 font-medium">Actions</th></tr></thead><tbody>{filtered.map((u) => <tr key={u.id} className="border-b border-white/5 last:border-0"><td className="px-5 py-3"><p className="font-medium text-white">{u.full_name || u.email}</p><p className="text-xs text-slate-500">{u.email}</p></td><td className="px-5 py-3 text-slate-200">{u.role}</td><td className="px-5 py-3"><Tag tone={u.status === 'active' ? 'green' : 'red'}>{u.status}</Tag></td><td className="px-5 py-3">{u.welcome_email_status ? <div><Tag tone={emailTone(u.welcome_email_status)}>{u.welcome_email_status.replace(/_/g, ' ')}</Tag>{u.welcome_email_last_event_at && <p className="mt-1 text-[11px] text-slate-500">Last update {new Date(`${u.welcome_email_last_event_at.replace(' ', 'T')}Z`).toLocaleString()}</p>}</div> : <span className="text-xs text-slate-500">Not sent</span>}</td><td className="px-5 py-3"><div className="flex flex-wrap gap-3"><button onClick={() => sendAccessEmail(u)} disabled={sendingId === u.id || u.status !== 'active'} className="text-xs font-medium text-gold hover:underline disabled:cursor-not-allowed disabled:opacity-40">{sendingId === u.id ? 'Sending…' : u.password_set ? 'Send portal reminder' : u.welcome_email_sent_at ? 'Resend setup' : 'Send setup'}</button><button onClick={() => toggleStatus(u)} className="text-xs font-medium text-gold hover:underline">{u.status === 'active' ? 'Suspend' : 'Reactivate'}</button></div></td></tr>)}</tbody></table>
+          <table className="w-full min-w-[820px] text-sm"><thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500"><th className="px-5 py-3 font-medium">Name</th><th className="px-5 py-3 font-medium">Role</th><th className="px-5 py-3 font-medium">Status</th><th className="px-5 py-3 font-medium">Account email</th><th className="px-5 py-3 font-medium">Actions</th></tr></thead><tbody>{filtered.map((u) => <tr key={u.id} className="border-b border-white/5 last:border-0"><td className="px-5 py-3"><p className="font-medium text-white">{u.full_name || u.email}</p><p className="text-xs text-slate-500">{u.email}</p></td><td className="px-5 py-3 text-slate-200">{u.role}</td><td className="px-5 py-3"><Tag tone={u.status === 'active' ? 'green' : 'red'}>{u.status}</Tag></td><td className="px-5 py-3">{u.welcome_email_status ? <div><Tag tone={emailTone(u.welcome_email_status)}>{u.welcome_email_status.replace(/_/g, ' ')}</Tag>{u.welcome_email_last_event_at && <p className="mt-1 text-[11px] text-slate-500">Last update {new Date(`${u.welcome_email_last_event_at.replace(' ', 'T')}Z`).toLocaleString()}</p>}</div> : <span className="text-xs text-slate-500">Not sent</span>}</td><td className="px-5 py-3"><div className="flex flex-wrap items-center gap-3"><button onClick={() => sendAccessEmail(u)} disabled={sendingId === u.id || u.status !== 'active'} className="text-xs font-medium text-gold hover:underline disabled:cursor-not-allowed disabled:opacity-40">{sendingId === u.id ? 'Sending…' : u.password_set ? 'Send portal reminder' : u.welcome_email_sent_at ? 'Resend setup' : 'Send setup'}</button><button onClick={() => toggleStatus(u)} className="text-xs font-medium text-gold hover:underline">{u.status === 'active' ? 'Suspend' : 'Reactivate'}</button>{me?.id !== u.id && u.status === 'active' && <ImpersonateButton targetUserId={u.id} targetLabel={u.full_name || u.email}/>}</div></td></tr>)}</tbody></table>
         )}
       </Panel>
     </div>

@@ -9,6 +9,7 @@ import { Avatar } from '../kit/Avatar'
 import { MailBell } from '../kit/MailBell'
 import { NotificationFeedPanel } from '../kit/NotificationFeedPanel'
 import { LoginBanner } from '../kit/LoginBanner'
+import { ImpersonationBanner } from '../kit/ImpersonationBanner'
 import type { NavItem } from './nav'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { AdminPageBoundary } from '../admin/AdminPageBoundary'
@@ -76,6 +77,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
 
   return (
     <div className="min-h-screen bg-navy-radial lg:flex">
+      <ImpersonationBanner />
       <LoginBanner />
       <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/[.07] bg-navy-950/75 backdrop-blur-xl transition-[width,padding] duration-200 lg:flex ${sidebarOpen ? 'w-64 border-r p-4' : 'w-0 p-0'}`}>
         <div className="flex h-full w-64 min-h-0 shrink-0 flex-col">{sidebarContent}</div>
