@@ -21,23 +21,6 @@ export function Reveal({ children, delay = 0, className = '' }: { children: Reac
   )
 }
 
-export function ClipLine({ children, delay = 0, className = '' }: { children: ReactNode; delay?: number; className?: string }) {
-  const reduceMotion = useReducedMotion()
-  if (reduceMotion) return <span className={`block ${className}`}>{children}</span>
-  return (
-    <span className={`block overflow-hidden ${className}`}>
-      <motion.span
-        className="block"
-        initial={{ y: '110%' }}
-        animate={{ y: 0 }}
-        transition={{ ...pmvMotion.gentle, delay }}
-      >
-        {children}
-      </motion.span>
-    </span>
-  )
-}
-
 const staggerContainer: Variants = pmvStagger
 
 export const staggerItem: Variants = pmvFadeUp
