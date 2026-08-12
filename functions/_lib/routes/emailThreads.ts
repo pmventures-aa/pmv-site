@@ -1,0 +1,234 @@
+import { Hono } from 'hono'
+import type { AppEnv, Env, SessionUser } from '../types'
+import { requireStaff } from '../mid'
+import { uuid } from '../crypto'
+import { sendEmailStrict } from '../email'
+import { logActivity } from '../activity'
+
+export const emailThreadRoutes = new Hono<AppEnv>()
+emailThreadRoutes.use('*', requireStaff)
+
+const clean = (v: unknown, n: number) => typeof v === 'string' ? v.trim().slice(0, n) : ''
+const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+
+function parseAddresses(input: unknown): { email: string; name?: string }[] {
+  if (!input) return []
+  const list = Array.isArray(input) ? input : String(input).split(/[,;]/)
+  const out: { email: string; name?: string }[] = []
+  for (const raw of list) {
+    if (typeof raw === 'object' && raw && 'email' in raw) {
+      const e = String((raw as any).email).trim().toLowerCase()
+      if (emailOk(e)) out.push({ email: e, name: (raw as any).name })
+    } else {
+      const s = String(raw).trim()
+      const m = s.match(/^(.*)\s*<\s*([^>]+)\s*>\s*$/)
+      const email = (m ? m[2] : s).trim().toLowerCase()
+      const name = m ? m[1].trim().replace(/^"|"$/g, '') : undefined
+      if (emailOk(email)) out.push({ email, name: name || undefined })
+    }
+  }
+  return out.slice(0, 30)
+}
+
+function formatAddresses(list: { email: string; name?: string }[]): string[] {
+  return list.map((a) => a.name ? `${a.name} <${a.email}>` : a.email)
+}
+
+function generateMessageId(env: Env): string {
+  const host = (env.RESEND_FROM_EMAIL || 'orders@pinnaclemanagementventures.com').split('@')[1]?.replace(/>$/, '').trim() || 'pinnaclemanagementventures.com'
+  return `<${uuid()}@${host}>`
+}
+
+emailThreadRoutes.get('/email-threads', async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT et.id, et.subject, et.scope_client_user_id, et.last_activity_at, et.created_at,
+            et.conversation_id,
+            (SELECT COUNT(*) FROM email_messages em WHERE em.email_thread_id = et.id) message_count,
+            (SELECT full_name FROM users WHERE id = et.scope_client_user_id) client_name,
+            (SELECT direction FROM email_messages WHERE email_thread_id = et.id ORDER BY created_at DESC LIMIT 1) last_direction,
+            (SELECT provider_status FROM email_messages WHERE email_thread_id = et.id ORDER BY created_at DESC LIMIT 1) last_status
+     FROM email_threads et
+     ORDER BY et.last_activity_at DESC LIMIT 200`
+  ).all()
+  return c.json({ threads: (rows.results as any[]) || [] })
+})
+
+emailThreadRoutes.get('/email-threads/:id', async (c) => {
+  const thread = await c.env.DB.prepare(`SELECT * FROM email_threads WHERE id = ?`).bind(c.req.param('id')).first() as any
+  if (!thread) return c.json({ error: 'not found' }, 404)
+  const [messagesRes, attachmentsRes] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT id, direction, from_email, from_name, to_json, cc_json, subject, body_html, body_text,
+              external_message_id, in_reply_to_external, provider_id, provider_status, opened_at,
+              clicked_at, bounced_at, error, sender_user_id, created_at
+       FROM email_messages WHERE email_thread_id = ? ORDER BY created_at ASC`
+    ).bind(thread.id).all(),
+    c.env.DB.prepare(
+      `SELECT ea.id, ea.email_message_id, ea.file_name, ea.content_type, ea.size_bytes
+       FROM email_attachments ea
+       JOIN email_messages em ON em.id = ea.email_message_id
+       WHERE em.email_thread_id = ?`
+    ).bind(thread.id).all(),
+  ])
+  return c.json({ thread, messages: (messagesRes.results as any[]) || [], attachments: (attachmentsRes.results as any[]) || [] })
+})
+
+// POST /admin/email-threads
+// Body: { subject, to, cc?, bcc?, body_html, body_text?, scope_client_user_id?, conversation_id? }
+emailThreadRoutes.post('/email-threads', async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json<any>().catch(() => null)
+  if (!body) return c.json({ error: 'invalid body' }, 400)
+  const subject = clean(body.subject, 300)
+  if (!subject) return c.json({ error: 'subject required' }, 400)
+  const to = parseAddresses(body.to)
+  if (!to.length) return c.json({ error: 'to required' }, 400)
+  const cc = parseAddresses(body.cc)
+  const bcc = parseAddresses(body.bcc)
+  const bodyHtml = clean(body.body_html, 60_000)
+  if (!bodyHtml) return c.json({ error: 'body_html required' }, 400)
+  const bodyText = clean(body.body_text, 60_000) || undefined
+
+  const scopeClientId = clean(body.scope_client_user_id, 40) || null
+  let conversationId = clean(body.conversation_id, 40) || null
+
+  // Create the parent conversation if none was passed. Every email thread
+  // hangs off a conversation row so the Hub shows them uniformly.
+  if (!conversationId) {
+    conversationId = uuid()
+    await c.env.DB.prepare(
+      `INSERT INTO conversations (id, kind, subject, scope_client_user_id, created_by_user_id, last_message_at)
+       VALUES (?, 'email_thread', ?, ?, ?, datetime('now'))`
+    ).bind(conversationId, subject, scopeClientId, user.id).run()
+    await c.env.DB.prepare(
+      `INSERT OR IGNORE INTO conversation_participants (conversation_id, user_id, role_in_conv) VALUES (?, ?, 'participant')`
+    ).bind(conversationId, user.id).run()
+  }
+
+  const threadId = uuid()
+  const messageId = uuid()
+  const externalMessageId = generateMessageId(c.env)
+
+  await c.env.DB.prepare(
+    `INSERT INTO email_threads (id, conversation_id, subject, root_external_message_id, scope_client_user_id, created_by_user_id, last_activity_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+  ).bind(threadId, conversationId, subject, externalMessageId, scopeClientId, user.id).run()
+
+  // Insert the outbound record first as 'queued'; update after Resend returns.
+  await c.env.DB.prepare(
+    `INSERT INTO email_messages (id, email_thread_id, direction, from_email, from_name, to_json, cc_json, bcc_json, reply_to,
+       subject, body_html, body_text, external_message_id, sender_user_id)
+     VALUES (?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(messageId, threadId, user.email, user.full_name || null,
+    JSON.stringify(to), JSON.stringify(cc), JSON.stringify(bcc), user.email,
+    subject, bodyHtml, bodyText || null, externalMessageId, user.id).run()
+
+  try {
+    const providerId = await sendEmailStrict(c.env, {
+      to: formatAddresses(to),
+      cc: cc.length ? formatAddresses(cc) : undefined,
+      bcc: bcc.length ? formatAddresses(bcc) : undefined,
+      subject, html: bodyHtml, text: bodyText,
+      replyTo: user.email,
+      headers: { 'Message-ID': externalMessageId },
+      tags: [{ name: 'email_thread_id', value: threadId }, { name: 'email_message_id', value: messageId }],
+      idempotencyKey: messageId,
+    })
+    await c.env.DB.prepare(
+      `UPDATE email_messages SET provider_id = ?, provider_status = 'sent' WHERE id = ?`
+    ).bind(providerId, messageId).run()
+  } catch (err) {
+    await c.env.DB.prepare(
+      `UPDATE email_messages SET provider_status = 'failed', error = ? WHERE id = ?`
+    ).bind(err instanceof Error ? err.message.slice(0, 1000) : 'send failed', messageId).run()
+    return c.json({ error: 'send failed', message: err instanceof Error ? err.message : 'unknown', thread_id: threadId, id: messageId }, 502)
+  }
+
+  try {
+    await logActivity(c.env, {
+      actorUserId: user.id, clientUserId: scopeClientId,
+      kind: 'email.sent',
+      detail: { email_thread_id: threadId, subject, to: to.map((a) => a.email), conversation_id: conversationId },
+    })
+  } catch {}
+
+  return c.json({ ok: true, id: messageId, thread_id: threadId, conversation_id: conversationId }, 201)
+})
+
+// POST /admin/email-threads/:id/reply
+// Body: { body_html, body_text?, cc?, bcc? }
+emailThreadRoutes.post('/email-threads/:id/reply', async (c) => {
+  const user = c.get('user')
+  const thread = await c.env.DB.prepare(`SELECT * FROM email_threads WHERE id = ?`).bind(c.req.param('id')).first() as any
+  if (!thread) return c.json({ error: 'not found' }, 404)
+  const body = await c.req.json<any>().catch(() => null)
+  const bodyHtml = clean(body?.body_html, 60_000)
+  if (!bodyHtml) return c.json({ error: 'body_html required' }, 400)
+  const bodyText = clean(body?.body_text, 60_000) || undefined
+  const cc = parseAddresses(body?.cc)
+  const bcc = parseAddresses(body?.bcc)
+
+  // Last message in the thread is what we're replying to (from provider POV).
+  const last = await c.env.DB.prepare(
+    `SELECT external_message_id, in_reply_to_external, references_external, from_email
+     FROM email_messages WHERE email_thread_id = ? ORDER BY created_at DESC LIMIT 1`
+  ).bind(thread.id).first() as any
+  const inReplyTo = last?.external_message_id || thread.root_external_message_id
+  const referencesChain = [last?.references_external, last?.in_reply_to_external, last?.external_message_id]
+    .filter(Boolean).join(' ').trim().slice(0, 2000) || undefined
+
+  // Reply "to" defaults to the last inbound sender (if any) else the last outbound "to" list.
+  let replyTo: { email: string; name?: string }[] = []
+  const lastInbound = await c.env.DB.prepare(
+    `SELECT from_email, from_name FROM email_messages WHERE email_thread_id = ? AND direction = 'inbound' ORDER BY created_at DESC LIMIT 1`
+  ).bind(thread.id).first() as any
+  if (lastInbound?.from_email) replyTo = [{ email: lastInbound.from_email, name: lastInbound.from_name || undefined }]
+  else {
+    const firstOut = await c.env.DB.prepare(
+      `SELECT to_json FROM email_messages WHERE email_thread_id = ? AND direction = 'outbound' ORDER BY created_at ASC LIMIT 1`
+    ).bind(thread.id).first() as any
+    if (firstOut?.to_json) { try { replyTo = JSON.parse(firstOut.to_json) } catch {} }
+  }
+  if (!replyTo.length) return c.json({ error: 'no reply target' }, 400)
+
+  const messageId = uuid()
+  const externalMessageId = generateMessageId(c.env)
+  const replySubject = /^re:/i.test(thread.subject) ? thread.subject : `Re: ${thread.subject}`
+
+  await c.env.DB.prepare(
+    `INSERT INTO email_messages (id, email_thread_id, direction, from_email, from_name, to_json, cc_json, bcc_json, reply_to,
+       subject, body_html, body_text, external_message_id, in_reply_to_external, references_external, sender_user_id)
+     VALUES (?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(messageId, thread.id, user.email, user.full_name || null,
+    JSON.stringify(replyTo), JSON.stringify(cc), JSON.stringify(bcc), user.email,
+    replySubject, bodyHtml, bodyText || null, externalMessageId, inReplyTo, referencesChain || null, user.id).run()
+
+  try {
+    const providerId = await sendEmailStrict(c.env, {
+      to: formatAddresses(replyTo),
+      cc: cc.length ? formatAddresses(cc) : undefined,
+      bcc: bcc.length ? formatAddresses(bcc) : undefined,
+      subject: replySubject, html: bodyHtml, text: bodyText,
+      replyTo: user.email,
+      headers: {
+        'Message-ID': externalMessageId,
+        ...(inReplyTo ? { 'In-Reply-To': inReplyTo } : {}),
+        ...(referencesChain ? { References: referencesChain } : {}),
+      },
+      tags: [{ name: 'email_thread_id', value: thread.id }, { name: 'email_message_id', value: messageId }],
+      idempotencyKey: messageId,
+    })
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE email_messages SET provider_id = ?, provider_status = 'sent' WHERE id = ?`).bind(providerId, messageId),
+      c.env.DB.prepare(`UPDATE email_threads SET last_activity_at = datetime('now') WHERE id = ?`).bind(thread.id),
+      c.env.DB.prepare(`UPDATE conversations SET last_message_at = datetime('now') WHERE id = ?`).bind(thread.conversation_id),
+    ])
+  } catch (err) {
+    await c.env.DB.prepare(
+      `UPDATE email_messages SET provider_status = 'failed', error = ? WHERE id = ?`
+    ).bind(err instanceof Error ? err.message.slice(0, 1000) : 'send failed', messageId).run()
+    return c.json({ error: 'send failed', message: err instanceof Error ? err.message : 'unknown' }, 502)
+  }
+
+  return c.json({ ok: true, id: messageId }, 201)
+})

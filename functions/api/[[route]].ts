@@ -60,6 +60,7 @@ import { scopeFunnelPublicRoutes, scopeFunnelAdminRoutes } from '../_lib/routes/
 import { carePlanPublicRoutes } from '../_lib/routes/carePlans'
 import { communicationsHubRoutes } from '../_lib/routes/communicationsHub'
 import { conversationRoutes } from '../_lib/routes/conversations'
+import { emailThreadRoutes } from '../_lib/routes/emailThreads'
 import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib/routes/managedTemplates'
 import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
 
@@ -103,6 +104,7 @@ app.route('/admin', relationshipAutomationAdminRoutes)
 app.route('/admin', communicationsHubRoutes)
 app.route('/admin', conversationRoutes)
 app.route('/portal', conversationRoutes)
+app.route('/admin', emailThreadRoutes)
 app.route('/admin', securitySessionRoutes)
 app.route('/admin', serviceOfferingAdminRoutes)
 app.route('/admin', intakeCatalogAdminRoutes)
