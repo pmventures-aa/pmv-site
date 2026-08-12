@@ -3,7 +3,6 @@ import { Archive, Check, CopyPlus, FileDiff, Files, Gavel, Layers3, RefreshCw, R
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
-import EnvelopeWorkspace from './EnvelopeWorkspace'
 
 type Envelope={id:string;public_id:string;title:string;status:string;created_at:string;priority?:string}
 type Detail={envelope:any;recipients:any[];fields:any[];events:any[];seal?:any}
@@ -44,9 +43,15 @@ export default function EnvelopeWorkspaceEnterprise(){
   async function createHold(){if(!holdName.trim()||holdReason.trim().length<5)return;setBusy('hold');try{await api.post('/admin/document-platform/retention/holds',{scope_type:holdScope,scope_id:holdScope==='global'?null:selected,name:holdName,reason:holdReason});setHoldName('');setHoldReason('');toast.success('Legal hold activated');await loadBase()}catch(err){toast.error(err instanceof ApiError?err.message:'Could not create legal hold')}finally{setBusy('')}}
   async function releaseHold(id:string){try{await api.post(`/admin/document-platform/retention/holds/${id}/release`,{});toast.success('Legal hold released');await loadBase()}catch(err){toast.error(err instanceof ApiError?err.message:'Could not release hold')}}
 
+  // Only the core envelope list is critical - if templates or retention are
+  // empty or not yet provisioned, they're optional enterprise features and
+  // shouldn't render as an alarming warning. Warn only when the primary
+  // envelopes feed itself is unavailable.
+  const criticalWarnings = serviceWarnings.filter((w) => w === 'Envelope records')
+
   return <div className="space-y-6">
-    <PageIntro kicker="PMV Document Platform" title="Enterprise Envelope Workspace" subtitle="Reusable templates, multi-document packets, controlled recipient access, field rules, bulk processing, retention, legal holds, and evidentiary controls in one self-hosted workspace." />
-    {serviceWarnings.length>0&&<div role="alert" className="flex flex-col gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-amber-100">Part of the document workspace is temporarily unavailable</p><p className="mt-1 text-xs text-slate-400">Unavailable: {serviceWarnings.join(', ')}. The sections that loaded remain usable.</p></div><button className={btnSecondary} onClick={()=>void loadBase()}><RefreshCw size={14}/>Retry unavailable services</button></div>}
+    <PageIntro kicker="Signed Documents" title="Signing & Documents" subtitle="Everything you've sent for signature. Create a new signing packet, track who has signed, remind late signers, or open the completed evidence bundle. Templates and retention are optional enterprise features - the list below is the day-to-day view." />
+    {criticalWarnings.length>0&&<div role="alert" className="flex flex-col gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-amber-100">The signed-document list could not load</p><p className="mt-1 text-xs text-slate-400">This usually clears on retry. If it persists, check the D1 database is reachable from Pages Functions.</p></div><button className={btnSecondary} onClick={()=>void loadBase()}><RefreshCw size={14}/>Retry</button></div>}
 
     <Panel className="!p-0 overflow-hidden border-gold/20 bg-gradient-to-br from-gold/[.055] via-white/[.015] to-transparent">
       <div className="grid gap-px bg-white/[.06] sm:grid-cols-2 xl:grid-cols-4">{[
@@ -70,6 +75,5 @@ export default function EnvelopeWorkspaceEnterprise(){
 
     {mode==='retention'&&<div className="grid gap-5 xl:grid-cols-2"><Panel><div className="flex items-center gap-2"><Archive size={16} className="text-gold"/><h2 className="text-sm font-extrabold text-white">Retention policies</h2></div><div className="mt-4 grid gap-2 sm:grid-cols-[1fr_120px_auto]"><input className={inputCls} value={policyName} onChange={e=>setPolicyName(e.target.value)} placeholder="Policy name"/><input className={inputCls} value={policyDays} onChange={e=>setPolicyDays(e.target.value)} inputMode="numeric" placeholder="Days"/><button className={btnPrimary} disabled={busy==='policy'} onClick={createPolicy}>Create</button></div><div className="mt-4 space-y-2">{retention.policies.map(p=><div key={p.id} className="flex flex-col gap-3 rounded-xl border border-white/10 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold text-white">{p.name}</p><p className="text-[11px] text-slate-500">{p.retention_days?`${p.retention_days} days`:'No automatic disposition'} · {p.active?'Active':'Inactive'}</p></div><button className={btnSecondary} disabled={!selected} onClick={()=>assignPolicy(p.id)}>Assign to Envelope</button></div>)}</div></Panel><Panel><div className="flex items-center gap-2"><Gavel size={16} className="text-gold"/><h2 className="text-sm font-extrabold text-white">Legal holds</h2></div><div className="mt-4 grid gap-2 sm:grid-cols-2"><select className={inputCls} value={holdScope} onChange={e=>setHoldScope(e.target.value as any)}><option value="envelope">Selected envelope</option><option value="global">Global hold</option></select><input className={inputCls} value={holdName} onChange={e=>setHoldName(e.target.value)} placeholder="Hold name"/><textarea className={`${inputCls} min-h-20 sm:col-span-2`} value={holdReason} onChange={e=>setHoldReason(e.target.value)} placeholder="Required legal/business reason"/><button className={btnPrimary} disabled={busy==='hold'||(!selected&&holdScope!=='global')} onClick={createHold}>Activate Hold</button></div><div className="mt-4 space-y-2">{retention.holds.map(h=><div key={h.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-3"><div><p className="text-sm font-bold text-white">{h.name}</p><p className="mt-1 text-[11px] text-slate-500">{fmt(h.scope_type)} · {fmt(h.status)}</p></div>{h.status==='active'?<button className={btnSecondary} onClick={()=>releaseHold(h.id)}>Release</button>:<Tag>Released</Tag>}</div>)}</div></Panel></div>}
 
-    <div className="border-t border-white/10 pt-6"><EnvelopeWorkspace/></div>
   </div>
 }

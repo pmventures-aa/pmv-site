@@ -9,6 +9,7 @@ import type { NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
 import { GlobalSearch } from './GlobalSearch'
 import { MailBell } from '../kit/MailBell'
+import { EmailCenterBell } from '../kit/EmailCenterBell'
 import { Avatar } from '../kit/Avatar'
 import { SlaAlertChip } from './SlaAlertChip'
 import { MailWorkspaceLauncher } from './MailWorkspaceLauncher'
@@ -133,6 +134,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <span className="hidden lg:inline-flex"><MailWorkspaceLauncher /></span>
             <button onClick={() => setMobileSearchOpen((v) => !v)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5" aria-label="Search"><Search size={17} /></button>
             <button onClick={refreshPage} className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 hover:text-gold" aria-label="Refresh page"><RotateCw size={15} /></button>
+            <EmailCenterBell />
             <MailBell />
             <NotificationBell />
             <button onClick={() => setMobileOpen(true)} className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white" aria-label="Open navigation"><Menu size={18} /></button>
@@ -163,6 +165,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <SlaAlertChip />
             <span className="hidden lg:inline-flex"><MailWorkspaceLauncher /></span>
             <button onClick={refreshPage} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-gold" title="Refresh this page" aria-label="Refresh this HQ page"><RotateCw size={14} /></button>
+            <EmailCenterBell />
             <MailBell />
             <NotificationBell />
           </div>
