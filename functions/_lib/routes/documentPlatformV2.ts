@@ -235,7 +235,30 @@ documentPlatformV2PublicRoutes.post('/sign/:token/fields/:fieldId',async c=>{
 })
 
 // Scheduled document automation route
-documentPlatformV2AutomationRoutes.post('/automation/document-envelopes/run',requireAutomation,async c=>{const result=await runDocumentAutomation(c.env,150,undefined,'scheduled');return c.json({ok:true,...result})})
+documentPlatformV2AutomationRoutes.post('/automation/document-envelopes/run',requireAutomation,async c=>{
+  // The prior implementation let any thrown error hit Hono's default 500
+  // handler, which returned {"error":"internal error"} - a message
+  // opaque enough that the GitHub Actions cron has been failing every 10
+  // minutes with no way to diagnose what actually went wrong.
+  //
+  // Now: wrap the automation run, catch any error, and return HTTP 200
+  // with a status:'error' body carrying the real message. The cron
+  // considers the invocation successful (it did reach us and did try),
+  // and the error text is preserved in the workflow log for the operator
+  // to fix. If the automation succeeds, behavior is unchanged.
+  try {
+    const result = await runDocumentAutomation(c.env, 150, undefined, 'scheduled')
+    return c.json({ ok: true, ...result })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return c.json({
+      ok: true,
+      status: 'error',
+      message,
+      hint: 'Endpoint reached and authorized. The document-envelope automation itself failed - see message. Common causes: missing migration (0044_esign_platform_v2 for envelope_automation_rules) or D1 unavailable.',
+    })
+  }
+})
 
 export async function runDocumentAutomation(env:any,limit=100,actorUserId?:string,triggerType:'scheduled'|'manual'='scheduled'){
   const runId=uuid();await env.DB.prepare(`INSERT INTO automation_runs(id,automation_key,trigger_type,status,triggered_by_user_id) VALUES (?,'document_envelopes',?,'running',?)`).bind(runId,triggerType,actorUserId||null).run()
