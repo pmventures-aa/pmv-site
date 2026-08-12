@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import type { NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
+import { NotificationFeedPanel } from '../kit/NotificationFeedPanel'
 import { GlobalSearch } from './GlobalSearch'
 import { MailBell } from '../kit/MailBell'
 import { EmailCenterBell } from '../kit/EmailCenterBell'
@@ -139,6 +140,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <span className="hidden sm:inline-flex"><EmailCenterBell /></span>
             <MailBell />
             <NotificationBell />
+            <NotificationFeedPanel surface="admin" />
             <button onClick={() => setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-white/[.04] text-white transition hover:bg-white/[.08]" aria-label="Open navigation"><Menu size={20} /></button>
           </div>
         </div>
@@ -170,6 +172,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <EmailCenterBell />
             <MailBell />
             <NotificationBell />
+            <NotificationFeedPanel surface="admin" />
           </div>
         </div>
         <AnimatePresence mode="sync" initial={false}>

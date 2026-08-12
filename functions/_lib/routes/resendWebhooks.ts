@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { verifyResendWebhookSignature } from '../resendWebhookVerify'
 import { uuid } from '../crypto'
+import { pushNotification } from '../notificationFeed'
 
 export const resendWebhookRoutes = new Hono<AppEnv>()
 
@@ -236,6 +237,31 @@ resendWebhookRoutes.post('/webhooks/resend/inbound', async (c) => {
     c.env.DB.prepare(`UPDATE email_threads SET last_activity_at = datetime('now') WHERE id = ?`).bind(threadId),
     c.env.DB.prepare(`UPDATE conversations SET last_message_at = datetime('now') WHERE id = (SELECT conversation_id FROM email_threads WHERE id = ?)`).bind(threadId),
   ])
+
+  // Notify assigned staff of the inbound reply so it never gets buried.
+  c.executionCtx.waitUntil((async () => {
+    const thread = await c.env.DB.prepare(
+      `SELECT et.id, et.conversation_id, et.subject, et.scope_client_user_id FROM email_threads et WHERE et.id = ?`
+    ).bind(threadId).first() as any
+    if (!thread) return
+    const staff = await c.env.DB.prepare(
+      `SELECT DISTINCT u.id FROM users u
+       WHERE u.status = 'active' AND u.role IN ('staff','admin')
+         AND (u.id IN (SELECT user_id FROM conversation_participants WHERE conversation_id = ? AND removed_at IS NULL)
+              OR ? IS NOT NULL AND u.id IN (SELECT staff_user_id FROM staff_assignments WHERE client_user_id = ?)
+              OR u.role = 'admin')`
+    ).bind(thread.conversation_id, thread.scope_client_user_id, thread.scope_client_user_id).all()
+    const link = `/hq/communications?tab=email&thread=${thread.id}`
+    for (const row of ((staff.results as any[]) || [])) {
+      await pushNotification(c.env, {
+        userId: row.id, kind: 'email.inbound',
+        subjectType: 'email_thread', subjectId: thread.id,
+        title: `New reply from ${from.name || from.email}`,
+        body: `${thread.subject}: ${(text || html || '').replace(/<[^>]+>/g, '').slice(0, 180)}`,
+        deepLinkPath: link, dedupeWindowSeconds: 90,
+      })
+    }
+  })())
 
   return c.json({ ok: true, id: messageId, thread_id: threadId })
 })

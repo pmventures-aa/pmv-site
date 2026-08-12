@@ -61,6 +61,8 @@ import { carePlanPublicRoutes } from '../_lib/routes/carePlans'
 import { communicationsHubRoutes } from '../_lib/routes/communicationsHub'
 import { conversationRoutes } from '../_lib/routes/conversations'
 import { emailThreadRoutes } from '../_lib/routes/emailThreads'
+import { notificationFeedRoutes } from '../_lib/routes/notificationFeed'
+import { clientBannerAdminRoutes, clientBannerSelfRoutes } from '../_lib/routes/clientBanners'
 import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib/routes/managedTemplates'
 import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
 
@@ -105,6 +107,10 @@ app.route('/admin', communicationsHubRoutes)
 app.route('/admin', conversationRoutes)
 app.route('/portal', conversationRoutes)
 app.route('/admin', emailThreadRoutes)
+app.route('/admin', notificationFeedRoutes)
+app.route('/portal', notificationFeedRoutes)
+app.route('/admin', clientBannerAdminRoutes)
+app.route('/portal', clientBannerSelfRoutes)
 app.route('/admin', securitySessionRoutes)
 app.route('/admin', serviceOfferingAdminRoutes)
 app.route('/admin', intakeCatalogAdminRoutes)
