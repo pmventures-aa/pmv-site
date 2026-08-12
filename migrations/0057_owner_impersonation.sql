@@ -37,8 +37,10 @@ CREATE TABLE impersonation_events (
 CREATE INDEX idx_impersonation_events_session ON impersonation_events(impersonation_session_id, created_at DESC);
 
 -- Session flag: an active impersonation session is bound to a specific
--- sessions.id so the target-user swap only applies to requests coming
--- through that exact cookie. Prevents accidentally impersonating on a
--- second browser or a stale tab.
-ALTER TABLE sessions ADD COLUMN impersonation_session_id TEXT REFERENCES impersonation_sessions(id) ON DELETE SET NULL;
-CREATE INDEX idx_sessions_impersonation ON sessions(impersonation_session_id) WHERE impersonation_session_id IS NOT NULL;
+-- auth_sessions.id so the target-user swap only applies to requests
+-- coming through that exact cookie. Prevents accidentally impersonating
+-- on a second browser or a stale tab. (The runtime KV
+-- `impersonate:<token>` key is the actual gate; this column is for
+-- server-side reporting joins.)
+ALTER TABLE auth_sessions ADD COLUMN impersonation_session_id TEXT REFERENCES impersonation_sessions(id) ON DELETE SET NULL;
+CREATE INDEX idx_auth_sessions_impersonation ON auth_sessions(impersonation_session_id) WHERE impersonation_session_id IS NOT NULL;
