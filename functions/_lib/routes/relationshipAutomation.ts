@@ -5,6 +5,7 @@ import { runDueClientNurture } from '../relationshipAutomation'
 import { runClientNotificationOutbox } from '../clientNotificationOutbox'
 import { runDueScheduledReports } from '../scheduledReports'
 import { uuid } from '../crypto'
+import { runDueScopeFollowups } from '../scopeFunnel'
 
 export const relationshipAutomationRoutes = new Hono<AppEnv>()
 export const relationshipAutomationAdminRoutes = new Hono<AppEnv>()
@@ -13,6 +14,7 @@ const AUTOMATIONS = {
   client_notifications: { label: 'Client event notifications', cadence: 'Every 10 minutes', intervalMinutes: 10, description: 'Processes queued client-facing event notifications and records delivery outcomes.' },
   client_nurture: { label: 'Client nurture campaign', cadence: 'Daily at 10:20 AM ET', intervalMinutes: 1440, description: 'Processes due client nurture steps and records successful, skipped, or failed delivery work.' },
   scheduled_reports: { label: 'Scheduled management reports', cadence: 'Hourly', intervalMinutes: 60, description: 'Generates due saved reports, emails authorized recipients, and records report-delivery outcomes.' },
+  scope_followup: { label: 'Public request follow-up', cadence: 'Daily at 10:40 AM ET', intervalMinutes: 1440, description: 'Sends the three-step, opt-in follow-up sequence for unbooked public scope requests and stops after booking or account creation.' },
 } as const
 
 type AutomationKey = keyof typeof AUTOMATIONS
@@ -59,7 +61,9 @@ async function executeAutomation(c: any, key: AutomationKey, triggerType: 'sched
       ? await runClientNotificationOutbox(c.env, 75)
       : key === 'client_nurture'
         ? await runDueClientNurture(c.env, 50)
-        : await runDueScheduledReports(c.env, 20)
+        : key === 'scheduled_reports'
+          ? await runDueScheduledReports(c.env, 20)
+          : await runDueScopeFollowups(c.env, 50)
     const processed = Number(result.processed || 0)
     const succeeded = Number((result as any).sent || 0)
     const failed = Number((result as any).failed || 0)
@@ -130,6 +134,7 @@ relationshipAutomationAdminRoutes.get('/automation-center', requireOwner, async 
       nextRunAt = next.toISOString()
     } else if (key === 'client_nurture') nextRunAt = nextDailyEastern(10,20)
     else if(key==='scheduled_reports') nextRunAt=nextHourly()
+    else if(key==='scope_followup') nextRunAt=nextDailyEastern(10,40)
     return { key, ...meta, last_run: last, next_run_at: nextRunAt }
   })
   return c.json({ automations, runs: runs.results || [] })
@@ -211,5 +216,9 @@ relationshipAutomationRoutes.post('/automation/client-notifications/run', requir
 })
 relationshipAutomationRoutes.post('/automation/reports/run', requireAutomationCron, async (c) => {
   const result=await executeAutomation(c,'scheduled_reports','scheduled')
+  return c.json({ok:true,...result})
+})
+relationshipAutomationRoutes.post('/automation/scope-followup/run', requireAutomationCron, async (c) => {
+  const result=await executeAutomation(c,'scope_followup','scheduled')
   return c.json({ok:true,...result})
 })

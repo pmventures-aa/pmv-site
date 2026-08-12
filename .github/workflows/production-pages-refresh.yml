@@ -80,6 +80,8 @@ jobs:
 
           check_get '/portal/login'
           check_get '/portal/signup?source=deploy-smoke'
+          check_get '/scope-request'
+          check_get '/instant-quote'
           check_get '/admin/login'
           check_get '/terms'
           check_get '/privacy'

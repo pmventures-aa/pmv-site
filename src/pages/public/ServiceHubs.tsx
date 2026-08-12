@@ -6,8 +6,10 @@ import { btnOutline, btnPrimary } from '../../components/public/ui'
 import { BrandMark3D } from '../../components/ui'
 import { services, type ServiceInfo } from '../../data/services'
 import { usePageMeta } from '../../lib/usePageMeta'
+import { CaseStudyStrip } from '../../components/public/Proof'
 
-const CLIENT_SIGNUP = '/portal/signup'
+const CLIENT_SIGNUP = '/scope-request'
+const HUB_PROOF_SERVICE={business:'consulting',property:'property_management',mobile:'admin_support'} as const
 
 type HubConfig = {
   eyebrow: string
@@ -89,7 +91,7 @@ function HubPage({ hub }: { hub: keyof typeof HUBS }) {
     <section className="pmv-hero-story relative overflow-hidden border-b border-white/[.08]">
       <div className="pmv-hero-gold" aria-hidden="true" />
       <div className="container-pmv grid gap-10 py-16 sm:py-20 lg:grid-cols-[1.12fr_.88fr] lg:items-center lg:py-24">
-        <Reveal><p className="eyebrow">{cfg.eyebrow}</p><h1 className="mt-4 max-w-4xl font-display text-4xl font-medium leading-[1.06] tracking-[-.03em] text-white sm:text-6xl">{cfg.title}</h1><p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{cfg.intro}</p><p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">{cfg.statement}</p><div className="mt-8 flex flex-wrap gap-3"><a href={`${CLIENT_SIGNUP}?source=${hub}-hub`} className={btnPrimary}>Start a Request</a><Link to="/services" className={btnOutline}>All Services</Link></div></Reveal>
+        <Reveal><p className="eyebrow">{cfg.eyebrow}</p><h1 className="mt-4 max-w-4xl font-display text-4xl font-medium leading-[1.06] tracking-[-.03em] text-white sm:text-6xl">{cfg.title}</h1><p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{cfg.intro}</p><p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">{cfg.statement}</p><div className="mt-8 flex flex-wrap gap-3"><Link to={`${CLIENT_SIGNUP}?source=${hub}-hub`} className={btnPrimary}>Scope a Request</Link>{hub==='property'&&<Link to="/instant-quote" className={btnOutline}>Instant Cleaning / Inspection Estimate</Link>}<Link to="/services" className={btnOutline}>All Services</Link></div></Reveal>
         <Reveal className="relative flex min-h-[300px] items-center justify-center"><div className="pmv-story-orbit" aria-hidden="true"/><BrandMark3D size={210} decorative className="relative z-10"/><div className="absolute bottom-4 right-0 max-w-[210px] border-l border-gold/35 pl-4 text-sm leading-6 text-slate-300">One client relationship. The right scope for the work.</div></Reveal>
       </div>
     </section>
@@ -98,7 +100,8 @@ function HubPage({ hub }: { hub: keyof typeof HUBS }) {
 
     <section className="border-y border-white/[.08] bg-navy-900/30"><div className="container-pmv py-14 sm:py-18"><Reveal className="mb-7 max-w-3xl"><p className="eyebrow">Services</p><h2 className="mt-3 font-display text-3xl font-medium text-white sm:text-4xl">Choose a service, or start with the situation.</h2><p className="mt-4 text-sm leading-7 text-slate-400">These pages explain the typical scope in more detail. If your need crosses categories, start a request and we can help organize it.</p></Reveal><div className="border-b border-white/10">{hubServices.map((service)=><ServiceRow key={service.slug} service={service}/>)}</div></div></section>
 
-    <section className="container-pmv py-14 sm:py-18"><Reveal className="grid gap-8 border-y border-gold/20 py-9 lg:grid-cols-[1fr_auto] lg:items-center"><div><p className="eyebrow">Not sure where it fits?</p><h2 className="mt-2 font-display text-3xl font-medium text-white">You can start with the problem instead of the service name.</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">Give us enough context to understand what needs to happen. We will help identify the most practical scope and next step.</p></div><a href={`${CLIENT_SIGNUP}?source=${hub}-hub-bottom`} className={btnPrimary}>Tell Us What You Need</a></Reveal></section>
+    <section className="container-pmv py-14 sm:py-18"><Reveal className="grid gap-8 border-y border-gold/20 py-9 lg:grid-cols-[1fr_auto] lg:items-center"><div><p className="eyebrow">Not sure where it fits?</p><h2 className="mt-2 font-display text-3xl font-medium text-white">You can start with the problem instead of the service name.</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">Give us enough context to understand what needs to happen. We will help identify the most practical scope and next step.</p></div><Link to={`${CLIENT_SIGNUP}?source=${hub}-hub-bottom`} className={btnPrimary}>Tell Us What You Need</Link></Reveal></section>
+    <CaseStudyStrip serviceKey={HUB_PROOF_SERVICE[hub]} className="border-t border-white/10"/>
   </main><Footer/></div>
 }
 

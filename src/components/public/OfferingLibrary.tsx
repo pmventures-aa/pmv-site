@@ -50,7 +50,7 @@ export function OfferingLibrary({ serviceKey, offeringPrefixes }: { serviceKey: 
 
     <div className="mt-7 divide-y divide-white/10 border-y border-white/10">
       {visible.map((item) => {
-        const requestUrl = `https://client.pinnaclemanagementventures.com/signup?service=${encodeURIComponent(serviceKey)}&offering=${encodeURIComponent(item.id)}&source=service-offering`
+        const requestUrl = `/scope-request?service=${encodeURIComponent(serviceKey)}&offering=${encodeURIComponent(item.id)}&source=service-offering`
         return <article key={item.id} className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-8">
           <div>
             <div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold text-white">{item.name}</h3>{item.badge&&<span className="rounded-full border border-gold/25 bg-gold/[.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">{item.badge}</span>}</div>
@@ -62,7 +62,7 @@ export function OfferingLibrary({ serviceKey, offeringPrefixes }: { serviceKey: 
           </div>
           <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
             <p className="whitespace-nowrap text-sm font-semibold text-white">{item.pricingLabel || (item.startingPrice ? `From $${item.startingPrice}` : 'Custom quote')}</p>
-            <a href={requestUrl} className="text-sm font-medium text-gold hover:underline">Start this service →</a>
+            <a href={requestUrl} className="text-sm font-medium text-gold hover:underline">Scope this service →</a>
           </div>
         </article>
       })}

@@ -57,3 +57,4 @@ jobs:
 
           check_endpoint 'Client notifications' '/api/automation/client-notifications/run'
           check_endpoint 'Client nurture' '/api/automation/nurture/run'
+          check_endpoint 'Public scope follow-up' '/api/automation/scope-followup/run'

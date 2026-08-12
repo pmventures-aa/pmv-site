@@ -1,0 +1,29 @@
+name: Follow up on public scope requests
+
+on:
+  schedule:
+    - cron: '40 14 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/scope-request-followup.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  follow-up:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Process due opt-in scope-request follow-ups
+        env:
+          PMV_AUTOMATION_SECRET: ${{ secrets.PMV_AUTOMATION_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PMV_AUTOMATION_SECRET"
+          curl --fail --silent --show-error --request POST \
+            --header "x-pmv-automation-secret: $PMV_AUTOMATION_SECRET" \
+            https://pmv-site.pages.dev/api/automation/scope-followup/run

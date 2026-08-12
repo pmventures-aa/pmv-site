@@ -8,7 +8,7 @@ import { services } from '../../data/services'
 import { usePageMeta } from '../../lib/usePageMeta'
 import { Icon, type IconName } from '../../components/kit/Icon'
 
-const CLIENT_SIGNUP='/portal/signup?source=services-overview'
+const CLIENT_SIGNUP='/scope-request?source=services-overview'
 // Category order matches Home: business + operations first, documents +
 // signing second, property + field third. Reflects the nationwide-network
 // framing rather than the property-management-first frame the site used

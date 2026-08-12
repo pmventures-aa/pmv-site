@@ -10,6 +10,7 @@ import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
 const MIN_PASSWORD = 10
 type Step = 'contact' | 'business' | 'account'
 interface InviteResponse { invite: { invite_type:string; email:string; full_name:string|null; status:string; expires_at:string; metadata?:Record<string,unknown> } }
+interface ScopeResponse { request:{contact_name:string;email:string;phone:string|null;service_key:string|null;offering_id:string|null;job_type:string;timing:string;city:string|null;state:string|null};job_label:string }
 
 export default function Signup() {
   const { signup } = useAuth()
@@ -17,12 +18,18 @@ export default function Signup() {
   const p = useAppPath()
   const [params] = useSearchParams()
   const inviteToken = params.get('invite') || ''
-  const serviceKey = params.get('service') || ''
-  const offeringId = params.get('offering') || ''
+  const scopeToken = params.get('scope') || ''
+  const directServiceKey = params.get('service') || ''
+  const [scopeServiceKey,setScopeServiceKey]=useState('')
+  const [scopeOfferingId,setScopeOfferingId]=useState('')
+  const serviceKey = scopeServiceKey || directServiceKey
+  const offeringId = scopeOfferingId || params.get('offering') || ''
   const requestedService = useMemo(() => services.find((service) => service.key === serviceKey), [serviceKey])
   const [step, setStep] = useState<Step>('contact')
   const [invite, setInvite] = useState<InviteResponse['invite'] | null>(null)
   const [inviteLoading, setInviteLoading] = useState(!!inviteToken)
+  const [scopeLoading,setScopeLoading]=useState(!!scopeToken)
+  const [scopeLabel,setScopeLabel]=useState('')
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', business_name: '', client_type: '', password: '', confirm: '' })
   const [tosAccepted, setTosAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -41,6 +48,17 @@ export default function Signup() {
       .catch((err) => setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Could not load this invitation.'))
       .finally(() => setInviteLoading(false))
   }, [inviteToken])
+
+  useEffect(()=>{
+    if(!scopeToken)return
+    api.get<ScopeResponse>(`/scope-requests/${encodeURIComponent(scopeToken)}`).then(response=>{
+      const full=response.request.contact_name.trim().split(/\s+/).filter(Boolean)
+      const key=response.request.service_key||''
+      setScopeServiceKey(key);setScopeOfferingId(response.request.offering_id||'');setScopeLabel(response.job_label)
+      const clientType=key==='property_management'||key==='property_inspections'?'property':key==='consulting'||key==='merchant_services'||key==='admin_support'?'business':'personal'
+      setForm(current=>({...current,first_name:full[0]||current.first_name,last_name:full.slice(1).join(' ')||current.last_name,email:response.request.email||current.email,phone:response.request.phone||current.phone,client_type:clientType}))
+    }).catch(err=>setError(err instanceof ApiError?err.message:'Could not load the request details.')).finally(()=>setScopeLoading(false))
+  },[scopeToken])
 
   function set<K extends keyof typeof form>(key: K, value: string) { setForm((current) => ({ ...current, [key]: value })) }
   const steps: Step[] = ['contact','business','account']
@@ -80,6 +98,7 @@ export default function Signup() {
     try {
       await signup({ email: form.email, password: form.password, first_name: form.first_name, last_name: form.last_name, phone: form.phone, business_name: form.business_name || undefined, tos_accepted: true })
       if (inviteToken) await api.post(`/invite/${encodeURIComponent(inviteToken)}/complete-existing`, {}).catch(() => {})
+      if (scopeToken) await api.post(`/scope-requests/${encodeURIComponent(scopeToken)}/convert`, {}).catch(() => {})
       playWelcomeSound('client')
       const query = requestedService
         ? `?service=${encodeURIComponent(requestedService.key)}${offeringId ? `&offering=${encodeURIComponent(offeringId)}` : ''}&welcome=1`
@@ -103,7 +122,7 @@ export default function Signup() {
   return (
     <AuthLayout
       surface="client"
-      eyebrow={inviteToken ? 'Private Pinnacle Invitation' : requestedService ? 'Your Pinnacle Journey' : 'New Client'}
+      eyebrow={inviteToken ? 'Private Pinnacle Invitation' : scopeToken ? 'Continue Your Request' : requestedService ? 'Your Pinnacle Journey' : 'New Client'}
       title={title}
       subtitle={subtitle}
       footer={<>Already have an account? <Link to={`../login${loginQuery}`} className="font-bold text-gold hover:text-gold-300">Sign In</Link></>}
@@ -116,6 +135,8 @@ export default function Signup() {
       </div>
 
       {inviteLoading && <p className="mb-4 text-sm text-slate-400">Loading your invitation…</p>}
+      {scopeLoading && <p className="mb-4 text-sm text-slate-400">Connecting your request…</p>}
+      {scopeToken&&!scopeLoading&&scopeLabel&&<div className="mb-5 rounded-xl border border-gold/20 bg-gold/[.05] p-4"><p className="text-sm font-bold text-white">Your request is already connected</p><p className="mt-1 text-xs leading-5 text-slate-400">We carried over your request for {scopeLabel}. This account gives you one place for updates, documents, estimates, and completion records.</p></div>}
       {requestedService && !inviteToken && <div className="mb-5 rounded-xl border border-gold/15 bg-gold/[.04] p-4"><p className="text-sm font-bold text-white">We Remember What Brought You Here</p><p className="mt-1 text-xs leading-5 text-slate-400">{requestedService.shortDescription}</p></div>}
       {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-xl border border-gold/20 bg-gold/[0.05] p-3 text-xs text-slate-400">Connected to your private Pinnacle invitation. Expires {new Date(invite.expires_at).toLocaleString()}.</div>}
       <ErrorBanner message={error} />
@@ -144,7 +165,7 @@ export default function Signup() {
         <Field label="Confirm Password"><input className={inputCls} type="password" autoComplete="new-password" value={form.confirm} onChange={(e)=>set('confirm',e.target.value)} placeholder="Enter it again"/></Field>
         <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[.018] p-3.5 text-xs leading-5 text-slate-400"><input type="checkbox" checked={tosAccepted} onChange={(e)=>setTosAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-white/[0.04] accent-gold"/><span>I agree to the <a href="https://pinnaclemanagementventures.com/terms" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Terms of Service</a>, acknowledge the <a href="https://pinnaclemanagementventures.com/privacy" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Privacy Policy</a>, and consent to the <a href="https://pinnaclemanagementventures.com/electronic-communications" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Electronic Communications Disclosure</a> for account and service-related communications.</span></label>
         <p className="text-[11px] leading-5 text-slate-500">Creating an account does not require consent to promotional marketing. Marketing messages, if offered, use separate opt-in and opt-out controls.</p>
-        <div className="flex gap-3"><button type="button" className="btn-outline flex-1" onClick={()=>setStep('business')}>Back</button><button type="button" disabled={busy||inviteLoading|| (!!inviteToken&&invite?.status!=='pending')} className="btn-gold flex-[1.5] disabled:opacity-60" onClick={()=>void submit()}>{busy?'Creating Your Workspace…':'Create My Account'}</button></div>
+        <div className="flex gap-3"><button type="button" className="btn-outline flex-1" onClick={()=>setStep('business')}>Back</button><button type="button" disabled={busy||inviteLoading||scopeLoading|| (!!inviteToken&&invite?.status!=='pending')} className="btn-gold flex-[1.5] disabled:opacity-60" onClick={()=>void submit()}>{busy?'Creating Your Workspace…':'Create My Account'}</button></div>
       </div>}
     </AuthLayout>
   )
