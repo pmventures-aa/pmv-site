@@ -31,7 +31,7 @@ async function ensurePrimaryPerson(c: any, clientId: string): Promise<string> {
   if (!user) throw new Error('client not found')
   const id = uuid(), display = toDisplayCase(user.full_name || `${user.first_name || ''} ${user.last_name || ''}`) || user.email
   await c.env.DB.batch([
-    c.env.DB.prepare('INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,\'person\',?,?,?,?,?)').bind(id, display, user.email, user.phone, c.get('user').id),
+    c.env.DB.prepare('INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,?,?,?,?,?)').bind(id, 'person', display, user.email, user.phone, c.get('user').id),
     c.env.DB.prepare('INSERT INTO relationship_people(party_id,first_name,last_name) VALUES (?,?,?)').bind(id, toDisplayCase(user.first_name) || null, toDisplayCase(user.last_name) || null),
     c.env.DB.prepare("INSERT INTO account_parties(user_id,party_id,access_role,is_primary) VALUES (?,?,'self',1)").bind(clientId, id),
     c.env.DB.prepare('UPDATE client_profiles SET primary_party_id=? WHERE user_id=?').bind(id, clientId),
@@ -107,7 +107,7 @@ clientRelationshipRoutes.post('/clients/:id/relationships/people', requireStaff,
   const relation = RELATION_TYPES.has(String(body.relationship_type)) ? String(body.relationship_type) : 'other'
   const id = uuid(), relationshipId = uuid()
   await c.env.DB.batch([
-    c.env.DB.prepare("INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,'person',?,?,?,?,?)").bind(id,name,email(body.email)||null,text(body.phone,60)||null,actor.id),
+    c.env.DB.prepare('INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,?,?,?,?,?)').bind(id, 'person', name, email(body.email)||null, text(body.phone,60)||null, actor.id),
     c.env.DB.prepare('INSERT INTO relationship_people(party_id,first_name,last_name,title) VALUES (?,?,?,?)').bind(id,first||null,last||null,toDisplayCase(body.title)||null),
     c.env.DB.prepare('INSERT INTO party_relationships(id,from_party_id,to_party_id,relationship_type,label,notes,created_by_user_id) VALUES (?,?,?,?,?,?,?)').bind(relationshipId,primary,id,relation,toDisplayCase(body.label)||null,text(body.notes,2000)||null,actor.id),
   ])
@@ -124,7 +124,7 @@ clientRelationshipRoutes.post('/clients/:id/relationships/businesses', requireSt
   if (!contact) return c.json({ error: 'every business requires an active contact person' }, 400)
   const id = uuid()
   await c.env.DB.batch([
-    c.env.DB.prepare("INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,'business',?,?,?,?,?)").bind(id,legalName,email(body.email)||null,text(body.phone,60)||null,actor.id),
+    c.env.DB.prepare('INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,?,?,?,?,?)').bind(id, 'business', legalName, email(body.email)||null, text(body.phone,60)||null, actor.id),
     c.env.DB.prepare('INSERT INTO relationship_businesses(party_id,legal_name,dba_name,entity_type,ein,state,primary_contact_party_id) VALUES (?,?,?,?,?,?,?)').bind(id,legalName,toDisplayCase(body.dba_name)||null,toDisplayCase(body.entity_type)||null,text(body.ein,100)||null,toDisplayCase(body.state)||null,contactId),
     c.env.DB.prepare("INSERT INTO party_relationships(id,from_party_id,to_party_id,relationship_type,label,created_by_user_id) VALUES (?,?,?,'primary_contact','Primary Contact',?)").bind(uuid(),contactId,id,actor.id),
   ])
@@ -139,7 +139,7 @@ clientRelationshipRoutes.post('/clients/:id/relationships/link', requireStaff, a
   const primary = await ensurePrimaryPerson(c, access), actor = c.get('user'), body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
   const partyId = text(body.party_id, 100), relation = RELATION_TYPES.has(String(body.relationship_type)) ? String(body.relationship_type) : 'other'
   if (!partyId || partyId === primary) return c.json({ error: 'choose another person or business' }, 400)
-  const party = await c.env.DB.prepare('SELECT id FROM relationship_parties WHERE id=? AND status=\'active\'').bind(partyId).first()
+  const party = await c.env.DB.prepare("SELECT id FROM relationship_parties WHERE id=? AND status='active'").bind(partyId).first()
   if (!party) return c.json({ error: 'relationship record not found' }, 404)
   await c.env.DB.prepare('INSERT OR IGNORE INTO party_relationships(id,from_party_id,to_party_id,relationship_type,label,notes,created_by_user_id) VALUES (?,?,?,?,?,?,?)').bind(uuid(),primary,partyId,relation,toDisplayCase(body.label)||null,text(body.notes,2000)||null,actor.id).run()
   return c.json({ ok: true })
