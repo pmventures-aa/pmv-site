@@ -145,7 +145,7 @@ export default function Dashboard() {
           {greeting(hour)}, {firstName}.
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-          See what is moving, what Pinnacle owns, and where you are needed — then jump straight into that work.
+          See what is moving, what Pinnacle owns, and where you are needed. Then jump straight into that work.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link to={p('support')} className="btn-gold">Start a request</Link>
