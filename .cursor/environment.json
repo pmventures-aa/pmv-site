@@ -1,0 +1,15 @@
+{
+  "name": "PMV Site",
+  "install": "npm ci && ([ -f .dev.vars ] || cp .dev.vars.example .dev.vars) && npm run db:migrate:local",
+  "terminals": [
+    {
+      "name": "vite (frontend)",
+      "command": "npm run dev -- --host 0.0.0.0"
+    },
+    {
+      "name": "wrangler (full app + api)",
+      "command": "npm run db:migrate:local && npm run build && npx wrangler pages dev dist --port 8788 --ip 0.0.0.0"
+    }
+  ],
+  "ports": [5173, 8788]
+}
