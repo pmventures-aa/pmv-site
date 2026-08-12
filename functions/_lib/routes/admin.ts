@@ -415,7 +415,7 @@ adminRoutes.patch('/clients/:id/profile', requireStaff, async (c) => {
   if (!personPartyId && current) {
     personPartyId = uuid()
     stmts.push(
-      c.env.DB.prepare("INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,'person',?,?,?,?,?)").bind(personPartyId,userFields.full_name || current.full_name || current.email,current.email,userFields.phone ?? current.phone,user.id),
+      c.env.DB.prepare("INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,'person',?,?,?,?)").bind(personPartyId,userFields.full_name || current.full_name || current.email,current.email,userFields.phone ?? current.phone,user.id),
       c.env.DB.prepare('INSERT INTO relationship_people(party_id,first_name,last_name) VALUES (?,?,?)').bind(personPartyId,current.first_name,current.last_name),
       c.env.DB.prepare("INSERT INTO account_parties(user_id,party_id,access_role,is_primary) VALUES (?,?,'self',1)").bind(id,personPartyId),
       c.env.DB.prepare('UPDATE client_profiles SET primary_party_id=? WHERE user_id=?').bind(personPartyId,id),
