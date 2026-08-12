@@ -21,22 +21,26 @@ const crestClass = 'pmv-crest-adaptive object-contain'
 
 type BrandMarkVariant = 'standard' | 'spotlight' | 'quiet'
 type CrestTone = 'auto' | 'light' | 'dark'
-// Two source assets: the original navy/blue crest for light surfaces, and a
-// pre-rendered white/gold crest for dark surfaces. The prior tone='light'
-// implementation stacked CSS filters on the original artwork and looked
-// muddy in the sidebar; the dedicated asset renders cleanly at every size.
-const CREST_DARK_ART = '/logo-crest-transparent.png'   // navy artwork - for LIGHT surfaces
-const CREST_LIGHT_ART = '/logo-crest-white-gold.png'   // white+gold artwork - for DARK surfaces
+// Single source asset for the crest: the original navy+gold artwork the
+// user gave us. Prior attempts to render a white/gold auto-inverted PNG
+// on dark surfaces came out washed and pixelated. Instead we always
+// render the real crest and, on dark surfaces, wrap it in a small
+// cream tile that gives it a proper light background to sit on.
+const CREST_ART = '/logo-crest-transparent.png'
 
 function CrestArtwork({ size, tone = 'auto', className = '', decorative = false }: { size:number; tone?:CrestTone; className?:string; decorative?:boolean }) {
   const alt = decorative ? '' : 'Pinnacle Management Ventures crest'
-  if (tone === 'light') return <img src={CREST_LIGHT_ART} alt={alt} aria-hidden={decorative || undefined} className={`pmv-crest-artwork pmv-crest-dark-surface object-contain ${className}`} style={{ width:size, height:size }}/>
-  if (tone === 'dark') return <img src={CREST_DARK_ART} alt={alt} aria-hidden={decorative || undefined} className={`pmv-crest-artwork object-contain ${className}`} style={{ width:size, height:size }}/>
-  // Auto: show the white/gold on dark theme, navy on light theme via CSS
-  return <span className={`pmv-crest-switch pmv-crest-switch-auto relative inline-block shrink-0 ${className}`} style={{ width:size, height:size }} aria-hidden={decorative || undefined}>
-    <img src={CREST_LIGHT_ART} alt={alt} className="pmv-crest-artwork pmv-crest-dark-surface pmv-crest-for-dark absolute inset-0 h-full w-full object-contain"/>
-    <img src={CREST_DARK_ART} alt={alt} className="pmv-crest-artwork pmv-crest-for-light absolute inset-0 h-full w-full object-contain"/>
-  </span>
+  const inner = <img src={CREST_ART} alt={alt} aria-hidden={decorative || undefined} className="h-full w-full object-contain"/>
+  if (tone === 'light') {
+    // Dark surface: cream tile around the crest for contrast.
+    return <span className={`pmv-crest-tile shrink-0 ${className}`} style={{ width:size, height:size }} aria-hidden={decorative || undefined}>{inner}</span>
+  }
+  if (tone === 'dark') {
+    // Light surface: crest sits directly.
+    return <img src={CREST_ART} alt={alt} aria-hidden={decorative || undefined} className={`pmv-crest-artwork object-contain ${className}`} style={{ width:size, height:size }}/>
+  }
+  // Auto: cream tile on dark themes, bare crest on light themes (CSS-controlled).
+  return <span className={`pmv-crest-switch-auto shrink-0 ${className}`} style={{ width:size, height:size }} aria-hidden={decorative || undefined}>{inner}</span>
 }
 
 export function WhiteGoldBrandMark({ size = 120, className = '', decorative = false }: { size?: number; className?: string; decorative?: boolean }) {
@@ -51,7 +55,7 @@ export function Logo({ className = '', showText = true, markSize = 54, tone = 'a
   if (compact) return (
     <div className={`flex items-center gap-3 ${className}`}>
       <span className="grid place-items-center rounded-xl border border-white/[.08] bg-gradient-to-b from-[#f5efe0] to-[#eae1c8] p-1.5 shadow-[0_2px_10px_rgba(0,0,0,.35)] ring-1 ring-black/[.04]" style={{ width: 48, height: 48 }}>
-        <img src={CREST_DARK_ART} alt="" aria-hidden="true" className="h-full w-full object-contain"/>
+        <img src={CREST_ART} alt="" aria-hidden="true" className="h-full w-full object-contain"/>
       </span>
       <div className="leading-tight">
         <div className="font-display text-[15px] font-extrabold tracking-[.04em] text-white">PINNACLE</div>
@@ -79,7 +83,7 @@ export function BrandMark3D({ size = 120, className = '', decorative = false, va
       <div className="pmv-brand-gyro relative h-full w-full">
         <div className="pmv-brand-depth relative h-full w-full">
           {depth.map((_, i) => (
-            <img key={i} src={CREST_LIGHT_ART} alt="" aria-hidden="true" className="pmv-brand-depth-layer absolute inset-0 h-full w-full object-contain" style={{ transform: `translate3d(${depth.length - i}px, ${Math.max(1, depth.length - i - 1)}px, ${-10 + i * 2}px)`, opacity: Math.max(.035, .11 - i * .012) }} />
+            <img key={i} src={CREST_ART} alt="" aria-hidden="true" className="pmv-brand-depth-layer absolute inset-0 h-full w-full object-contain" style={{ transform: `translate3d(${depth.length - i}px, ${Math.max(1, depth.length - i - 1)}px, ${-10 + i * 2}px)`, opacity: Math.max(.035, .11 - i * .012) }} />
           ))}
           <div className="pmv-brand-face absolute inset-0 h-full w-full drop-shadow-[0_18px_24px_rgba(0,0,0,.28)]"><CrestArtwork size={size} tone="auto" decorative={decorative} className={crestClass}/></div>
           <div className="pmv-brand-specular pointer-events-none absolute inset-[3%]" aria-hidden="true" />
