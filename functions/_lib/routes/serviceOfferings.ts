@@ -31,7 +31,7 @@ const cleanText = (value: unknown, max = 500) => typeof value === 'string' ? val
 const cents = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value * 100) : null
 const arrayJson = (value: unknown): string | null => Array.isArray(value) ? JSON.stringify(value.map((item) => String(item).trim()).filter(Boolean).slice(0, 50)) : null
 
-async function ensureSeeded(env: Env) {
+export async function ensureServiceOfferingsSeeded(env: Env) {
   const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM service_offerings').first<{ n: number }>()
   if ((row?.n ?? 0) > 0) return
   const statements = defaultOfferings.map((item, index) => env.DB.prepare(`
@@ -76,7 +76,7 @@ function publicShape(row: any) {
 }
 
 serviceOfferingPublicRoutes.get('/service-offerings', async (c) => {
-  await ensureSeeded(c.env)
+  await ensureServiceOfferingsSeeded(c.env)
   const serviceKey = (c.req.query('service_key') || '').trim()
   const where = serviceKey ? 'WHERE active = 1 AND service_key = ?' : 'WHERE active = 1'
   const query = `SELECT * FROM service_offerings ${where} ORDER BY service_key, sort_order, name`
@@ -87,7 +87,7 @@ serviceOfferingPublicRoutes.get('/service-offerings', async (c) => {
 })
 
 serviceOfferingAdminRoutes.get('/service-offerings', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  await ensureSeeded(c.env)
+  await ensureServiceOfferingsSeeded(c.env)
   const serviceKey = (c.req.query('service_key') || '').trim()
   const where = serviceKey ? 'WHERE service_key = ?' : ''
   const query = `SELECT * FROM service_offerings ${where} ORDER BY service_key, sort_order, name`
@@ -102,7 +102,7 @@ serviceOfferingAdminRoutes.get('/service-offerings', requireStaff, requireCapabi
 })
 
 serviceOfferingAdminRoutes.post('/service-offerings', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  await ensureSeeded(c.env)
+  await ensureServiceOfferingsSeeded(c.env)
   const body = await c.req.json<OfferingBody>().catch(() => ({} as OfferingBody))
   const id = cleanId(body.id || '')
   const serviceKey = cleanText(body.service_key, 100)
@@ -124,7 +124,7 @@ serviceOfferingAdminRoutes.post('/service-offerings', requireStaff, requireCapab
 })
 
 serviceOfferingAdminRoutes.patch('/service-offerings/:id', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  await ensureSeeded(c.env)
+  await ensureServiceOfferingsSeeded(c.env)
   const body = await c.req.json<OfferingBody>().catch(() => ({} as OfferingBody))
   const sets: string[] = []
   const values: unknown[] = []

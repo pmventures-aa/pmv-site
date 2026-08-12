@@ -25,6 +25,9 @@ import Accessibility from './pages/public/Accessibility'
 import VerifyDocument from './pages/public/VerifyDocument'
 import SignerExperience from './pages/public/SignerExperience'
 import SharedDocument from './pages/public/SharedDocument'
+import ScopeRequest from './pages/public/ScopeRequest'
+import ScopeConfirmation from './pages/public/ScopeConfirmation'
+import InstantQuote from './pages/public/InstantQuote'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
 import { installAudioUnlock } from './lib/sound'
@@ -78,6 +81,9 @@ function App() {
       <Route path="/services/mobile-documents" element={<MobileDocumentHub />} />
       <Route path="/services/:slug" element={<ServiceDetail />} />
       <Route path="/projects/:slug" element={<ProjectGuidePage />} />
+      <Route path="/scope-request" element={<ScopeRequest />} />
+      <Route path="/scope-request/confirmation" element={<ScopeConfirmation />} />
+      <Route path="/instant-quote" element={<InstantQuote />} />
       <Route path="/about" element={<About />} />
       <Route path="/service-area" element={<ServiceArea />} />
       <Route path="/professionals" element={<Professionals />} />

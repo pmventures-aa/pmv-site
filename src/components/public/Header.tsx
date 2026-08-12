@@ -13,7 +13,7 @@ const serviceLinks=[
   {to:'/services/business-operations',label:'Business & Administrative Support',body:'Operations, administrative capacity, client and project coordination, POS and payments, processes, and vendor management.'},
 ]
 const CLIENT_LOGIN='/portal/login'
-const CLIENT_SIGNUP='/portal/signup?source=header'
+const CLIENT_SIGNUP='/scope-request?source=header'
 
 export function Header(){
   const [open,setOpen]=useState(false)

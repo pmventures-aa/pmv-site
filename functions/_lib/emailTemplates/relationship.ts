@@ -15,6 +15,7 @@ export interface EventEmailInput {
   body: string
   ctaLabel?: string
   ctaUrl?: string
+  footerLink?: { label: string; url: string }
   eyebrow?: string
   preheader?: string
 }
@@ -24,7 +25,8 @@ const para = (text: string) => text.split(/\n\n+/).map((p) => `<p style="margin:
 
 export function renderRelationshipEvent(input: EventEmailInput): RelationshipEmail {
   const name = first(input.firstName)
-  const bodyHtml = `<p style="margin:0 0 18px">Hi ${escapeHtml(name)},</p>${para(input.body)}`
+  const footerLinkHtml=input.footerLink?`<p style="margin:24px 0 0;font-size:12px;color:#64748b"><a href="${escapeHtml(input.footerLink.url)}" style="color:#94a3b8;text-decoration:underline">${escapeHtml(input.footerLink.label)}</a></p>`:''
+  const bodyHtml = `<p style="margin:0 0 18px">Hi ${escapeHtml(name)},</p>${para(input.body)}${footerLinkHtml}`
   const html = renderPinnacleEmailLayout({
     preheader: input.preheader || input.subject,
     eyebrow: input.eyebrow || 'Pinnacle update',
@@ -35,7 +37,7 @@ export function renderRelationshipEvent(input: EventEmailInput): RelationshipEma
   return {
     subject: input.subject,
     html,
-    text: `Hi ${name},\n\n${input.body}${input.ctaLabel && input.ctaUrl ? `\n\n${input.ctaLabel}: ${input.ctaUrl}` : ''}\n\nPinnacle Management Ventures\n(561) 388-7879\npinnaclemanagementventures.com`,
+    text: `Hi ${name},\n\n${input.body}${input.ctaLabel && input.ctaUrl ? `\n\n${input.ctaLabel}: ${input.ctaUrl}` : ''}${input.footerLink?`\n\n${input.footerLink.label}: ${input.footerLink.url}`:''}\n\nPinnacle Management Ventures\n(561) 388-7879\npinnaclemanagementventures.com`,
   }
 }
 

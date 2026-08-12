@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom'
 import { Logo } from '../ui'
+import { MobileConversionBar } from './MobileConversionBar'
 
 export function Footer() {
-  return (
+  return <>
     <footer className="border-t border-white/[.07] bg-navy-950">
       <div className="container-pmv py-12">
         <div className="grid gap-10 lg:grid-cols-[1.25fr_.75fr_.8fr_1fr]">
@@ -47,5 +48,6 @@ export function Footer() {
         </div>
       </div>
     </footer>
-  )
+    <MobileConversionBar />
+  </>
 }

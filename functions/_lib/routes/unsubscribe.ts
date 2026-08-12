@@ -17,6 +17,7 @@ unsubscribeRoutes.get('/unsubscribe/:token', async (c) => {
       c.env.DB.prepare("UPDATE email_unsubscribe_tokens SET used_at = datetime('now') WHERE token = ?").bind(token),
       c.env.DB.prepare("UPDATE contact_inquiries SET email_status = 'unsubscribed', email_unsubscribed_at = datetime('now'), updated_at = datetime('now') WHERE lower(email) = lower(?)").bind(row.email),
       c.env.DB.prepare("UPDATE users SET marketing_email_status = 'unsubscribed', marketing_unsubscribed_at = datetime('now') WHERE lower(email) = lower(?)").bind(row.email),
+      c.env.DB.prepare("UPDATE public_scope_requests SET marketing_status = 'unsubscribed', follow_up_opt_in = 0, updated_at = datetime('now') WHERE lower(email) = lower(?)").bind(row.email),
     ])
   }
 
