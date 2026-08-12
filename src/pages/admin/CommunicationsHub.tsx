@@ -5,6 +5,7 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, btnSecondary, btnPrimary, inputCls } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { useAppPath } from '../../lib/basePath'
+import { ConversationsPanel } from './ConversationsPanel'
 
 type Overview = {
   unread_threads: number
@@ -36,10 +37,11 @@ type ReportingResponse = {
   aging_threads: Array<{ id: string; subject: string; client_name: string; client_email: string; last_message_at: string }>
 }
 
-type Tab = 'overview' | 'notifications' | 'reporting'
+type Tab = 'overview' | 'threads' | 'notifications' | 'reporting'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'threads', label: 'Threads' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'reporting', label: 'Reporting' },
 ]
@@ -89,6 +91,7 @@ export default function CommunicationsHub() {
       </div>
 
       {tab === 'overview' && <OverviewTab overview={overview} loading={loading}/>}
+      {tab === 'threads' && <ConversationsPanel/>}
       {tab === 'notifications' && <NotificationsTab/>}
       {tab === 'reporting' && <ReportingTab/>}
     </div>
