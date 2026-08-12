@@ -36,7 +36,7 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
   .btn-gold { @apply btn bg-gold text-navy-950 hover:-translate-y-0.5 hover:bg-gold-400; box-shadow:0 8px 20px rgba(201,162,39,.1); }
   .btn-outline { @apply btn border border-white/15 bg-white/[.015] text-slate-100 hover:-translate-y-0.5 hover:border-gold/60 hover:bg-gold/[.035] hover:text-gold; }
   .container-pmv { @apply mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8; }
-  .eyebrow { @apply font-display text-[10px] font-bold uppercase tracking-[0.2em] text-gold-400; }
+  .eyebrow { @apply font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-gold-400; }
   .surface-panel { border:1px solid var(--pmv-line); background:rgba(255,255,255,.022); box-shadow:var(--pmv-shadow-sm); }
   .surface-panel-strong { border:1px solid var(--pmv-line-strong); background:rgba(255,255,255,.032); box-shadow:var(--pmv-shadow-md); }
   .enterprise-grid { background-image:none; }
@@ -50,37 +50,16 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 .theme-toggle-compact:hover { border-color:rgba(201,162,39,.45); color:#c9a227; }
 .theme-indicator { color:#c9a227; font-size:10px; }
 
-.pmv-crest-adaptive { filter:contrast(1.03) drop-shadow(0 8px 18px rgba(0,0,0,.22)); }
-.pmv-crest-light { filter:contrast(1.03) drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
-.pmv-crest-outline { display:none; }
+.pmv-crest-on-dark, .pmv-crest-switch { filter: drop-shadow(0 8px 18px rgba(0,0,0,.32)); }
+.pmv-crest-for-light { display: none; }
+:root[data-theme='light'] .pmv-crest-for-dark { display: none; }
+:root[data-theme='light'] .pmv-crest-for-light { display: block; }
+:root[data-theme='light'] .pmv-crest-switch { filter: drop-shadow(0 4px 10px rgba(15,23,42,.12)); }
+.pmv-logo-halo { background:radial-gradient(circle,rgba(201,162,39,.14),rgba(201,162,39,.04) 48%,transparent 72%); filter:blur(6px); }
+.pmv-brand-stage { background:radial-gradient(circle,rgba(201,162,39,.16),rgba(201,162,39,.05) 38%,transparent 68%); filter:blur(12px); }
 
-/* Dark-surface crest. We ship a purpose-built cream/gold artwork
-   (logo-crest-white-gold.png) that is legible on navy instead of
-   CSS-filtering the navy original into a muddy, washed silhouette.
-   .pmv-crest-gold always uses it (it only ever sits on dark surfaces);
-   .pmv-crest-switch-auto swaps to the navy original under a light theme. */
-.pmv-crest-gold, .pmv-crest-switch-auto {
-  display:inline-block;
-  background:url('/logo-crest-white-gold.png') center / contain no-repeat;
-  filter:drop-shadow(0 2px 8px rgba(0,0,0,.4));
-}
-:root[data-theme='light'] .pmv-crest-switch-auto {
-  background-image:url('/logo-crest-transparent.png');
-  filter:drop-shadow(0 4px 10px rgba(0,0,0,.15));
-}
-
-.pmv-crest-dark-surface { filter:none; }
-.pmv-crest-tile { display:contents; } /* legacy class - no-op now */
-.pmv-crest-switch { vertical-align:middle; }
-.pmv-crest-for-light { display:none; }
-:root[data-theme='light'] .pmv-crest-switch-auto .pmv-crest-for-dark { display:none; }
-:root[data-theme='light'] .pmv-crest-switch-auto .pmv-crest-for-light { display:block; filter:contrast(1.06) saturate(.9) drop-shadow(0 6px 14px rgba(15,23,42,.12)); }
-.pmv-logo-halo { background:radial-gradient(circle,rgba(201,162,39,.18),rgba(201,162,39,.045) 48%,transparent 72%); filter:blur(5px); }
-.pmv-brand-stage { background:radial-gradient(circle,rgba(201,162,39,.22),rgba(201,162,39,.065) 38%,transparent 68%); filter:blur(12px); }
-.brand-mark-3d { animation:pmv-brand-float 7s ease-in-out infinite; }
-
-.pmv-hero-story { background:radial-gradient(circle at 76% 42%,rgba(201,162,39,.11),transparent 28%),linear-gradient(140deg,#06111f 0%,#071522 56%,#0b1b2e 100%); }
-.pmv-hero-gold { position:absolute; inset:auto -12rem -15rem auto; width:42rem; height:42rem; border-radius:999px; background:radial-gradient(circle,rgba(201,162,39,.22),rgba(201,162,39,.07) 35%,transparent 68%); filter:blur(18px); pointer-events:none; animation:pmv-glow-breathe 9s ease-in-out infinite; }
+.pmv-hero-story { background:linear-gradient(165deg,#06111f 0%,#071522 48%,#0a1a2c 100%); }
+.pmv-hero-gold { position:absolute; inset:auto -10rem -18rem auto; width:36rem; height:36rem; border-radius:999px; background:radial-gradient(circle,rgba(201,162,39,.14),rgba(201,162,39,.04) 42%,transparent 70%); filter:blur(22px); pointer-events:none; }
 .pmv-gold-text { color:#e4c765; text-shadow:0 0 30px rgba(201,162,39,.12); }
 .pmv-gold-band { background:linear-gradient(180deg,rgba(201,162,39,.055),rgba(10,23,39,.5) 32%,rgba(6,17,31,.9)); }
 .pmv-trust-strip { background:linear-gradient(90deg,rgba(201,162,39,.055),rgba(6,17,31,.84) 30%,rgba(6,17,31,.84) 70%,rgba(201,162,39,.055)); }
@@ -196,7 +175,7 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 :root[data-theme='light'] .theme-toggle button,:root[data-theme='light'] .theme-toggle-compact { color:#4b5563; }
 :root[data-theme='light'] .theme-toggle button:hover,:root[data-theme='light'] .theme-toggle-compact:hover { color:#8f6f05; }
 :root[data-theme='light'] .theme-toggle button.is-active { background:rgba(201,162,39,.14); color:#765b05; }
-:root[data-theme='light'] .pmv-hero-story { background:radial-gradient(circle at 76% 42%,rgba(201,162,39,.12),transparent 28%),linear-gradient(140deg,#f7f3e8 0%,#fffefa 56%,#eee9dd 100%); }
+:root[data-theme='light'] .pmv-hero-story { background:linear-gradient(165deg,#f7f3e8 0%,#fffefa 52%,#eee9dd 100%); }
 :root[data-theme='light'] .pmv-gold-band { background:linear-gradient(180deg,rgba(201,162,39,.08),rgba(255,254,250,.92) 38%,#f3f1ec); }
 :root[data-theme='light'] .pmv-trust-strip { background:linear-gradient(90deg,rgba(201,162,39,.075),#f7f4ec 30%,#f7f4ec 70%,rgba(201,162,39,.075)); }
 :root[data-theme='light'] .pmv-story-note { background:rgba(255,254,250,.92); box-shadow:0 14px 30px rgba(28,43,59,.08); }

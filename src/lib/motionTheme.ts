@@ -11,7 +11,7 @@ export const pmvMotion = {
 } satisfies Record<string, Transition>
 
 export const pmvFadeUp: Variants = {
-  hidden: { opacity: 0, y: 16 },
+  hidden: { opacity: 0, y: 10 },
   show: { opacity: 1, y: 0, transition: pmvMotion.gentle },
 }
 

@@ -96,7 +96,7 @@ function HubPage({ hub }: { hub: keyof typeof HUBS }) {
       <div className="pmv-hero-gold" aria-hidden="true" />
       <div className="container-pmv grid gap-10 py-16 sm:py-20 lg:grid-cols-[1.12fr_.88fr] lg:items-center lg:py-24">
         <Reveal><p className="eyebrow">{cfg.eyebrow}</p><h1 className="mt-4 max-w-4xl font-display text-4xl font-medium leading-[1.06] tracking-[-.03em] text-white sm:text-6xl">{cfg.title}</h1><p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{cfg.intro}</p><p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">{cfg.statement}</p><div className="mt-8 flex flex-wrap gap-3"><Link to={HUB_INTAKE[hub].to} className={btnPrimary}>{HUB_INTAKE[hub].cta}</Link>{hub==='property'&&<Link to="/instant-quote" className={btnOutline}>Instant Cleaning / Inspection Estimate</Link>}<Link to="/services" className={btnOutline}>All Services</Link></div></Reveal>
-        <Reveal className="relative flex min-h-[300px] items-center justify-center"><BrandMark3D size={220} decorative variant="spotlight" className="relative z-10"/></Reveal>
+        <Reveal className="relative flex min-h-[300px] items-center justify-center"><BrandMark3D size={200} decorative variant="quiet" className="relative z-10"/></Reveal>
       </div>
     </section>
 
