@@ -54,17 +54,18 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 .pmv-crest-light { filter:contrast(1.03) drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
 .pmv-crest-outline { display:none; }
 
-/* Gold-tinted version of the ORIGINAL crest. Grayscale first to strip
-   the flat navy fill, then re-tint via sepia + hue-rotate so the crown,
-   shield, mountain, and flourish detail all stay visible as brightness
-   variance instead of collapsing to a single blob. */
+/* Dark-surface crest. We ship a purpose-built cream/gold artwork
+   (logo-crest-white-gold.png) that is legible on navy instead of
+   CSS-filtering the navy original into a muddy, washed silhouette.
+   .pmv-crest-gold always uses it (it only ever sits on dark surfaces);
+   .pmv-crest-switch-auto swaps to the navy original under a light theme. */
 .pmv-crest-gold, .pmv-crest-switch-auto {
   display:inline-block;
-  background:url('/logo-crest-transparent.png') center / contain no-repeat;
-  filter:grayscale(1) brightness(1.35) sepia(1) saturate(4) hue-rotate(-8deg)
-         drop-shadow(0 2px 6px rgba(0,0,0,.35));
+  background:url('/logo-crest-white-gold.png') center / contain no-repeat;
+  filter:drop-shadow(0 2px 8px rgba(0,0,0,.4));
 }
 :root[data-theme='light'] .pmv-crest-switch-auto {
+  background-image:url('/logo-crest-transparent.png');
   filter:drop-shadow(0 4px 10px rgba(0,0,0,.15));
 }
 
