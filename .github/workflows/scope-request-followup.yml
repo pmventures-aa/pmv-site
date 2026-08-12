@@ -3,10 +3,6 @@ name: Follow up on public scope requests
 on:
   schedule:
     - cron: '40 14 * * *'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/scope-request-followup.yml'
   workflow_dispatch:
 
 permissions:

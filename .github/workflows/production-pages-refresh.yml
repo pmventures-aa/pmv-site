@@ -17,6 +17,8 @@ on:
       - 'tsconfig*.json'
       - 'wrangler.toml'
       - '.github/workflows/production-pages-refresh.yml'
+      - '.github/workflows/automation-auth-smoke.yml'
+      - '.github/workflows/scope-request-followup.yml'
   workflow_dispatch:
 
 concurrency:
