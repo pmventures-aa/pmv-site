@@ -1,33 +1,47 @@
 import {
-  Home, Layers, Scale, CheckSquare, FileText, MessageSquare, Calendar, Receipt, HelpCircle, Building2, Users, Bell, ShieldCheck,
-  Workflow, UserPlus, Megaphone, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned, Send,
-  BookOpen, Bot, Gauge, PenTool, Wrench, type LucideIcon,
+  Home, Layers, FileText, MessageSquare, Calendar, Receipt, HelpCircle, Building2, Users,
+  Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned, Send,
+  BookOpen, Bot, Gauge, PenTool, Wrench, ShieldCheck, type LucideIcon,
 } from 'lucide-react'
+import { clientWorkspace, resolveWorld, type OperatingWorld } from '../../lib/workspace'
 
 export interface NavItem { key:string;label:string;to:string;icon:LucideIcon;section?:string }
 
-// The Command Center dashboard IS the client's real navigation - the tile
-// grid there surfaces every service the client can access, so the sidebar
-// intentionally stays minimal (just the three destinations the client will
-// jump back to independent of context). Everything else is discovered
-// through the dashboard's tile grid + discovery panel.
 export const portalNav: NavItem[] = [
-  {key:'dashboard',label:'Command Center',to:'',icon:Home},
-  {key:'support',label:'Requests & Cases',to:'support',icon:HelpCircle},
-  {key:'documents',label:'Documents',to:'documents',icon:FileText},
+  {key:'dashboard',label:'Home',to:'',icon:Home},
+  {key:'support',label:'Requests',to:'support',icon:HelpCircle,section:'Your work'},
+  {key:'documents',label:'Documents',to:'documents',icon:FileText,section:'Your work'},
+  {key:'messages',label:'Messages',to:'messages',icon:MessageSquare,section:'Your work'},
+  {key:'calendar',label:'Calendar',to:'calendar',icon:Calendar,section:'Your work'},
+  {key:'billing',label:'Billing',to:'billing',icon:Receipt,section:'Account'},
+  {key:'services',label:'Services',to:'services',icon:Layers,section:'Account'},
 ]
-// Persona-based extras. Only added when the account has services in that
-// category - a landlord sees "My Properties" appear, an admin-heavy account
-// sees "Projects & Tasks", a funding client sees "Funding". Never all three
-// at once, so the sidebar stays under four items for most people.
+
+export const portalMobilePrimary = ['dashboard', 'support', 'documents', 'messages'] as const
+
 export function clientPortalNav(serviceKeys: string[]): NavItem[] {
   const keys = new Set(serviceKeys)
-  const contextual: NavItem[] = []
-  if (keys.has('property_management') || keys.has('property_inspections')) contextual.push({key:'properties',label:'My Properties',to:'property-management',icon:Building2,section:'Your work'})
-  if (keys.has('funding')) contextual.push({key:'funding',label:'Funding',to:'funding',icon:Gauge,section:'Your work'})
-  if ([...keys].some((key) => ['admin_support','document_courier','mobile_notary'].includes(key))) contextual.push({key:'work',label:'Projects & Tasks',to:'matters',icon:Wrench,section:'Your work'})
-  return [portalNav[0], ...contextual, ...portalNav.slice(1)]
+  const world = resolveWorld(serviceKeys)
+  const extras: NavItem[] = []
+  if (keys.has('property_management') || keys.has('property_inspections')) extras.push({key:'properties',label:'Properties',to:'property-management',icon:Building2,section:'Your work'})
+  if (keys.has('funding')) extras.push({key:'funding',label:'Funding',to:'funding',icon:Gauge,section:'Your work'})
+  if ([...keys].some((key) => ['admin_support','document_courier','mobile_notary'].includes(key)) && world !== 'documents') {
+    extras.push({key:'work',label:'Projects',to:'matters',icon:Wrench,section:'Your work'})
+  }
+  const home = portalNav[0]
+  const work = portalNav.filter((item) => item.section === 'Your work')
+  const account = portalNav.filter((item) => item.section === 'Account')
+  const properties = extras.filter((item) => item.key === 'properties')
+  const rest = extras.filter((item) => item.key !== 'properties')
+  if (world === 'property') return [home, ...properties, ...work, ...rest, ...account]
+  if (world === 'funding') return [home, ...rest.filter((item) => item.key === 'funding'), ...work, ...properties, ...rest.filter((item) => item.key !== 'funding'), ...account]
+  return [home, ...work, ...extras, ...account]
 }
+
+export function clientMobilePrimary(serviceKeys: string[]): string[] {
+  return clientWorkspace(serviceKeys).mobilePrimary
+}
+
 export const portalHiddenRoutes=['planned-calls','funding','property-management','tax-filings'] as const
 
 export const adminNav: NavItem[] = [
@@ -38,3 +52,18 @@ export const adminNav: NavItem[] = [
   {key:'public-funnel',label:'Public Funnel',to:'public-funnel',icon:Wrench,section:'Intelligence'},
   {key:'security-center',label:'Security Center',to:'security-center',icon:ShieldCheck,section:'Access'},{key:'network',label:'Network & Dispatch',to:'network',icon:UsersRound,section:'Access'},{key:'users',label:'Users',to:'users',icon:UserCog,section:'Access'},{key:'assignments',label:'Assignments',to:'assignments',icon:ArrowLeftRight,section:'Access'},{key:'settings',label:'Settings',to:'settings',icon:Settings,section:'Access'},
 ]
+
+export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
+  const assignmentLabel = world === 'property'
+    ? 'Field assignments'
+    : world === 'documents'
+      ? 'Signing assignments'
+      : 'My assignments'
+  return [
+    {key:'assignments',label:assignmentLabel,to:'field-work/mine',icon:MapPinned},
+    {key:'messages',label:'Inbox',to:'messages',icon:MessageSquare,section:'Work'},
+    {key:'security-center',label:'Security',to:'security-center',icon:ShieldCheck,section:'Account'},
+  ]
+}
+
+export const vendorNav: NavItem[] = vendorNavForWorld('general')

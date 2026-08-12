@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { api, ApiError } from './api'
+import { emptyWorkspace, rememberOperatingWorld, type WorkspaceContext } from './workspace'
 
 export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
 
@@ -14,6 +15,7 @@ export interface SessionUser {
 
 interface AuthState {
   user: SessionUser | null
+  workspace: WorkspaceContext
   loading: boolean
   login: (email: string, password: string) => Promise<SessionUser>
   signup: (input: {
@@ -43,17 +45,26 @@ function ensureWelcomeSession() {
   if (!window.sessionStorage.getItem(WELCOME_SESSION_KEY)) newWelcomeSession()
 }
 
+function applyWorkspace(workspace?: WorkspaceContext | null) {
+  const next = workspace || emptyWorkspace()
+  rememberOperatingWorld(next.world, next.party_type)
+  return next
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
+  const [workspace, setWorkspace] = useState<WorkspaceContext>(emptyWorkspace())
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
     try {
-      const data = await api.get<{ user: SessionUser }>('/me')
+      const data = await api.get<{ user: SessionUser; workspace?: WorkspaceContext }>('/me')
       setUser(data.user)
+      setWorkspace(applyWorkspace(data.workspace))
       ensureWelcomeSession()
     } catch {
       setUser(null)
+      setWorkspace(emptyWorkspace())
     } finally {
       setLoading(false)
     }
@@ -67,6 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await api.post<{ ok: boolean; user: SessionUser }>('/auth/login', { email, password })
     newWelcomeSession()
     setUser(data.user)
+    try {
+      const me = await api.get<{ user: SessionUser; workspace?: WorkspaceContext }>('/me')
+      setWorkspace(applyWorkspace(me.workspace))
+    } catch {
+      setWorkspace(emptyWorkspace())
+    }
     return data.user
   }, [])
 
@@ -74,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await api.post<{ ok: boolean; user: SessionUser }>('/auth/signup', input)
     newWelcomeSession()
     setUser(data.user)
+    setWorkspace(emptyWorkspace())
     return data.user
   }, [])
 
@@ -81,10 +99,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await api.post('/auth/logout')
     if (typeof window !== 'undefined') window.sessionStorage.removeItem(WELCOME_SESSION_KEY)
     setUser(null)
+    setWorkspace(emptyWorkspace())
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, refresh }}>
+    <AuthContext.Provider value={{ user, workspace, loading, login, signup, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   )

@@ -67,6 +67,7 @@ import { impersonationRoutes } from '../_lib/routes/impersonation'
 import { denyDuringImpersonation, impersonationGuard } from '../_lib/impersonationGuard'
 import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib/routes/managedTemplates'
 import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
+import { loadWorkspaceContext } from '../_lib/workspaceContext'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -98,7 +99,11 @@ app.route('/', scopeFunnelPublicRoutes)
 app.route('/', carePlanPublicRoutes)
 app.route('/', managedTemplatePublicRoutes)
 
-app.get('/me', requireUser, (c) => c.json({ user: c.get('user') }))
+app.get('/me', requireUser, async (c) => {
+  const user = c.get('user')
+  const workspace = await loadWorkspaceContext(c.env, user)
+  return c.json({ user, workspace })
+})
 
 app.route('/portal', intakeCopyRoutes)
 app.route('/portal', signaturePortalSyncRoutes)

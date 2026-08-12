@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { api, ApiError } from '../../lib/api'
 import { Icon, type IconName } from '../kit/Icon'
 import { AddressAutocomplete } from '../kit/AddressAutocomplete'
+import { jobsForWorld, publicIntakeCopy, worldFromPublicParams } from '../../lib/workspace'
 
 type ScopeResponse = { confirmation_url:string }
 type Form = {
@@ -23,9 +24,6 @@ type Form = {
   service_answers:Record<string,string|string[]>
 }
 
-// Regex validation - kept intentionally lenient. Email requires a
-// user@host.tld shape; phone accepts US-formatted digits with common
-// separators, min 10 digits.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const PHONE_RE = /^[\d\s().+\-]{10,}$/
 const validEmail = (v:string) => EMAIL_RE.test(v.trim())
@@ -50,12 +48,10 @@ const serviceJobs:Record<string,string>={
   remote_online_notary:'documents_notary',
   property_management:'cleaning_turnover',
   property_inspections:'property_inspection',
+  funding:'business_operations',
 }
 const timings=['As soon as possible','Within 2-3 business days','This week','I have a specific date','Flexible / planning ahead']
 
-// Per-job (or per-service key) targeted questions asked between the
-// timing step and the contact step. Keeps intake short but captures the
-// operational details we need to actually scope + price.
 type Question = {
   key:string
   label:string
@@ -81,7 +77,7 @@ const QUESTIONS_BY_JOB:Record<string,Question[]>={
     {key:'document_kind',label:'What kind of document work?',type:'multiselect',options:['Mobile notary','Remote Online Notary (RON)','Document prep / packet','Courier / delivery','Courthouse filing','Signing coordination','Attorney handoff']},
     {key:'signer_count',label:'How many signers?',type:'select',options:['1','2','3','4+']},
     {key:'has_document',label:'Do you already have the document?',type:'select',options:['Yes, ready to go','Yes, needs review','No, need help preparing it']},
-    {key:'meeting_location',label:'Where does it need to happen?',hint:'Address, office, care facility, courthouse, remote…',type:'text'},
+    {key:'meeting_location',label:'Where does it need to happen?',hint:'Address, office, care facility, courthouse, remote',type:'text'},
   ],
   eviction_reo:[
     {key:'stage',label:'Current stage',type:'select',options:['Pre-notice','Notice served','Filed / awaiting hearing','Judgment entered','Writ / lockout scheduled','Post-possession']},
@@ -103,7 +99,7 @@ const QUESTIONS_BY_JOB:Record<string,Question[]>={
     {key:'timeline',label:'Timeline pressure',type:'select',options:['ASAP - system down or provider issues','Within 30 days','1-3 months','No fixed date']},
   ],
   other:[
-    {key:'outcome',label:'What outcome are you after?',hint:'Describe the "handled" state so we can scope backwards from it',type:'text'},
+    {key:'outcome',label:'What outcome are you after?',hint:'Describe the handled state so we can scope backwards from it',type:'text'},
   ],
 }
 
@@ -111,19 +107,30 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
   const navigate=useNavigate();const [params]=useSearchParams()
   const serviceKey=params.get('service')||''
   const offeringId=params.get('offering')||''
-  const preselected=params.get('job')||serviceJobs[serviceKey]||''
   const requestSource=params.get('source')||source
-  const [step,setStep]=useState(0);const [busy,setBusy]=useState(false);const [error,setError]=useState('')
+  const world=worldFromPublicParams({
+    world:params.get('world'),
+    service:serviceKey,
+    job:params.get('job'),
+    source:requestSource,
+    audience:params.get('audience'),
+    family:params.get('family'),
+    guide:params.get('guide'),
+  })
+  const copy=publicIntakeCopy(world)
+  const visibleJobs=jobs.filter((job)=>jobsForWorld(world).includes(job.value))
+  const preselected=params.get('job')||serviceJobs[serviceKey]||(visibleJobs.length===1?visibleJobs[0].value:'')
+  const initialJob=visibleJobs.some((job)=>job.value===preselected)?preselected:''
+  const [step,setStep]=useState(initialJob?1:0);const [busy,setBusy]=useState(false);const [error,setError]=useState('')
   const [form,setForm]=useState<Form>({
-    job_type:jobs.some(j=>j.value===preselected)?preselected:'',
-    location_type:remoteJobs.has(preselected)?'remote':'onsite',
+    job_type:initialJob,
+    location_type:remoteJobs.has(initialJob)?'remote':'onsite',
     address:'',city:'',state:'',postal_code:'',timing:'',details:'',
     contact_name:'',email:'',phone:'',follow_up_opt_in:false,website:'',
     service_answers:{},
   })
 
   const activeQuestions = useMemo(() => QUESTIONS_BY_JOB[form.job_type] || [], [form.job_type])
-
   const update=<K extends keyof Form>(key:K,value:Form[K])=>setForm(current=>({...current,[key]:value}))
   const setAnswer=(k:string,v:string|string[])=>setForm(current=>({...current,service_answers:{...current.service_answers,[k]:v}}))
   const chooseJob=(value:string)=>{setForm(current=>({...current,job_type:value,location_type:remoteJobs.has(value)?'remote':'onsite',service_answers:{}}));setError('')}
@@ -153,16 +160,24 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     finally{setBusy(false)}
   }
 
+  const selectedLabel=jobs.find(j=>j.value===form.job_type)?.label
   const totalSteps = activeQuestions.length ? 5 : 4
   const progressPct = ((step + 1) / totalSteps) * 100
   const showQuestionsStep = step === 3 && activeQuestions.length > 0
   const showContactStep = (activeQuestions.length ? step === 4 : step === 3)
   const isLastStep = showContactStep
+  const detailsPlaceholder = world==='property'
+    ? 'Address, access, occupancy, condition, and what should be true when the visit is finished.'
+    : world==='documents'
+      ? 'Document type, signer location, deadline, and whether it needs notary, RON, filing, or courier.'
+      : world==='business'
+        ? 'The capacity, system, or follow-through gap, plus any deadline that matters.'
+        : 'What should be true when the work is finished? Add any deadline, access issue, document, property condition, or other detail that matters.'
 
   return <div className={`overflow-hidden rounded-2xl border border-white/10 bg-navy-900/75 shadow-[0_24px_80px_rgba(0,0,0,.24)] ${compact?'':'max-w-5xl'}`}>
     <div className="border-b border-white/10 px-5 py-4 sm:px-7">
       <div className="flex items-center justify-between gap-5">
-        <div><p className="eyebrow">Tell us what needs to happen</p><p className="mt-1 text-xs text-slate-500">No account · about two minutes · real reply within 2 business hours</p></div>
+        <div><p className="eyebrow">{selectedLabel||copy.eyebrow}</p><p className="mt-1 text-xs text-slate-500">No account · about two minutes · real reply within 2 business hours</p></div>
         <span className="text-xs font-bold text-gold">{step+1} / {totalSteps}</span>
       </div>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10"><motion.div className="h-full bg-gold" animate={{width:`${progressPct}%`}}/></div>
@@ -172,9 +187,9 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
       <motion.div key={step} initial={{opacity:0,x:16}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-12}} transition={{duration:.18}}>
 
         {step===0 && <div>
-          <h3 className="text-xl font-bold text-white">What outcome are you after?</h3>
-          <p className="mt-1 text-sm text-slate-400">Pick the closest fit. You can add detail in a moment.</p>
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">{jobs.map(job=>
+          <h3 className="text-xl font-bold text-white">{copy.pickerTitle}</h3>
+          <p className="mt-1 text-sm text-slate-400">{world==='general'?'Pick the closest fit. You can add detail in a moment.':'These options stay inside this operating world. You can add detail in a moment.'}</p>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">{visibleJobs.map(job=>
             <button key={job.value} type="button" onClick={()=>chooseJob(job.value)} className={`flex min-h-[88px] items-start gap-3 rounded-xl border p-4 text-left transition ${form.job_type===job.value?'border-gold/55 bg-gold/[.08]':'border-white/10 bg-white/[.02] hover:border-white/25'}`}>
               <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-navy-950 text-gold"><Icon name={job.icon} size={17}/></span>
               <span><strong className="block text-sm text-white">{job.label}</strong><span className="mt-1 block text-xs leading-5 text-slate-400">{job.body}</span></span>
@@ -183,10 +198,10 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
         </div>}
 
         {step===1 && <div>
-          <h3 className="text-xl font-bold text-white">Where does the work need to happen?</h3>
+          <h3 className="text-xl font-bold text-white">{copy.locationTitle}</h3>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <button type="button" onClick={()=>update('location_type','onsite')} className={`rounded-xl border p-4 text-left ${form.location_type==='onsite'?'border-gold/50 bg-gold/[.07]':'border-white/10'}`}><strong className="text-sm text-white">At a location</strong><span className="mt-1 block text-xs text-slate-400">A property, office, courthouse, care facility, or other site.</span></button>
-            <button type="button" onClick={()=>update('location_type','remote')} className={`rounded-xl border p-4 text-left ${form.location_type==='remote'?'border-gold/50 bg-gold/[.07]':'border-white/10'}`}><strong className="text-sm text-white">Remote or nationwide</strong><span className="mt-1 block text-xs text-slate-400">Business support, documents, coordination, or RON.</span></button>
+            <button type="button" onClick={()=>update('location_type','onsite')} className={`rounded-xl border p-4 text-left ${form.location_type==='onsite'?'border-gold/50 bg-gold/[.07]':'border-white/10'}`}><strong className="text-sm text-white">At a location</strong><span className="mt-1 block text-xs text-slate-400">{world==='property'?'The address, unit, or site that needs the visit.':'A property, office, courthouse, care facility, or other site.'}</span></button>
+            <button type="button" onClick={()=>update('location_type','remote')} className={`rounded-xl border p-4 text-left ${form.location_type==='remote'?'border-gold/50 bg-gold/[.07]':'border-white/10'}`}><strong className="text-sm text-white">Remote or nationwide</strong><span className="mt-1 block text-xs text-slate-400">{world==='documents'?'RON, document prep, or coordination that does not require a site visit.':'Business support, documents, coordination, or RON.'}</span></button>
           </div>
           {form.location_type==='onsite' && <div className="mt-5 space-y-3">
             <AddressAutocomplete
@@ -198,7 +213,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
                 if(a.state) update('state',a.state.slice(0,2).toUpperCase())
                 if(a.postal_code) update('postal_code',a.postal_code)
               }}
-              placeholder="Start typing the property address…"
+              placeholder="Start typing the property address"
               inputClassName="input"
             />
             <div className="grid gap-3 sm:grid-cols-[1fr_100px_130px]">
@@ -214,7 +229,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
           <div className="mt-5 grid gap-2 sm:grid-cols-2">{timings.map(item=>
             <button key={item} type="button" onClick={()=>update('timing',item)} className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold ${form.timing===item?'border-gold/50 bg-gold/[.07] text-white':'border-white/10 text-slate-300 hover:border-white/25'}`}>{item}</button>)}
           </div>
-          <textarea className="input mt-5 min-h-28 resize-y" placeholder="What should be true when the work is finished? Add any deadline, access issue, document, property condition, or other detail that matters." value={form.details} onChange={e=>update('details',e.target.value)}/>
+          <textarea className="input mt-5 min-h-28 resize-y" placeholder={detailsPlaceholder} value={form.details} onChange={e=>update('details',e.target.value)}/>
         </div>}
 
         {showQuestionsStep && <div>
@@ -251,7 +266,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
             <input className="input sm:col-span-2" type="tel" inputMode="tel" autoComplete="tel" placeholder="Phone (optional)" value={form.phone} onChange={e=>update('phone',e.target.value)}/>
             <input aria-hidden="true" tabIndex={-1} autoComplete="off" className="hidden" value={form.website} onChange={e=>update('website',e.target.value)}/>
           </div>
-          {form.email && !validEmail(form.email) && <p className="mt-2 text-xs text-amber-300">That doesn't look like a valid email address.</p>}
+          {form.email && !validEmail(form.email) && <p className="mt-2 text-xs text-amber-300">That does not look like a valid email address.</p>}
           {form.phone && !validPhone(form.phone) && <p className="mt-2 text-xs text-amber-300">Phone number needs at least 10 digits.</p>}
           <label className="mt-4 flex items-start gap-3 text-xs leading-5 text-slate-400">
             <input type="checkbox" className="mt-0.5 accent-gold" checked={form.follow_up_opt_in} onChange={e=>update('follow_up_opt_in',e.target.checked)}/>
@@ -267,7 +282,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
       {step>0 ? <button type="button" className="btn-outline" onClick={()=>{setError('');setStep(v=>v-1)}}>Back</button> : <span/>}
       {!isLastStep
         ? <button type="button" className="btn-gold" onClick={next}>Continue</button>
-        : <button type="button" className="btn-gold" disabled={busy} onClick={()=>void submit()}>{busy?'Sending request…':'Send My Request'}</button>}
+        : <button type="button" className="btn-gold" disabled={busy} onClick={()=>void submit()}>{busy?'Sending request…':copy.cta}</button>}
     </div>
     </div>
   </div>

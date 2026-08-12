@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, LogOut } from 'lucide-react'
+import { Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, LogOut, Bell, ShieldCheck, UserRound } from 'lucide-react'
 import { Logo } from '../ui'
 import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
@@ -10,22 +10,24 @@ import { MailBell } from '../kit/MailBell'
 import { NotificationFeedPanel } from '../kit/NotificationFeedPanel'
 import { LoginBanner } from '../kit/LoginBanner'
 import { ImpersonationBanner } from '../kit/ImpersonationBanner'
-import type { NavItem } from './nav'
+import { portalMobilePrimary, type NavItem } from './nav'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { AdminPageBoundary } from '../admin/AdminPageBoundary'
 
-export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
+export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: { nav: NavItem[]; badge: string; mobilePrimary?: string[] }) {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  // Portal sidebar defaults CLOSED on first visit - the Command Center
-  // dashboard is the client's real navigation, so the sidebar is a
-  // secondary control they can pin open if they prefer. Once they toggle
-  // it, we remember their choice via localStorage on both directions.
   const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window === 'undefined') return false
-    const stored = window.localStorage.getItem('pmv_sidebar_open')
-    return stored === '1'
+    if (typeof window === 'undefined') return true
+    return window.localStorage.getItem('pmv_sidebar_open') !== '0'
+  })
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem('pmv_portal_nav_collapsed') || '[]')
+      return new Set(Array.isArray(parsed) ? parsed : [])
+    } catch { return new Set() }
   })
   const p = useAppPath()
   const location = useLocation()
@@ -38,10 +40,34 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
     })
   }
 
+  function toggleSection(section: string) {
+    setCollapsedSections((current) => {
+      const next = new Set(current)
+      if (next.has(section)) next.delete(section)
+      else next.add(section)
+      window.localStorage.setItem('pmv_portal_nav_collapsed', JSON.stringify([...next]))
+      return next
+    })
+  }
+
   const linkCls = ({ isActive }: { isActive: boolean }) =>
     `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
       isActive ? 'bg-white/[.07] text-white ring-1 ring-white/[.08]' : 'text-slate-400 hover:bg-white/[.035] hover:text-white'
     }`
+
+  const grouped: { section: string | null; items: NavItem[] }[] = []
+  for (const item of nav) {
+    const section = item.section ?? null
+    const last = grouped[grouped.length - 1]
+    if (last && last.section === section) last.items.push(item)
+    else grouped.push({ section, items: [item] })
+  }
+
+  const profileLinks = [
+    { to: p('business-profile'), label: 'Account', icon: UserRound },
+    { to: p('security'), label: 'Security', icon: ShieldCheck },
+    { to: p('notifications'), label: 'Notifications', icon: Bell },
+  ]
 
   const sidebarContent = (
     <>
@@ -54,13 +80,26 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
-        <div className="space-y-1 pb-5">
-          {nav.map((item) => (
-            <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[.02] text-slate-500 transition group-hover:text-gold"><item.icon size={17} strokeWidth={1.8} /></span>
-              <span className="truncate">{item.label}</span>
-            </NavLink>
-          ))}
+        <div className="space-y-2 pb-5">
+          {grouped.map((group, index) => {
+            const collapsed = !!group.section && collapsedSections.has(group.section)
+            return (
+              <div key={group.section ?? `__top-${index}`} className="space-y-1">
+                {group.section && (
+                  <button type="button" onClick={() => toggleSection(group.section!)} className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500 transition hover:bg-white/[.025] hover:text-slate-300" aria-expanded={!collapsed}>
+                    <span>{group.section}</span>
+                    {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                  </button>
+                )}
+                {!collapsed && group.items.map((item) => (
+                  <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[.02] text-slate-500 transition group-hover:text-gold"><item.icon size={17} strokeWidth={1.8} /></span>
+                    <span className="truncate">{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            )
+          })}
         </div>
       </nav>
 
@@ -70,10 +109,21 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p><p className="truncate text-xs text-slate-500">{user?.email}</p></div>
           <ChevronDown size={14} className={`shrink-0 text-slate-600 transition ${profileOpen ? 'rotate-180' : ''}`} />
         </button>
-        <AnimatePresence initial={false}>{profileOpen && <motion.div initial={{opacity:0,y:6,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:5,scale:.985}} transition={pmvMotion.ui} className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-white/[.08] bg-navy-900 shadow-2xl"><button onClick={() => logout()} className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[.04] hover:text-white"><LogOut size={15}/>Sign out</button></motion.div>}</AnimatePresence>
+        <AnimatePresence initial={false}>{profileOpen && (
+          <motion.div initial={{opacity:0,y:6,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:5,scale:.985}} transition={pmvMotion.ui} className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-white/[.08] bg-navy-900 shadow-2xl">
+            {profileLinks.map((item) => (
+              <NavLink key={item.to} to={item.to} onClick={() => { setProfileOpen(false); setMobileOpen(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[.04] hover:text-white">
+                <item.icon size={15} /> {item.label}
+              </NavLink>
+            ))}
+            <button onClick={() => logout()} className="flex w-full items-center gap-2 border-t border-white/[.08] px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[.04] hover:text-white"><LogOut size={15}/>Sign out</button>
+          </motion.div>
+        )}</AnimatePresence>
       </div>
     </>
   )
+
+  const mobileItems = nav.filter((item) => mobilePrimary.includes(item.key))
 
   return (
     <div className="min-h-screen bg-navy-radial lg:flex">
@@ -106,9 +156,29 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
           <div className="flex items-center gap-3"><NotificationFeedPanel surface="portal"/><MailBell /><span className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">{badge}</span></div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-5 pb-24 sm:px-6 lg:px-8 lg:py-7 lg:pb-7"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[.08] bg-navy-950/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl lg:hidden" aria-label="Primary client destinations">
+        <div className="grid grid-cols-5 gap-1">
+          {mobileItems.map((item) => (
+            <NavLink
+              key={item.key}
+              to={p(item.to)}
+              end={item.to === ''}
+              className={({ isActive }) => `flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold ${isActive ? 'text-gold' : 'text-slate-500'}`}
+            >
+              <item.icon size={18} strokeWidth={1.8} />
+              <span className="truncate">{item.label}</span>
+            </NavLink>
+          ))}
+          <button type="button" onClick={() => setMobileOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold text-slate-500">
+            <Menu size={18} strokeWidth={1.8} />
+            More
+          </button>
+        </div>
+      </nav>
     </div>
   )
 }

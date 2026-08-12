@@ -103,6 +103,42 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
 
   const canSetStatusDropdown = isStaff || config.clientCanSetStatus
 
+  function statusControls(row: any) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {canSetStatusDropdown && config.statusOptions ? (
+          <select
+            className="rounded-lg border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
+            value={row[config.statusField!]}
+            onChange={(e) => setStatus(row.id, e.target.value)}
+          >
+            {config.statusOptions.map((s) => (
+              <option key={s} value={s}>
+                {s.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+        ) : config.statusField ? (
+          <StatusBadge tone={statusTone(row[config.statusField])}>
+            {String(row[config.statusField] ?? 'Not provided').replace(/_/g, ' ')}
+          </StatusBadge>
+        ) : null}
+        {!isStaff &&
+          !config.clientCanSetStatus &&
+          config.clientCancelValue &&
+          config.statusField &&
+          row[config.statusField] !== config.clientCancelValue && (
+            <button
+              onClick={() => setStatus(row.id, config.clientCancelValue!)}
+              className="text-xs text-rose-300 hover:underline"
+            >
+              Cancel
+            </button>
+          )}
+      </div>
+    )
+  }
+
   return (
     <div>
       <PageHeader
@@ -169,63 +205,53 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
             <EmptyState label={config.emptyLabel} />
           </div>
         ) : (
-          <table className="w-full min-w-[560px] text-sm">
-            <thead>
-              <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
-                {config.columns.map((col) => (
-                  <th key={col.key} className="whitespace-nowrap px-5 py-3 font-medium">
-                    {col.label}
-                  </th>
-                ))}
-                {config.statusField && <th className="whitespace-nowrap px-5 py-3 font-medium">Status</th>}
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <ul className="divide-y divide-white/10 md:hidden">
               {items.map((row, i) => (
-                <tr key={row.id ?? i} className="border-b border-white/5 last:border-0">
-                  {config.columns.map((col) => (
-                    <td key={col.key} className="whitespace-nowrap px-5 py-3 text-slate-200">
-                      {col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')}
-                    </td>
+                <li key={row.id ?? i} className="space-y-2 px-4 py-4">
+                  {config.columns.map((col, index) => (
+                    <div key={col.key} className={index === 0 ? '' : 'flex items-start justify-between gap-3 text-xs'}>
+                      {index === 0 ? (
+                        <p className="text-sm font-semibold text-white">{col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')}</p>
+                      ) : (
+                        <>
+                          <span className="text-slate-500">{col.label}</span>
+                          <span className="text-right text-slate-200">{col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')}</span>
+                        </>
+                      )}
+                    </div>
                   ))}
-                  {config.statusField && (
-                    <td className="whitespace-nowrap px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        {canSetStatusDropdown && config.statusOptions ? (
-                          <select
-                            className="rounded-lg border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
-                            value={row[config.statusField]}
-                            onChange={(e) => setStatus(row.id, e.target.value)}
-                          >
-                            {config.statusOptions.map((s) => (
-                              <option key={s} value={s}>
-                                {s.replace(/_/g, ' ')}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <StatusBadge tone={statusTone(row[config.statusField])}>
-                            {String(row[config.statusField] ?? 'Not provided').replace(/_/g, ' ')}
-                          </StatusBadge>
-                        )}
-                        {!isStaff &&
-                          !config.clientCanSetStatus &&
-                          config.clientCancelValue &&
-                          row[config.statusField] !== config.clientCancelValue && (
-                            <button
-                              onClick={() => setStatus(row.id, config.clientCancelValue!)}
-                              className="text-xs text-rose-300 hover:underline"
-                            >
-                              Cancel
-                            </button>
-                          )}
-                      </div>
-                    </td>
-                  )}
-                </tr>
+                  {config.statusField && <div className="pt-1">{statusControls(row)}</div>}
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+            <table className="hidden w-full min-w-[560px] text-sm md:table">
+              <thead>
+                <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
+                  {config.columns.map((col) => (
+                    <th key={col.key} className="whitespace-nowrap px-5 py-3 font-medium">
+                      {col.label}
+                    </th>
+                  ))}
+                  {config.statusField && <th className="whitespace-nowrap px-5 py-3 font-medium">Status</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((row, i) => (
+                  <tr key={row.id ?? i} className="border-b border-white/5 last:border-0">
+                    {config.columns.map((col) => (
+                      <td key={col.key} className="whitespace-nowrap px-5 py-3 text-slate-200">
+                        {col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')}
+                      </td>
+                    ))}
+                    {config.statusField && (
+                      <td className="whitespace-nowrap px-5 py-3">{statusControls(row)}</td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </Card>
     </div>

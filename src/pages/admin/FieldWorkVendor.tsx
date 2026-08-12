@@ -18,6 +18,7 @@ import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } f
 import { useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
 import { toast } from '../../components/kit/toast'
+import { hqWorkspaceCopy } from '../../lib/workspace'
 
 interface Assignment {
   id: string
@@ -111,7 +112,8 @@ async function getPosition(): Promise<GeolocationPosition | null> {
 
 export function FieldWorkList() {
   const p = useAppPath()
-  const { user } = useAuth()
+  const { user, workspace } = useAuth()
+  const copy = hqWorkspaceCopy(workspace.party_type, workspace.vendor_category, workspace.role_name)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'active' | 'completed'>('active')
@@ -129,9 +131,9 @@ export function FieldWorkList() {
   return (
     <div>
       <PageIntro
-        kicker="Field & mobile work"
+        kicker={copy.homeKicker}
         title="My assignments"
-        subtitle="Property visits, mobile notary jobs, and Remote Online Notarizations assigned to you."
+        subtitle={copy.homeSubtitle}
       />
       <div className="mb-4 flex gap-2">
         <button

@@ -31,11 +31,14 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
     return window.localStorage.getItem('pmv_hq_sidebar_open') !== '0'
   })
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set()
+    const firstVisitDefault = new Set(['Intelligence'])
+    if (typeof window === 'undefined') return firstVisitDefault
     try {
-      const parsed = JSON.parse(window.localStorage.getItem('pmv_hq_nav_collapsed') || '[]')
-      return new Set(Array.isArray(parsed) ? parsed : [])
-    } catch { return new Set() }
+      const raw = window.localStorage.getItem('pmv_hq_nav_collapsed')
+      if (raw == null) return firstVisitDefault
+      const parsed = JSON.parse(raw)
+      return new Set(Array.isArray(parsed) ? parsed : ['Intelligence'])
+    } catch { return firstVisitDefault }
   })
   const p = useAppPath()
   const location = useLocation()

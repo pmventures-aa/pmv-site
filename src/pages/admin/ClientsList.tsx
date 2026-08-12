@@ -56,7 +56,7 @@ export default function ClientsList() {
 
   return (
     <div>
-      <PageIntro kicker="Client accounts" title="Clients" subtitle="Everyone you have access to." />
+      <PageIntro kicker="Client accounts" title="Clients" subtitle={loading ? 'Everyone you have access to.' : `${filtered.length} of ${clients.length} client${clients.length === 1 ? '' : 's'}.`} />
       <div className="mb-4 flex flex-wrap gap-3">
         <input
           className={`${inputCls} max-w-xs`}
