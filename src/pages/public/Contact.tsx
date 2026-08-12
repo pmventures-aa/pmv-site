@@ -20,6 +20,9 @@ export default function Contact() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.name.trim()) return setError('Enter your name.')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim())) return setError('Enter a valid email address (e.g. you@example.com).')
+    if (form.phone.trim() && form.phone.replace(/\D/g, '').length < 10) return setError('Phone number needs at least 10 digits.')
     setStatus('busy')
     setError(null)
     try {
