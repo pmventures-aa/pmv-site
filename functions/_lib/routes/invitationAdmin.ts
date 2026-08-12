@@ -5,6 +5,7 @@ import { requireNamedPermission } from '../capabilities'
 import { createInvite, rotateInviteToken, sendInviteEmail, type InviteType } from '../invites'
 import { logAudit, actorIp, actorUserAgent } from '../auditLog'
 import { uuid } from '../crypto'
+import { toDisplayCase } from '../../../shared/displayCase'
 
 export const invitationAdminRoutes = new Hono<AppEnv>()
 export const roleAdminRoutes = new Hono<AppEnv>()
@@ -70,13 +71,13 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
 
   const email = normEmail(body.email)
   if (!email || !email.includes('@')) return c.json({ error: 'valid email required' }, 400)
-  const fullName = clean(body.full_name, 160)
+  const fullName = toDisplayCase(clean(body.full_name, 160))
   const roleDefinitionId = clean(body.role_definition_id, 80) || null
   if (inviteType === 'staff' && !roleDefinitionId) return c.json({ error: 'staff invitations require a role template' }, 400)
   if (roleDefinitionId) {
     const role = await c.env.DB.prepare('SELECT id,party_type FROM role_definitions WHERE id = ?').bind(roleDefinitionId).first<{ id: string; party_type: string }>()
     if (!role) return c.json({ error: 'role template not found' }, 404)
-    if (inviteType === 'staff' && !['employee', 'either'].includes(role.party_type)) return c.json({ error: 'choose an employee role for a staff invitation' }, 400)
+    if (inviteType === 'staff' && !['employee', 'either'].includes(role.party_type)) return c.json({ error: 'choose an internal-team role for a staff invitation' }, 400)
   }
 
   const allowedServices = new Set(['property_field', 'mobile_notary', 'ron', 'document_courier', 'merchant_technology', 'business_operations', 'bookkeeping_financial', 'other'])
@@ -84,7 +85,7 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
   const recipientContext = ['flexible', 'person', 'business'].includes(body.recipient_context || '') ? body.recipient_context! : 'flexible'
   const metadata = {
     vendor_category: clean(body.vendor_category, 120) || undefined,
-    company_name: clean(body.company_name, 200) || undefined,
+    company_name: toDisplayCase(clean(body.company_name, 200)) || undefined,
     known_services: inviteType === 'vendor' ? knownServices : undefined,
     recipient_context: inviteType === 'vendor' ? recipientContext : undefined,
     personal_note: inviteType === 'vendor' ? clean(body.personal_note, 800) || undefined : undefined,
@@ -170,7 +171,7 @@ roleAdminRoutes.post('/roles', requireOwner, async (c) => {
   const actor = c.get('user')
   type Body = { name?: string; role_key?: string; description?: string; party_type?: string; permissions?: string[] }
   const body = await c.req.json<Body>().catch(() => ({} as Body))
-  const name = clean(body.name, 120)
+  const name = toDisplayCase(clean(body.name, 120))
   if (!name) return c.json({ error: 'role name required' }, 400)
   const generatedKey = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
   const roleKey = clean(body.role_key || generatedKey, 80)
@@ -201,7 +202,7 @@ roleAdminRoutes.patch('/roles/:id', requireOwner, async (c) => {
   const current = await c.env.DB.prepare('SELECT * FROM role_definitions WHERE id = ?').bind(id).first<any>()
   if (!current) return c.json({ error: 'role not found' }, 404)
 
-  const name = clean(body.name, 120) || current.name
+  const name = toDisplayCase(clean(body.name, 120)) || current.name
   const description = body.description !== undefined ? clean(body.description, 500) || null : current.description
   const partyType = ['employee', 'vendor', 'either'].includes(body.party_type || '') ? body.party_type! : current.party_type
   const permissionKeys = Array.isArray(body.permissions) ? [...new Set(body.permissions.map((value) => clean(value, 80)).filter(Boolean))] : []

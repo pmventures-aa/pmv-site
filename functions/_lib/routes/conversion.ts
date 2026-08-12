@@ -3,6 +3,7 @@ import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { createActivationToken } from '../session'
+import { toDisplayCase } from '../../../shared/displayCase'
 import { activityInsert } from '../activity'
 import { sendAccountWelcome } from '../accountEmails'
 import { logAudit, actorGeo, actorIp, actorUserAgent } from '../auditLog'
@@ -49,7 +50,9 @@ conversionRoutes.post('/inquiries/:id/convert', requireStaff, async (c) => {
   const inquiry=preview.inquiry
 
   const clientId = uuid()
-  const nameParts = (inquiry.name || '').trim().split(/\s+/).filter(Boolean)
+  const displayName = toDisplayCase(inquiry.name)
+  const businessName = toDisplayCase(inquiry.company_name) || null
+  const nameParts = displayName.trim().split(/\s+/).filter(Boolean)
   const firstName = nameParts[0] ?? null
   const lastName = nameParts.slice(1).join(' ') || null
   const conversionId = uuid()
@@ -59,10 +62,10 @@ conversionRoutes.post('/inquiries/:id/convert', requireStaff, async (c) => {
     c.env.DB.prepare(
       `INSERT INTO users (id, email, password_hash, role, full_name, first_name, last_name, phone, two_factor_enabled, status)
        VALUES (?, ?, NULL, 'client', ?, ?, ?, ?, 0, 'active')`,
-    ).bind(clientId, inquiry.email, inquiry.name || null, firstName, lastName, inquiry.phone ?? null),
+    ).bind(clientId, inquiry.email, displayName || null, firstName, lastName, inquiry.phone ?? null),
     c.env.DB.prepare(
       `INSERT INTO client_profiles (id, user_id, business_name, services_enrolled, onboarding_completed) VALUES (?, ?, ?, ?, 0)`,
-    ).bind(uuid(), clientId, inquiry.company_name||null, inquiry.service_key ? JSON.stringify([inquiry.service_key]) : null),
+    ).bind(uuid(), clientId, businessName, inquiry.service_key ? JSON.stringify([inquiry.service_key]) : null),
     c.env.DB.prepare(`UPDATE internal_notes SET client_user_id = ? WHERE inquiry_id = ? AND client_user_id IS NULL`).bind(clientId, id),
     c.env.DB.prepare(`UPDATE activity_events SET client_user_id = ? WHERE inquiry_id = ? AND client_user_id IS NULL`).bind(clientId, id),
     c.env.DB.prepare(`UPDATE email_log SET client_user_id = ? WHERE inquiry_id = ? AND client_user_id IS NULL`).bind(clientId, id),
@@ -80,7 +83,7 @@ conversionRoutes.post('/inquiries/:id/convert', requireStaff, async (c) => {
   const setupUrl = `https://client.pinnaclemanagementventures.com/set-password?token=${encodeURIComponent(setupToken)}`
   c.executionCtx.waitUntil(
     sendAccountWelcome(c.env, {
-      userId: clientId, role: 'client', email: inquiry.email, firstName, businessName:inquiry.company_name||null,
+      userId: clientId, role: 'client', email: inquiry.email, firstName, businessName,
       creationType: 'lead_conversion', actionLabel: 'Set Up My Pinnacle Account', actionUrl: setupUrl, actorUserId: user.id,
     }).catch((err) => console.error('[account-email] converted lead invite failed', err)),
   )

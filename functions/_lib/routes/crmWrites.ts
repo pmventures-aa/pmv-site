@@ -3,6 +3,7 @@ import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
+import { toDisplayCase } from '../../../shared/displayCase'
 
 export const crmWriteRoutes = new Hono<AppEnv>()
 crmWriteRoutes.use('*', requireStaff)
@@ -13,12 +14,12 @@ crmWriteRoutes.post('/crm/records', async (c) => {
   const actor = c.get('user')
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as any))
   const recordType = body.record_type === 'business' ? 'business' : 'person'
-  const firstName = clean(body.first_name, 100)
-  const lastName = clean(body.last_name, 100)
-  const companyName = clean(body.company_name, 200)
+  const firstName = toDisplayCase(clean(body.first_name, 100)) || null
+  const lastName = toDisplayCase(clean(body.last_name, 100)) || null
+  const companyName = toDisplayCase(clean(body.company_name, 200)) || null
   const name = recordType === 'business'
     ? companyName
-    : clean(body.name, 200) || [firstName, lastName].filter(Boolean).join(' ') || companyName
+    : toDisplayCase(clean(body.name, 200)) || [firstName, lastName].filter(Boolean).join(' ') || companyName
   const email = clean(body.email, 250)?.toLowerCase() ?? null
   if (!name) return c.json({ error: recordType === 'business' ? 'business name is required' : 'name is required' }, 400)
   // contact_inquiries.email is still NOT NULL in the current production schema.

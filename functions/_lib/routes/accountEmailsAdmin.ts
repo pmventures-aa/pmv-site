@@ -6,6 +6,7 @@ import { uuid } from '../crypto'
 import { createActivationToken } from '../session'
 import { activityInsert } from '../activity'
 import { sendAccountWelcome, sendPortalReminder, sendVendorApproved } from '../accountEmails'
+import { toDisplayCase } from '../../../shared/displayCase'
 
 export const accountEmailsAdminRoutes = new Hono<AppEnv>()
 
@@ -82,9 +83,9 @@ accountEmailsAdminRoutes.post('/account-users', requireStaff, async (c) => {
   const exists = await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(email).first()
   if (exists) return c.json({ error: 'a user with that email already exists' }, 409)
 
-  const first = clean(body.first_name, 120) || null
-  const last = clean(body.last_name, 120) || null
-  const fullName = clean(body.full_name, 240) || [first, last].filter(Boolean).join(' ') || null
+  const first = toDisplayCase(clean(body.first_name, 120)) || null
+  const last = toDisplayCase(clean(body.last_name, 120)) || null
+  const fullName = toDisplayCase(clean(body.full_name, 240) || [first, last].filter(Boolean).join(' ')) || null
   const phone = clean(body.phone, 40) || null
   const id = uuid()
 
@@ -102,10 +103,10 @@ accountEmailsAdminRoutes.post('/account-users', requireStaff, async (c) => {
       ).bind(
         uuid(),
         id,
-        clean(body.business_name) || null,
-        clean(body.entity_type, 100) || null,
+        toDisplayCase(clean(body.business_name)) || null,
+        toDisplayCase(clean(body.entity_type, 100)) || null,
         clean(body.ein, 100) || null,
-        clean(body.state, 100) || null,
+        toDisplayCase(clean(body.state, 100)) || null,
         Array.isArray(body.services_enrolled) ? JSON.stringify(body.services_enrolled) : null,
       ),
     )
