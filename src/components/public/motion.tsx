@@ -11,13 +11,30 @@ export function Reveal({ children, delay = 0, className = '' }: { children: Reac
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 18 }}
+      initial={{ opacity: 0, y: 10 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-80px' }}
+      viewport={{ once: true, margin: '-64px' }}
       transition={{ ...pmvMotion.gentle, delay }}
     >
       {children}
     </motion.div>
+  )
+}
+
+export function ClipLine({ children, delay = 0, className = '' }: { children: ReactNode; delay?: number; className?: string }) {
+  const reduceMotion = useReducedMotion()
+  if (reduceMotion) return <span className={`block ${className}`}>{children}</span>
+  return (
+    <span className={`block overflow-hidden ${className}`}>
+      <motion.span
+        className="block"
+        initial={{ y: '110%' }}
+        animate={{ y: 0 }}
+        transition={{ ...pmvMotion.gentle, delay }}
+      >
+        {children}
+      </motion.span>
+    </span>
   )
 }
 
@@ -50,14 +67,9 @@ export function AmbientGlow({ className = '' }: { className?: string }) {
   return (
     <div ref={ref} className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`} aria-hidden="true">
       <motion.div
-        className="pmv-ambient-field pmv-ambient-field-gold absolute -left-40 -top-40 h-[34rem] w-[34rem]"
-        animate={shouldMove ? { x: [0, 34, 0], y: [0, 22, 0], scale: [1, 1.035, 1] } : { x: 0, y: 0, scale: 1 }}
-        transition={shouldMove ? { ...pmvMotion.ambient, repeat: Infinity } : pmvMotion.snap}
-      />
-      <motion.div
-        className="pmv-ambient-field pmv-ambient-field-blue absolute -right-48 top-[18%] h-[38rem] w-[38rem]"
-        animate={shouldMove ? { x: [0, -28, 0], y: [0, -30, 0], scale: [1, 1.025, 1] } : { x: 0, y: 0, scale: 1 }}
-        transition={shouldMove ? { ...pmvMotion.ambient, duration: 16, repeat: Infinity } : pmvMotion.snap}
+        className="pmv-ambient-field pmv-ambient-field-gold absolute -left-32 top-[-12%] h-[28rem] w-[28rem]"
+        animate={shouldMove ? { x: [0, 18, 0], y: [0, 14, 0] } : { x: 0, y: 0 }}
+        transition={shouldMove ? { ...pmvMotion.ambient, duration: 18, repeat: Infinity } : pmvMotion.snap}
       />
     </div>
   )
@@ -91,9 +103,9 @@ export function ServiceRotator({ items }: { items: ServiceInfo[] }) {
       <AnimatePresence mode="wait">
         <motion.div
           key={current.slug}
-          initial={reduceMotion ? undefined : { opacity: 0, y: 10 }}
+          initial={reduceMotion ? undefined : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={reduceMotion ? undefined : { opacity: 0, y: -10 }}
+          exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
           transition={pmvMotion.gentle}
           className="mt-4 min-h-[6.5rem]"
         >
@@ -157,9 +169,9 @@ export function SpecialtyRotator({ items }: { items: SpecialtySpotlightItem[] })
           <AnimatePresence mode="wait">
             <motion.div
               key={current.title}
-              initial={reduceMotion ? undefined : { opacity: 0, x: 14 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={reduceMotion ? undefined : { opacity: 0, x: -14 }}
+              initial={reduceMotion ? undefined : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
               transition={pmvMotion.gentle}
             >
               <p className="eyebrow">{current.eyebrow}</p>

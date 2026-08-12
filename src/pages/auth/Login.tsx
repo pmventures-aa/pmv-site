@@ -1,4 +1,4 @@
-import { Eye, EyeOff, LockKeyhole, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, LockKeyhole } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth, isApiError } from '../../lib/auth'
@@ -105,7 +105,7 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
       {surface === 'client' && (
         <div className="mt-6 rounded-xl border border-gold/15 bg-gold/[.045] p-4">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold/10 text-gold"><Sparkles size={16} /></span>
+            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-gold/20 bg-gold/[.06] text-gold"><LockKeyhole size={15} /></span>
             <div>
               <p className="text-sm font-bold text-white">Need a different kind of help?</p>
               <p className="mt-1 text-xs leading-5 text-slate-400">Property, documents, operations, and funding each have their own workspace. Start from the work in front of you.</p>

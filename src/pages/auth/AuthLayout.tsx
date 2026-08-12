@@ -1,4 +1,4 @@
-import { CheckCircle2, LockKeyhole, Sparkles } from 'lucide-react'
+import { CheckCircle2, LockKeyhole } from 'lucide-react'
 import { Crest } from '../../components/ui'
 import { ThemeToggle } from '../../components/ThemeToggle'
 
@@ -66,8 +66,8 @@ export function AuthLayout({
           </a>
 
           <div className="py-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/[.06] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.16em] text-gold">
-              <Sparkles size={13} /> {sideLabel || copy.label}
+            <div className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/[.06] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[.14em] text-gold">
+              {sideLabel || copy.label}
             </div>
             <h2 className="mt-6 max-w-lg font-display text-4xl font-semibold leading-[1.08] tracking-[-.025em] text-white xl:text-5xl">
               {sideTitle || copy.title}
