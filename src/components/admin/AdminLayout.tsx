@@ -77,7 +77,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   const sidebarContent = (
     <>
       <div className="shrink-0 px-1 pb-5">
-        <Logo />
+        <Logo compact />
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
@@ -127,17 +127,19 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
       </aside>
 
       <header className="sticky top-0 z-30 border-b border-white/10 bg-navy-900/95 backdrop-blur lg:hidden print:hidden">
-        <div className="flex items-center justify-between gap-3 px-4 py-3">
-          <Logo />
-          <div className="flex items-center gap-1.5">
-            <SlaAlertChip />
-            <span className="hidden lg:inline-flex"><MailWorkspaceLauncher /></span>
-            <button onClick={() => setMobileSearchOpen((v) => !v)} className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5" aria-label="Search"><Search size={17} /></button>
-            <button onClick={refreshPage} className="grid h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 hover:text-gold" aria-label="Refresh page"><RotateCw size={15} /></button>
-            <EmailCenterBell />
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+          <Logo compact />
+          {/* On phone widths keep only the essentials (Menu + a single bell)
+              so the hamburger is always reachable. The full icon set only
+              appears at tablet+ widths. */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="hidden sm:inline-flex"><SlaAlertChip /></span>
+            <button onClick={() => setMobileSearchOpen((v) => !v)} className="hidden h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 sm:grid" aria-label="Search"><Search size={17} /></button>
+            <button onClick={refreshPage} className="hidden h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 hover:text-gold sm:grid" aria-label="Refresh page"><RotateCw size={15} /></button>
+            <span className="hidden sm:inline-flex"><EmailCenterBell /></span>
             <MailBell />
             <NotificationBell />
-            <button onClick={() => setMobileOpen(true)} className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white" aria-label="Open navigation"><Menu size={18} /></button>
+            <button onClick={() => setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-white/[.04] text-white transition hover:bg-white/[.08]" aria-label="Open navigation"><Menu size={20} /></button>
           </div>
         </div>
         <AnimatePresence initial={false}>{mobileSearchOpen && <motion.div initial={{opacity:0,y:-5}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-5}} transition={pmvMotion.ui} className="border-t border-white/10 px-4 py-3"><GlobalSearch /></motion.div>}</AnimatePresence>

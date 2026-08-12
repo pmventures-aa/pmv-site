@@ -43,7 +43,22 @@ export function WhiteGoldBrandMark({ size = 120, className = '', decorative = fa
   return <CrestArtwork size={size} tone="light" decorative={decorative} className={`pmv-white-gold-mark ${className}`}/>
 }
 
-export function Logo({ className = '', showText = true, markSize = 54, tone = 'auto' }: { className?: string; showText?: boolean; markSize?: number; tone?:CrestTone }) {
+export function Logo({ className = '', showText = true, markSize = 54, tone = 'auto', compact = false }: { className?: string; showText?: boolean; markSize?: number; tone?:CrestTone; compact?: boolean }) {
+  // Compact mode places the ORIGINAL navy+gold crest inside a small cream
+  // tile so the detailed artwork reads properly against a dark sidebar.
+  // We keep the client's actual crest - only the surface behind it
+  // changes color, which is what the crest was designed to sit on.
+  if (compact) return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <span className="grid place-items-center rounded-xl border border-white/[.08] bg-gradient-to-b from-[#f5efe0] to-[#eae1c8] p-1.5 shadow-[0_2px_10px_rgba(0,0,0,.35)] ring-1 ring-black/[.04]" style={{ width: 48, height: 48 }}>
+        <img src={CREST_DARK_ART} alt="" aria-hidden="true" className="h-full w-full object-contain"/>
+      </span>
+      <div className="leading-tight">
+        <div className="font-display text-[15px] font-extrabold tracking-[.04em] text-white">PINNACLE</div>
+        <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.24em] text-gold-400">Management Ventures</div>
+      </div>
+    </div>
+  )
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <CrestArtwork size={markSize} tone={tone} decorative />
