@@ -34,6 +34,7 @@ import { ThemeProvider } from './lib/theme'
 import { installAudioUnlock } from './lib/sound'
 import { AppToaster } from './components/kit/Toaster'
 import { LoadingScreen } from './components/LoadingScreen'
+import { ScrollToTop } from './components/ScrollToTop'
 
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
@@ -111,6 +112,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <AuthProvider>
           <MotionConfig reducedMotion="user">
+            <ScrollToTop />
             <App />
             <AppToaster />
           </MotionConfig>

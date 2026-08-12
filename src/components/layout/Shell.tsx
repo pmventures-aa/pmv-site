@@ -9,6 +9,7 @@ import { Avatar } from '../kit/Avatar'
 import { MailBell } from '../kit/MailBell'
 import type { NavItem } from './nav'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
+import { AdminPageBoundary } from '../admin/AdminPageBoundary'
 
 export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
   const { user, logout } = useAuth()
@@ -100,7 +101,7 @@ export function Shell({ nav, badge }: { nav: NavItem[]; badge: string }) {
           <div className="flex items-center gap-3"><MailBell /><span className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">{badge}</span></div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><Outlet /></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
     </div>
