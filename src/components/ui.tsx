@@ -30,17 +30,12 @@ const CREST_ART = '/logo-crest-transparent.png'
 
 function CrestArtwork({ size, tone = 'auto', className = '', decorative = false }: { size:number; tone?:CrestTone; className?:string; decorative?:boolean }) {
   const alt = decorative ? '' : 'Pinnacle Management Ventures crest'
-  const inner = <img src={CREST_ART} alt={alt} aria-hidden={decorative || undefined} className="h-full w-full object-contain"/>
-  if (tone === 'light') {
-    // Dark surface: cream tile around the crest for contrast.
-    return <span className={`pmv-crest-tile shrink-0 ${className}`} style={{ width:size, height:size }} aria-hidden={decorative || undefined}>{inner}</span>
-  }
-  if (tone === 'dark') {
-    // Light surface: crest sits directly.
-    return <img src={CREST_ART} alt={alt} aria-hidden={decorative || undefined} className={`pmv-crest-artwork object-contain ${className}`} style={{ width:size, height:size }}/>
-  }
-  // Auto: cream tile on dark themes, bare crest on light themes (CSS-controlled).
-  return <span className={`pmv-crest-switch-auto shrink-0 ${className}`} style={{ width:size, height:size }} aria-hidden={decorative || undefined}>{inner}</span>
+  const goldSilhouette = <span role={decorative ? undefined : 'img'} aria-label={decorative ? undefined : alt} aria-hidden={decorative || undefined} className={`pmv-crest-gold block shrink-0 ${className}`} style={{ width:size, height:size }}/>
+  const bareCrest = <img src={CREST_ART} alt={alt} aria-hidden={decorative || undefined} className={`pmv-crest-artwork block object-contain ${className}`} style={{ width:size, height:size }}/>
+  if (tone === 'light') return goldSilhouette
+  if (tone === 'dark') return bareCrest
+  // Auto: gold silhouette on dark themes, original artwork on light themes.
+  return <span className={`pmv-crest-switch-auto block shrink-0 ${className}`} style={{ width:size, height:size }} aria-hidden={decorative || undefined}/>
 }
 
 export function WhiteGoldBrandMark({ size = 120, className = '', decorative = false }: { size?: number; className?: string; decorative?: boolean }) {
@@ -54,9 +49,7 @@ export function Logo({ className = '', showText = true, markSize = 54, tone = 'a
   // changes color, which is what the crest was designed to sit on.
   if (compact) return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <span className="grid place-items-center rounded-xl border border-white/[.08] bg-gradient-to-b from-[#f5efe0] to-[#eae1c8] p-1.5 shadow-[0_2px_10px_rgba(0,0,0,.35)] ring-1 ring-black/[.04]" style={{ width: 48, height: 48 }}>
-        <img src={CREST_ART} alt="" aria-hidden="true" className="h-full w-full object-contain"/>
-      </span>
+      <span className="pmv-crest-gold shrink-0" style={{ width: 42, height: 42 }} aria-hidden="true"/>
       <div className="leading-tight">
         <div className="font-display text-[15px] font-extrabold tracking-[.04em] text-white">PINNACLE</div>
         <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.24em] text-gold-400">Management Ventures</div>
