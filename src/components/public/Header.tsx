@@ -6,11 +6,11 @@ import { Icon } from '../kit/Icon'
 import { btnOutline, btnPrimary } from './ui'
 import { pmvMotion } from '../../lib/motionTheme'
 
-const navItems=[{to:'/about',label:'About'},{to:'/professionals',label:'Professional Network'},{to:'/service-area',label:'Service Area'},{to:'/contact',label:'Contact'}]
+const navItems=[{to:'/care-plans',label:'Monthly Plans'},{to:'/about',label:'About'},{to:'/professionals',label:'Professional Network'},{to:'/contact',label:'Contact'}]
 const serviceLinks=[
-  {to:'/services/property-field',label:'Property, Cleaning & Field Services',body:'Cleaning and deep cleaning, inspections, turnovers, eviction and REO support, vendor access, and documented property visits.'},
-  {to:'/services/mobile-documents',label:'Documents, Notary & Signing',body:'Document preparation, delivery and filing, courthouse runs, mobile notary, RON, and signing coordination.'},
-  {to:'/services/business-operations',label:'Business & Administrative Support',body:'Operations, administrative capacity, client and project coordination, POS and payments, processes, and vendor management.'},
+  {to:'/services/property-field',label:'Property, Cleaning & Field Services',body:'Cleaning and turnovers, inspections, field photos and BPO support, eviction and REO work, and documented property visits.'},
+  {to:'/services/mobile-documents',label:'Documents, Notary & Signing',body:'Document preparation, filing and courthouse runs, courier, mobile notary, loan signings, and Remote Online Notarization.'},
+  {to:'/services/business-operations',label:'Business & Administrative Support',body:'Operations consulting, administrative capacity, project coordination, POS and payments, and funding readiness.'},
 ]
 const CLIENT_LOGIN='/portal/login'
 const CLIENT_SIGNUP='/services'

@@ -29,6 +29,7 @@ import SharedDocument from './pages/public/SharedDocument'
 import ScopeRequest from './pages/public/ScopeRequest'
 import ScopeConfirmation from './pages/public/ScopeConfirmation'
 import InstantQuote from './pages/public/InstantQuote'
+import QuoteView from './pages/public/QuoteView'
 import CarePlans, { CarePlansConfirmation } from './pages/public/CarePlans'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
@@ -87,6 +88,7 @@ function App() {
       <Route path="/scope-request" element={<ScopeRequest />} />
       <Route path="/scope-request/confirmation" element={<ScopeConfirmation />} />
       <Route path="/instant-quote" element={<InstantQuote />} />
+      <Route path="/quote/:token" element={<QuoteView />} />
       <Route path="/care-plans" element={<CarePlans />} />
       <Route path="/care-plans/confirmation" element={<CarePlansConfirmation />} />
       <Route path="/about" element={<About />} />

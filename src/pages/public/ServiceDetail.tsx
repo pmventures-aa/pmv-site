@@ -8,6 +8,26 @@ import { usePageMeta } from '../../lib/usePageMeta'
 import { PriceAnchor } from '../../components/public/PriceAnchor'
 import { CaseStudyStrip } from '../../components/public/Proof'
 
+const PLAN_PITCH: Record<'property'|'ops'|'legal', { eyebrow: string; title: string; body: string; from: string; to: string }> = {
+  property: { eyebrow: 'Property Care Plans', title: 'Doing this more than once? Members pay less.', body: 'Property Care plans start at $89/mo with included inspection visits, cleaning credits, priority scheduling, and 10-20% off every service on this page.', from: 'From $89/mo', to: '/care-plans?family=property' },
+  ops: { eyebrow: 'Ops-on-Call Plans', title: 'Keep this capacity on retainer.', body: 'Ops-on-Call plans start at $199/mo with included hours, a named coordinator, and 10-20% off project engagements - without renegotiating every request.', from: 'From $199/mo', to: '/care-plans?family=ops' },
+  legal: { eyebrow: 'Legal & Notary Pass', title: 'Firms on the Pass skip the per-request scramble.', body: 'The Legal & Notary Pass starts at $99/mo with included appointments and courier runs, same-day priority scheduling, and 25% off additional volume.', from: 'From $99/mo', to: '/care-plans?family=legal' },
+}
+
+function PlanCrossSell({ family }: { family: 'property'|'ops'|'legal' }) {
+  const pitch = PLAN_PITCH[family]
+  return (
+    <div className="mt-12 grid gap-6 rounded-2xl border border-gold/25 bg-gradient-to-br from-gold/[.07] via-transparent to-transparent p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">{pitch.eyebrow} · {pitch.from}</p>
+        <h2 className="mt-2 font-display text-2xl font-bold tracking-[-.02em] text-white">{pitch.title}</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">{pitch.body}</p>
+      </div>
+      <Link to={pitch.to} className={btnPrimary}>See Monthly Plans</Link>
+    </div>
+  )
+}
+
 export default function ServiceDetail() {
   const { slug } = useParams<{ slug: string }>()
   const service = getServiceBySlug(slug)
@@ -15,8 +35,8 @@ export default function ServiceDetail() {
 
   if (!service) return <Navigate to="/services" replace />
 
-  const others = services.filter((item) => item.slug !== service.slug).slice(0, 3)
-  const requestUrl = `/scope-request?service=${encodeURIComponent(service.key)}&source=service-page`
+  const others = services.filter((item) => item.slug !== service.slug && item.key !== service.key).slice(0, 3)
+  const requestUrl = `/scope-request?service=${encodeURIComponent(service.key)}${service.intakeJob ? `&job=${encodeURIComponent(service.intakeJob)}` : ''}&source=service-page`
 
   return (
     <div className="min-h-screen bg-navy-950">
@@ -50,6 +70,8 @@ export default function ServiceDetail() {
         </div>
 
         <OfferingLibrary serviceKey={service.key} offeringPrefixes={service.offeringPrefixes} />
+
+        {service.planFamily && <PlanCrossSell family={service.planFamily} />}
 
         <div className="mt-16">
           <p className="eyebrow mb-4">You may also want to explore</p>

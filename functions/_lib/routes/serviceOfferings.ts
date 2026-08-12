@@ -31,25 +31,36 @@ const cleanText = (value: unknown, max = 500) => typeof value === 'string' ? val
 const cents = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value * 100) : null
 const arrayJson = (value: unknown): string | null => Array.isArray(value) ? JSON.stringify(value.map((item) => String(item).trim()).filter(Boolean).slice(0, 50)) : null
 
+// Bump when the default catalog in src/data/serviceOfferings.ts changes so
+// already-seeded databases pick up new offerings and refreshed market pricing.
+// Rows edited in HQ (updated_at moved past created_at) are never overwritten;
+// rows deactivated in HQ stay deactivated.
+const SEED_VERSION = '2026-08-market-pricing'
+
 export async function ensureServiceOfferingsSeeded(env: Env) {
-  const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM service_offerings').first<{ n: number }>()
-  if ((row?.n ?? 0) > 0) return
-  const statements = defaultOfferings.map((item, index) => env.DB.prepare(`
-    INSERT OR IGNORE INTO service_offerings
-      (id, service_key, name, description, starting_price_cents, pricing_label, badge, requirements_json, client_note, active, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-  `).bind(
-    item.id,
-    item.serviceKey,
-    item.name,
-    item.description,
-    typeof item.startingPrice === 'number' ? Math.round(item.startingPrice * 100) : null,
-    item.pricingLabel ?? null,
-    item.badge ?? null,
-    item.requirements?.length ? JSON.stringify(item.requirements) : null,
-    item.note ?? null,
-    index * 10,
-  ))
+  const [countRow, versionRow] = await Promise.all([
+    env.DB.prepare('SELECT COUNT(*) AS n FROM service_offerings').first<{ n: number }>(),
+    env.DB.prepare("SELECT value FROM app_settings WHERE key = 'service_offerings_seed_version'").first<{ value: string | null }>(),
+  ])
+  if ((countRow?.n ?? 0) > 0 && versionRow?.value === SEED_VERSION) return
+
+  const statements: D1PreparedStatement[] = []
+  defaultOfferings.forEach((item, index) => {
+    const priceCents = typeof item.startingPrice === 'number' ? Math.round(item.startingPrice * 100) : null
+    const requirements = item.requirements?.length ? JSON.stringify(item.requirements) : null
+    statements.push(env.DB.prepare(`
+      INSERT OR IGNORE INTO service_offerings
+        (id, service_key, name, description, starting_price_cents, pricing_label, badge, requirements_json, client_note, active, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+    `).bind(item.id, item.serviceKey, item.name, item.description, priceCents, item.pricingLabel ?? null, item.badge ?? null, requirements, item.note ?? null, index * 10))
+    statements.push(env.DB.prepare(`
+      UPDATE service_offerings SET name = ?, description = ?, starting_price_cents = ?, pricing_label = ?, badge = ?, requirements_json = ?, client_note = ?, sort_order = ?
+      WHERE id = ? AND updated_at = created_at
+    `).bind(item.name, item.description, priceCents, item.pricingLabel ?? null, item.badge ?? null, requirements, item.note ?? null, index * 10, item.id))
+  })
+  statements.push(env.DB.prepare(
+    "INSERT INTO app_settings (key, value) VALUES ('service_offerings_seed_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+  ).bind(SEED_VERSION))
   for (let i = 0; i < statements.length; i += 40) await env.DB.batch(statements.slice(i, i + 40))
 }
 

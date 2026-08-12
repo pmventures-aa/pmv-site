@@ -46,7 +46,7 @@ const PROPERTY_SERVICES: PlanService[] = [
   { key:'dewinterize', category:'Seasonal', label:'De-winterization / re-activation', detail:'Reactivate utilities, verify no freeze damage, ready for occupancy.', priceHint:'$150-300' },
   { key:'storm_prep', category:'Seasonal', label:'Hurricane / storm prep', detail:'Shutters, patio secure-down, exterior clear, photo documentation.', priceHint:'$225-600' },
   { key:'storm_assess', category:'Seasonal', label:'Post-storm damage assessment', detail:'Interior + exterior condition report with photos and insurance-ready notes.', priceHint:'$150-350' },
-  { key:'insp_occupancy', category:'Inspections & Reports', label:'Occupancy check (drive-by / knock)', detail:'Verify occupied vs vacant, exterior condition, photo evidence.', priceHint:'$45-95' },
+  { key:'insp_occupancy', category:'Inspections & Reports', label:'Occupancy check (drive-by / knock)', detail:'Verify occupied vs vacant, exterior condition, photo evidence.', priceHint:'$65-115' },
   { key:'insp_interior', category:'Inspections & Reports', label:'Interior condition + photo package', detail:'Room-by-room photos + observed condition notes with timestamps.', priceHint:'$125-225' },
   { key:'insp_movein_out', category:'Inspections & Reports', label:'Move-in / move-out condition report', detail:'Comprehensive documented report suitable for lease dispute or turnover.', priceHint:'$185-325' },
   { key:'insp_insurance', category:'Inspections & Reports', label:'Insurance / underwriting inspection package', detail:'4-point, wind mitigation coordination, or exterior underwriting photos.', priceHint:'$150-275' },
