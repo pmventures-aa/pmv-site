@@ -18,4 +18,11 @@ describe('HQ navigation contract', () => {
     const destinations = adminNav.map((item) => item.to || '/')
     expect(new Set(destinations).size).toBe(destinations.length)
   })
+
+  it('surfaces previously URL-only HQ tools in the sidebar', () => {
+    const keys = new Set(adminNav.map((item) => item.key))
+    for (const key of ['roles', 'invitations', 'communications', 'invoices', 'service-assignments', 'client-banners']) {
+      expect(keys, `missing HQ nav key: ${key}`).toContain(key)
+    }
+  })
 })
