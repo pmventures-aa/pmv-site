@@ -2,73 +2,240 @@ import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Header } from '../components/public/Header'
 import { Footer } from '../components/public/Footer'
-import { btnOutline, btnPrimary, CtaBand } from '../components/public/ui'
+import { btnOutline, btnPrimary, CtaBand, MotionStage } from '../components/public/ui'
 import { AmbientGlow, Reveal, StaggerGroup, StaggerOnMount, staggerItem } from '../components/public/motion'
 import { usePageMeta } from '../lib/usePageMeta'
-import { Icon, type IconName } from '../components/kit/Icon'
 import { HeroGuideRail } from '../components/public/HeroGuideRail'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
+import { CLIENT_LOGIN, GET_HELP, founder, howItWorks, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 
-const CLIENT_SIGNUP='/scope-request?source=home'
+export default function Home() {
+  usePageMeta(
+    'Professional Support. One Call Away.',
+    'Pinnacle Management Ventures helps businesses, property owners, and individuals get business, property, and administrative matters handled through one trusted point of contact.',
+  )
 
-const personas:{label:string;benefit:string;to:string}[]=[
-  {label:'Landlords & Property Owners',benefit:'Licensed PMs and CAMs in network, or on-call inspections, turnovers, and documented visits',to:'/care-plans?family=property'},
-  {label:'Real Estate Agents & Brokers',benefit:'On-site help so listings and closings stay on time',to:'/projects/local-support-south-florida?audience=agent-broker'},
-  {label:'Real Estate Investors',benefit:'Eviction, REO, and possession work with a dedicated property path',to:'/scope-request?job=eviction_reo&audience=investor'},
-  {label:'Business Owners & Operators',benefit:'Operations workspace: capacity, systems, and follow-through',to:'/services/business-operations'},
-  {label:'Attorneys & Legal Teams',benefit:'Documents & signing: filings, notary, courier, and courthouse runs',to:'/services/mobile-documents'},
-  {label:'Multi-Location Operators',benefit:'Ongoing operations support across sites and vendors',to:'/care-plans?family=ops'},
-]
+  return (
+    <div className="min-h-screen bg-navy-950">
+      <Header />
+      <main>
+        <section className="pmv-hero-story relative min-h-[calc(100vh-68px)] overflow-hidden border-b border-white/[.07]">
+          <AmbientGlow />
+          <div className="container-pmv relative z-10 grid min-h-[calc(100vh-68px)] gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
+            <StaggerOnMount>
+              <motion.p variants={staggerItem} className="eyebrow">Nationwide professional support · South Florida field services</motion.p>
+              <motion.h1 variants={staggerItem} className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-[-.05em] text-white sm:text-6xl lg:text-[3.75rem] xl:text-[4rem]">
+                <span className="block">Professional Support.</span>
+                <span className="pmv-gold-text block">One Call Away.</span>
+              </motion.h1>
+              <motion.p variants={staggerItem} className="mt-7 max-w-3xl text-lg leading-8 text-slate-300 sm:text-xl">
+                Business, property, and administrative matters handled through one trusted point of contact.
+              </motion.p>
+              <motion.p variants={staggerItem} className="mt-4 max-w-2xl text-base leading-7 text-slate-400">
+                Not sure which service you need? That is okay. Start with the situation and we will help determine the next step.
+              </motion.p>
+              <motion.div variants={staggerItem} className="mt-9 flex flex-wrap gap-3">
+                <Link to={GET_HELP} className={btnPrimary}>Tell Us What You Need Help With</Link>
+                <Link to="/services" className={btnOutline}>Explore Services</Link>
+              </motion.div>
+              <motion.p variants={staggerItem} className="mt-4 text-sm text-slate-500">
+                Need a cleaning or inspection number first? <Link to="/instant-quote" className="font-semibold text-gold hover:underline">Get an instant estimate</Link>
+              </motion.p>
+            </StaggerOnMount>
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.18 }} className="relative lg:min-h-[520px]">
+              <HeroGuideRail />
+            </motion.div>
+          </div>
+        </section>
 
-const audiences:{icon:IconName;label:string;title:string;body:string;links:[string,string][]}[]=[
-  {icon:'briefcase',label:'Business & professional support',title:'Operations, administration, and project support.',body:'Add experienced support for day-to-day operations, administrative work, client follow-up, project coordination, process improvement, POS and payment systems, and vendor management.',links:[['Business support','/services/business-operations'],['POS & payment support','/services/merchant-services'],['Ops-on-Call retainer plans','/care-plans?family=ops']]},
-  {icon:'building',label:'Property & field services',title:'On-site help for one property or an entire portfolio.',body:'Licensed property managers and CAM agents in the Pinnacle network, plus inspections, cleaning, turnover, eviction and REO support, and documented field visits. Use us on call or for full management.',links:[['Property & field services','/services/property-field'],['Cleaning & turnover','/projects/property-cleaning-turnover'],['Property Care monthly plans','/care-plans?family=property']]},
-  {icon:'file',label:'Documents, notary & signing',title:'Prepare, move, sign, notarize, and track documents.',body:'Get help with document preparation, delivery, filing, courthouse runs, mobile notary appointments, Remote Online Notarization, signing coordination, and secure completion records.',links:[['Document & notary services','/services/mobile-documents'],['Legal & Notary Pass plans','/care-plans?family=legal']]},
-]
+        <section className="container-pmv py-16 sm:py-24">
+          <Reveal className="grid gap-6 lg:grid-cols-[.72fr_1.28fr] lg:items-end">
+            <div>
+              <p className="eyebrow">What brings you to Pinnacle?</p>
+              <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">Three clear paths. One relationship.</h2>
+            </div>
+            <p className="max-w-2xl text-base leading-7 text-slate-400">
+              Pinnacle&apos;s breadth is intentional. You do not need to diagnose the exact service before you contact us.
+            </p>
+          </Reveal>
+          <StaggerGroup className="mt-12 grid border-y border-white/10 lg:grid-cols-3">
+            {pathways.map((item, i) => (
+              <motion.article key={item.key} variants={staggerItem} className="border-b border-white/10 py-10 lg:border-b-0 lg:border-r lg:px-8 lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0">
+                <p className="eyebrow">{item.label}</p>
+                <span className="mt-2 block font-display text-xs text-gold/55">0{i + 1}</span>
+                <h3 className="mt-5 font-display text-2xl font-bold leading-tight text-white sm:text-[1.85rem]">{item.title}</h3>
+                <p className="mt-4 text-sm leading-7 text-slate-400">{item.body}</p>
+                <ul className="mt-5 space-y-1.5 text-sm text-slate-300">
+                  {item.items.map((capability) => <li key={capability}>{capability}</li>)}
+                </ul>
+                <Link to={item.to} className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">Explore {item.label} →</Link>
+              </motion.article>
+            ))}
+          </StaggerGroup>
+          <Reveal className="mt-8">
+            <Link to={GET_HELP} className="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-gold">
+              Doesn&apos;t fit neatly into one of these? Tell us what&apos;s going on. <span aria-hidden="true">→</span>
+            </Link>
+          </Reveal>
+        </section>
 
-const difference=[
-  ['Tell us what you need','Start with the task, property, document, deadline, or problem. You do not need to know the correct service name.'],
-  ['Confirm the scope','We identify what Pinnacle can handle directly, what requires a qualified provider, and what the work will involve.'],
-  ['Coordinate the work','We schedule the right people, manage the handoffs, and keep you updated instead of sending you between separate vendors.'],
-  ['Verify completion','Photos, documents, notes, signatures, and completion details are kept with the request so you have a clear record.'],
-]
+        <section className="border-y border-gold/15 bg-gradient-to-br from-gold/[.055] via-white/[.012] to-transparent">
+          <div className="container-pmv grid gap-12 py-16 sm:py-20 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
+            <Reveal>
+              <p className="eyebrow">How Pinnacle works</p>
+              <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">You do not have to know the service name first.</h2>
+              <p className="mt-5 max-w-lg text-base leading-8 text-slate-400">
+                Tell us what is going on. We review the matter, name who is handling it, and stay with the work through completion.
+              </p>
+              <Link to="/how-it-works" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-gold">See the full process <span>→</span></Link>
+            </Reveal>
+            <div className="divide-y divide-white/10 border-y border-white/10">
+              {howItWorks.map(([title, body], i) => (
+                <Reveal key={title} delay={i * 0.05} className="grid gap-3 py-6 sm:grid-cols-[44px_minmax(160px,.7fr)_1fr] sm:items-start">
+                  <span className="font-display text-xs font-bold text-gold/60">0{i + 1}</span>
+                  <h3 className="font-display text-sm font-bold text-white">{title}</h3>
+                  <p className="text-sm leading-6 text-slate-400">{body}</p>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
 
-export default function Home(){
-  usePageMeta('Pinnacle Management Ventures - Business, Property, Document & Field Services','Nationwide business support, administration, documents, mobile notary, RON, property cleaning, inspections, eviction and REO support, and coordinated field services.')
-  return <div className="min-h-screen bg-navy-950"><Header/><main>
-    <section className="pmv-hero-story relative min-h-[calc(100vh-68px)] overflow-hidden border-b border-white/[.07]"><AmbientGlow/><div className="container-pmv relative z-10 grid min-h-[calc(100vh-68px)] gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
-      <StaggerOnMount>
-        <motion.p variants={staggerItem} className="eyebrow">Nationwide professional support · South Florida field services</motion.p>
-        <motion.h1 variants={staggerItem} className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-[-.05em] text-white sm:text-6xl lg:text-[3.75rem] xl:text-[4rem]"><span className="block">Business support.</span><span className="block">Property services.</span><span className="pmv-gold-text block">Documents &amp; field work.</span></motion.h1>
-        <motion.p variants={staggerItem} className="mt-7 max-w-3xl text-lg leading-8 text-slate-300 sm:text-xl">Pinnacle helps business owners, property owners, landlords, and professionals get real work done: operations and administrative support, document preparation and filing, mobile notary and RON, inspections, property cleaning, eviction and REO support, field visits, and vendor coordination.</motion.p>
-        <motion.p variants={staggerItem} className="mt-4 max-w-2xl text-base leading-7 text-slate-500">Use Pinnacle for one straightforward task, ongoing support, or a multi-step project that needs one accountable point of contact.</motion.p>
-        <motion.div variants={staggerItem} className="mt-9 flex flex-wrap gap-3"><Link to={CLIENT_SIGNUP} className={btnPrimary}>Tell Us What You Need</Link><Link to="/services" className={btnOutline}>View All Services</Link></motion.div>
-        <motion.p variants={staggerItem} className="mt-4 text-sm text-slate-500">Need a cleaning or inspection number first? <Link to="/instant-quote" className="font-semibold text-gold hover:underline">Get an instant estimate</Link></motion.p>
-        <motion.div variants={staggerItem} className="mt-9 grid max-w-2xl gap-3 border-t border-white/10 pt-5 text-[11px] font-semibold uppercase tracking-[.13em] text-slate-500 sm:grid-cols-3"><span>One-time or ongoing help</span><span>Nationwide coordination</span><span>Direct South Florida coverage</span></motion.div>
-      </StaggerOnMount>
-      <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{duration:.55,delay:.18}} className="relative lg:min-h-[520px]"><HeroGuideRail/></motion.div>
-    </div></section>
+        <section className="container-pmv py-16 sm:py-24">
+          <Reveal className="max-w-3xl">
+            <p className="eyebrow">Why Pinnacle</p>
+            <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">One Relationship. Multiple Capabilities. Less Runaround.</h2>
+          </Reveal>
+          <div className="mt-10 grid gap-x-10 md:grid-cols-2">
+            {whyPinnacle.map(([title, body]) => (
+              <Reveal key={title} className="border-t border-gold/20 py-6">
+                <h3 className="font-semibold text-white">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
+              </Reveal>
+            ))}
+          </div>
+        </section>
 
-    <section className="border-b border-white/[.07] bg-navy-900/30"><div className="container-pmv py-10 sm:py-14"><Reveal className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-gold">Built For</p><h2 className="mt-2 font-display text-2xl font-bold tracking-[-.02em] text-white sm:text-3xl">Find your world, jump in where it fits.</h2></div><p className="max-w-md text-xs leading-6 text-slate-500">Each path opens a dedicated operating world: property, documents, or business. The intake, portal, and follow-through match that work.</p></Reveal><div className="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Find support by client type">{personas.map(item=><Link key={item.label} to={item.to} className="group flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[.02] px-4 py-3 transition hover:border-gold/45 hover:bg-white/[.045]"><span className="min-w-0"><span className="block text-sm font-bold leading-tight text-white group-hover:text-gold">{item.label}</span><span className="mt-1 block text-[11px] leading-5 text-slate-400">{item.benefit}</span></span><span className="text-gold transition-transform group-hover:translate-x-0.5">→</span></Link>)}</div></div></section>
+        <section className="border-y border-white/[.07] bg-navy-900/30">
+          <div className="container-pmv py-16 sm:py-20">
+            <Reveal>
+              <p className="eyebrow">Real-world situations</p>
+              <h2 className="mt-4 max-w-3xl font-display text-3xl font-bold tracking-[-.035em] text-white sm:text-5xl">Recognize the problem. We will help name the work.</h2>
+            </Reveal>
+            <div className="mt-10 grid gap-3 md:grid-cols-2">
+              {useCases.map((item) => (
+                <Link key={item.title} to={item.to} className="group rounded-lg border border-white/10 bg-white/[.02] px-5 py-5 transition hover:border-gold/40 hover:bg-white/[.04]">
+                  <h3 className="font-display text-lg font-semibold text-white group-hover:text-gold">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-400">{item.body}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
 
-    <section className="container-pmv py-16 sm:py-24"><Reveal className="grid gap-7 lg:grid-cols-[.72fr_1.28fr] lg:gap-16"><div><p className="eyebrow">Services</p><h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">Professional support for the work on your list.</h2></div><p className="max-w-3xl text-lg leading-8 text-slate-400 lg:pt-7">You do not need to turn every need into a consulting engagement or manage a different company for every task. Tell Pinnacle what needs to be handled, where it is, and when you need it. We will confirm the scope and coordinate the right next step.</p></Reveal><StaggerGroup className="mt-12 grid border-y border-white/10 lg:grid-cols-3">{audiences.map((item,i)=><motion.article variants={staggerItem} key={item.title} className="group border-b border-white/10 py-10 lg:border-b-0 lg:border-r lg:px-8 lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0"><div className="flex items-center justify-between"><p className="eyebrow">{item.label}</p><span className="font-display text-xs text-gold/55">0{i+1}</span></div><Icon name={item.icon} size={26} className="mt-8 text-gold"/><h3 className="mt-6 font-display text-3xl font-bold leading-[1.08] tracking-[-.03em] text-white sm:text-[2.15rem]">{item.title}</h3><p className="mt-5 text-sm leading-7 text-slate-400">{item.body}</p><div className="mt-7 space-y-2">{item.links.map(([label,to])=><Link key={to} to={to} className="flex items-center justify-between border-t border-white/[.07] pt-2 text-xs font-semibold text-slate-300 transition group-hover:text-white"><span>{label}</span><span className="text-gold">↗</span></Link>)}</div></motion.article>)}</StaggerGroup></section>
+        <section className="container-pmv py-16 sm:py-24">
+          <div className="grid gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
+            <Reveal>
+              <p className="eyebrow">Client portal</p>
+              <h2 className="mt-4 font-display text-3xl font-bold tracking-[-.035em] text-white sm:text-5xl">Know What&apos;s Happening Without Having to Ask.</h2>
+              <p className="mt-5 max-w-lg text-base leading-7 text-slate-400">
+                Once you are a client, matters, documents, agreements, updates, billing, and your assigned Pinnacle contact live in one secure workspace.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-slate-300">
+                {portalHighlights.map((item) => (
+                  <li key={item} className="flex items-start gap-2"><span className="mt-1 text-gold">✓</span>{item}</li>
+                ))}
+              </ul>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <a href={CLIENT_LOGIN} className={btnPrimary}>Existing Client? Sign In</a>
+                <Link to={GET_HELP} className={btnOutline}>Not a client yet?</Link>
+              </div>
+            </Reveal>
+            <Reveal>
+              <div className="overflow-hidden rounded-xl border border-white/10 bg-navy-900/40 p-4 sm:p-6">
+                <MotionStage />
+              </div>
+            </Reveal>
+          </div>
+        </section>
 
-    <section className="border-y border-gold/15 bg-gradient-to-br from-gold/[.055] via-white/[.012] to-transparent"><div className="container-pmv grid gap-12 py-16 sm:py-20 lg:grid-cols-[.8fr_1.2fr] lg:gap-16"><Reveal><p className="eyebrow">How requests are handled</p><h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">A clear process from request to completion.</h2><p className="mt-5 max-w-lg text-base leading-8 text-slate-400">Pinnacle gives you one place to explain the need, receive updates, share documents, and confirm the work is complete - even when several providers or steps are involved.</p><Link to="/about" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-gold">How Pinnacle works <span>→</span></Link></Reveal><div className="divide-y divide-white/10 border-y border-white/10">{difference.map(([title,body],i)=><Reveal key={title} delay={i*.05} className="grid gap-3 py-6 sm:grid-cols-[44px_170px_1fr] sm:items-start"><span className="font-display text-xs font-bold text-gold/60">0{i+1}</span><h3 className="font-display text-sm font-bold text-white">{title}</h3><p className="text-sm leading-6 text-slate-400">{body}</p></Reveal>)}</div></div></section>
+        <section className="border-y border-white/[.07] bg-navy-900/30">
+          <div className="container-pmv grid gap-10 py-16 sm:py-20 lg:grid-cols-[.85fr_1.15fr] lg:items-center">
+            <Reveal>
+              <p className="eyebrow">Founder</p>
+              <h2 className="mt-3 font-display text-3xl font-bold text-white sm:text-4xl">{founder.name}</h2>
+              <p className="mt-2 text-sm font-semibold uppercase tracking-[.12em] text-gold">{founder.title}</p>
+            </Reveal>
+            <Reveal>
+              <p className="text-base leading-8 text-slate-300">{founder.lead}</p>
+              <p className="mt-4 text-base leading-8 text-slate-400">{founder.close}</p>
+              <Link to="/about" className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">About Pinnacle →</Link>
+            </Reveal>
+          </div>
+        </section>
 
-    <section className="border-b border-white/[.07]"><div className="container-pmv py-16 sm:py-20"><Reveal className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="eyebrow">Monthly plans</p><h2 className="mt-4 max-w-2xl font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">The work repeats. Your rate should reward that.</h2></div><p className="max-w-md text-sm leading-7 text-slate-400">Month-to-month retainers with included visits, credits, priority scheduling, and member pricing on everything else. Cancel anytime.</p></Reveal><div className="mt-10 grid gap-4 lg:grid-cols-3">{[
-      {name:'Property Care',price:'From $89/mo',body:'Licensed property managers and CAM agents in our network, at a lower cost than the typical 8-12% shop. Prefer to keep the keys? Monthly on-call care covers inspections, credits, and a coordinator who already knows the property.',to:'/care-plans?family=property',audience:'Landlords · investors · out-of-area owners'},
-      {name:'Ops-on-Call',price:'From $199/mo',body:'Included admin and coordination hours, a named coordinator, and priority scheduling on projects - real capacity without a hire.',to:'/care-plans?family=ops',audience:'Owners · operators · small teams'},
-      {name:'Legal & Notary Pass',price:'From $99/mo',body:'One coordinator for mobile notary, RON, courier, and courthouse runs. Included volume, same-day priority, and 25% off everything past the pass.',to:'/care-plans?family=legal',audience:'Attorneys · title · closing teams'},
-    ].map(plan=><Reveal key={plan.name}><Link to={plan.to} className="group flex h-full flex-col rounded-2xl border border-white/10 bg-white/[.02] p-6 transition hover:border-gold/45 hover:bg-white/[.04]"><div className="flex items-baseline justify-between gap-3"><h3 className="font-display text-xl font-bold text-white group-hover:text-gold">{plan.name}</h3><span className="whitespace-nowrap text-sm font-bold text-gold">{plan.price}</span></div><p className="mt-3 text-sm leading-7 text-slate-400">{plan.body}</p><p className="mt-auto pt-5 text-[11px] font-semibold uppercase tracking-[.13em] text-slate-500">{plan.audience}</p><span className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-gold transition group-hover:gap-2">See plan details <span>→</span></span></Link></Reveal>)}</div></div></section>
+        <section className="container-pmv py-16 sm:py-20">
+          <Reveal className="grid gap-8 lg:grid-cols-2 lg:items-end">
+            <div>
+              <p className="eyebrow">The right support for the matter</p>
+              <h2 className="mt-4 font-display text-3xl font-bold text-white sm:text-4xl">Direct when we can. Coordinated when it should be.</h2>
+            </div>
+            <p className="text-sm leading-7 text-slate-400">
+              Pinnacle may provide the work directly, manage the matter, or work with licensed third-party professionals when specialized or regulated services are required. We name that up front. We are not a law firm, accounting firm, lender, or licensed property manager unless that provider is identified as such.
+            </p>
+          </Reveal>
+        </section>
 
-    <section className="container-pmv py-16 sm:py-24"><div className="grid gap-10 lg:grid-cols-[.58fr_1.42fr] lg:items-start lg:gap-14"><Reveal><p className="eyebrow">Start a request</p><h2 className="mt-4 font-display text-3xl font-bold tracking-[-.035em] text-white sm:text-4xl">Two minutes. No account. Real reply.</h2><p className="mt-5 max-w-md text-sm leading-7 text-slate-400">Tell us what needs to happen, where, and when. We reply with what Pinnacle handles directly, what a qualified provider covers, and what it will run.</p><ul className="mt-5 space-y-2 text-sm text-slate-300"><li className="flex items-start gap-2"><span className="mt-1 text-gold">✓</span>No signup, no long form</li><li className="flex items-start gap-2"><span className="mt-1 text-gold">✓</span>Priced up front when we can</li><li className="flex items-start gap-2"><span className="mt-1 text-gold">✓</span>Same team across every request you send</li></ul><p className="mt-5 flex items-center gap-2 text-sm font-semibold text-white"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,.6)]"/>A real person replies within two business hours.</p></Reveal><ScopeWizard source="home" compact/></div></section>
+        <section className="border-y border-white/[.07]">
+          <div className="container-pmv py-16 sm:py-20">
+            <Reveal className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="eyebrow">Monthly plans</p>
+                <h2 className="mt-4 max-w-2xl font-display text-3xl font-bold text-white sm:text-4xl">When the work repeats, put it on a plan.</h2>
+              </div>
+              <Link to="/care-plans" className="text-sm font-semibold text-gold hover:underline">See monthly plans →</Link>
+            </Reveal>
+            <div className="mt-8 grid gap-3 lg:grid-cols-3">
+              {[
+                { name: 'Property Care', price: 'From $89/mo', to: '/care-plans?family=property' },
+                { name: 'Ops-on-Call', price: 'From $199/mo', to: '/care-plans?family=ops' },
+                { name: 'Legal & Notary Pass', price: 'From $99/mo', to: '/care-plans?family=legal' },
+              ].map((plan) => (
+                <Link key={plan.name} to={plan.to} className="rounded-lg border border-white/10 bg-white/[.02] px-5 py-4 transition hover:border-gold/40">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="font-semibold text-white">{plan.name}</h3>
+                    <span className="text-sm font-bold text-gold">{plan.price}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
 
-    <section className="pmv-trust-strip border-y border-gold/15"><div className="container-pmv grid gap-8 py-10 md:grid-cols-3">{[['Nationwide support','Business operations, administration, documents, signing, RON, and coordination available across the United States.'],['South Florida field coverage','Direct local support for cleaning, inspections, property visits, mobile notary, courthouse runs, and on-site requests.'],['One-time or ongoing service','Use Pinnacle for one defined task, a recurring need, a property portfolio, or a project involving several providers.']].map(([a,b])=><Reveal key={a}><strong className="font-display text-xl font-bold tracking-[-.02em] text-white">{a}</strong><p className="mt-2 text-sm leading-6 text-slate-400">{b}</p></Reveal>)}</div></section>
+        <section className="container-pmv py-16 sm:py-24">
+          <div className="grid gap-10 lg:grid-cols-[.58fr_1.42fr] lg:items-start lg:gap-14">
+            <Reveal>
+              <p className="eyebrow">Start a request</p>
+              <h2 className="mt-4 font-display text-3xl font-bold tracking-[-.035em] text-white sm:text-4xl">Two minutes. No account. Real reply.</h2>
+              <p className="mt-5 max-w-md text-sm leading-7 text-slate-400">Tell us what needs to happen, where, and when. We reply with what Pinnacle handles directly, what a qualified provider covers, and what it will run.</p>
+              <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-white"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />A real person replies within two business hours.</p>
+            </Reveal>
+            <ScopeWizard source="home" compact />
+          </div>
+        </section>
 
-    <PublicMetricsBand/>
-    <CaseStudyStrip className="border-b border-white/10"/>
+        <PublicMetricsBand />
+        <CaseStudyStrip className="border-b border-white/10" />
 
-    <CtaBand title="What do you need handled?" body="Tell us the work, location, timing, and outcome. No account is required to start." primary={{to:CLIENT_SIGNUP,label:'Scope a Request'}} secondary={{to:'/contact',label:'Contact Pinnacle'}}/>
-  </main><Footer/></div>
+        <CtaBand
+          title="What Can We Help You Get Handled?"
+          body="You do not have to know the correct service. Tell us what is going on and we will help determine the next step."
+          primary={{ to: GET_HELP, label: 'Tell Us What You Need Help With' }}
+          secondary={{ to: CLIENT_LOGIN, label: 'Existing Client? Sign In' }}
+        />
+      </main>
+      <Footer />
+    </div>
+  )
 }

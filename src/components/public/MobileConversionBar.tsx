@@ -10,8 +10,8 @@ function intakeFromPath(pathname: string, family: string | null) {
   if (world === 'property') return { to: '/scope-request?world=property&source=mobile-bar', label: 'Property' }
   if (world === 'documents') return { to: '/scope-request?world=documents&source=mobile-bar', label: 'Documents' }
   if (world === 'business') return { to: '/scope-request?world=business&source=mobile-bar', label: 'Ops' }
-  if (world === 'funding') return { to: '/scope-request?world=funding&source=mobile-bar', label: 'Funding' }
-  return { to: '/services', label: 'Services' }
+  if (world === 'funding') return { to: '/scope-request?world=funding&source=mobile-bar', label: 'Get Help' }
+  return { to: '/scope-request?source=mobile-bar', label: 'Get Help' }
 }
 
 export function MobileConversionBar(){

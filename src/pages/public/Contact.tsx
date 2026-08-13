@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
-import { btnPrimary, PageIntro, panelCls } from '../../components/public/ui'
+import { btnOutline, btnPrimary, PageIntro, panelCls } from '../../components/public/ui'
+import { GET_HELP } from '../../data/publicSite'
 import { services } from '../../data/services'
 import { api, ApiError } from '../../lib/api'
 import { inputCls } from '../auth/AuthLayout'
@@ -40,9 +42,14 @@ export default function Contact() {
       <section className="container-pmv py-16">
         <PageIntro
           kicker="Contact Pinnacle"
-          title="Tell us what you need help with"
-          subtitle="Give us a little context and we will follow up to discuss the right service, scope, and next step."
+          title="Phone, email, and a place to write."
+          subtitle="For a service request, start a request. Use this page for general inquiries, hours, and how to reach us."
         />
+
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link to={GET_HELP} className={btnPrimary}>Start a Request</Link>
+          <a href="/portal/login" className={btnOutline}>Existing Client? Sign In</a>
+        </div>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-3">
           <div className={`${panelCls} lg:col-span-2`}>
@@ -90,7 +97,7 @@ export default function Contact() {
                 </label>
                 {error && <p className="text-sm text-rose-300">{error}</p>}
                 <button type="submit" disabled={status === 'busy'} className={`${btnPrimary} disabled:opacity-60`}>
-                  {status === 'busy' ? 'Sending...' : 'Send Request'}
+                  {status === 'busy' ? 'Sending...' : 'Send Inquiry'}
                 </button>
                 <p className="text-xs text-slate-500">We use the information you provide to respond to your request and manage the resulting client relationship.</p>
               </form>

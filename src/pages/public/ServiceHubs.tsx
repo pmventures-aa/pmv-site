@@ -28,7 +28,7 @@ type HubConfig = {
 
 const HUBS: Record<'business'|'property'|'mobile', HubConfig> = {
   business: {
-    eyebrow: 'Business & Operations',
+    eyebrow: 'Business Support',
     title: 'Support for the systems, projects, and decisions behind the business.',
     intro: 'Pinnacle works alongside owners and teams when operations need more structure, a transition needs coordination, or important work is sitting between departments, vendors, and providers.',
     statement: 'Use us for a defined project or as an ongoing operational resource. The point is not to add another layer. It is to give the work a clear owner.',
@@ -43,7 +43,7 @@ const HUBS: Record<'business'|'property'|'mobile', HubConfig> = {
     metaDescription: 'Business consulting, POS and payment transitions, administrative support, project coordination, and funding readiness support from Pinnacle Management Ventures.',
   },
   property: {
-    eyebrow: 'Property Care & Field Services',
+    eyebrow: 'Property & Project Support',
     title: 'From a simple deep clean to a complete property turnover.',
     intro: 'Pinnacle gives owners, landlords, agents, investors, and asset teams one place to request the practical work a property needs: cleaning, inspections, REO support, eviction-related coordination, access, vendors, documentation, and ready-to-market follow-through.',
     statement: 'Request one service for one address or coordinate several steps across a property or portfolio. Field crews are owned in South Florida with a vetted vendor network reaching other regions - every visit ends with a documented, geo-verified audit trail.',
@@ -58,7 +58,7 @@ const HUBS: Record<'business'|'property'|'mobile', HubConfig> = {
     metaDescription: 'Property cleaning, deep cleaning, inspections, eviction support, REO and vacant-property preservation, turnovers, vendor coordination, and documented field services. Owned South Florida crews plus a vetted nationwide vendor network.',
   },
   mobile: {
-    eyebrow: 'Documents, Signing & Mobile',
+    eyebrow: 'Personal & Administrative',
     title: 'Prepare it, move it, file it, sign it, or get it where it needs to go.',
     intro: 'Pinnacle provides practical document support without turning every request into a larger project. We can organize permitted client-directed paperwork, coordinate filing or delivery, run a mobile notary appointment, or complete a Remote Online Notarization from wherever the signer is, and keep confirmation connected to the client record.',
     statement: 'Straightforward scope, secure handling, certified audit trail on completion. Local field work in South Florida, mobile notary through our vetted signing network in other regions, and RON available nationwide in permitted states.',
