@@ -1,7 +1,7 @@
 import {
   Home, Layers, FileText, MessageSquare, Calendar, Receipt, HelpCircle, Building2, Users,
   Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned, Send,
-  BookOpen, Bot, Gauge, PenTool, Wrench, ShieldCheck, type LucideIcon,
+  BookOpen, Bot, Gauge, PenTool, Wrench, ShieldCheck, Globe, type LucideIcon,
 } from 'lucide-react'
 import { clientWorkspace, resolveWorld, type OperatingWorld } from '../../lib/workspace'
 
@@ -46,11 +46,10 @@ export const portalHiddenRoutes=['planned-calls','funding','property-management'
 
 export const adminNav: NavItem[] = [
   {key:'dashboard',label:'Overview',to:'',icon:Home},
-  {key:'pipelines',label:'Pipeline',to:'pipelines',icon:Workflow,section:'Revenue'},{key:'inquiries',label:'Leads',to:'inquiries',icon:UserPlus,section:'Revenue'},{key:'clients',label:'Clients',to:'clients',icon:Users,section:'Revenue'},
+  {key:'pipelines',label:'Pipeline',to:'pipelines',icon:Workflow,section:'Revenue'},{key:'quotes',label:'Quotes',to:'quotes',icon:FileText,section:'Revenue'},{key:'clients',label:'Clients',to:'clients',icon:Users,section:'Revenue'},
   {key:'messages',label:'Inbox',to:'messages',icon:MessageSquare,section:'Operations'},{key:'cases',label:'Cases & SLA',to:'cases',icon:HelpCircle,section:'Operations'},{key:'automation-center',label:'Automation Center',to:'automation-center',icon:Bot,section:'Operations'},{key:'document-center',label:'Document Hub',to:'document-center',icon:FileText,section:'Operations'},{key:'esign-platform',label:'E-Signature Platform',to:'esign-platform',icon:PenTool,section:'Operations'},{key:'community-documents',label:'Community Docs',to:'community-documents',icon:BookOpen,section:'Operations'},{key:'envelopes',label:'Signed Documents',to:'envelopes',icon:Send,section:'Operations'},{key:'field-work',label:'Field Work & RON',to:'field-work',icon:MapPinned,section:'Operations'},
   {key:'management',label:'Management',to:'management',icon:Gauge,section:'Intelligence'},{key:'reports',label:'Reports',to:'reports',icon:BarChart3,section:'Intelligence'},{key:'activity',label:'Activity',to:'activity',icon:Activity,section:'Intelligence'},{key:'audit-log',label:'Audit Log',to:'audit-log',icon:ClipboardList,section:'Intelligence'},
-  {key:'public-funnel',label:'Public Funnel',to:'public-funnel',icon:Wrench,section:'Intelligence'},
-  {key:'security-center',label:'Security Center',to:'security-center',icon:ShieldCheck,section:'Access'},{key:'network',label:'Network & Dispatch',to:'network',icon:UsersRound,section:'Access'},{key:'users',label:'Users',to:'users',icon:UserCog,section:'Access'},{key:'assignments',label:'Assignments',to:'assignments',icon:ArrowLeftRight,section:'Access'},{key:'settings',label:'Settings',to:'settings',icon:Settings,section:'Access'},
+  {key:'security-center',label:'Security Center',to:'security-center',icon:ShieldCheck,section:'Administration'},{key:'network',label:'Network & Dispatch',to:'network',icon:UsersRound,section:'Administration'},{key:'users',label:'Users',to:'users',icon:UserCog,section:'Administration'},{key:'assignments',label:'Assignments',to:'assignments',icon:ArrowLeftRight,section:'Administration'},{key:'inquiries',label:'Leads & CRM',to:'inquiries',icon:UserPlus,section:'Administration'},{key:'public-funnel',label:'Website Studio',to:'public-funnel',icon:Globe,section:'Administration'},{key:'settings',label:'Settings',to:'settings',icon:Settings,section:'Administration'},
 ]
 
 export function vendorNavForWorld(world: OperatingWorld): NavItem[] {

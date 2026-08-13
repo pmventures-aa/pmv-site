@@ -57,6 +57,7 @@ import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_l
 import { documentWorkspaceExtraRoutes } from '../_lib/routes/documentWorkspaceExtras'
 import { securitySessionRoutes } from '../_lib/routes/securitySessions'
 import { scopeFunnelPublicRoutes, scopeFunnelAdminRoutes } from '../_lib/routes/scopeFunnel'
+import { quoteAdminRoutes, quotePublicRoutes } from '../_lib/routes/quotesAdmin'
 import { carePlanPublicRoutes } from '../_lib/routes/carePlans'
 import { communicationsHubRoutes } from '../_lib/routes/communicationsHub'
 import { conversationRoutes } from '../_lib/routes/conversations'
@@ -96,6 +97,7 @@ app.route('/', documentPlatformV2PublicRoutes)
 app.route('/', documentLifecyclePublicRoutes)
 app.route('/', internalDocumentPublicRoutes)
 app.route('/', scopeFunnelPublicRoutes)
+app.route('/', quotePublicRoutes)
 app.route('/', carePlanPublicRoutes)
 app.route('/', managedTemplatePublicRoutes)
 
@@ -162,6 +164,7 @@ app.route('/admin', casesRoutes)
 app.route('/admin', communicationBrandingAdminRoutes)
 app.route('/admin', presenceRoutes)
 app.route('/admin', scopeFunnelAdminRoutes)
+app.route('/admin', quoteAdminRoutes)
 app.route('/admin', managedTemplateAdminRoutes)
 app.route('/admin', clientRelationshipRoutes)
 // Public endpoint serves branded font files by id for the mail workspace

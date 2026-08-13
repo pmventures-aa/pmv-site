@@ -35,7 +35,7 @@ managementInsightRoutes.get('/management/scorecard', requireStaff, requireCapabi
         (SELECT MAX(a.created_at) FROM activity_events a WHERE a.client_user_id=m.client_user_id) last_activity_at
       FROM matters m JOIN users u ON u.id=m.client_user_id WHERE m.status!='closed' AND ${matterScope.where} ORDER BY COALESCE(m.due_date,'9999-12-31'),m.created_at LIMIT 250`,
     ).bind(...matterScope.params).all<any>(),
-    c.env.DB.prepare(`SELECT COALESCE(ci.lifecycle_stage,'unclassified') stage,COUNT(*) count,ROUND(AVG(julianday('now')-julianday(ci.created_at)),1) avg_age_days,SUM(CASE WHEN julianday('now')-julianday(ci.created_at)>=14 THEN 1 ELSE 0 END) aged_14d FROM contact_inquiries ci WHERE ci.client_user_id IS NULL AND ci.archived_at IS NULL AND ${leadScope} GROUP BY COALESCE(ci.lifecycle_stage,'unclassified') ORDER BY count DESC`).bind(...leadParams).all<any>(),
+    c.env.DB.prepare(`SELECT COALESCE(ci.lifecycle_stage,'unclassified') stage,COUNT(*) count,ROUND(AVG(julianday('now')-julianday(ci.created_at)),1) avg_age_days,SUM(CASE WHEN julianday('now')-julianday(ci.created_at)>=14 THEN 1 ELSE 0 END) aged_14d FROM contact_inquiries ci WHERE ci.converted_at IS NULL AND ci.archived_at IS NULL AND ${leadScope} GROUP BY COALESCE(ci.lifecycle_stage,'unclassified') ORDER BY count DESC`).bind(...leadParams).all<any>(),
     c.env.DB.prepare(`SELECT
       COALESCE(SUM(CASE WHEN i.status='open' THEN i.amount_cents ELSE 0 END),0) open_cents,
       COALESCE(SUM(CASE WHEN i.status='open' AND i.due_date IS NOT NULL AND date(i.due_date)<date('now') THEN i.amount_cents ELSE 0 END),0) overdue_cents,
