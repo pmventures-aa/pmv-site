@@ -1,5 +1,5 @@
 import { Crest } from '../../components/ui'
-import type { EmailSignature } from '../../lib/emailSignatures'
+import { previewSignatureHtml, type EmailSignature } from '../../lib/emailSignatures'
 
 const PHONE = '(561) 388-7879'
 const SITE = 'pinnaclemanagementventures.com'
@@ -55,7 +55,12 @@ export function SignatureLetterhead({
 
 export function SignaturePreview({ signature }: { signature: EmailSignature }) {
   if (signature.kind === 'custom') {
-    return <SignatureLetterhead kind="company" />
+    return (
+      <div
+        className="signature-preview"
+        dangerouslySetInnerHTML={{ __html: previewSignatureHtml(signature.html) }}
+      />
+    )
   }
   return (
     <SignatureLetterhead

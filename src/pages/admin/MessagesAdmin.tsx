@@ -74,11 +74,11 @@ function NewThreadDialog({ clients, initialClientId, onCreated }: { clients: Cli
   </Dialog>
 }
 
-function ClientInbox({ initialClientId, onClearClient }: { initialClientId?: string | null; onClearClient: () => void }) {
+function ClientInbox({ initialClientId, initialThreadId, onClearClient }: { initialClientId?: string | null; initialThreadId?: string | null; onClearClient: () => void }) {
   const [threads, setThreads] = useState<ThreadRow[]>([])
   const [clients, setClients] = useState<ClientOption[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(initialThreadId || null)
   const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
@@ -87,9 +87,13 @@ function ClientInbox({ initialClientId, onClearClient }: { initialClientId?: str
         api.get<{ threads: ThreadRow[] }>('/portal/message-threads'),
         api.get<{ clients: ClientOption[] }>('/admin/clients'),
       ])
-      setThreads(t.threads); setClients(c.clients); setActiveId((prev) => prev ?? t.threads[0]?.id ?? null)
+      setThreads(t.threads); setClients(c.clients)
+      setActiveId((prev) => {
+        if (initialThreadId && t.threads.some((row) => row.id === initialThreadId)) return initialThreadId
+        return prev ?? t.threads[0]?.id ?? null
+      })
     } finally { setLoading(false) }
-  }, [])
+  }, [initialThreadId])
 
   useEffect(() => { void load() }, [load])
   useLiveRefresh(load)
@@ -166,6 +170,8 @@ export default function MessagesAdmin() {
       if (next === 'inbox') params.delete('tab')
       else params.set('tab', next)
       if (next !== 'email') params.delete('thread')
+      if (next !== 'staff') params.delete('conv')
+      if (next !== 'inbox') params.delete('inbox')
       return params
     }, { replace: true })
   }
@@ -184,7 +190,7 @@ export default function MessagesAdmin() {
         <Link to={p('communications/email')} className="ml-auto mb-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-400 hover:text-gold">Campaigns</Link>
       </div>
       <div className="flex min-h-0 flex-1 flex-col pb-3">
-        {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
+        {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} initialThreadId={searchParams.get('inbox')} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
         {tab === 'email' && <EmailThreadsPanel />}
         {tab === 'staff' && <ConversationsPanel />}
         {tab === 'notifications' && <NotificationsTab />}

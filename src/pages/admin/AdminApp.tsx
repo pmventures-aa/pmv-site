@@ -57,7 +57,6 @@ function AdminShell(){
   if(caps.can_manage_settings)visible.add('settings')
   if(caps.can_view_audit_log)visible.add('audit-log')
   if(caps.can_view_reports){visible.add('reports');visible.add('management')}
-  if(caps.can_manage_communications){visible.add('communications');visible.add('client-banners')}
   if(caps.can_manage_invitations)visible.add('invitations')
   if(caps.can_manage_documents){visible.add('document-center');visible.add('community-documents');visible.add('envelopes');visible.add('esign-platform')}
   if(caps.can_manage_team)visible.add('network')

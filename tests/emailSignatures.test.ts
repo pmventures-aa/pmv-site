@@ -64,13 +64,16 @@ describe('branded email signatures', () => {
 describe('HQ notification deep links', () => {
   const p = (path: string) => path ? `/hq/${path}` : '/hq'
 
-  it('rewrites /hq/communications links onto the current HQ base', () => {
-    expect(resolveHqDeepLink('/hq/communications?tab=email&thread=abc', p)).toBe('/hq/communications?tab=email&thread=abc')
+  it('sends legacy communications links to the live Messages hub', () => {
+    expect(resolveHqDeepLink('/hq/communications?tab=email&thread=abc', p)).toBe('/hq/messages?tab=email&thread=abc')
+    expect(resolveHqDeepLink('/hq/communications?tab=threads&conv=xyz', p)).toBe('/hq/messages?tab=staff&conv=xyz')
+    expect(resolveHqDeepLink('/hq/communications', p)).toBe('/hq/messages?tab=email')
+    expect(resolveHqDeepLink('/hq/communications/email', p)).toBe('/hq/communications/email')
   })
 
   it('keeps relative mail workspace links on the current HQ base', () => {
     const local = (path: string) => path ? `/admin/${path}` : '/admin'
     expect(resolveHqDeepLink('/messages?tab=email&thread=abc', local)).toBe('/admin/messages?tab=email&thread=abc')
-    expect(resolveHqDeepLink('/hq/communications?tab=email&thread=abc', local)).toBe('/admin/communications?tab=email&thread=abc')
+    expect(resolveHqDeepLink('/hq/communications?tab=email&thread=abc', local)).toBe('/admin/messages?tab=email&thread=abc')
   })
 })
