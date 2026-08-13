@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { AtSign, CheckCheck, MailPlus, PenLine, RefreshCw, Reply, Send, XCircle } from 'lucide-react'
+import { CheckCheck, MailPlus, PenLine, RefreshCw, Reply, Send, XCircle } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Tag, btnPrimary, btnSecondary } from '../../components/admin/ui'
@@ -37,14 +37,16 @@ export function EmailThreadsPanel() {
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('thread'))
   const [detail, setDetail] = useState<Detail | null>(null)
   const [signatures, setSignatures] = useState<EmailSignature[]>([])
+  const [templates, setTemplates] = useState<{ company: string; support: string; personal: string } | undefined>()
   const [draft, setDraft] = useState<ComposeDraft | null>(null)
   const [busy, setBusy] = useState(false)
   const [managingSignatures, setManagingSignatures] = useState(false)
 
   const loadSignatures = useCallback(async () => {
     try {
-      const r = await api.get<{ signatures: EmailSignature[] }>('/admin/email-signatures')
+      const r = await api.get<{ signatures: EmailSignature[]; templates?: { company: string; support: string; personal: string } }>('/admin/email-signatures')
       setSignatures(r.signatures || [])
+      setTemplates(r.templates)
     } catch (err) { if (err instanceof ApiError) toast.error(err.message) }
   }, [])
 
@@ -139,6 +141,30 @@ export function EmailThreadsPanel() {
 
   const unread = threads.filter((t) => t.unread).length
 
+  if (managingSignatures) {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-white/10">
+        <EmailSignaturesPanel signatures={signatures} templates={templates} onClose={() => setManagingSignatures(false)} onChanged={() => void loadSignatures()} />
+      </div>
+    )
+  }
+
+  if (draft) {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-white/10">
+        <EmailComposePane
+          draft={draft}
+          signatures={signatures}
+          busy={busy}
+          onChange={setDraft}
+          onSend={(id) => void send(id)}
+          onDiscard={() => setDraft(null)}
+          onManageSignatures={() => setManagingSignatures(true)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ResendWebhookPanel compact />
@@ -159,8 +185,7 @@ export function EmailThreadsPanel() {
                   <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${t.unread ? 'bg-rose-500' : 'bg-transparent'}`} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <AtSign size={12} className="shrink-0 text-slate-500"/>
-                      <p className={`truncate text-sm ${t.unread ? 'font-extrabold text-white' : 'font-semibold text-slate-200'}`}>{t.subject}</p>
+                      <p className={`truncate font-display text-[13px] ${t.unread ? 'font-bold text-white' : 'font-medium text-slate-200'}`}>{t.subject}</p>
                     </div>
                     <p className="mt-1 truncate text-[11px] text-slate-500">
                       {t.client_name && <>{t.client_name} · </>}
@@ -178,26 +203,12 @@ export function EmailThreadsPanel() {
         </aside>
 
         <section className="relative min-w-0 flex-1 bg-navy-950/40">
-          {managingSignatures ? (
-            <EmailSignaturesPanel signatures={signatures} onClose={() => setManagingSignatures(false)} onChanged={() => void loadSignatures()} />
-          ) : draft ? (
-            <EmailComposePane
-              draft={draft}
-              signatures={signatures}
-              busy={busy}
-              onChange={setDraft}
-              onSend={(id) => void send(id)}
-              onDiscard={() => setDraft(null)}
-              onManageSignatures={() => setManagingSignatures(true)}
-            />
-          ) : (
-            <EmailThreadDetail
-              detail={detail}
-              onReply={startReply}
-              onCompose={startCompose}
-              onSignatures={() => setManagingSignatures(true)}
-            />
-          )}
+          <EmailThreadDetail
+            detail={detail}
+            onReply={startReply}
+            onCompose={startCompose}
+            onSignatures={() => setManagingSignatures(true)}
+          />
         </section>
       </div>
     </div>
@@ -223,7 +234,7 @@ function EmailThreadDetail({
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div className="min-w-0">
-          <p className="text-lg font-extrabold text-white">{detail.thread.subject}</p>
+          <p className="font-display text-xl font-semibold tracking-[-.02em] text-white">{detail.thread.subject}</p>
           <p className="mt-1 text-xs text-slate-500">{detail.messages.length} messages · Last activity {new Date(detail.thread.last_activity_at).toLocaleString()}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -255,7 +266,7 @@ function EmailThreadDetail({
                 </div>
               </div>
               {m.error && <div className="mt-2 rounded border border-red-400/25 bg-red-400/[.05] p-2 text-[11px] text-red-200">Delivery error: {m.error}</div>}
-              <div className="prose prose-sm mt-3 max-w-none rounded-md bg-white p-4 text-sm text-navy-950" dangerouslySetInnerHTML={{ __html: m.body_html || (m.body_text ? `<pre class="whitespace-pre-wrap font-sans">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
+              <div className="prose prose-sm mt-3 max-w-none rounded-md bg-white p-5 font-serif text-[15px] leading-7 text-[#1b2430]" dangerouslySetInnerHTML={{ __html: m.body_html || (m.body_text ? `<pre class="whitespace-pre-wrap font-serif">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
               {detail.attachments.filter((a) => a.email_message_id === m.id).map((a) => (
                 <p key={a.id} className="mt-2 text-[11px] text-slate-500">Attachment: {a.file_name}</p>
               ))}

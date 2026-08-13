@@ -5,6 +5,7 @@ import { uuid } from '../crypto'
 import { hasCapability } from '../capabilities'
 import {
   brandedSignatureHtml,
+  letterheadTemplates,
   listSignaturesForUser,
   type SignatureKind,
 } from '../emailSignatures'
@@ -21,7 +22,7 @@ const clean = (v: unknown, n: number) => typeof v === 'string' ? v.trim().slice(
 emailSignatureRoutes.get('/email-signatures', async (c) => {
   const user = c.get('user')
   const signatures = await listSignaturesForUser(c.env, user)
-  return c.json({ signatures })
+  return c.json({ signatures, templates: letterheadTemplates(user) })
 })
 
 emailSignatureRoutes.post('/email-signatures', async (c) => {

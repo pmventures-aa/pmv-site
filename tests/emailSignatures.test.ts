@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendSignature, brandedSignatureHtml, htmlToPlainText } from '../functions/_lib/emailSignatures'
+import { appendSignature, absolutizeSignatureAssets, brandedSignatureHtml, htmlToPlainText } from '../functions/_lib/emailSignatures'
 import { resolveHqDeepLink } from '../src/components/kit/NotificationFeedPanel'
 
 describe('branded email signatures', () => {
@@ -9,6 +9,8 @@ describe('branded email signatures', () => {
     expect(html).toContain('logo-crest-transparent.png')
     expect(html).toContain('(561) 388-7879')
     expect(html).toContain('pinnaclemanagementventures.com')
+    expect(html).toContain('Property')
+    expect(html).toContain('South Florida')
     expect(html).not.toContain('—')
   })
 
@@ -40,6 +42,17 @@ describe('branded email signatures', () => {
     const second = appendSignature(first, brandedSignatureHtml('support'))
     expect(second).toContain('PMV Support')
     expect(second.match(/data-pmv-signature/g)?.length).toBe(1)
+  })
+
+  it('keeps the crest on a same-origin path so HQ can display it', () => {
+    const html = brandedSignatureHtml('company')
+    expect(html).toContain('src="/logo-crest-transparent.png"')
+    expect(html).not.toContain('https://www.pinnaclemanagementventures.com/logo-crest-transparent.png')
+  })
+
+  it('absolutizes the crest for outbound mail', () => {
+    const html = absolutizeSignatureAssets(brandedSignatureHtml('company'))
+    expect(html).toContain('https://www.pinnaclemanagementventures.com/logo-crest-transparent.png')
   })
 
   it('turns composed HTML into readable plain text', () => {
