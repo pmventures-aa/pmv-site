@@ -15,12 +15,13 @@ employeeRoutes.get('/staff-directory', requireStaff, async (c) => {
 
 employeeRoutes.get('/employees', requireStaff, requireNamedPermission('manage_team'), async (c) => {
   const res = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status,
+    `SELECT u.id, u.email, u.full_name, u.phone, u.last_seen_at, u.last_login_at, u.status,
             tm.staff_role, tm.title, tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name,
             tm.network_status, tm.availability_status, tm.is_preferred_provider, tm.service_area_summary,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id) AS tasks_assigned,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status = 'done') AS tasks_completed,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status != 'done' AND due_date IS NOT NULL AND due_date < date('now')) AS tasks_overdue,
+            (SELECT COUNT(*) FROM field_assignments WHERE vendor_user_id = u.id AND status NOT IN ('completed','cancelled')) AS dispatch_open,
             (SELECT COUNT(*) FROM internal_notes WHERE author_user_id = u.id) AS notes_added,
             (SELECT COUNT(*) FROM email_log WHERE sent_by_user_id = u.id) AS emails_sent,
             (SELECT COUNT(*) FROM activity_events WHERE actor_user_id = u.id) AS client_interactions,
