@@ -8,6 +8,7 @@ import { selfRoutes } from '../_lib/routes/self'
 import { portalRoutes } from '../_lib/routes/portal'
 import { messageRoutes } from '../_lib/routes/messages'
 import { adminRoutes } from '../_lib/routes/admin'
+import { processorReviewLoginRoutes } from '../_lib/routes/processorReviewLogin'
 import { publicRoutes } from '../_lib/routes/public'
 import { uploadRoutes } from '../_lib/routes/uploads'
 import { unsubscribeRoutes } from '../_lib/routes/unsubscribe'
@@ -140,6 +141,7 @@ app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', accountEmailsAdminRoutes)
 app.route('/admin', resendWebhookAdminRoutes)
 app.route('/admin', signatureAdminSyncRoutes)
+app.route('/admin', processorReviewLoginRoutes)
 app.route('/admin', staffServiceAssignmentRoutes)
 app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)

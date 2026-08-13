@@ -14,7 +14,7 @@ import NotificationSettings from './settings/NotificationSettings'
 import ManagedTemplatesSettings from './settings/ManagedTemplatesSettings'
 
 const TABS = [
-  { key: 'general', label: 'General', short: 'Firm identity, contact details, invitation link lifetime, communications, and compliance copy.', icon: Building2, terms: 'business firm address phone hours marketing compliance application resend webhook inbound email invite expiry token lifetime' },
+  { key: 'general', label: 'General', short: 'Firm identity, contact details, invitation link lifetime, communications, processor review login, and compliance copy.', icon: Building2, terms: 'business firm address phone hours marketing compliance application resend webhook inbound email invite expiry token lifetime processor review login underwriting authorize payment cloud' },
   { key: 'appearance', label: 'Appearance', short: 'Personal HQ display preferences for this device.', icon: Palette, terms: 'theme dark light workspace display' },
   { key: 'catalog', label: 'Service Catalog', short: 'Define service structure, intake configuration, and client-facing service data.', icon: BriefcaseBusiness, terms: 'services catalog intake applications client offerings' },
   { key: 'offerings', label: 'Service Offerings', short: 'Control which services are available and how they are presented.', icon: SlidersHorizontal, terms: 'services offerings enabled availability pricing scope' },

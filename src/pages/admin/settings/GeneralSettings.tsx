@@ -3,6 +3,7 @@ import { api, ApiError } from '../../../lib/api'
 import { Panel, NoAccess, inputCls, btnPrimary } from '../../../components/admin/ui'
 import { toast } from '../../../components/kit/toast'
 import { ResendWebhookPanel } from './ResendWebhookPanel'
+import { ProcessorReviewLoginPanel } from './ProcessorReviewLoginPanel'
 import { INVITE_TTL_PRESETS, INVITE_TTL_SETTING_KEY, parseInviteTtlHours } from '../../../../shared/inviteTtl'
 
 const FIRM_FIELDS: { key: string; label: string; type?: string; help?: string }[] = [
@@ -83,6 +84,8 @@ export default function GeneralSettings() {
           <span className="mt-1 block text-xs leading-relaxed text-slate-500">Optional. If blank, Pinnacle uses https://www.pinnaclemanagementventures.com.</span>
         </label>
       </Panel>
+
+      <ProcessorReviewLoginPanel />
 
       <ResendWebhookPanel />
 
