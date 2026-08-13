@@ -21,6 +21,7 @@ import { CLIENT_PORTAL_URL, sendAccountWelcome, sendVendorApplicationReceived } 
 import { PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
 import { getCurrentProviderAgreementVersion } from '../managedTemplates'
 import { toDisplayCase } from '../../../shared/displayCase'
+import { advanceInquiryLifecycle } from '../lifecycle'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -280,6 +281,8 @@ authRoutes.post('/set-password', async (c) => {
 
   const hash = await hashPassword(password, c.env.SESSION_SECRET)
   await c.env.DB.prepare("UPDATE users SET password_hash = ?, last_login_at = datetime('now') WHERE id = ?").bind(hash, userId).run()
+  await c.env.DB.prepare("UPDATE contact_inquiries SET client_user_id = COALESCE(client_user_id, ?), updated_at = datetime('now') WHERE lower(email) = lower(?) AND converted_at IS NULL AND archived_at IS NULL").bind(userId, user.email).run()
+  await advanceInquiryLifecycle(c.env, { userId, email: user.email, target: 'prospect' })
 
   const su: SessionUser = {
     id: user.id,
@@ -426,6 +429,10 @@ authRoutes.post('/login', async (c) => {
 
   await clearFailures(c.env, e, ip)
   await c.env.DB.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").bind(user.id).run()
+  if (user.role === 'client') {
+    await c.env.DB.prepare("UPDATE contact_inquiries SET client_user_id = COALESCE(client_user_id, ?), updated_at = datetime('now') WHERE lower(email) = lower(?) AND converted_at IS NULL AND archived_at IS NULL").bind(user.id, user.email).run()
+    await advanceInquiryLifecycle(c.env, { userId: user.id, email: user.email, target: 'prospect' })
+  }
   const su: SessionUser = {
     id: user.id,
     email: user.email,

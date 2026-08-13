@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
+import { lifecycleLabel } from '../../../shared/lifecycle'
 import { Panel, Tag, inputCls, btnPrimary, btnOutline, EmptyState } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { timeAgo } from '../../lib/activity'
@@ -39,6 +40,7 @@ interface LeadRecord {
   created_at: string
   updated_at: string | null
   client_user_id: string | null
+  converted_at: string | null
 }
 
 interface NoteRow { id: string; body: string; author_name: string | null; author_email: string; created_at: string }
@@ -166,8 +168,9 @@ export default function LeadDetail() {
               {location && <span>{location}</span>}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Tag tone={lifecycleTone(r.lifecycle_stage)}>{r.lifecycle_stage}</Tag>
+              <Tag tone={lifecycleTone(r.lifecycle_stage)}>{lifecycleLabel(r.lifecycle_stage)}</Tag>
               <Tag>{r.status}</Tag>
+              {r.client_user_id && !r.converted_at && <Tag tone="blue">Reserved workspace</Tag>}
               {r.email_status !== 'emailable' && <Tag tone="red">Email {r.email_status}</Tag>}
               {data.tags.map((tag) => <Tag key={tag.id}>{tag.name}</Tag>)}
             </div>
@@ -175,8 +178,8 @@ export default function LeadDetail() {
           <div className="flex flex-wrap gap-2">
             <Link to={`${p('communications')}?lead=${encodeURIComponent(r.id)}`} className={btnPrimary}>Email</Link>
             <Link className={btnOutline} to={p(`leads/${r.id}/activity`)}>Add note</Link>
-            {!r.client_user_id && !data.conversion && <button className={btnOutline} disabled={busy} onClick={convert}>Convert to client</button>}
-            {(r.client_user_id || data.conversion) && <Link to={p(`clients/${r.client_user_id || data.conversion?.client_user_id}/overview`)} className={btnOutline}>Open client</Link>}
+            {!r.converted_at && !data.conversion && <button className={btnOutline} disabled={busy} onClick={convert}>Convert to client</button>}
+            {(r.converted_at || data.conversion) && <Link to={p(`clients/${r.client_user_id || data.conversion?.client_user_id}/overview`)} className={btnOutline}>Open client</Link>}
           </div>
         </div>
       </header>
@@ -191,7 +194,7 @@ export default function LeadDetail() {
         <section>
           <div className="mb-5 flex items-end justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Relationship</p><h2 className="mt-1 text-xl font-semibold text-white">What we know</h2></div><button onClick={() => setEditing((v) => !v)} className="text-sm font-medium text-gold hover:underline">{editing ? 'Done' : 'Edit details'}</button></div>
           {editing ? <RecordEditor record={r} staff={staff} onSave={async (patch) => { await updateRecord(patch); setEditing(false) }} /> : <dl className="grid border-y border-white/10 sm:grid-cols-2">
-            <Info label="Lifecycle" value={r.lifecycle_stage} />
+            <Info label="Lifecycle" value={lifecycleLabel(r.lifecycle_stage)} />
             <Info label="Pipeline stage" value={r.status} />
             <Info label="Owner" value={r.owner_name || r.owner_email || 'Unassigned'} />
             <Info label="Interested in" value={r.service_name || 'Not specified'} />
@@ -237,5 +240,5 @@ function RecordEditor({ record, staff, onSave }: { record: LeadRecord; staff: St
   const [busy, setBusy] = useState(false)
   async function submit(e: React.FormEvent) { e.preventDefault(); setBusy(true); try { await onSave(form) } finally { setBusy(false) } }
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }))
-  return <form onSubmit={submit} className="grid gap-4 md:grid-cols-2"><select className={inputCls} value={form.record_type} onChange={(e) => set('record_type', e.target.value)}><option value="person">Person</option><option value="business">Business</option></select><select className={inputCls} value={form.lifecycle_stage} onChange={(e) => set('lifecycle_stage', e.target.value)}><option value="lead">Lead</option><option value="prospect">Prospect</option><option value="opportunity">Opportunity</option><option value="lost">Lost</option></select>{form.record_type === 'person' && <><input className={inputCls} placeholder="First name" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} /><input className={inputCls} placeholder="Last name" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} /></>}<input className={inputCls} placeholder="Company / business" value={form.company_name} onChange={(e) => set('company_name', e.target.value)} /><input className={inputCls} placeholder="Job title" value={form.job_title} onChange={(e) => set('job_title', e.target.value)} /><input className={inputCls} placeholder="Phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} /><input className={inputCls} placeholder="Website" value={form.website} onChange={(e) => set('website', e.target.value)} /><input className={inputCls} placeholder="Industry" value={form.industry} onChange={(e) => set('industry', e.target.value)} /><input className={inputCls} placeholder="Source" value={form.source} onChange={(e) => set('source', e.target.value)} /><select className={inputCls} value={form.status} onChange={(e) => set('status', e.target.value)}><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="lost">Lost</option></select><select className={inputCls} value={form.owner_staff_user_id} onChange={(e) => set('owner_staff_user_id', e.target.value)}><option value="">Unassigned</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.full_name || s.email}</option>)}</select><select className={inputCls} value={form.email_status} onChange={(e) => set('email_status', e.target.value)}><option value="emailable">Email allowed</option><option value="unsubscribed">Unsubscribed</option><option value="bounced">Bounced</option><option value="suppressed">Suppressed</option></select><input className={inputCls} placeholder="Address line 1" value={form.address_line1} onChange={(e) => set('address_line1', e.target.value)} /><input className={inputCls} placeholder="Address line 2" value={form.address_line2} onChange={(e) => set('address_line2', e.target.value)} /><input className={inputCls} placeholder="City" value={form.city} onChange={(e) => set('city', e.target.value)} /><input className={inputCls} placeholder="State" value={form.state} onChange={(e) => set('state', e.target.value)} /><input className={inputCls} placeholder="Postal code" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} /><input className={inputCls} placeholder="Country" value={form.country} onChange={(e) => set('country', e.target.value)} /><div className="md:col-span-2"><button className={btnPrimary} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div></form>
+  return <form onSubmit={submit} className="grid gap-4 md:grid-cols-2"><select className={inputCls} value={form.record_type} onChange={(e) => set('record_type', e.target.value)}><option value="person">Person</option><option value="business">Business</option></select><select className={inputCls} value={form.lifecycle_stage} onChange={(e) => set('lifecycle_stage', e.target.value)}><option value="lead">Lead</option><option value="prospect">Prospect</option><option value="opportunity">Application</option><option value="lost">Lost</option></select>{form.record_type === 'person' && <><input className={inputCls} placeholder="First name" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} /><input className={inputCls} placeholder="Last name" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} /></>}<input className={inputCls} placeholder="Company / business" value={form.company_name} onChange={(e) => set('company_name', e.target.value)} /><input className={inputCls} placeholder="Job title" value={form.job_title} onChange={(e) => set('job_title', e.target.value)} /><input className={inputCls} placeholder="Phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} /><input className={inputCls} placeholder="Website" value={form.website} onChange={(e) => set('website', e.target.value)} /><input className={inputCls} placeholder="Industry" value={form.industry} onChange={(e) => set('industry', e.target.value)} /><input className={inputCls} placeholder="Source" value={form.source} onChange={(e) => set('source', e.target.value)} /><select className={inputCls} value={form.status} onChange={(e) => set('status', e.target.value)}><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="lost">Lost</option></select><select className={inputCls} value={form.owner_staff_user_id} onChange={(e) => set('owner_staff_user_id', e.target.value)}><option value="">Unassigned</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.full_name || s.email}</option>)}</select><select className={inputCls} value={form.email_status} onChange={(e) => set('email_status', e.target.value)}><option value="emailable">Email allowed</option><option value="unsubscribed">Unsubscribed</option><option value="bounced">Bounced</option><option value="suppressed">Suppressed</option></select><input className={inputCls} placeholder="Address line 1" value={form.address_line1} onChange={(e) => set('address_line1', e.target.value)} /><input className={inputCls} placeholder="Address line 2" value={form.address_line2} onChange={(e) => set('address_line2', e.target.value)} /><input className={inputCls} placeholder="City" value={form.city} onChange={(e) => set('city', e.target.value)} /><input className={inputCls} placeholder="State" value={form.state} onChange={(e) => set('state', e.target.value)} /><input className={inputCls} placeholder="Postal code" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} /><input className={inputCls} placeholder="Country" value={form.country} onChange={(e) => set('country', e.target.value)} /><div className="md:col-span-2"><button className={btnPrimary} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div></form>
 }

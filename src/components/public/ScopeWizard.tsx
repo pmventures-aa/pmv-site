@@ -5,8 +5,9 @@ import { api, ApiError } from '../../lib/api'
 import { Icon, type IconName } from '../kit/Icon'
 import { AddressAutocomplete } from '../kit/AddressAutocomplete'
 import { jobsForWorld, publicIntakeCopy, worldFromPublicParams } from '../../lib/workspace'
+import { resolveScopeEntry, type ScopeQuestion } from '../../../shared/scopeEntries'
 
-type ScopeResponse = { confirmation_url:string }
+type ScopeResponse = { confirmation_url:string; request_token?:string; setup_url?:string|null; account_status?:string }
 type Form = {
   job_type:string
   location_type:'onsite'|'remote'
@@ -52,85 +53,48 @@ const serviceJobs:Record<string,string>={
 }
 const timings=['As soon as possible','Within 2-3 business days','This week','I have a specific date','Flexible / planning ahead']
 
-type Question = {
-  key:string
-  label:string
-  hint?:string
-  type:'select'|'multiselect'|'text'|'number'
-  options?:string[]
-}
-const QUESTIONS_BY_JOB:Record<string,Question[]>={
-  cleaning_turnover:[
-    {key:'clean_type',label:'What kind of clean?',type:'select',options:['Standard turnover','Deep / detail clean','Move-out with punch list','Rent-ready','REO / vacant','Post-eviction / heavy condition','Vacancy maintenance (recurring)']},
-    {key:'property_type',label:'Property type',type:'select',options:['Single-family','Condo','Townhome','Multi-unit 2-4','Small multi-family 5-20','Vacation / STR','Commercial']},
-    {key:'square_feet',label:'Approx square footage',hint:'Best guess is fine',type:'number'},
-    {key:'occupancy',label:'Current occupancy',type:'select',options:['Occupied','Vacant / on market','Vacant / off market','Transitioning','Owner-occupied']},
-    {key:'access',label:'Access instructions',hint:'Lockbox, key hidden, tenant present, etc.',type:'text'},
-  ],
-  property_inspection:[
-    {key:'inspection_type',label:'What kind of inspection?',type:'select',options:['Occupancy check (drive-by / knock)','Interior + photo package','Move-in / move-out condition report','Insurance / underwriting package','Rehab / construction progress','30/60/90-day rental','Vacant property check','Damage assessment']},
-    {key:'property_type',label:'Property type',type:'select',options:['Single-family','Condo','Townhome','Multi-unit','Commercial','Land / lot']},
-    {key:'recurring',label:'One-time or recurring?',type:'select',options:['One-time','Weekly','Bi-weekly','Monthly','Quarterly']},
-    {key:'access',label:'Access instructions',type:'text'},
-  ],
-  documents_notary:[
-    {key:'document_kind',label:'What kind of document work?',type:'multiselect',options:['Mobile notary','Remote Online Notary (RON)','Document prep / packet','Courier / delivery','Courthouse filing','Signing coordination','Attorney handoff']},
-    {key:'signer_count',label:'How many signers?',type:'select',options:['1','2','3','4+']},
-    {key:'has_document',label:'Do you already have the document?',type:'select',options:['Yes, ready to go','Yes, needs review','No, need help preparing it']},
-    {key:'meeting_location',label:'Where does it need to happen?',hint:'Address, office, care facility, courthouse, remote',type:'text'},
-  ],
-  eviction_reo:[
-    {key:'stage',label:'Current stage',type:'select',options:['Pre-notice','Notice served','Filed / awaiting hearing','Judgment entered','Writ / lockout scheduled','Post-possession']},
-    {key:'attorney',label:'Is an attorney already involved?',type:'select',options:['Yes','No','Not yet, looking to coordinate one']},
-    {key:'property_condition',label:'Expected property condition',type:'select',options:['Normal turnover','Heavy trash / damage expected','Bio-aware condition','Unknown']},
-    {key:'needs_after_lockout',label:'What is needed after lawful possession?',type:'multiselect',options:['Locksmith / rekey','Debris haul','Deep clean','Inspection + photos','Board-up / secure','Ready-to-list']},
-  ],
-  business_operations:[
-    {key:'industry',label:'Industry / vertical',type:'select',options:['Real estate','Legal / professional','Retail','Restaurant / hospitality','Health / wellness','Home services / contractor','Property services','Non-profit','Other']},
-    {key:'team_size',label:'Team size',type:'select',options:['Solo / owner-only','2-5','6-15','16-50','50+']},
-    {key:'need_type',label:'What kind of help?',type:'multiselect',options:['Administrative capacity','Bookkeeping coordination','Vendor management','Client follow-up','Project management','Process documentation','Operational audit','Systems / software']},
-    {key:'urgency',label:'Is there a launch date or deadline?',type:'text'},
-  ],
-  pos_payments:[
-    {key:'current_system',label:'Current POS / payment provider',type:'text'},
-    {key:'target_system',label:'Target system, if known',type:'text',hint:'Optional - we can help you compare'},
-    {key:'business_type',label:'Business type',type:'select',options:['Retail','Restaurant / hospitality','Services','E-commerce','Multi-location','Other']},
-    {key:'volume',label:'Approx monthly card volume',type:'select',options:['Under $10k','$10k-$50k','$50k-$250k','$250k-$1M','Over $1M','Not sure']},
-    {key:'timeline',label:'Timeline pressure',type:'select',options:['ASAP - system down or provider issues','Within 30 days','1-3 months','No fixed date']},
-  ],
-  other:[
-    {key:'outcome',label:'What outcome are you after?',hint:'Describe the handled state so we can scope backwards from it',type:'text'},
-  ],
-}
 
 export function ScopeWizard({source='scope-page',compact=false}:{source?:string;compact?:boolean}){
   const navigate=useNavigate();const [params]=useSearchParams()
   const serviceKey=params.get('service')||''
   const offeringId=params.get('offering')||''
   const requestSource=params.get('source')||source
+  const entry=useMemo(()=>resolveScopeEntry({
+    guide:params.get('guide'),
+    entry:params.get('entry'),
+    service:serviceKey,
+    job:params.get('job'),
+    offering:offeringId,
+    source:requestSource,
+  }),[params,serviceKey,offeringId,requestSource])
   const world=worldFromPublicParams({
     world:params.get('world'),
     service:serviceKey,
-    job:params.get('job'),
+    job:params.get('job')||entry?.job,
     source:requestSource,
     audience:params.get('audience'),
     family:params.get('family'),
     guide:params.get('guide'),
+    entry:params.get('entry'),
   })
   const copy=publicIntakeCopy(world)
   const visibleJobs=jobs.filter((job)=>jobsForWorld(world).includes(job.value))
-  const preselected=params.get('job')||serviceJobs[serviceKey]||(visibleJobs.length===1?visibleJobs[0].value:'')
-  const initialJob=visibleJobs.some((job)=>job.value===preselected)?preselected:''
+  const preselected=entry?.job||params.get('job')||serviceJobs[serviceKey]||(visibleJobs.length===1?visibleJobs[0].value:'')
+  const initialJob=visibleJobs.some((job)=>job.value===preselected)?preselected:(entry?.job||'')
+  const [locked,setLocked]=useState(!!entry)
   const [step,setStep]=useState(initialJob?1:0);const [busy,setBusy]=useState(false);const [error,setError]=useState('')
   const [form,setForm]=useState<Form>({
     job_type:initialJob,
-    location_type:remoteJobs.has(initialJob)?'remote':'onsite',
+    location_type:(entry?.remoteDefault||remoteJobs.has(initialJob))?'remote':'onsite',
     address:'',city:'',state:'',postal_code:'',timing:'',details:'',
     contact_name:'',email:'',phone:'',follow_up_opt_in:false,website:'',
     service_answers:{},
   })
 
-  const activeQuestions = useMemo(() => QUESTIONS_BY_JOB[form.job_type] || [], [form.job_type])
+  const activeQuestions:ScopeQuestion[] = useMemo(() => {
+    if(entry && form.job_type===entry.job) return entry.questions
+    return resolveScopeEntry({job:form.job_type})?.questions || []
+  }, [entry, form.job_type])
   const update=<K extends keyof Form>(key:K,value:Form[K])=>setForm(current=>({...current,[key]:value}))
   const setAnswer=(k:string,v:string|string[])=>setForm(current=>({...current,service_answers:{...current.service_answers,[k]:v}}))
   const chooseJob=(value:string)=>{setForm(current=>({...current,job_type:value,location_type:remoteJobs.has(value)?'remote':'onsite',service_answers:{}}));setError('')}
@@ -150,23 +114,31 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
       const response=await api.post<ScopeResponse>('/scope-requests',{
         ...form,
         source:requestSource,
-        service_key:serviceKey||undefined,
+        service_key:entry?.serviceKey||serviceKey||undefined,
         offering_id:offeringId||undefined,
         audience:params.get('audience')||undefined,
-        guide_slug:params.get('guide')||undefined,
+        guide_slug:params.get('guide')||entry?.id||undefined,
+        entry_id:entry?.id||undefined,
       })
+      if(response.setup_url&&response.request_token){
+        try{sessionStorage.setItem(`pmv_scope_setup_${response.request_token}`,response.setup_url)}catch{/* private mode */}
+      }
       navigate(response.confirmation_url)
     }catch(err){setError(err instanceof ApiError?err.message:'We could not submit the request. Call (561) 388-7879 if the need is urgent.')}
     finally{setBusy(false)}
   }
 
-  const selectedLabel=jobs.find(j=>j.value===form.job_type)?.label
+  const selectedLabel=entry && form.job_type===entry.job ? entry.pickerLabel : jobs.find(j=>j.value===form.job_type)?.label
   const totalSteps = activeQuestions.length ? 5 : 4
-  const progressPct = ((step + 1) / totalSteps) * 100
+  const displayTotal = locked ? totalSteps - 1 : totalSteps
+  const displayStep = locked ? step : step + 1
+  const progressPct = (displayStep / displayTotal) * 100
   const showQuestionsStep = step === 3 && activeQuestions.length > 0
   const showContactStep = (activeQuestions.length ? step === 4 : step === 3)
   const isLastStep = showContactStep
-  const detailsPlaceholder = world==='property'
+  const detailsPlaceholder = entry?.id==='moving-data-between-systems'
+    ? 'Anything else about the source, destination, or records that must survive the move.'
+    : world==='property'
     ? 'Address, access, occupancy, condition, and what should be true when the visit is finished.'
     : world==='documents'
       ? 'Document type, signer location, deadline, and whether it needs notary, RON, filing, or courier.'
@@ -177,14 +149,18 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
   return <div className={`overflow-hidden rounded-2xl border border-white/10 bg-navy-900/75 shadow-[0_24px_80px_rgba(0,0,0,.24)] ${compact?'':'max-w-5xl'}`}>
     <div className="border-b border-white/10 px-5 py-4 sm:px-7">
       <div className="flex items-center justify-between gap-5">
-        <div><p className="eyebrow">{selectedLabel||copy.eyebrow}</p><p className="mt-1 text-xs text-slate-500">No account · about two minutes · real reply within 2 business hours</p></div>
-        <span className="text-xs font-bold text-gold">{step+1} / {totalSteps}</span>
+        <div><p className="eyebrow">{selectedLabel||copy.eyebrow}</p><p className="mt-1 text-xs text-slate-500">About two minutes · a workspace is reserved when you send this · reply within 2 business hours</p></div>
+        <span className="text-xs font-bold text-gold">{displayStep} / {displayTotal}</span>
       </div>
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10"><motion.div className="h-full bg-gold" animate={{width:`${progressPct}%`}}/></div>
     </div>
 
     <div className="p-5 sm:p-7"><AnimatePresence mode="wait" initial={false}>
       <motion.div key={step} initial={{opacity:0,x:16}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-12}} transition={{duration:.18}}>
+        {locked && entry && step>0 && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/25 bg-gold/[.06] px-4 py-3">
+          <p className="text-sm text-white"><span className="text-[10px] font-bold uppercase tracking-[.14em] text-gold">This request</span><span className="mt-0.5 block font-semibold">{entry.pickerLabel}</span></p>
+          <button type="button" className="text-xs font-bold text-gold hover:underline" onClick={()=>{setLocked(false);setStep(0)}}>Choose a different need</button>
+        </div>}
 
         {step===0 && <div>
           <h3 className="text-xl font-bold text-white">{copy.pickerTitle}</h3>
@@ -233,8 +209,8 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
         </div>}
 
         {showQuestionsStep && <div>
-          <h3 className="text-xl font-bold text-white">A few details specific to this work</h3>
-          <p className="mt-1 text-sm text-slate-400">All optional but they help us reply with real pricing instead of a generic follow-up.</p>
+          <h3 className="text-xl font-bold text-white">{entry && form.job_type===entry.job ? 'A few details specific to this work' : 'A few details specific to this work'}</h3>
+          <p className="mt-1 text-sm text-slate-400">{entry?.id==='moving-data-between-systems'?'These questions are for a data move, not a generic operations request.':'All optional, but they help us reply with real pricing instead of a generic follow-up.'}</p>
           <div className="mt-5 space-y-4">{activeQuestions.map((q)=>{
             const val = form.service_answers[q.key]
             return <div key={q.key}>
@@ -260,6 +236,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
 
         {showContactStep && <div>
           <h3 className="text-xl font-bold text-white">Last step - where should we reply?</h3>
+          <p className="mt-1 text-sm text-slate-400">Sending this reserves a client workspace as a lead. You can set a password after, or we will email a setup link. Logging in later is what turns a lead into a prospect.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <input className="input" autoComplete="name" placeholder="Your name" value={form.contact_name} onChange={e=>update('contact_name',e.target.value)}/>
             <input className="input" type="email" inputMode="email" autoComplete="email" placeholder="Email address" value={form.email} onChange={e=>update('email',e.target.value)}/>
@@ -279,7 +256,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     </AnimatePresence>
     {error && <p role="alert" className="mt-4 rounded-lg border border-red-400/20 bg-red-400/[.06] px-4 py-3 text-sm text-red-200">{error}</p>}
     <div className="mt-6 flex items-center justify-between gap-3">
-      {step>0 ? <button type="button" className="btn-outline" onClick={()=>{setError('');setStep(v=>v-1)}}>Back</button> : <span/>}
+      {step>0 ? <button type="button" className="btn-outline" onClick={()=>{setError('');if(locked&&step===1){setLocked(false);setStep(0)}else setStep(v=>v-1)}}>Back</button> : <span/>}
       {!isLastStep
         ? <button type="button" className="btn-gold" onClick={next}>Continue</button>
         : <button type="button" className="btn-gold" disabled={busy} onClick={()=>void submit()}>{busy?'Sending request…':copy.cta}</button>}

@@ -97,6 +97,7 @@ export function worldFromPublicParams(input: {
   audience?: string | null
   family?: string | null
   guide?: string | null
+  entry?: string | null
 }): OperatingWorld {
   const explicit = parseOperatingWorld(input.world)
   if (explicit) return explicit
@@ -108,10 +109,11 @@ export function worldFromPublicParams(input: {
     const fromJob = JOB_WORLD[input.job]
     if (fromJob && fromJob !== 'general') return fromJob
   }
-  const blob = [input.source, input.audience, input.family, input.guide].filter(Boolean).join(' ').toLowerCase()
-  if (/propert|clean|inspect|eviction|reo|landlord|investor|agent|broker/.test(blob)) return 'property'
+  const blob = [input.source, input.audience, input.family, input.guide, input.entry].filter(Boolean).join(' ').toLowerCase()
+  if (/moving-data|data-between|switching-pos|pos-payment|business-transition|administrative-support|merchant|ops-on-call/.test(blob)) return 'business'
+  if (/propert|clean|inspect|eviction|reo|landlord|investor|agent|broker|field-photo|bpo/.test(blob)) return 'property'
   if (/document|notary|sign|courier|legal|attorney|mobile-hub|mobile_hub/.test(blob)) return 'documents'
   if (/fund|lender|financ/.test(blob)) return 'funding'
-  if (/business|ops|merchant|admin|operator|pos|payment/.test(blob)) return 'business'
+  if (/business|ops|admin|operator|payment/.test(blob)) return 'business'
   return 'general'
 }

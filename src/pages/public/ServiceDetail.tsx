@@ -36,7 +36,7 @@ export default function ServiceDetail() {
   if (!service) return <Navigate to="/services" replace />
 
   const others = services.filter((item) => item.slug !== service.slug && item.key !== service.key).slice(0, 3)
-  const requestUrl = `/scope-request?service=${encodeURIComponent(service.key)}${service.intakeJob ? `&job=${encodeURIComponent(service.intakeJob)}` : ''}&source=service-page`
+  const requestUrl = `/scope-request?entry=${encodeURIComponent(service.slug)}&service=${encodeURIComponent(service.key)}${service.intakeJob ? `&job=${encodeURIComponent(service.intakeJob)}` : ''}&source=service-${encodeURIComponent(service.slug)}`
 
   return (
     <div className="min-h-screen bg-navy-950">

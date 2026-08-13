@@ -51,7 +51,7 @@ function userEligible(row: any, type: MessageType): boolean {
 
 function leadEligible(row: any, type: MessageType): boolean {
   if (type === 'internal') return false
-  if (row.client_user_id || row.archived_at) return false
+  if (row.converted_at || row.archived_at) return false
   if (type === 'marketing') return (row.email_status || 'emailable') === 'emailable'
   return !['bounced', 'suppressed'].includes(row.email_status || 'emailable')
 }
@@ -88,7 +88,7 @@ function addLead(byEmail: Map<string, Recipient>, row: any, type: MessageType) {
 async function resolveDynamicList(env: Env, list: any): Promise<any[]> {
   let filter: Record<string, string> = {}
   try { filter = list.filter_json ? JSON.parse(list.filter_json) : {} } catch { filter = {} }
-  const clauses = ['ci.client_user_id IS NULL', 'ci.archived_at IS NULL']
+  const clauses = ['ci.converted_at IS NULL', 'ci.archived_at IS NULL']
   const params: string[] = []
   for (const [key, column] of Object.entries({
     record_type: 'ci.record_type',
@@ -144,10 +144,10 @@ async function resolveAudience(env: Env, audience: Audience, type: MessageType):
 
     let leadWhere: string | null = null
     const params: string[] = []
-    if (segment === 'all_leads') leadWhere = 'client_user_id IS NULL AND archived_at IS NULL'
-    else if (segment.startsWith('lifecycle:')) { leadWhere = 'client_user_id IS NULL AND archived_at IS NULL AND lifecycle_stage = ?'; params.push(segment.slice('lifecycle:'.length)) }
-    else if (segment.startsWith('lead_status:')) { leadWhere = 'client_user_id IS NULL AND archived_at IS NULL AND status = ?'; params.push(segment.slice('lead_status:'.length)) }
-    else if (segment.startsWith('record_type:')) { leadWhere = 'client_user_id IS NULL AND archived_at IS NULL AND record_type = ?'; params.push(segment.slice('record_type:'.length)) }
+    if (segment === 'all_leads') leadWhere = 'converted_at IS NULL AND archived_at IS NULL'
+    else if (segment.startsWith('lifecycle:')) { leadWhere = 'converted_at IS NULL AND archived_at IS NULL AND lifecycle_stage = ?'; params.push(segment.slice('lifecycle:'.length)) }
+    else if (segment.startsWith('lead_status:')) { leadWhere = 'converted_at IS NULL AND archived_at IS NULL AND status = ?'; params.push(segment.slice('lead_status:'.length)) }
+    else if (segment.startsWith('record_type:')) { leadWhere = 'converted_at IS NULL AND archived_at IS NULL AND record_type = ?'; params.push(segment.slice('record_type:'.length)) }
     if (leadWhere) {
       const rows = await env.DB.prepare(`SELECT * FROM contact_inquiries WHERE ${leadWhere}`).bind(...params).all()
       for (const row of rows.results ?? []) addLead(byEmail, row, type)
@@ -193,9 +193,9 @@ commsRoutes.get('/comms/audience', requireStaff, async (c) => {
         (SELECT COUNT(*) FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE u.role IN ('staff','admin') AND u.status = 'active' AND (tm.party_type IS NULL OR tm.party_type = 'employee')) AS employees,
         (SELECT COUNT(*) FROM users u JOIN team_members tm ON tm.user_id = u.id WHERE u.role = 'staff' AND u.status = 'active' AND tm.party_type = 'vendor') AS vendors,
         (SELECT COUNT(*) FROM users WHERE role = 'client' AND status = 'active') AS clients,
-        (SELECT COUNT(*) FROM contact_inquiries WHERE client_user_id IS NULL AND archived_at IS NULL) AS leads,
-        (SELECT COUNT(*) FROM contact_inquiries WHERE client_user_id IS NULL AND archived_at IS NULL AND lifecycle_stage = 'prospect') AS prospects,
-        (SELECT COUNT(*) FROM contact_inquiries WHERE client_user_id IS NULL AND archived_at IS NULL AND lifecycle_stage = 'opportunity') AS opportunities`,
+        (SELECT COUNT(*) FROM contact_inquiries WHERE converted_at IS NULL AND archived_at IS NULL) AS leads,
+        (SELECT COUNT(*) FROM contact_inquiries WHERE converted_at IS NULL AND archived_at IS NULL AND lifecycle_stage = 'prospect') AS prospects,
+        (SELECT COUNT(*) FROM contact_inquiries WHERE converted_at IS NULL AND archived_at IS NULL AND lifecycle_stage = 'opportunity') AS opportunities`,
     ).first(),
     c.env.DB.prepare(
       "SELECT DISTINCT vendor_category AS category, COUNT(*) AS n FROM team_members tm JOIN users u ON u.id = tm.user_id WHERE tm.party_type = 'vendor' AND u.status = 'active' AND vendor_category IS NOT NULL GROUP BY vendor_category ORDER BY vendor_category",
@@ -206,7 +206,7 @@ commsRoutes.get('/comms/audience', requireStaff, async (c) => {
     ).all(),
     c.env.DB.prepare(
       `SELECT id, name, email, phone, company_name, record_type, lifecycle_stage, status, email_status
-       FROM contact_inquiries WHERE client_user_id IS NULL AND archived_at IS NULL ORDER BY COALESCE(updated_at, created_at) DESC LIMIT 2000`,
+       FROM contact_inquiries WHERE converted_at IS NULL AND archived_at IS NULL ORDER BY COALESCE(updated_at, created_at) DESC LIMIT 2000`,
     ).all(),
     c.env.DB.prepare(`SELECT id, name, list_type, record_type FROM crm_lists WHERE archived_at IS NULL ORDER BY name`).all(),
   ])

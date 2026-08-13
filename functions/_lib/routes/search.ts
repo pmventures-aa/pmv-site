@@ -31,7 +31,7 @@ searchRoutes.get('/search', requireStaff, async (c) => {
     c.env.DB.prepare(
       `SELECT id, name, email, phone, company_name, record_type, lifecycle_stage, status
        FROM contact_inquiries
-       WHERE client_user_id IS NULL AND archived_at IS NULL
+       WHERE converted_at IS NULL AND archived_at IS NULL
          AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR company_name LIKE ?)
        ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ?`,
     ).bind(like, like, like, like, RESULT_LIMIT).all(),

@@ -45,7 +45,7 @@ function displayName(body: Record<string, unknown>, recordType: RecordType): str
 }
 
 function buildDynamicWhere(filter: DynamicFilter, alias = 'ci') {
-  const clauses = [`${alias}.client_user_id IS NULL`, `${alias}.archived_at IS NULL`]
+  const clauses = [`${alias}.converted_at IS NULL`, `${alias}.archived_at IS NULL`]
   const params: string[] = []
   if (filter.record_type && RECORD_TYPES.includes(filter.record_type as any)) {
     clauses.push(`${alias}.record_type = ?`)

@@ -38,6 +38,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Owners managing an operational change without internal bandwidth', 'Teams whose processes have outgrown the tools running them', 'Businesses that need experienced project support without a full-time hire'],
     offeringPrefixes: ['consult-'],
+    intakeJob: 'business_operations',
   },
   {
     slug: 'merchant-services',
@@ -57,6 +58,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Businesses comparing POS or payment providers', 'Multi-location operators planning a system change', 'Owners who want an independent coordinator between them and the vendors'],
     offeringPrefixes: ['pos-'],
+    intakeJob: 'pos_payments',
   },
   {
     slug: 'administrative-support',
@@ -75,6 +77,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Owners doing administrative work at 9 pm', 'Small teams without dedicated operations support', 'Businesses that need steady capacity without adding headcount'],
     offeringPrefixes: ['admin-'],
+    intakeJob: 'business_operations',
   },
   {
     slug: 'funding',
@@ -93,6 +96,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Businesses seeking working capital', 'Owners preparing for an expansion or equipment purchase', 'Companies comparing financing structures'],
     offeringPrefixes: ['funding-'],
+    intakeJob: 'business_operations',
   },
   {
     slug: 'property-management',
@@ -112,6 +116,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Landlords who want oversight without the full management percentage', 'Out-of-area owners who need dependable local follow-through', 'Investors comparing management proposals and tired of surprise fees'],
     offeringPrefixes: ['property-tenant-placement','property-full-management','property-portfolio','property-vendor-coordinate','property-access','property-maintenance-followup','property-turnover-coordinate','property-project-coordinate'],
+    intakeJob: 'cleaning_turnover',
   },
   {
     slug: 'property-cleaning',
@@ -170,6 +175,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Out-of-area owners and investors', 'Lenders and servicers needing dated condition evidence', 'Landlords running 30/60/90-day or turnover inspections'],
     offeringPrefixes: ['occupancy','insurance-photo','disaster-doc','interior-','pmi-removal','qc-progress','investor-','rentready-','moveout','construction','boarded','video-','vacation-rental'],
+    intakeJob: 'property_inspection',
   },
   {
     slug: 'field-photos-bpo',
@@ -189,6 +195,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['BPO brokers and agents who need reliable photo coverage', 'Servicers, asset managers, and inspection companies routing South Florida volume', 'Underwriters and lenders verifying collateral'],
     offeringPrefixes: ['field-','bpo-','listing-verification','commercial-','gas-station','landscape','restroom','night-signage','community-amenities','dealership','hotel','display-endcap','auto-','motorcycle','rv','marine-','aircraft-'],
+    intakeJob: 'property_inspection',
   },
   {
     slug: 'document-preparation',
@@ -208,6 +215,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Owners who need paperwork organized and moved forward', 'Landlords building a clean file before a dispute', 'Businesses with recurring registration and filing deadlines'],
     offeringPrefixes: ['document-'],
+    intakeJob: 'documents_notary',
   },
   {
     slug: 'document-courier',
@@ -226,6 +234,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Law firms and title companies', 'Real estate closings with original documents in motion', 'Offices with recurring bank, courthouse, or agency runs'],
     offeringPrefixes: ['courier-'],
+    intakeJob: 'documents_notary',
   },
   {
     slug: 'mobile-notary',
@@ -244,6 +253,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Powers of attorney, affidavits, and estate documents', 'Title companies and lenders needing signing coverage', 'Families coordinating signings at hospitals or care facilities'],
     offeringPrefixes: ['notary-'],
+    intakeJob: 'documents_notary',
   },
   {
     slug: 'remote-online-notary',
@@ -262,6 +272,7 @@ export const services: ServiceInfo[] = [
     ],
     idealFor: ['Out-of-state signers on Florida transactions', 'Firms that need same-day notarization without travel', 'Anyone whose document qualifies and whose time matters'],
     offeringPrefixes: ['ron-'],
+    intakeJob: 'documents_notary',
   },
 ]
 

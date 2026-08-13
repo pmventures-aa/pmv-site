@@ -6,6 +6,9 @@ import { escapeHtml, notifyStaff } from '../email'
 import { requireOwner, requireUser } from '../mid'
 import { calculateCleaningEstimate, CLIENT_PORTAL_BASE, sendScopeConfirmation, twoBusinessHoursFrom, type QuoteRule } from '../scopeFunnel'
 import { ensureServiceOfferingsSeeded } from './serviceOfferings'
+import { createActivationToken } from '../session'
+import { sendAccountWelcome, CLIENT_PORTAL_URL } from '../accountEmails'
+import { advanceInquiryLifecycle } from '../lifecycle'
 
 export const scopeFunnelPublicRoutes = new Hono<AppEnv>()
 export const scopeFunnelAdminRoutes = new Hono<AppEnv>()
@@ -24,6 +27,30 @@ const JOBS: Record<string,{label:string;serviceKey:string|null;guideSlug?:string
 
 const clean = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0,max) : ''
 const emailOk = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+
+function answersPayload(raw: unknown): { json: string | null; text: string } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { json: null, text: '' }
+  const object: Record<string, string | number | boolean | string[]> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>).slice(0, 40)) {
+    if (!key.trim()) continue
+    if (Array.isArray(value)) {
+      object[key] = value.map((item) => String(item).slice(0, 200)).filter(Boolean).slice(0, 12)
+      continue
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') object[key] = value
+  }
+  const keys = Object.keys(object)
+  if (!keys.length) return { json: null, text: '' }
+  const text = keys.map((key) => {
+    const value = object[key]
+    return `${key.replace(/_/g, ' ')}: ${Array.isArray(value) ? value.join(', ') : String(value)}`
+  }).join('\n')
+  return { json: JSON.stringify(object).slice(0, 8000), text }
+}
+
+function setupUrlFor(token: string) {
+  return `${CLIENT_PORTAL_URL.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(token)}`
+}
 
 async function throttled(c: any) {
   const ip = c.req.header('CF-Connecting-IP') || 'unknown'
@@ -98,32 +125,87 @@ scopeFunnelPublicRoutes.post('/scope-requests', async (c) => {
   const id = uuid(); const token = uuid(); const inquiryId = uuid()
   const responseDueAt = twoBusinessHoursFrom(new Date())
   const followUp = body.follow_up_opt_in === true ? 1 : 0
-  const message = [job.label, locationType === 'remote' ? 'Remote / nationwide' : [city,state,postal].filter(Boolean).join(', '), `Timing: ${timing}`, details].filter(Boolean).join('\n')
+  const answers = answersPayload(body.service_answers)
+  const message = [job.label, locationType === 'remote' ? 'Remote / nationwide' : [city,state,postal].filter(Boolean).join(', '), `Timing: ${timing}`, details, answers.text].filter(Boolean).join('\n')
   const requestedOfferingId = body.offering_id || body.quote?.offering_id
   const offeringId = quote && 'offeringId' in quote && quote.offeringId ? quote.offeringId : await validOfferingId(c,requestedOfferingId,serviceKey)
+  const nameParts = name.trim().split(/\s+/).filter(Boolean)
+  const firstName = nameParts[0] || null
+  const lastName = nameParts.slice(1).join(' ') || null
 
-  await c.env.DB.batch([
-    c.env.DB.prepare(`INSERT INTO contact_inquiries(id,name,email,phone,service_key,message,source,city,state,postal_code,updated_at)
-      VALUES(?,?,?,?,?,?, 'public_scope_request',?,?,?,datetime('now'))`).bind(inquiryId,name,email,phone||null,serviceKey,message,city||null,state||null,postal||null),
+  const existingUser = await c.env.DB.prepare('SELECT id, role, password_hash FROM users WHERE lower(email) = lower(?)').bind(email).first<{id:string;role:string;password_hash:string|null}>()
+  let reservedUserId: string | null = null
+  let setupUrl: string | null = null
+  let accountStatus: 'reserved' | 'existing' | 'none' = 'none'
+  const statements: ReturnType<typeof c.env.DB.prepare>[] = []
+
+  if (existingUser?.role === 'client') {
+    reservedUserId = existingUser.id
+    accountStatus = existingUser.password_hash ? 'existing' : 'reserved'
+    if (!existingUser.password_hash) {
+      setupUrl = setupUrlFor(await createActivationToken(c.env, existingUser.id))
+    }
+  } else if (!existingUser) {
+    reservedUserId = uuid()
+    accountStatus = 'reserved'
+    statements.push(
+      c.env.DB.prepare(
+        `INSERT INTO users (id, email, password_hash, role, full_name, first_name, last_name, phone, two_factor_enabled, status)
+         VALUES (?, ?, NULL, 'client', ?, ?, ?, ?, 0, 'active')`,
+      ).bind(reservedUserId, email, name, firstName, lastName, phone || null),
+      c.env.DB.prepare(
+        `INSERT INTO client_profiles (id, user_id, services_enrolled, onboarding_completed) VALUES (?, ?, ?, 0)`,
+      ).bind(uuid(), reservedUserId, serviceKey ? JSON.stringify([serviceKey]) : null),
+    )
+    setupUrl = setupUrlFor(await createActivationToken(c.env, reservedUserId))
+  }
+
+  statements.push(
+    c.env.DB.prepare(`INSERT INTO contact_inquiries(id,name,email,phone,service_key,message,source,city,state,postal_code,lifecycle_stage,first_name,last_name,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?, 'lead',?,?,datetime('now'))`).bind(inquiryId,name,email,phone||null,serviceKey,message,clean(body.source,100)||'public_scope_request',city||null,state||null,postal||null,firstName,lastName),
     c.env.DB.prepare(`INSERT INTO public_scope_requests
-      (id,public_token,inquiry_id,job_type,service_key,offering_id,guide_slug,audience,location_type,city,state,postal_code,timing,details,contact_name,email,phone,follow_up_opt_in,response_due_at,estimate_low_cents,estimate_high_cents,estimate_basis,quote_inputs_json,status)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
-        id,token,inquiryId,jobType,serviceKey,offeringId,clean(body.guide_slug,120)||job.guideSlug||null,clean(body.audience,80)||null,locationType,city||null,state||null,postal||null,timing,details||null,name,email,phone||null,followUp,responseDueAt,quote?.lowCents||null,quote?.highCents||null,quote?.basis||null,body.quote?JSON.stringify(body.quote):null,quote?'quoted':'new',
+      (id,public_token,inquiry_id,job_type,service_key,offering_id,guide_slug,audience,location_type,city,state,postal_code,timing,details,contact_name,email,phone,follow_up_opt_in,response_due_at,estimate_low_cents,estimate_high_cents,estimate_basis,quote_inputs_json,status,answers_json,reserved_user_id)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+        id,token,inquiryId,jobType,serviceKey,offeringId,clean(body.guide_slug,120)||job.guideSlug||null,clean(body.audience,80)||null,locationType,city||null,state||null,postal||null,timing,details||null,name,email,phone||null,followUp,responseDueAt,quote?.lowCents||null,quote?.highCents||null,quote?.basis||null,body.quote?JSON.stringify(body.quote):null,quote?'quoted':'new',answers.json,reservedUserId,
       ),
-    activityInsert(c.env,{kind:'scope_request_submitted',detail:{job_type:jobType,service_key:serviceKey,source:clean(body.source,100)||'public'}}),
-  ])
+    activityInsert(c.env,{kind:'scope_request_submitted',detail:{job_type:jobType,service_key:serviceKey,source:clean(body.source,100)||'public',account_status:accountStatus}}),
+  )
+
+  await c.env.DB.batch(statements)
 
   c.executionCtx.waitUntil(Promise.all([
     sendScopeConfirmation(c.env,{name,email,jobLabel:job.label,token}),
     notifyStaff(c.env,{staffUserIds:[],kind:'lead_created',subject:`New scoped request: ${name}`,html:`<p><strong>${escapeHtml(name)}</strong> submitted a request for ${escapeHtml(job.label)}.</p><p>${escapeHtml(message).replace(/\n/g,'<br>')}</p><p><strong>Response target:</strong> ${escapeHtml(responseDueAt)}</p>`}),
+    setupUrl && reservedUserId ? sendAccountWelcome(c.env, {
+      userId: reservedUserId, role: 'client', email, firstName, creationType: 'lead_conversion',
+      actionLabel: 'Open My Workspace', actionUrl: setupUrl,
+    }).catch((err) => console.error('[account-email] scope reserve failed', err)) : Promise.resolve(),
   ]))
-  return c.json({ok:true,request_token:token,response_due_at:responseDueAt,estimate:quote?{low_cents:quote.lowCents,high_cents:quote.highCents,basis:quote.basis}:null,confirmation_url:`/scope-request/confirmation?request=${encodeURIComponent(token)}`,signup_url:`${CLIENT_PORTAL_BASE}/signup?scope=${encodeURIComponent(token)}&source=scope-confirmation`},201)
+  return c.json({
+    ok:true,
+    request_token:token,
+    response_due_at:responseDueAt,
+    estimate:quote?{low_cents:quote.lowCents,high_cents:quote.highCents,basis:quote.basis}:null,
+    confirmation_url:`/scope-request/confirmation?request=${encodeURIComponent(token)}`,
+    signup_url:`${CLIENT_PORTAL_BASE}/signup?scope=${encodeURIComponent(token)}&source=scope-confirmation`,
+    setup_url:setupUrl,
+    account_status:accountStatus,
+  },201)
 })
 
 scopeFunnelPublicRoutes.get('/scope-requests/:token', async (c) => {
-  const row = await c.env.DB.prepare(`SELECT public_token,job_type,service_key,offering_id,guide_slug,audience,location_type,city,state,postal_code,timing,details,contact_name,email,phone,status,response_due_at,estimate_low_cents,estimate_high_cents,estimate_basis,preferred_slot_at,created_at FROM public_scope_requests WHERE public_token=?`).bind(c.req.param('token')).first<any>()
+  const token = c.req.param('token')
+  let row: any = null
+  try {
+    row = await c.env.DB.prepare(`SELECT r.public_token,r.job_type,r.service_key,r.offering_id,r.guide_slug,r.audience,r.location_type,r.city,r.state,r.postal_code,r.timing,r.details,r.contact_name,r.email,r.phone,r.status,r.response_due_at,r.estimate_low_cents,r.estimate_high_cents,r.estimate_basis,r.preferred_slot_at,r.created_at,r.reserved_user_id,u.password_hash
+      FROM public_scope_requests r LEFT JOIN users u ON u.id = r.reserved_user_id WHERE r.public_token=?`).bind(token).first<any>()
+  } catch {
+    row = await c.env.DB.prepare(`SELECT public_token,job_type,service_key,offering_id,guide_slug,audience,location_type,city,state,postal_code,timing,details,contact_name,email,phone,status,response_due_at,estimate_low_cents,estimate_high_cents,estimate_basis,preferred_slot_at,created_at FROM public_scope_requests WHERE public_token=?`).bind(token).first<any>()
+  }
   if (!row) return c.json({error:'request not found'},404)
-  return c.json({request:row,job_label:JOBS[row.job_type]?.label||'professional support',signup_url:`${CLIENT_PORTAL_BASE}/signup?scope=${encodeURIComponent(row.public_token)}&source=scope-confirmation`},{headers:{'Cache-Control':'no-store'}})
+  const {reserved_user_id,password_hash,...request} = row
+  const accountStatus = reserved_user_id ? (password_hash ? 'existing' : 'reserved') : 'none'
+  return c.json({request,job_label:JOBS[row.job_type]?.label||'professional support',signup_url:`${CLIENT_PORTAL_BASE}/signup?scope=${encodeURIComponent(row.public_token)}&source=scope-confirmation`,account_status:accountStatus},{headers:{'Cache-Control':'no-store'}})
 })
 
 scopeFunnelPublicRoutes.get('/public-booking-slots', async (c) => {
@@ -174,8 +256,9 @@ scopeFunnelPublicRoutes.post('/scope-requests/:token/convert', requireUser, asyn
   if (!row) return c.json({error:'request not found'},404)
   await c.env.DB.batch([
     c.env.DB.prepare("UPDATE public_scope_requests SET converted_user_id=?,status='converted',updated_at=datetime('now') WHERE id=?").bind(user.id,row.id),
-    c.env.DB.prepare("UPDATE contact_inquiries SET client_user_id=?,lifecycle_stage='converted',converted_at=datetime('now'),updated_at=datetime('now') WHERE id=?").bind(user.id,row.inquiry_id),
+    c.env.DB.prepare("UPDATE contact_inquiries SET client_user_id=?,updated_at=datetime('now') WHERE id=? AND converted_at IS NULL").bind(user.id,row.inquiry_id),
   ])
+  await advanceInquiryLifecycle(c.env, { inquiryId: row.inquiry_id, target: 'prospect' })
   return c.json({ok:true})
 })
 

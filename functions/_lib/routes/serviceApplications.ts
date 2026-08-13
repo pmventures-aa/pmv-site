@@ -17,6 +17,7 @@ import {
   type IntakeValue,
 } from '../intake'
 import { renderApplicationPdf, type ApplicationPdfAnswer } from '../applicationPdf'
+import { advanceInquiryLifecycle } from '../lifecycle'
 
 export const serviceApplicationRoutes = new Hono<AppEnv>()
 
@@ -320,6 +321,7 @@ serviceApplicationRoutes.post('/service-applications/:serviceKey/start', require
        VALUES (?, ?, ?, 'draft', 0)`,
     ).bind(id, user.id, serviceKey).run()
     application = await c.env.DB.prepare('SELECT * FROM service_applications WHERE id = ?').bind(id).first<ApplicationRow>()
+    await advanceInquiryLifecycle(c.env, { userId: user.id, email: user.email, target: 'opportunity' })
   }
   if (!application) return c.json({ error: 'could not start application' }, 500)
 

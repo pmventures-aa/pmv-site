@@ -529,13 +529,14 @@ adminRoutes.post('/clients/:id/payment-methods/:pmId/reveal', requireStaff, asyn
 // Converted or archived leads are excluded by default — this is what makes
 // a converted lead "automatically disappear from the sales pipeline"
 // (both this list and the Pipelines board's Inquiries tab read from here).
+// Reserved client logins are not conversion; converted_at is the marker.
 // See GET /admin/conversions for converted leads and GET
 // /admin/records/inquiries/archived for archived ones.
 adminRoutes.get('/inquiries', requireStaff, async (c) => {
   const res = await c.env.DB.prepare(
     `SELECT ci.*, s.name AS service_name FROM contact_inquiries ci
      LEFT JOIN services s ON s.key = ci.service_key
-     WHERE ci.client_user_id IS NULL AND ci.archived_at IS NULL
+     WHERE ci.converted_at IS NULL AND ci.archived_at IS NULL
      ORDER BY ci.created_at DESC LIMIT 200`,
   ).all()
   return c.json({ inquiries: res.results ?? [] })
