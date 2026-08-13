@@ -46,4 +46,18 @@ describe('HQ pipeline workspace', () => {
     expect(board).toContain('Needs follow-up')
     expect(board).not.toContain("lifecycle_stage: draft")
   })
+
+  it('lets a business CRM record keep an optional contact person', () => {
+    const board = readFileSync(new URL('../src/pages/admin/LeadPipelineBoard.tsx', import.meta.url), 'utf8')
+    const create = readFileSync(new URL('../src/pages/admin/LeadCreate.tsx', import.meta.url), 'utf8')
+    const records = readFileSync(new URL('../src/pages/admin/CRMRecordsAdmin.tsx', import.meta.url), 'utf8')
+    const detail = readFileSync(new URL('../src/pages/admin/LeadDetail.tsx', import.meta.url), 'utf8')
+    for (const source of [board, create, records, detail]) {
+      expect(source).toContain('Contact first name')
+      expect(source).not.toContain("first_name: draft.record_type === 'person' ? first")
+    }
+    expect(board).toContain('crmRecordLine')
+    expect(create).toContain('crmInviteName')
+    expect(records).toContain('contact_name')
+  })
 })

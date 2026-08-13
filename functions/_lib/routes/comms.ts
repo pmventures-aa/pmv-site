@@ -111,8 +111,8 @@ async function resolveDynamicList(env: Env, list: any): Promise<any[]> {
   }
   if (filter.search) {
     const q = `%${String(filter.search).slice(0, 120)}%`
-    clauses.push('(ci.name LIKE ? OR ci.email LIKE ? OR ci.company_name LIKE ? OR ci.phone LIKE ?)')
-    params.push(q, q, q, q)
+    clauses.push('(ci.name LIKE ? OR ci.email LIKE ? OR ci.company_name LIKE ? OR ci.phone LIKE ? OR ci.first_name LIKE ? OR ci.last_name LIKE ? OR ci.job_title LIKE ?)')
+    params.push(q, q, q, q, q, q, q)
   }
   const res = await env.DB.prepare(`SELECT ci.* FROM contact_inquiries ci WHERE ${clauses.join(' AND ')} LIMIT 10000`).bind(...params).all()
   return res.results ?? []
@@ -215,7 +215,7 @@ commsRoutes.get('/comms/audience', requireStaff, async (c) => {
        FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE u.role IN ('client','staff','admin') ORDER BY u.full_name, u.email LIMIT 2000`,
     ).all(),
     c.env.DB.prepare(
-      `SELECT id, name, email, phone, company_name, record_type, lifecycle_stage, status, email_status
+      `SELECT id, name, email, phone, company_name, first_name, last_name, job_title, record_type, lifecycle_stage, status, email_status
        FROM contact_inquiries WHERE converted_at IS NULL AND archived_at IS NULL ORDER BY COALESCE(updated_at, created_at) DESC LIMIT 2000`,
     ).all(),
     c.env.DB.prepare(`SELECT id, name, list_type, record_type FROM crm_lists WHERE archived_at IS NULL ORDER BY name`).all(),

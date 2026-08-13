@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail, ShieldCheck, UserPlus } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
@@ -6,6 +6,8 @@ import { useAppPath } from '../../lib/basePath'
 import { PageIntro, Panel, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { BrandMark3D } from '../../components/ui'
 import { toast } from '../../components/kit/toast'
+import { crmInviteName } from '../../../shared/crmRecord'
+import { formatInviteTtl, parseInviteTtlHours } from '../../../shared/inviteTtl'
 
 type DraftLead = {
   record_type: 'person' | 'business'
@@ -41,19 +43,29 @@ export default function LeadCreate() {
   const [draft, setDraft] = useState<DraftLead>(blank)
   const [sendInvite, setSendInvite] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [inviteTtlHours, setInviteTtlHours] = useState(24)
+  const inviteTtlLabel = formatInviteTtl(inviteTtlHours)
+  const isBusiness = draft.record_type === 'business'
+  const displayName = crmInviteName(draft)
 
-  const displayName = draft.record_type === 'business'
-    ? draft.company_name.trim()
-    : `${draft.first_name.trim()} ${draft.last_name.trim()}`.trim()
+  useEffect(() => {
+    api.get<{ invite_ttl_hours?: number }>('/admin/invitations')
+      .then((res) => setInviteTtlHours(parseInviteTtlHours(res.invite_ttl_hours)))
+      .catch(() => {})
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!draft.email.trim()) return toast.error('Enter an email address before creating the lead.')
+    if (isBusiness && !draft.company_name.trim()) return toast.error('Enter a business name.')
+    if (!isBusiness && !draft.first_name.trim()) return toast.error('Enter a first name.')
     setBusy(true)
     try {
       const result = await api.post<{ id: string }>('/admin/crm/records', {
         ...draft,
-        company_name: draft.company_name || undefined,
+        first_name: draft.first_name.trim() || undefined,
+        last_name: draft.last_name.trim() || undefined,
+        company_name: draft.company_name.trim() || undefined,
         phone: draft.phone || undefined,
         job_title: draft.job_title || undefined,
         source: draft.source || 'Manual entry',
@@ -88,7 +100,7 @@ export default function LeadCreate() {
     <PageIntro
       kicker="Relationship onboarding"
       title="Create a Lead"
-      subtitle="Build the CRM relationship once, then optionally invite the person into their secure Pinnacle account immediately. New leads appear on the Pipeline board."
+      subtitle="Build the CRM relationship once, then optionally invite the person into their secure Pinnacle account immediately. New leads appear on the Pipeline board. A business can still list a contact person."
     />
 
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -102,12 +114,11 @@ export default function LeadCreate() {
 
         <form onSubmit={submit} className="space-y-6 p-5 sm:p-6">
           <div className="grid gap-4 md:grid-cols-2">
-            {draft.record_type === 'person' ? <>
-              <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">First name</span><input className={inputCls} required value={draft.first_name} onChange={(e) => setDraft((d) => ({ ...d, first_name: e.target.value }))} /></label>
-              <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">Last name</span><input className={inputCls} value={draft.last_name} onChange={(e) => setDraft((d) => ({ ...d, last_name: e.target.value }))} /></label>
-              <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">Company</span><input className={inputCls} value={draft.company_name} onChange={(e) => setDraft((d) => ({ ...d, company_name: e.target.value }))} /></label>
-              <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">Job title</span><input className={inputCls} value={draft.job_title} onChange={(e) => setDraft((d) => ({ ...d, job_title: e.target.value }))} /></label>
-            </> : <label className="md:col-span-2"><span className="mb-1.5 block text-xs font-semibold text-slate-400">Business name</span><input className={inputCls} required value={draft.company_name} onChange={(e) => setDraft((d) => ({ ...d, company_name: e.target.value }))} /></label>}
+            {isBusiness && <label className="md:col-span-2"><span className="mb-1.5 block text-xs font-semibold text-slate-400">Business name</span><input className={inputCls} required value={draft.company_name} onChange={(e) => setDraft((d) => ({ ...d, company_name: e.target.value }))} /></label>}
+            <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">{isBusiness ? 'Contact first name' : 'First name'}</span><input className={inputCls} required={!isBusiness} value={draft.first_name} onChange={(e) => setDraft((d) => ({ ...d, first_name: e.target.value }))} /></label>
+            <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">{isBusiness ? 'Contact last name' : 'Last name'}</span><input className={inputCls} value={draft.last_name} onChange={(e) => setDraft((d) => ({ ...d, last_name: e.target.value }))} /></label>
+            {!isBusiness && <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">Company</span><input className={inputCls} value={draft.company_name} onChange={(e) => setDraft((d) => ({ ...d, company_name: e.target.value }))} /></label>}
+            <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">{isBusiness ? 'Contact title' : 'Job title'}</span><input className={inputCls} value={draft.job_title} onChange={(e) => setDraft((d) => ({ ...d, job_title: e.target.value }))} /></label>
             <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">Email</span><input className={inputCls} type="email" required value={draft.email} onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))} /></label>
             <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">Phone</span><input className={inputCls} type="tel" value={draft.phone} onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))} /></label>
             <label><span className="mb-1.5 block text-xs font-semibold text-slate-400">Source</span><input className={inputCls} placeholder="Referral, website, outbound, event" value={draft.source} onChange={(e) => setDraft((d) => ({ ...d, source: e.target.value }))} /></label>
@@ -117,7 +128,7 @@ export default function LeadCreate() {
 
           <label className={`flex cursor-pointer gap-4 rounded-2xl border p-4 transition ${sendInvite ? 'border-gold/30 bg-gold/[.055]' : 'border-white/10 bg-white/[.018]'}`}>
             <input type="checkbox" className="mt-1 h-4 w-4 accent-[#c9a227]" checked={sendInvite} onChange={(e) => setSendInvite(e.target.checked)} />
-            <div className="min-w-0"><div className="flex items-center gap-2"><Mail size={16} className="text-gold"/><p className="font-semibold text-white">Send a branded account invitation</p></div><p className="mt-1 text-sm leading-6 text-slate-400">After the lead is created, Pinnacle emails a private 24-hour invitation tied to this CRM relationship so they can create their client account without re-entering the relationship manually.</p></div>
+            <div className="min-w-0"><div className="flex items-center gap-2"><Mail size={16} className="text-gold"/><p className="font-semibold text-white">Send a branded account invitation</p></div><p className="mt-1 text-sm leading-6 text-slate-400">After the lead is created, Pinnacle emails a private {inviteTtlLabel} invitation tied to this CRM relationship so they can create their client account without re-entering the relationship manually.{isBusiness && draft.first_name.trim() ? ' The email greets the contact person.' : ''}</p></div>
           </label>
 
           <div className="flex flex-col-reverse gap-3 border-t border-white/[.08] pt-5 sm:flex-row sm:justify-end">
@@ -132,7 +143,7 @@ export default function LeadCreate() {
           <BrandMark3D size={92} decorative className="mx-auto" />
           <div className="mt-3 text-center"><p className="text-xs font-bold uppercase tracking-[.16em] text-gold">Pinnacle Client Invitation</p><p className="mt-2 text-sm font-semibold text-white">Professional from the first touch</p></div>
           <div className="mt-5 space-y-3 text-sm text-slate-400">
-            <div className="flex gap-3"><ShieldCheck size={17} className="mt-0.5 shrink-0 text-gold"/><span>Private, tracked invitation with a 24-hour expiration.</span></div>
+            <div className="flex gap-3"><ShieldCheck size={17} className="mt-0.5 shrink-0 text-gold"/><span>Private, tracked invitation with a {inviteTtlLabel} expiration.</span></div>
             <div className="flex gap-3"><UserPlus size={17} className="mt-0.5 shrink-0 text-gold"/><span>Connected to the lead so onboarding starts with the context HQ already captured.</span></div>
             <div className="flex gap-3"><Mail size={17} className="mt-0.5 shrink-0 text-gold"/><span>Uses Pinnacle’s existing branded invitation email and account-creation experience.</span></div>
           </div>

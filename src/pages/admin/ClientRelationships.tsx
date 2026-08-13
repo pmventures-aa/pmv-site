@@ -74,6 +74,11 @@ export default function ClientRelationships({
     ein: "",
     state: "",
     primary_contact_party_id: "",
+    contact_first_name: "",
+    contact_last_name: "",
+    contact_email: "",
+    contact_phone: "",
+    contact_title: "",
     make_profile_business: false,
   });
   const [matter, setMatter] = useState({
@@ -148,7 +153,20 @@ export default function ClientRelationships({
         `/admin/clients/${clientId}/relationships/businesses`,
         business,
       );
-      toast.success("Business added with its contact person.");
+      toast.success("Business added and linked.");
+      setBusiness({
+        legal_name: "",
+        entity_type: "",
+        ein: "",
+        state: "",
+        primary_contact_party_id: "",
+        contact_first_name: "",
+        contact_last_name: "",
+        contact_email: "",
+        contact_phone: "",
+        contact_title: "",
+        make_profile_business: false,
+      });
       setMode(null);
       await load();
     } catch (e) {
@@ -279,8 +297,8 @@ export default function ClientRelationships({
                 Organizations Served
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-400">
-                Every business requires a named contact. Add other principals or
-                owners without replacing that contact.
+                A business can list an optional contact person. Add other
+                principals or owners without replacing that contact.
               </p>
             </div>
             <button className={btnOutline} onClick={() => setMode("business")}>
@@ -301,7 +319,11 @@ export default function ClientRelationships({
                     <p className="text-xs text-slate-500">
                       {p.entity_type || "Business"} · Contact:{" "}
                       {people.find((x) => x.id === p.primary_contact_party_id)
-                        ?.display_name || "Required"}
+                        ?.display_name &&
+                      p.primary_contact_party_id !== data?.primary_party_id
+                        ? people.find((x) => x.id === p.primary_contact_party_id)
+                            ?.display_name
+                        : "No contact listed"}
                     </p>
                   </div>
                 </div>
@@ -442,9 +464,8 @@ export default function ClientRelationships({
                   }
                 />
               </Field>
-              <Field label="Required Contact Person">
+              <Field label="Optional Contact Person">
                 <select
-                  required
                   className={inputCls}
                   value={business.primary_contact_party_id}
                   onChange={(e) =>
@@ -454,13 +475,70 @@ export default function ClientRelationships({
                     })
                   }
                 >
-                  <option value="">Choose a person</option>
+                  <option value="">No named contact</option>
                   {people.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.display_name}
                     </option>
                   ))}
                 </select>
+              </Field>
+              <Field label="Or new contact first name">
+                <input
+                  className={inputCls}
+                  placeholder="Optional"
+                  value={business.contact_first_name}
+                  onChange={(e) =>
+                    setBusiness({
+                      ...business,
+                      contact_first_name: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+              <Field label="New contact last name">
+                <input
+                  className={inputCls}
+                  placeholder="Optional"
+                  value={business.contact_last_name}
+                  onChange={(e) =>
+                    setBusiness({
+                      ...business,
+                      contact_last_name: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+              <Field label="New contact title">
+                <input
+                  className={inputCls}
+                  placeholder="Optional"
+                  value={business.contact_title}
+                  onChange={(e) =>
+                    setBusiness({ ...business, contact_title: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="New contact email">
+                <input
+                  className={inputCls}
+                  type="email"
+                  placeholder="Optional"
+                  value={business.contact_email}
+                  onChange={(e) =>
+                    setBusiness({ ...business, contact_email: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="New contact phone">
+                <input
+                  className={inputCls}
+                  placeholder="Optional"
+                  value={business.contact_phone}
+                  onChange={(e) =>
+                    setBusiness({ ...business, contact_phone: e.target.value })
+                  }
+                />
               </Field>
               <label className="flex items-center gap-3 self-end rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-300">
                 <input
@@ -478,7 +556,7 @@ export default function ClientRelationships({
             </div>
             <button
               className={`${btnPrimary} mt-5`}
-              disabled={busy || !business.primary_contact_party_id}
+              disabled={busy}
             >
               Add Business
             </button>
