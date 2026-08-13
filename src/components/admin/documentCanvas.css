@@ -1,7 +1,7 @@
 .doc-tool{display:inline-grid;height:2rem;width:2rem;place-items:center;border:1px solid rgba(255,255,255,.10);border-radius:.375rem;color:rgb(148 163 184);background:rgba(255,255,255,.02);transition:background .15s ease,border-color .15s ease,color .15s ease}
 .doc-tool:hover{border-color:rgba(201,162,39,.38);background:rgba(201,162,39,.06);color:rgb(201 162 39)}
 
-.doc-ribbon{position:sticky;top:0;z-20;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(8,16,28,.96);padding:.55rem .85rem;backdrop-filter:blur(10px)}
+.doc-ribbon{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(8,16,28,.96);padding:.55rem .85rem;backdrop-filter:blur(10px)}
 .doc-ribbon-group{display:flex;align-items:center;gap:.2rem;padding-right:.7rem;border-right:1px solid rgba(255,255,255,.08)}
 .doc-ribbon-group:last-child{border-right:0;padding-right:0}
 .doc-ribbon-btn{display:inline-grid;height:1.85rem;min-width:1.85rem;place-items:center;border:0;border-radius:.35rem;background:transparent;color:#cbd5e1;padding:0 .35rem}
