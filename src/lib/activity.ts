@@ -63,6 +63,9 @@ const COMMUNICATIONS_KINDS = new Set<string>([
   'account_email_failed',
   'email.inbound',
   'email.sent',
+  'conversation.created',
+  'conversation.message',
+  'conversation.internal_note',
 ])
 
 export function categorizeActivity(kind: string): ActivityCategory {
@@ -107,7 +110,9 @@ export function describeActivity(e: ActivityEvent): string {
     case 'lead_note_added': return `${actor} added an internal note to a lead/prospect`
     case 'crm_import_completed': return `${actor} completed a CRM import · ${d.created ?? 0} new · ${d.updated ?? 0} updated · ${d.skipped ?? 0} skipped`
     case 'comms_message_created': return `${actor} created a ${fmtStatus(d.message_type)} communication “${d.subject || ''}”${typeof d.eligible_recipients === 'number' ? ` for ${d.eligible_recipients} eligible recipient${d.eligible_recipients === 1 ? '' : 's'}` : ''}`
-    case 'comms_message_sent': return `${actor} sent “${d.subject || 'a communication'}” to ${d.recipients ?? 'selected'} recipient${d.recipients === 1 ? '' : 's'}`
+    case 'comms_message_sent':
+      if (typeof d.to === 'string' && d.to) return `${actor} sent “${d.subject || 'a communication'}” to ${e.client_name || e.client_email || d.to}`
+      return `${actor} sent “${d.subject || 'a communication'}” to ${d.recipients ?? 'selected'} recipient${d.recipients === 1 ? '' : 's'}`
     case 'client_signed_up': return `${client} signed up${d.business_name ? ` (${d.business_name})` : ''}`
     case 'user_created': return `${actor} created a${d.role === 'admin' ? 'n' : ''} ${d.role} account for ${d.full_name || d.email}`
     case 'user_status_changed': return `${actor} updated ${d.name || 'a user'}: ${d.to?.status ?? ''} · ${d.to?.role ?? ''}`.trim()
@@ -160,7 +165,10 @@ export function describeActivity(e: ActivityEvent): string {
     case 'message_sent': return `${actor} sent a message to ${client}: “${d.subject}”`
     case 'message_attachment_added': return `${actor} attached “${d.file_name}” to a message${d.subject ? `: “${d.subject}”` : ''}`
     case 'email.inbound': return `Email reply from ${d.from_name || d.from || 'a sender'}: “${d.subject || 'no subject'}”`
-    case 'email.sent': return `${actor} sent an email: “${d.subject || 'no subject'}”`
+    case 'email.sent': return `${actor} sent an email${e.client_name || e.client_email ? ` to ${client}` : ''}: “${d.subject || 'no subject'}”`
+    case 'conversation.created': return `${actor} started a conversation${d.subject ? `: “${d.subject}”` : ''}`
+    case 'conversation.message': return `${actor} sent a staff message${d.subject ? ` in “${d.subject}”` : ''}${e.client_name || e.client_email ? ` for ${client}` : ''}`
+    case 'conversation.internal_note': return `${actor} added an internal note${d.subject ? ` in “${d.subject}”` : ''}`
     default: return fmtStatus(e.kind)
   }
 }

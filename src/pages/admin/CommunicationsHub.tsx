@@ -264,6 +264,7 @@ function fieldLabel(field: string) {
 }
 
 export function ReportingTab() {
+  const p = useAppPath()
   const [range, setRange] = useState<'7d' | '14d' | '30d'>('7d')
   const [data, setData] = useState<ReportingResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -343,7 +344,7 @@ export function ReportingTab() {
             {data.aging_threads.map((t) => (
               <div key={t.id} className="flex items-center justify-between py-3">
                 <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{t.subject}</p><p className="truncate text-[11px] text-slate-500">{t.client_name || t.client_email} · last {new Date(t.last_message_at).toLocaleString()}</p></div>
-                <Link to={`../messages?thread=${t.id}`} className="text-xs font-semibold text-gold hover:underline">Open →</Link>
+                <Link to={`${p('messages')}?tab=inbox&inbox=${encodeURIComponent(t.id)}`} className="text-xs font-semibold text-gold hover:underline">Open</Link>
               </div>
             ))}
           </div>

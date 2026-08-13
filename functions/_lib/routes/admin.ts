@@ -803,15 +803,32 @@ adminRoutes.patch('/my-signature', requireStaff, async (c) => {
   const user = c.get('user')
   const body = await c.req.json<{ signature_html?: string }>().catch(() => ({}) as any)
   const html = typeof body.signature_html === 'string' ? body.signature_html.slice(0, 5000) : ''
-  await c.env.DB.prepare(
-    `INSERT INTO team_members (id, user_id, staff_role, signature_html) VALUES (?, ?, 'representative', ?)
-     ON CONFLICT(user_id) DO UPDATE SET signature_html = excluded.signature_html`,
-  ).bind(uuid(), user.id, html || null).run()
+  const personal = await c.env.DB.prepare(
+    `SELECT id FROM email_signatures WHERE owner_user_id = ? AND kind = 'personal' LIMIT 1`,
+  ).bind(user.id).first<{ id: string }>()
+  const stmts = [
+    c.env.DB.prepare(
+      `INSERT INTO team_members (id, user_id, staff_role, signature_html) VALUES (?, ?, 'representative', ?)
+       ON CONFLICT(user_id) DO UPDATE SET signature_html = excluded.signature_html`,
+    ).bind(uuid(), user.id, html || null),
+  ]
+  if (personal) {
+    stmts.push(
+      c.env.DB.prepare(
+        `UPDATE email_signatures SET html = ?, updated_at = datetime('now') WHERE id = ?`,
+      ).bind(html, personal.id),
+    )
+  }
+  await c.env.DB.batch(stmts)
   return c.json({ ok: true })
 })
 
 adminRoutes.get('/my-signature', requireStaff, async (c) => {
   const user = c.get('user')
+  const personal = await c.env.DB.prepare(
+    `SELECT html FROM email_signatures WHERE owner_user_id = ? AND kind = 'personal' LIMIT 1`,
+  ).bind(user.id).first<{ html: string | null }>()
+  if (personal?.html) return c.json({ signature_html: personal.html })
   const row = await c.env.DB.prepare('SELECT signature_html FROM team_members WHERE user_id = ?').bind(user.id).first<{ signature_html: string | null }>()
   return c.json({ signature_html: row?.signature_html ?? '' })
 })

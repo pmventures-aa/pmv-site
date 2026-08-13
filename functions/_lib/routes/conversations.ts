@@ -308,7 +308,7 @@ conversationRoutes.post('/conversations/:id/messages', async (c) => {
       `SELECT user_id FROM conversation_participants WHERE conversation_id = ? AND removed_at IS NULL AND user_id != ?`
     ).bind(gate.conversation.id, user.id).all()
     const participantIds = new Set(((participants.results as any[]) || []).map((r) => r.user_id))
-    const deepLink = `/hq/communications?tab=threads&conv=${gate.conversation.id}`
+    const deepLink = `/messages?tab=staff&conv=${gate.conversation.id}`
     const senderName = user.full_name || user.email
     // Skip mentioned-user notifications for clients/vendors on internal notes.
     for (const uid of mentionedIds) {
@@ -332,6 +332,15 @@ conversationRoutes.post('/conversations/:id/messages', async (c) => {
       })
     }
   })())
+
+  try {
+    await logActivity(c.env, {
+      actorUserId: user.id,
+      clientUserId: gate.conversation.scope_client_user_id || null,
+      kind: isInternalNote ? 'conversation.internal_note' : 'conversation.message',
+      detail: { conversation_id: gate.conversation.id, subject: gate.conversation.subject },
+    })
+  } catch {}
 
   return c.json({ ok: true, id: messageId }, 201)
 })

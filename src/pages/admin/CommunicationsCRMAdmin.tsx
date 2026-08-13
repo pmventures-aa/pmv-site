@@ -6,7 +6,9 @@ import { useCapabilities } from '../../lib/capabilities'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, EmptyState, Tag, btnPrimary, btnOutline, inputCls, NoAccess, SkeletonTable } from '../../components/admin/ui'
 import { RichTextComposer } from '../../components/admin/RichTextComposer'
-import { Dialog, DialogContent, DialogTrigger } from '../../components/kit/Dialog'
+import { Dialog, DialogContent } from '../../components/kit/Dialog'
+import { pickDefaultSignature, rememberSignatureId, signatureLabel, type EmailSignature } from '../../lib/emailSignatures'
+import { SignaturePreview } from './SignatureLetterhead'
 
 interface AudienceData {
   counts: { employees: number; vendors: number; pending_vendors?: number; clients: number; leads: number; prospects: number; opportunities: number }
@@ -64,7 +66,8 @@ export default function CommunicationsCRMAdmin() {
   const [sendMode, setSendMode] = useState<'now' | 'schedule'>('now')
   const [scheduledAt, setScheduledAt] = useState('')
   const [recurrence, setRecurrence] = useState<'' | 'daily' | 'weekly' | 'monthly'>('')
-  const [signature, setSignature] = useState('')
+  const [signatureId, setSignatureId] = useState('none')
+  const [signatures, setSignatures] = useState<EmailSignature[]>([])
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async (silent = false) => {
@@ -73,11 +76,15 @@ export default function CommunicationsCRMAdmin() {
       const [a, m, s, f] = await Promise.all([
         api.get<AudienceData>('/admin/comms/audience'),
         api.get<{ messages: MessageRow[] }>('/admin/comms/messages'),
-        api.get<{ signature_html: string }>('/admin/my-signature'),
+        api.get<{ signatures: EmailSignature[] }>('/admin/email-signatures'),
         api.get<FolderCounts>('/admin/comms/folders'),
       ])
       setAudience(a); setMessages(m.messages); setFolders(f); setError(null)
-      if (!silent) setSignature(s.signature_html || '')
+      setSignatures(s.signatures || [])
+      if (!silent) {
+        const next = pickDefaultSignature(s.signatures || [])
+        if (next) setSignatureId(next.id)
+      }
       if (!seeded.current) {
         const lead = searchParams.get('lead'); const leadIds = searchParams.get('leadIds')?.split(',').filter(Boolean) ?? []; const list = searchParams.get('list'); const client = searchParams.get('client')
         if (lead) setInquiryIds([lead]); else if (leadIds.length) setInquiryIds(leadIds)
@@ -130,9 +137,11 @@ export default function CommunicationsCRMAdmin() {
     if (lead) { if (!inquiryIds.includes(lead.id)) setInquiryIds((ids) => [...ids, lead.id]); setDirectStatus(`${lead.name || lead.email} added as a recipient.`); setDirectEmail(''); return }
     setDirectStatus('That address is not attached to a client, vendor, staff, or CRM record. Add the record first so the communication remains part of the relationship history.')
   }
+  function setCampaignSignature(id: string) {
+    setSignatureId(id)
+    if (id !== 'none') rememberSignatureId(id)
+  }
   async function uploadImage(file: File) { const res = await api.upload<{ ok: boolean; url: string }>('/admin/comms/images', file); return res.url }
-  function insertSignature() { if (!signature.trim()) return window.alert('No signature is saved to your HQ profile yet.'); setBodyHtml((html) => `${html}<br>${signature}`) }
-  async function saveSignature() { try { await api.patch('/admin/my-signature', { signature_html: signature }) } catch { window.alert('Your signature could not be saved.') } }
   function resetComposer() { setSubject(''); setBodyHtml(''); setSegments([]); setUserIds([]); setInquiryIds([]); setListIds([]); setDirectEmail(''); setDirectStatus(null); setSendMode('now'); setScheduledAt(''); setRecurrence(''); setEligibleCount(0) }
 
   async function submit(action: 'draft' | 'send_now' | 'schedule') {
@@ -144,7 +153,7 @@ export default function CommunicationsCRMAdmin() {
     if (action === 'schedule' && !scheduledAt) return window.alert('Choose a delivery date and time.')
     setBusy(true)
     try {
-      await api.post('/admin/comms/messages', { subject, body_html: bodyHtml, message_type: messageType, audience: { segments, user_ids: userIds, inquiry_ids: inquiryIds, list_ids: listIds }, action, scheduled_at: action === 'schedule' ? new Date(scheduledAt).toISOString() : undefined, recurrence: action === 'schedule' && recurrence ? recurrence : undefined })
+      await api.post('/admin/comms/messages', { subject, body_html: bodyHtml, message_type: messageType, audience: { segments, user_ids: userIds, inquiry_ids: inquiryIds, list_ids: listIds }, action, scheduled_at: action === 'schedule' ? new Date(scheduledAt).toISOString() : undefined, recurrence: action === 'schedule' && recurrence ? recurrence : undefined, signature_id: signatureId === 'none' ? null : signatureId })
       resetComposer(); setComposeOpen(false); await load()
     } catch (err) { window.alert(err instanceof ApiError ? err.message : 'The message could not be saved.') }
     finally { setBusy(false) }
@@ -154,6 +163,7 @@ export default function CommunicationsCRMAdmin() {
 
   if (loading) return <div><PageIntro kicker="HQ Communications" title="Email Center" subtitle="A unified mailbox for client, CRM, internal, scheduled, and campaign email." /><SkeletonTable rows={6} cols={5} /></div>
 
+  const selectedCampaignSignature = signatures.find((s) => s.id === signatureId) || null
   const folderItems = [
     { key: 'all' as const, label: 'All mail', count: folders.total, icon: Inbox },
     { key: 'drafts' as const, label: 'Drafts', count: folders.drafts, icon: FileText },
@@ -192,7 +202,7 @@ export default function CommunicationsCRMAdmin() {
     <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
       <DialogContent size="xl" title="New email" description="Compose a professional message and select the exact audience, delivery time, and communication type.">
         {!caps.can_manage_communications ? <NoAccess label="sending communications" /> : <div className="max-h-[78vh] overflow-y-auto pr-1"><div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <section><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-white">Message</p><p className="mt-1 text-xs text-slate-500">Write the final email exactly as the recipient should receive it.</p></div><select className={`${inputCls} !w-auto`} value={messageType} onChange={(e) => setMessageType(e.target.value as any)}><option value="operational">Client / operational</option><option value="internal">Internal team</option><option value="marketing">Marketing / outreach</option></select></div><div className="space-y-4"><input className={inputCls} placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} /><RichTextComposer value={bodyHtml} onChange={setBodyHtml} onUploadImage={uploadImage} /><div className="flex flex-wrap gap-2"><button className={btnOutline} onClick={insertSignature}>Insert signature</button><Dialog><DialogTrigger asChild><button className={btnOutline}>Edit signature</button></DialogTrigger><DialogContent title="My email signature" description="This signature is saved to your HQ profile."><RichTextComposer value={signature} onChange={setSignature} onUploadImage={uploadImage} /><button className={`${btnPrimary} mt-4 w-full`} onClick={saveSignature}>Save signature</button></DialogContent></Dialog></div></div></section>
+          <section><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-white">Message</p><p className="mt-1 text-xs text-slate-500">Write the final email exactly as the recipient should receive it.</p></div><select className={`${inputCls} !w-auto`} value={messageType} onChange={(e) => setMessageType(e.target.value as any)}><option value="operational">Client / operational</option><option value="internal">Internal team</option><option value="marketing">Marketing / outreach</option></select></div><div className="space-y-4"><input className={inputCls} placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} /><RichTextComposer value={bodyHtml} onChange={setBodyHtml} onUploadImage={uploadImage} /><div className="flex flex-wrap items-center gap-3"><label className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[.12em] text-slate-400">Signature<select className={`${inputCls} !w-auto min-w-[180px] normal-case tracking-normal`} value={signatureId} onChange={(e) => setCampaignSignature(e.target.value)}><option value="none">None</option>{signatures.map((s) => <option key={s.id} value={s.id}>{signatureLabel(s)}</option>)}</select></label></div>{selectedCampaignSignature && <div className="rounded-md border border-white/10 bg-white p-4"><SignaturePreview signature={selectedCampaignSignature} /></div>}</div></section>
           <aside className="rounded-lg border border-white/10 bg-white/[.02]">
             {messageType !== 'internal' && <div className="border-b border-white/10 p-4"><label className="text-xs font-medium text-slate-400">Direct recipient</label><div className="mt-2 flex gap-2"><input className={inputCls} type="email" placeholder="name@example.com" value={directEmail} onChange={(e) => setDirectEmail(e.target.value)} /><button className={btnOutline} onClick={addDirectRecipient}>Add</button></div>{directStatus && <p className="mt-2 text-xs text-slate-500">{directStatus}</p>}</div>}
             <div className="border-b border-white/10 px-4 py-3"><div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-white">Recipients</p><p className="text-xs text-slate-500">Eligible after suppression rules</p></div><p className="text-xl font-semibold text-white">{eligibleCount ?? 'Not provided'}</p></div></div>

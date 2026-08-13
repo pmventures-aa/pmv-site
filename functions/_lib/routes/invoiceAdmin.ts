@@ -6,6 +6,7 @@ import { uuid } from '../crypto'
 import { activityInsert, logActivity } from '../activity'
 import { sendEmailStrict, escapeHtml } from '../email'
 import { calculateInvoiceTotals, type InvoiceLineInput } from '../invoiceMath'
+import { portalUrl } from '../appUrls'
 
 export const invoiceAdminRoutes = new Hono<AppEnv>()
 
@@ -391,13 +392,13 @@ invoiceAdminRoutes.post('/invoices/:id/send', requireStaff, async (c) => {
     ? new Date(`${String(invoice.due_date).slice(0, 10)}T12:00:00`).toLocaleDateString('en-US')
     : 'upon receipt'
   const invoiceLabel = invoice.invoice_number || invoice.id
-  const portalUrl = 'https://client.pinnaclemanagementventures.com/billing'
+  const portalUrlValue = portalUrl('/billing')
   const subject = `${invoiceLabel} — ${amount}`
   const html = [
     `<p>Hi ${escapeHtml(invoice.client_name || 'there')},</p>`,
     `<p>Pinnacle Management Ventures has prepared invoice <strong>${escapeHtml(invoiceLabel)}</strong> for <strong>${escapeHtml(amount)}</strong>, due ${escapeHtml(due)}.</p>`,
     invoice.message ? `<p>${escapeHtml(invoice.message)}</p>` : '',
-    `<p><a href="${portalUrl}">View invoice in your Client Portal</a></p>`,
+    `<p><a href="${portalUrlValue}">View invoice in your Client Portal</a></p>`,
     '<p>This invoice records the amount and available payment methods. Online card/ACH charging is not enabled in Pinnacle at this time.</p>',
   ].join('')
 
@@ -407,7 +408,7 @@ invoiceAdminRoutes.post('/invoices/:id/send', requireStaff, async (c) => {
       to,
       subject,
       html,
-      text: `Pinnacle invoice ${invoiceLabel}: ${amount}, due ${due}. View it at ${portalUrl}`,
+      text: `Pinnacle invoice ${invoiceLabel}: ${amount}, due ${due}. View it at ${portalUrlValue}`,
       replyTo: 'orders@pinnaclemanagementventures.com',
       idempotencyKey: `invoice/${invoice.id}/${to}/${sendStamp}`,
       tags: [

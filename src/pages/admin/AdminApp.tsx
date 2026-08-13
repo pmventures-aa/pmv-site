@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth'
 import { useCapabilities } from '../../lib/capabilities'
 import { hqWorkspaceCopy } from '../../lib/workspace'
 import { BasePathProvider, useAppPath } from '../../lib/basePath'
+import { isCampaignAudienceQuery } from '../../lib/engagements'
 import Login from '../auth/Login'
 import ForgotPassword from '../auth/ForgotPassword'
 import ResetPassword from '../auth/ResetPassword'
@@ -57,7 +58,6 @@ function AdminShell(){
   if(caps.can_manage_settings)visible.add('settings')
   if(caps.can_view_audit_log)visible.add('audit-log')
   if(caps.can_view_reports){visible.add('reports');visible.add('management')}
-  if(caps.can_manage_communications){visible.add('communications');visible.add('client-banners')}
   if(caps.can_manage_invitations)visible.add('invitations')
   if(caps.can_manage_documents){visible.add('document-center');visible.add('community-documents');visible.add('envelopes');visible.add('esign-platform')}
   if(caps.can_manage_team)visible.add('network')
@@ -79,6 +79,9 @@ function CatchAll(){const p=useAppPath();return <Navigate to={p()} replace/>}
 function RedirectToMessages({ tab }: { tab?: string }) {
   const p = useAppPath()
   const [params] = useSearchParams()
+  if (isCampaignAudienceQuery(params)) {
+    return <Navigate to={`${p('communications/email')}?${params.toString()}`} replace />
+  }
   const next = new URLSearchParams(params)
   if (tab && !next.get('tab')) next.set('tab', tab)
   if (next.get('tab') === 'threads') next.set('tab', 'staff')

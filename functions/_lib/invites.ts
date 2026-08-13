@@ -1,6 +1,7 @@
 import type { Env } from './types'
 import { sendEmailStrict } from './email'
 import { uuid } from './crypto'
+import { hqUrl, wwwPortalUrl } from './appUrls'
 import { renderRelationshipEvent } from './emailTemplates/relationship'
 
 export type InviteType = 'vendor' | 'client' | 'staff' | 'trusted_contact'
@@ -40,9 +41,8 @@ export function inviteExpiry(hours = 24): string {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
 }
 
-const PUBLIC_BASE = 'https://www.pinnaclemanagementventures.com'
-const CLIENT_BASE = `${PUBLIC_BASE}/portal`
-const HQ_BASE = 'https://hq.pinnaclemanagementventures.com'
+const CLIENT_BASE = wwwPortalUrl()
+const HQ_BASE = hqUrl()
 
 export function inviteUrl(type: InviteType, token: string): string {
   if (type === 'vendor') return `${HQ_BASE}/vendor-signup?invite=${encodeURIComponent(token)}`

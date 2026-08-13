@@ -1,3 +1,4 @@
+import { CREST_ABSOLUTE_URL, FIRM_NAME, FIRM_PHONE, FIRM_PHONE_TEL, PUBLIC_SITE_URL } from '../../../shared/letterhead'
 import { escapeHtml } from '../email'
 
 export interface EmailCta {
@@ -14,9 +15,9 @@ export interface EmailLayoutInput {
   securityNote?: string
 }
 
-const SITE_URL = 'https://www.pinnaclemanagementventures.com'
-const LOGO_URL = `${SITE_URL}/logo-crest-transparent.png`
-const SUPPORT_PHONE = '(561) 388-7879'
+const SITE_URL = PUBLIC_SITE_URL
+const LOGO_URL = CREST_ABSOLUTE_URL
+const SUPPORT_PHONE = FIRM_PHONE
 
 export function renderPinnacleEmailLayout(input: EmailLayoutInput): string {
   const preheader = escapeHtml(input.preheader)
@@ -39,8 +40,8 @@ export function renderPinnacleEmailLayout(input: EmailLayoutInput): string {
     <tr><td align="center" style="padding:30px 14px">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px">
         <tr><td align="center" style="padding:4px 0 22px">
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto 10px"><tr><td bgcolor="#fffefa" style="width:72px;height:72px;border-radius:12px;border:1px solid #e7e2d8" align="center" valign="middle"><img src="${LOGO_URL}" width="58" height="58" alt="Pinnacle Management Ventures" style="display:block;width:58px;height:58px;object-fit:contain;margin:0 auto"></td></tr></table>
-          <div style="font-family:Georgia,'Times New Roman',serif;font-size:19px;line-height:24px;color:#ffffff;letter-spacing:.2px">Pinnacle Management Ventures</div>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto 10px"><tr><td bgcolor="#fffefa" style="width:72px;height:72px;border-radius:12px;border:1px solid #e7e2d8" align="center" valign="middle"><img src="${LOGO_URL}" width="58" height="58" alt="${FIRM_NAME}" style="display:block;width:58px;height:58px;object-fit:contain;margin:0 auto"></td></tr></table>
+          <div style="font-family:Georgia,'Times New Roman',serif;font-size:19px;line-height:24px;color:#ffffff;letter-spacing:.2px">${FIRM_NAME}</div>
           <div style="margin-top:5px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;letter-spacing:1.8px;text-transform:uppercase;color:#d7b56d">Professional support. One call away.</div>
         </td></tr>
         <tr><td bgcolor="#ffffff" style="border-radius:12px;overflow:hidden">
@@ -58,10 +59,10 @@ export function renderPinnacleEmailLayout(input: EmailLayoutInput): string {
           </table>
         </td></tr>
         <tr><td align="center" style="padding:22px 18px 6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;color:#8793a5">
-          <strong style="color:#c8d0dc">Pinnacle Management Ventures</strong><br>
+          <strong style="color:#c8d0dc">${FIRM_NAME}</strong><br>
           Professional Services &amp; Business Consulting<br>
-          <a href="tel:+15613887879" style="color:#d7b56d;text-decoration:none">${SUPPORT_PHONE}</a> &nbsp;·&nbsp; <a href="${SITE_URL}" style="color:#d7b56d;text-decoration:none">pinnaclemanagementventures.com</a><br>
-          This is a transactional account message from Pinnacle Management Ventures.
+          <a href="tel:${FIRM_PHONE_TEL}" style="color:#d7b56d;text-decoration:none">${SUPPORT_PHONE}</a> &nbsp;·&nbsp; <a href="${SITE_URL}" style="color:#d7b56d;text-decoration:none">pinnaclemanagementventures.com</a><br>
+          This is a transactional account message from ${FIRM_NAME}.
         </td></tr>
       </table>
     </td></tr>

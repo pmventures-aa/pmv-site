@@ -9,6 +9,7 @@ import { ResendWebhookPanel } from './settings/ResendWebhookPanel'
 import { EmailComposePane, type ComposeDraft } from './EmailComposePane'
 import { EmailSignaturesPanel } from './EmailSignaturesPanel'
 import { previewSignatureHtml, type EmailSignature } from '../../lib/emailSignatures'
+import { composeAddress } from '../../lib/engagements'
 
 type Thread = {
   id: string; subject: string; scope_client_user_id: string|null
@@ -41,6 +42,8 @@ export function EmailThreadsPanel() {
   const [draft, setDraft] = useState<ComposeDraft | null>(null)
   const [busy, setBusy] = useState(false)
   const [managingSignatures, setManagingSignatures] = useState(false)
+  const composeScope = useRef<{ clientId: string | null; inquiryId: string | null }>({ clientId: null, inquiryId: null })
+  const seededCompose = useRef(false)
 
   const loadSignatures = useCallback(async () => {
     try {
@@ -93,7 +96,31 @@ export function EmailThreadsPanel() {
     setSelectedId(id)
   }
 
+  useEffect(() => {
+    if (seededCompose.current) return
+    if (searchParams.get('compose') !== '1') return
+    seededCompose.current = true
+    const to = searchParams.get('to') || ''
+    const name = searchParams.get('name') || ''
+    composeScope.current = {
+      clientId: searchParams.get('scopeClient') || null,
+      inquiryId: searchParams.get('lead') || null,
+    }
+    setManagingSignatures(false)
+    setDraft({ mode: 'new', to: composeAddress(name, to), cc: '', bcc: '', subject: '', html: '' })
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.delete('compose')
+      next.delete('to')
+      next.delete('name')
+      next.delete('scopeClient')
+      next.delete('lead')
+      return next
+    }, { replace: true })
+  }, [searchParams, setSearchParams])
+
   function startCompose() {
+    composeScope.current = { clientId: null, inquiryId: null }
     setManagingSignatures(false)
     setDraft({ mode: 'new', to: '', cc: '', bcc: '', subject: '', html: '' })
   }
@@ -128,9 +155,12 @@ export function EmailThreadsPanel() {
         const r = await api.post<{ thread_id: string }>('/admin/email-threads', {
           subject: draft.subject.trim(), to, cc, bcc,
           body_html: draft.html, signature_id: signatureId,
+          scope_client_user_id: composeScope.current.clientId,
+          inquiry_id: composeScope.current.inquiryId,
         })
         toast.success('Email sent')
         setDraft(null)
+        composeScope.current = { clientId: null, inquiryId: null }
         setSelectedId(r.thread_id)
         void load()
       }

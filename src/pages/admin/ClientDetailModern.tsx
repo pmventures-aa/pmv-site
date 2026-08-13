@@ -7,6 +7,7 @@ import { Tag, EmptyState, inputCls, btnPrimary, btnOutline } from '../../compone
 import { toast } from '../../components/kit/toast'
 import { InlineLoading } from '../../components/LoadingScreen'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
+import { campaignAudienceHref, clientEmailHref, clientInboxHref } from '../../lib/engagements'
 import ClientRelationships from './ClientRelationships'
 import { humanizeLabel } from '../../../shared/displayCase'
 
@@ -219,8 +220,8 @@ export default function ClientDetailModern() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to={`${p('communications')}?client=${encodeURIComponent(account.id)}`} className={btnPrimary}>Email client</Link>
-          <Link to={p('messages')} className={btnOutline}>Messages</Link>
+          <Link to={clientEmailHref(p, { id: account.id, email: account.email, name: account.full_name })} className={btnPrimary}>Email client</Link>
+          <Link to={clientInboxHref(p, account.id)} className={btnOutline}>Messages</Link>
           <Link to={p(`clients/${account.id}/activity`)} className={btnOutline}>Add note</Link>
           <Link to={p(`clients/${account.id}/manage`)} className={btnOutline}>Manage records</Link>
         </div>
@@ -266,7 +267,7 @@ export default function ClientDetailModern() {
 
     {tab === 'activity' && <div className="mt-7 grid gap-9 xl:grid-cols-[minmax(0,1fr)_380px]">
       <main><SectionTitle eyebrow="Timeline" title="Relationship activity" />{timeline.length ? <Timeline rows={timeline} /> : <EmptyState label="No activity yet." />}</main>
-      <aside className="xl:border-l xl:border-white/10 xl:pl-7"><SectionTitle title="Add internal note" /><p className="mb-4 text-xs leading-5 text-slate-500">Staff-only. Notes are never visible in the client portal.</p><form onSubmit={addNote}><textarea className={inputCls} rows={7} placeholder="Call notes, context, follow-up, next steps…" value={note} onChange={(e) => setNote(e.target.value)} /><button className={`${btnPrimary} mt-3 w-full`} disabled={noteBusy || !note.trim()}>{noteBusy ? 'Saving…' : 'Save note'}</button></form><Link to={`${p('communications')}?client=${encodeURIComponent(account.id)}`} className={`${btnOutline} mt-3 w-full`}>Compose email</Link></aside>
+      <aside className="xl:border-l xl:border-white/10 xl:pl-7"><SectionTitle title="Add internal note" /><p className="mb-4 text-xs leading-5 text-slate-500">Staff-only. Notes are never visible in the client portal.</p><form onSubmit={addNote}><textarea className={inputCls} rows={7} placeholder="Call notes, context, follow-up, next steps…" value={note} onChange={(e) => setNote(e.target.value)} /><button className={`${btnPrimary} mt-3 w-full`} disabled={noteBusy || !note.trim()}>{noteBusy ? 'Saving…' : 'Save note'}</button></form><Link to={clientEmailHref(p, { id: account.id, email: account.email, name: account.full_name })} className={`${btnOutline} mt-3 w-full`}>Compose email</Link><Link to={campaignAudienceHref(p, { client: account.id })} className={`${btnOutline} mt-2 w-full`}>Campaign email</Link></aside>
     </div>}
 
     {tab === 'services' && <div className="mt-7 space-y-9">

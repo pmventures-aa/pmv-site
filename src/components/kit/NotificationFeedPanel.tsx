@@ -18,9 +18,16 @@ export function resolveHqDeepLink(path: string, p: (s: string) => string): strin
   if (!raw || /^https?:/i.test(raw)) return raw
   const qIndex = raw.indexOf('?')
   const pathname = qIndex >= 0 ? raw.slice(0, qIndex) : raw
-  const search = qIndex >= 0 ? raw.slice(qIndex) : ''
-  const stripped = pathname.replace(/^\/hq\/?/i, '').replace(/^\//, '')
-  return `${p(stripped)}${search}`
+  const search = qIndex >= 0 ? raw.slice(qIndex + 1) : ''
+  let stripped = pathname.replace(/^\/hq\/?/i, '').replace(/^\//, '')
+  const params = new URLSearchParams(search)
+  if (stripped === 'communications') {
+    stripped = 'messages'
+    if (!params.get('tab')) params.set('tab', 'email')
+  }
+  if (params.get('tab') === 'threads') params.set('tab', 'staff')
+  const qs = params.toString()
+  return qs ? `${p(stripped)}?${qs}` : p(stripped)
 }
 
 export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin' | 'portal' }) {

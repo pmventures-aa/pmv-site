@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AtSign, CheckCheck, ChevronLeft, Circle, Hash, Loader2, Lock, MessageSquare, Paperclip, PinIcon, Plus, Send, User, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { Panel, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
@@ -29,8 +30,9 @@ const KIND_LABEL: Record<string, string> = { dm: 'DM', group_dm: 'Group', email_
 const STATUS_TONE: Record<string, 'green'|'gold'|'slate'> = { open: 'green', snoozed: 'gold', closed: 'slate' }
 
 export function ConversationsPanel() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [conversations, setConversations] = useState<Conversation[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('conv'))
   const [detail, setDetail] = useState<Detail | null>(null)
   const [loading, setLoading] = useState(true)
   const [composerOpen, setComposerOpen] = useState(false)
@@ -46,14 +48,29 @@ export function ConversationsPanel() {
       if (search.trim()) params.set('q', search.trim())
       const r = await api.get<{ conversations: Conversation[] }>(`/admin/conversations?${params}`)
       setConversations(r.conversations)
-      if (!selectedId && r.conversations[0]) setSelectedId(r.conversations[0].id)
+      setSelectedId((current) => {
+        const fromUrl = new URLSearchParams(window.location.search).get('conv')
+        if (fromUrl && r.conversations.some((c) => c.id === fromUrl)) return fromUrl
+        if (current && r.conversations.some((c) => c.id === current)) return current
+        return r.conversations[0]?.id ?? null
+      })
     } catch (err) {
       if (err instanceof ApiError) toast.error(err.message)
     } finally { setLoading(false) }
-  }, [statusFilter, kindFilter, search, selectedId])
+  }, [statusFilter, kindFilter, search])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => { const t = setInterval(() => void load(), POLL_MS); return () => clearInterval(t) }, [load])
+
+  useEffect(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (selectedId) next.set('conv', selectedId)
+      else next.delete('conv')
+      if (next.toString() === current.toString()) return current
+      return next
+    }, { replace: true })
+  }, [selectedId, setSearchParams])
 
   const loadDetail = useCallback(async () => {
     if (!selectedId) { setDetail(null); return }

@@ -5,6 +5,7 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnOutline, btnPrimary, SkeletonTable } from '../../components/admin/ui'
 import { SlaClock } from '../../components/kit/SlaClock'
 import { useAppPath } from '../../lib/basePath'
+import { clientEmailHref } from '../../lib/engagements'
 import { useAuth } from '../../lib/auth'
 import { toast } from '../../components/kit/toast'
 import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../components/admin/RecentWindow'
@@ -226,6 +227,7 @@ function CaseRows({ rows, now, p }: { rows: CaseRow[]; now: number; p: (path: st
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs">
+              <Link to={clientEmailHref(p, { id: row.client_user_id, email: row.client_email, name: row.client_name })} className="text-xs font-semibold text-gold hover:underline">Email</Link>
               <SlaClock due={row.response_due_at} complete={!!row.first_response_at} label="Response" />
               <SlaClock due={row.resolution_due_at} complete={row.status === 'closed'} label="Resolution" />
               <span className="text-[10px] text-slate-500">Opened {new Date(row.created_at).toLocaleString()}</span>
