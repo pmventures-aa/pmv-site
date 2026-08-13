@@ -264,6 +264,29 @@ export default function FieldWorkDetail() {
     }
   }
 
+  // Live map ping: while traveling or on site, report GPS so HQ can see the agent.
+  useEffect(() => {
+    if (!assignment) return
+    if (!['traveling', 'on_site', 'documented', 'signed'].includes(assignment.status)) return
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    let lastSent = 0
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const now = Date.now()
+        if (now - lastSent < 20_000) return
+        lastSent = now
+        void api.post(`/admin/field-assignments/${assignment.id}/ping`, {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy_m: pos.coords.accuracy,
+        }).catch(() => {})
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 8000 },
+    )
+    return () => navigator.geolocation.clearWatch(id)
+  }, [assignment?.id, assignment?.status])
+
   // Auto-arrival: while we're in the 'traveling' state and we have a target
   // pin, poll geolocation lightly and flip to on_site when the vendor gets
   // within the geofence radius. Only runs while the tab is open.

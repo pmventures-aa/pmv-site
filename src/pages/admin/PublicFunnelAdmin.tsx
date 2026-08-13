@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { services } from '../../data/services'
 import { useAppPath } from '../../lib/basePath'
+import ClientBannersAdmin from './ClientBannersAdmin'
 
 type CaseStudy={id:string;service_key:string|null;guide_slug:string|null;audience:string|null;headline:string;outcome:string;timeline_label:string;redacted_location:string|null;image_url:string|null;image_alt:string|null;published:number;sort_order:number}
 type Rule={key:string;label:string;base_price_cents:number;per_sqft_cents:number;minimum_price_cents:number;range_low_percent:number;range_high_percent:number;active:number}
@@ -23,13 +24,20 @@ const TABS=[
   {key:'estimates',label:'Instant Estimates',blurb:'The pricing math behind the public instant-quote tool'},
   {key:'booking',label:'Online Booking',blurb:'Real appointment capacity customers can self-book'},
   {key:'proof',label:'Verified Proof',blurb:'Redacted completed jobs shown on the public site'},
+  {key:'banners',label:'Login Banners',blurb:'Announcements clients see when they sign in to the portal'},
 ] as const
 type TabKey=(typeof TABS)[number]['key']
 
 export default function PublicFunnelAdmin(){
   const p=useAppPath()
-  const [tab,setTab]=useState<TabKey>('estimates')
+  const [searchParams,setSearchParams]=useSearchParams()
+  const tabFromUrl=searchParams.get('tab')
+  const [tab,setTabState]=useState<TabKey>(TABS.some(item=>item.key===tabFromUrl)?tabFromUrl as TabKey:'estimates')
   const [data,setData]=useState<Data|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(''),[form,setForm]=useState(blank),[slotForm,setSlotForm]=useState(blankSlot)
+  function setTab(next:TabKey){
+    setTabState(next)
+    setSearchParams(next==='estimates'?{}:{tab:next},{replace:true})
+  }
   const load=()=>api.get<Data>('/admin/public-funnel').then(setData).catch(e=>setError(e instanceof ApiError?e.message:'Could not load website controls.'))
   useEffect(()=>{void load()},[])
   async function create(e:React.FormEvent){e.preventDefault();setBusy('new');try{await api.post('/admin/public-funnel/case-studies',form);setForm(blank);await load()}catch(x){setError(x instanceof ApiError?x.message:'Could not save the case study.')}finally{setBusy('')}}
@@ -64,7 +72,7 @@ export default function PublicFunnelAdmin(){
       <p className="border-t border-white/[.08] px-4 py-2.5 text-xs text-slate-500">{TABS.find(item=>item.key===tab)?.blurb}</p>
     </div>
 
-    {!data?<p className="text-sm text-slate-400">Loading…</p>:<>
+    {tab!=='banners'&&(!data?<p className="text-sm text-slate-400">Loading…</p>:<>
       {tab==='estimates'&&<section className="rounded-2xl border border-white/10 bg-white/[.02] p-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div><h2 className="text-xl font-bold text-white">Instant estimate rules</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">These numbers drive the public instant-quote tool. They are planning ranges only, never a committed price. Update them when labor, supply, travel, or market costs change.</p></div>
@@ -82,6 +90,7 @@ export default function PublicFunnelAdmin(){
         <form onSubmit={create} className="rounded-2xl border border-white/10 bg-white/[.02] p-5"><h2 className="text-xl font-bold text-white">Add a verified job</h2><p className="mt-2 text-xs leading-5 text-slate-500">Use real completed work only. Remove addresses, names, case numbers, faces, plates, and identifiers from copy and photos.</p><div className="mt-5 grid gap-3"><input className="input" placeholder="Headline" value={form.headline} onChange={e=>setForm({...form,headline:e.target.value})} required/><textarea className="input min-h-24" placeholder="One-line outcome" value={form.outcome} onChange={e=>setForm({...form,outcome:e.target.value})} required/><div className="grid gap-3 sm:grid-cols-2"><input className="input" placeholder="Timeline, e.g. 48 hours" value={form.timeline_label} onChange={e=>setForm({...form,timeline_label:e.target.value})} required/><input className="input" placeholder="Redacted location" value={form.redacted_location} onChange={e=>setForm({...form,redacted_location:e.target.value})}/><select className="input" value={form.service_key} onChange={e=>setForm({...form,service_key:e.target.value})}><option value="">All services</option>{serviceChoices.map(item=><option key={item.key} value={item.key}>{item.title}</option>)}</select><select className="input" value={form.guide_slug} onChange={e=>setForm({...form,guide_slug:e.target.value})}><option value="">No project guide</option>{guideChoices.map(value=><option key={value} value={value}>{value.replace(/-/g,' ')}</option>)}</select><select className="input" value={form.audience} onChange={e=>setForm({...form,audience:e.target.value})}><option value="">All client types</option>{audienceChoices.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select><input className="input" type="number" placeholder="Sort order" value={form.sort_order} onChange={e=>setForm({...form,sort_order:Number(e.target.value)})}/></div><input className="input" type="url" placeholder="HTTPS URL for approved redacted photo" value={form.image_url} onChange={e=>setForm({...form,image_url:e.target.value})}/><input className="input" placeholder="Photo description" value={form.image_alt} onChange={e=>setForm({...form,image_alt:e.target.value})}/><label className="flex gap-3 text-xs leading-5 text-slate-400"><input type="checkbox" className="accent-gold" checked={form.published} onChange={e=>setForm({...form,published:e.target.checked})}/>Publish now; the work and public-use approval are verified.</label><button className="btn-gold" disabled={busy==='new'}>{busy==='new'?'Saving…':'Save Verified Job'}</button></div></form>
         <div className="rounded-2xl border border-white/10 bg-white/[.02] p-5"><h2 className="text-xl font-bold text-white">Case-study library</h2><div className="mt-5 space-y-3">{data.case_studies.length?data.case_studies.map(item=><article key={item.id} className="rounded-xl border border-white/10 p-4"><span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${item.published?'bg-emerald-400/10 text-emerald-300':'bg-white/5 text-slate-400'}`}>{item.published?'Published':'Draft'}</span><h3 className="mt-3 font-bold text-white">{item.headline}</h3><p className="mt-1 text-xs leading-5 text-slate-400">{item.outcome}</p><div className="mt-3 flex gap-2"><button onClick={()=>void toggle(item)} disabled={busy===item.id} className="btn-outline px-3 py-2 text-xs">{item.published?'Unpublish':'Publish'}</button><button onClick={()=>void remove(item)} disabled={busy===item.id} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-200">Delete</button></div></article>):<p className="text-sm text-slate-500">No proof is public yet. The site intentionally hides this strip instead of inventing jobs or testimonials.</p>}</div></div>
       </section>}
-    </>}
+    </>)}
+    {tab==='banners'&&<ClientBannersAdmin embedded />}
   </div>
 }

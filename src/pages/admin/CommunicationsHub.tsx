@@ -115,7 +115,7 @@ function StatTile({ label, value, hint, icon: Icon, tone = 'slate' }: { label: s
   )
 }
 
-function OverviewTab({ overview, loading }: { overview: Overview | null; loading: boolean }) {
+export function OverviewTab({ overview, loading }: { overview: Overview | null; loading: boolean }) {
   const p = useAppPath()
   if (loading && !overview) return <Panel><p className="text-sm text-slate-400">Loading overview…</p></Panel>
   if (!overview) return <Panel><p className="text-sm text-slate-400">Overview data is not available right now.</p></Panel>
@@ -161,7 +161,7 @@ function OverviewTab({ overview, loading }: { overview: Overview | null; loading
   )
 }
 
-function NotificationsTab() {
+export function NotificationsTab() {
   const [events, setEvents] = useState<NotificationEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -263,7 +263,7 @@ function fieldLabel(field: string) {
   return 'Sound'
 }
 
-function ReportingTab() {
+export function ReportingTab() {
   const [range, setRange] = useState<'7d' | '14d' | '30d'>('7d')
   const [data, setData] = useState<ReportingResponse | null>(null)
   const [loading, setLoading] = useState(true)

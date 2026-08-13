@@ -1,0 +1,140 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { MapPin, Navigation, Radio } from 'lucide-react'
+import { useAppPath } from '../../lib/basePath'
+
+export type FieldMapPin = {
+  id: string
+  kind: 'site' | 'agent'
+  label: string
+  sublabel?: string
+  status?: string
+  lat: number
+  lng: number
+  href?: string
+  stale?: boolean
+}
+
+const DEFAULT_CENTER = { lat: 26.3683, lng: -80.1289 }
+const TILE_ZOOM = 8
+
+function lngToX(lng: number, zoom: number) {
+  return ((lng + 180) / 360) * 2 ** zoom
+}
+
+function latToY(lat: number, zoom: number) {
+  const clamped = Math.max(-85.0511, Math.min(85.0511, lat))
+  const s = Math.sin((clamped * Math.PI) / 180)
+  return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * 2 ** zoom
+}
+
+function wrapTile(n: number, zoom: number) {
+  const max = 2 ** zoom
+  return ((n % max) + max) % max
+}
+
+export function FieldLiveMap({ pins, className = '' }: { pins: FieldMapPin[]; className?: string }) {
+  const p = useAppPath()
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState({ w: 640, h: 360 })
+  const [selected, setSelected] = useState<string | null>(null)
+
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const update = () => setSize({ w: Math.max(320, el.clientWidth), h: Math.max(280, el.clientHeight) })
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const view = useMemo(() => {
+    const valid = pins.filter((pin) => Number.isFinite(pin.lat) && Number.isFinite(pin.lng))
+    const center = valid.length
+      ? { lat: valid.reduce((sum, pin) => sum + pin.lat, 0) / valid.length, lng: valid.reduce((sum, pin) => sum + pin.lng, 0) / valid.length }
+      : DEFAULT_CENTER
+    return { center, pins: valid }
+  }, [pins])
+
+  const tileSize = 256
+  const centerX = lngToX(view.center.lng, TILE_ZOOM)
+  const centerY = latToY(view.center.lat, TILE_ZOOM)
+  const originX = centerX * tileSize - size.w / 2
+  const originY = centerY * tileSize - size.h / 2
+  const minTx = Math.floor(originX / tileSize)
+  const maxTx = Math.floor((originX + size.w) / tileSize)
+  const minTy = Math.floor(originY / tileSize)
+  const maxTy = Math.floor((originY + size.h) / tileSize)
+  const tiles: { key: string; x: number; y: number; left: number; top: number }[] = []
+  for (let ty = minTy; ty <= maxTy; ty++) {
+    for (let tx = minTx; tx <= maxTx; tx++) {
+      tiles.push({
+        key: `${tx}:${ty}`,
+        x: wrapTile(tx, TILE_ZOOM),
+        y: ty,
+        left: tx * tileSize - originX,
+        top: ty * tileSize - originY,
+      })
+    }
+  }
+
+  const selectedPin = view.pins.find((pin) => pin.id === selected) || null
+
+  return (
+    <div className={`overflow-hidden rounded-lg border border-white/10 bg-[#0b1a2b] ${className}`}>
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold/80">Live field map</p>
+          <p className="mt-0.5 text-xs text-slate-400">{view.pins.length ? `${view.pins.filter((pin) => pin.kind === 'agent').length} agents · ${view.pins.filter((pin) => pin.kind === 'site').length} job sites` : 'Waiting for GPS from an assignment or agent ping'}</p>
+        </div>
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-300"><Radio size={11} /> Live</span>
+      </div>
+      <div ref={boxRef} className="relative h-[360px] overflow-hidden bg-[#1b2838]">
+        {tiles.map((tile) => (
+          tile.y >= 0 && tile.y < 2 ** TILE_ZOOM ? (
+            <img
+              key={tile.key}
+              alt=""
+              draggable={false}
+              className="pointer-events-none absolute max-w-none"
+              style={{ left: tile.left, top: tile.top, width: tileSize, height: tileSize }}
+              src={`https://tile.openstreetmap.org/${TILE_ZOOM}/${tile.x}/${tile.y}.png`}
+            />
+          ) : null
+        ))}
+        {view.pins.map((pin) => {
+          const left = lngToX(pin.lng, TILE_ZOOM) * tileSize - originX
+          const top = latToY(pin.lat, TILE_ZOOM) * tileSize - originY
+          const active = selected === pin.id
+          return (
+            <button
+              key={pin.id}
+              type="button"
+              onClick={() => setSelected(pin.id)}
+              className={`absolute z-10 -translate-x-1/2 -translate-y-full rounded-full border px-1.5 py-0.5 text-[10px] font-bold shadow-lg ${pin.kind === 'agent' ? 'border-emerald-300/50 bg-emerald-400 text-navy-950' : 'border-gold/50 bg-gold text-navy-950'} ${active ? 'ring-2 ring-white' : ''} ${pin.stale ? 'opacity-60' : ''}`}
+              style={{ left, top }}
+              title={pin.label}
+            >
+              <span className="inline-flex items-center gap-1">{pin.kind === 'agent' ? <Navigation size={10} /> : <MapPin size={10} />}{pin.label.split(' ')[0]}</span>
+            </button>
+          )
+        })}
+        {!view.pins.length && (
+          <div className="absolute inset-0 z-10 grid place-items-center bg-navy-950/35">
+            <p className="max-w-sm px-4 text-center text-xs leading-5 text-slate-300">No live coordinates yet. Create a field assignment with a site pin, or open an assignment on a vendor phone so GPS can report in.</p>
+          </div>
+        )}
+      </div>
+      {selectedPin && (
+        <div className="flex items-start justify-between gap-3 border-t border-white/10 px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{selectedPin.label}</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">{selectedPin.sublabel || selectedPin.status || (selectedPin.kind === 'agent' ? 'Agent location' : 'Job site')}</p>
+          </div>
+          {selectedPin.href && <Link to={p(selectedPin.href)} className="shrink-0 text-xs font-bold text-gold hover:underline">Open</Link>}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -32,7 +32,6 @@ import ProviderProfile from './ProviderProfile'
 import ReportingCenter from './ReportingCenter'
 import ManagementCenter from './ManagementCenter'
 import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
-import CommunicationsHub from './CommunicationsHub'
 import ClientBannersAdmin from './ClientBannersAdmin'
 import AutomationCenter from './AutomationCenter'
 import SecurityCenter from './SecurityCenter'
@@ -50,7 +49,7 @@ import CasesAdmin from './CasesAdmin'
 import PublicFunnelAdmin from './PublicFunnelAdmin'
 import QuotesAdmin from './QuotesAdmin'
 
-const STAFF_VISIBLE = ['dashboard','pipelines','clients','inquiries','quotes','messages','cases','activity','invoices','field-work','security-center']
+const STAFF_VISIBLE = ['dashboard','pipelines','clients','inquiries','quotes','messages','cases','activity','invoices','field-work','service-assignments','security-center']
 
 function AdminShell(){
   const{user,workspace}=useAuth();const caps=useCapabilities();const visible=new Set(STAFF_VISIBLE)
@@ -77,6 +76,11 @@ function AdminIndex(){
 }
 function CatchAll(){const p=useAppPath();return <Navigate to={p()} replace/>}
 
+function RedirectToMessages({ tab }: { tab?: string }) {
+  const p = useAppPath()
+  return <Navigate to={tab ? `${p('messages')}?tab=${tab}` : p('messages')} replace />
+}
+
 export default function AdminApp({basePath}:{basePath:string}){
   return <BasePathProvider base={basePath}><Routes>
     <Route path="login" element={<Login surface="staff"/>}/>
@@ -86,7 +90,7 @@ export default function AdminApp({basePath}:{basePath:string}){
     <Route path="vendor-signup" element={<VendorSignup/>}/>
     <Route path="invite/:token" element={<StaffInvite/>}/>
     <Route element={<ProtectedRoute allow={['staff','admin']}/>}><Route element={<AdminShell/>}>
-      <Route index element={<AdminIndex/>}/><Route path="pipelines" element={<PipelinesAdmin/>}/><Route path="clients" element={<ClientsList/>}/><Route path="clients/:id" element={<ClientDetailModern/>}/><Route path="clients/:id/:section" element={<ClientDetailModern/>}/><Route path="clients/:id/manage" element={<ClientDetail/>}/><Route path="inquiries" element={<CRMRecordsAdmin/>}/><Route path="leads/new" element={<LeadCreate/>}/><Route path="leads/:id" element={<LeadDetail/>}/><Route path="leads/:id/:section" element={<LeadDetail/>}/><Route path="messages" element={<MessagesAdmin/>}/><Route path="cases" element={<CasesAdmin/>}/><Route path="activity" element={<ActivityAdmin/>}/><Route path="service-assignments" element={<ServiceAssignmentsAdmin/>}/><Route path="field-work" element={<FieldWorkAdmin/>}/><Route path="field-work/mine" element={<FieldWorkList/>}/><Route path="field-work/:id" element={<FieldWorkDetail/>}/><Route path="invoices" element={<InvoicesAdmin/>}/><Route path="quotes" element={<QuotesAdmin/>}/><Route path="document-center" element={<DocumentOperationsDashboard/>}/><Route path="esign-platform" element={<ESignPlatformAdmin/>}/><Route path="community-documents" element={<CommunityDocuments/>}/><Route path="envelopes" element={<EnvelopeWorkspaceEnterprise/>}/><Route path="audit-log" element={<AuditLogAdmin/>}/><Route path="management" element={<ManagementCenter/>}/><Route path="reports" element={<ReportingCenter/>}/><Route path="communications" element={<CommunicationsHub/>}/><Route path="communications/email" element={<CommunicationsCRMAdmin/>}/><Route path="client-banners" element={<ClientBannersAdmin/>}/><Route path="automation-center" element={<AutomationCenter/>}/><Route path="public-funnel" element={<PublicFunnelAdmin/>}/><Route path="security-center" element={<SecurityCenter/>}/><Route path="network" element={<ProviderNetworkAdmin/>}/><Route path="network/:id/:section" element={<ProviderProfile/>}/><Route path="employees" element={<Navigate to="../network" replace/>}/><Route path="open-items/:type" element={<OpenItemsAdmin/>}/><Route path="open-items" element={<OpenItemsAdmin/>}/><Route path="invitations" element={<InvitationsAdmin/>}/><Route path="roles" element={<RolesPermissionsAdmin/>}/><Route path="users" element={<UsersAdmin/>}/><Route path="assignments" element={<AssignmentsAdmin/>}/><Route path="settings" element={<SettingsAdmin/>}/>
+      <Route index element={<AdminIndex/>}/><Route path="pipelines" element={<PipelinesAdmin/>}/><Route path="clients" element={<ClientsList/>}/><Route path="clients/:id" element={<ClientDetailModern/>}/><Route path="clients/:id/:section" element={<ClientDetailModern/>}/><Route path="clients/:id/manage" element={<ClientDetail/>}/><Route path="inquiries" element={<CRMRecordsAdmin/>}/><Route path="leads/new" element={<LeadCreate/>}/><Route path="leads/:id" element={<LeadDetail/>}/><Route path="leads/:id/:section" element={<LeadDetail/>}/><Route path="messages" element={<MessagesAdmin/>}/><Route path="cases" element={<CasesAdmin/>}/><Route path="activity" element={<ActivityAdmin/>}/><Route path="service-assignments" element={<ServiceAssignmentsAdmin/>}/><Route path="field-work" element={<FieldWorkAdmin/>}/><Route path="field-work/mine" element={<FieldWorkList/>}/><Route path="field-work/:id" element={<FieldWorkDetail/>}/><Route path="invoices" element={<InvoicesAdmin/>}/><Route path="quotes" element={<QuotesAdmin/>}/><Route path="document-center" element={<DocumentOperationsDashboard/>}/><Route path="esign-platform" element={<ESignPlatformAdmin/>}/><Route path="community-documents" element={<CommunityDocuments/>}/><Route path="envelopes" element={<EnvelopeWorkspaceEnterprise/>}/><Route path="audit-log" element={<AuditLogAdmin/>}/><Route path="management" element={<ManagementCenter/>}/><Route path="reports" element={<ReportingCenter/>}/><Route path="communications" element={<RedirectToMessages tab="email"/>}/><Route path="communications/email" element={<CommunicationsCRMAdmin/>}/><Route path="client-banners" element={<ClientBannersAdmin/>}/><Route path="automation-center" element={<AutomationCenter/>}/><Route path="public-funnel" element={<PublicFunnelAdmin/>}/><Route path="security-center" element={<SecurityCenter/>}/><Route path="network" element={<ProviderNetworkAdmin/>}/><Route path="network/:id/:section" element={<ProviderProfile/>}/><Route path="employees" element={<Navigate to="../network" replace/>}/><Route path="open-items/:type" element={<OpenItemsAdmin/>}/><Route path="open-items" element={<OpenItemsAdmin/>}/><Route path="invitations" element={<InvitationsAdmin/>}/><Route path="roles" element={<RolesPermissionsAdmin/>}/><Route path="users" element={<UsersAdmin/>}/><Route path="assignments" element={<AssignmentsAdmin/>}/><Route path="settings" element={<SettingsAdmin/>}/>
     </Route></Route><Route path="*" element={<CatchAll/>}/>
   </Routes></BasePathProvider>
 }

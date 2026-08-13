@@ -11,6 +11,8 @@ export interface AddressValue {
   state?: string
   postal_code?: string
   country?: string
+  lat?: number
+  lng?: number
 }
 
 interface Suggestion {
@@ -43,6 +45,8 @@ const MIN_QUERY_LENGTH = 4
 
 interface NominatimResult {
   display_name: string
+  lat?: string
+  lon?: string
   address?: {
     house_number?: string
     road?: string
@@ -68,6 +72,8 @@ function normalizeNominatim(result: NominatimResult): Suggestion {
     state: a.state || '',
     postal_code: a.postcode || '',
     country: a.country_code ? a.country_code.toUpperCase() : a.country || '',
+    lat: result.lat ? Number(result.lat) : undefined,
+    lng: result.lon ? Number(result.lon) : undefined,
   }
   return { display: result.display_name, address }
 }

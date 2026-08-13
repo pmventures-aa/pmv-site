@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search, Mail, MailOpen } from 'lucide-react'
+import { Search, Mail, MailOpen, Send } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
@@ -11,6 +11,9 @@ import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialo
 import { toast } from '../../components/kit/toast'
 import { timeAgo } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
+import { ConversationsPanel } from './ConversationsPanel'
+import { EmailThreadsPanel } from './EmailThreadsPanel'
+import { NotificationsTab, OverviewTab, ReportingTab } from './CommunicationsHub'
 
 interface ThreadRow {
   id: string
@@ -26,6 +29,15 @@ interface ClientOption {
   full_name: string | null
   email: string
 }
+
+type MessageTab = 'inbox' | 'email' | 'staff' | 'notifications' | 'pulse'
+const TABS: { id: MessageTab; label: string }[] = [
+  { id: 'inbox', label: 'Client inbox' },
+  { id: 'email', label: 'Email' },
+  { id: 'staff', label: 'Staff DMs' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'pulse', label: 'Pulse' },
+]
 
 function NewThreadDialog({ clients, initialClientId, onCreated }: { clients: ClientOption[]; initialClientId?: string | null; onCreated: (id: string) => void }) {
   const [open, setOpen] = useState(!!initialClientId)
@@ -61,15 +73,12 @@ function NewThreadDialog({ clients, initialClientId, onCreated }: { clients: Cli
   </Dialog>
 }
 
-export default function MessagesAdmin() {
-  const p = useAppPath()
-  const [searchParams, setSearchParams] = useSearchParams()
+function ClientInbox({ initialClientId, onClearClient }: { initialClientId?: string | null; onClearClient: () => void }) {
   const [threads, setThreads] = useState<ThreadRow[]>([])
   const [clients, setClients] = useState<ClientOption[]>([])
   const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const initialClientId = searchParams.get('client')
 
   const load = useCallback(async () => {
     try {
@@ -95,22 +104,71 @@ export default function MessagesAdmin() {
 
   function onCreated(id: string) {
     setActiveId(id)
-    if (initialClientId) setSearchParams((p) => { p.delete('client'); return p }, { replace: true })
+    onClearClient()
     void load()
   }
 
+  return <Panel className="grid h-[72vh] grid-cols-1 gap-0 overflow-hidden !p-0 md:grid-cols-[320px_1fr]">
+    <aside className="flex min-h-0 flex-col border-b border-white/10 md:border-b-0 md:border-r">
+      <div className="flex items-center gap-2 border-b border-white/10 p-2.5">
+        <div className="relative min-w-0 flex-1"><Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" /><input className={`${inputCls} !pl-8`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search conversations" /></div>
+        <NewThreadDialog clients={clients} initialClientId={initialClientId} onCreated={onCreated} />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {loading ? <p className="p-4 text-sm text-slate-400">Loading conversations…</p> : visibleThreads.length === 0 ? <div className="p-4"><EmptyState label={search ? 'No conversations match your search.' : 'No secure conversations yet.'} /></div> : <ul className="divide-y divide-white/5">{visibleThreads.map((t) => <li key={t.id}><button onClick={() => setActiveId(t.id)} className={`block w-full px-3 py-2.5 text-left transition ${activeId === t.id ? 'bg-gold/10 ring-1 ring-inset ring-gold/20' : 'hover:bg-white/5'}`}><div className="flex items-center gap-2"><span className="text-slate-500">{t.unread ? <Mail size={14} /> : <MailOpen size={14} />}</span><PresenceDot entry={presence[t.client_user_id]} size={7} /><p className={`min-w-0 flex-1 truncate text-sm font-medium ${t.unread ? 'text-white' : 'text-slate-300'}`}>{t.client_name || t.client_email}</p><span className="shrink-0 text-[10px] text-slate-500">{timeAgo(t.last_message_at)}</span></div><p className={`mt-1 truncate pl-[34px] text-xs ${t.unread ? 'text-slate-200' : 'text-slate-500'}`}>{t.subject}</p></button></li>)}</ul>}
+      </div>
+    </aside>
+    <section className="min-h-0 bg-navy-950/20">{activeId ? <ThreadView threadId={activeId} onSent={load} /> : <div className="grid h-full place-items-center p-6"><EmptyState label="Select a conversation or start a new secure message." /></div>}</section>
+  </Panel>
+}
+
+function PulseTab() {
+  const [overview, setOverview] = useState<{ unread_threads: number; active_threads_7d: number; aging_threads: number; campaigns_sent_7d: number; emails_sent_7d: number; avg_response_minutes: number | null; generated_at: string } | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    api.get<NonNullable<typeof overview>>('/admin/communications/overview')
+      .then(setOverview)
+      .catch((err) => { if (err instanceof ApiError) toast.error(err.message) })
+      .finally(() => setLoading(false))
+  }, [])
+  return <div className="space-y-5">
+    <OverviewTab overview={overview} loading={loading} />
+    <ReportingTab />
+  </div>
+}
+
+export default function MessagesAdmin() {
+  const p = useAppPath()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawTab = searchParams.get('tab')
+  const tab: MessageTab = TABS.some((item) => item.id === rawTab) ? rawTab as MessageTab : 'inbox'
+  const initialClientId = searchParams.get('client')
+
+  function setTab(next: MessageTab) {
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current)
+      if (next === 'inbox') params.delete('tab')
+      else params.set('tab', next)
+      return params
+    }, { replace: true })
+  }
+
   return <div className="mx-auto max-w-[1500px]">
-    <PageIntro kicker="Secure communications" title="Inbox" subtitle="Client conversations in a focused workspace. Email campaigns and staff threads live in Communications." action={<div className="flex flex-wrap gap-2"><Link to={p('communications')} className={btnOutline}>Email & campaigns</Link><NewThreadDialog clients={clients} initialClientId={initialClientId} onCreated={onCreated} /></div>} />
-    <Panel className="grid h-[72vh] grid-cols-1 gap-0 overflow-hidden !p-0 md:grid-cols-[340px_1fr]">
-      <aside className="flex min-h-0 flex-col border-b border-white/10 md:border-b-0 md:border-r">
-        <div className="border-b border-white/10 p-3">
-          <div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" /><input className={`${inputCls} !pl-9`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search conversations" /></div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {loading ? <p className="p-4 text-sm text-slate-400">Loading conversations…</p> : visibleThreads.length === 0 ? <div className="p-4"><EmptyState label={search ? 'No conversations match your search.' : 'No secure conversations yet.'} /></div> : <ul className="divide-y divide-white/5">{visibleThreads.map((t) => <li key={t.id}><button onClick={() => setActiveId(t.id)} className={`block w-full px-4 py-3.5 text-left transition ${activeId === t.id ? 'bg-gold/10 ring-1 ring-inset ring-gold/20' : 'hover:bg-white/5'}`}><div className="flex items-center gap-2"><span className="text-slate-500">{t.unread ? <Mail size={15} /> : <MailOpen size={15} />}</span><PresenceDot entry={presence[t.client_user_id]} size={7} /><p className={`min-w-0 flex-1 truncate text-sm font-medium ${t.unread ? 'text-white' : 'text-slate-300'}`}>{t.client_name || t.client_email}</p><span className="shrink-0 text-[10px] text-slate-500">{timeAgo(t.last_message_at)}</span></div><p className={`mt-1 truncate pl-[38px] text-xs ${t.unread ? 'text-slate-200' : 'text-slate-500'}`}>{t.subject}</p></button></li>)}</ul>}
-        </div>
-      </aside>
-      <section className="min-h-0 bg-navy-950/20">{activeId ? <ThreadView threadId={activeId} onSent={load} /> : <div className="grid h-full place-items-center p-6"><EmptyState label="Select a conversation or start a new secure message." /></div>}</section>
-    </Panel>
+    <PageIntro
+      kicker="Communications"
+      title="Messages"
+      subtitle="Client inbox, outbound email, staff DMs, and notification preferences in one workspace."
+      action={<Link to={p('communications/email')} className={btnOutline}><Send size={14} />Email Center</Link>}
+    />
+    <div className="mb-3 flex gap-1 overflow-x-auto border-b border-white/10">
+      {TABS.map((item) => (
+        <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`shrink-0 border-b-2 px-3 py-2 text-sm font-semibold transition ${tab === item.id ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{item.label}</button>
+      ))}
+    </div>
+    {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
+    {tab === 'email' && <EmailThreadsPanel />}
+    {tab === 'staff' && <ConversationsPanel />}
+    {tab === 'notifications' && <NotificationsTab />}
+    {tab === 'pulse' && <PulseTab />}
   </div>
 }

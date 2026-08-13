@@ -63,8 +63,8 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   }
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
-    `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-      isActive ? 'bg-white/[.08] text-white shadow-sm ring-1 ring-white/10' : 'text-slate-400 hover:bg-white/[.04] hover:text-white'
+    `group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition ${
+      isActive ? 'bg-white/[.08] text-white ring-1 ring-white/10' : 'text-slate-400 hover:bg-white/[.04] hover:text-white'
     }`
 
   function refreshPage() {
@@ -99,7 +99,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
                 )}
                 {!collapsed && group.items.map((item) => (
                   <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[.025] text-slate-400 transition group-hover:text-gold"><item.icon size={17} strokeWidth={1.8} /></span>
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/[.025] text-slate-400 transition group-hover:text-gold"><item.icon size={15} strokeWidth={1.8} /></span>
                     <span className="truncate">{item.label}</span>
                   </NavLink>
                 ))}
@@ -128,8 +128,8 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   return (
     <div className="min-h-screen bg-navy-950 lg:flex">
       <ImpersonationBanner />
-      <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/10 bg-navy-900/95 backdrop-blur transition-[width,padding] duration-200 lg:flex print:hidden ${sidebarOpen ? 'w-64 border-r p-4' : 'w-0 p-0'}`}>
-        <div className="flex h-full w-64 min-h-0 shrink-0 flex-col">{sidebarContent}</div>
+      <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/10 bg-navy-900/95 backdrop-blur transition-[width,padding] duration-200 lg:flex print:hidden ${sidebarOpen ? 'w-56 border-r p-3' : 'w-0 p-0'}`}>
+        <div className="flex h-full w-56 min-h-0 shrink-0 flex-col">{sidebarContent}</div>
       </aside>
 
       <header className="sticky top-0 z-30 border-b border-white/10 bg-navy-900/95 backdrop-blur lg:hidden print:hidden">
@@ -181,7 +181,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
           </div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
     </div>

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Download, FileText, Maximize2, Minus, Plus, RotateCw } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AlignCenter, AlignLeft, AlignRight, Bold, Download, FileText, Heading1, Heading2, Italic, List, ListOrdered, Maximize2, Minus, Plus, RotateCw, Underline } from 'lucide-react'
 import './documentCanvas.css'
 
 type CanvasDocument = {
@@ -95,12 +95,64 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false}:{docu
     </div>
     <div className="relative h-[calc(100vh-255px)] min-h-[600px] overflow-auto bg-[#2a3037] p-4 sm:p-7">
       {isPdf&&<div className="mx-auto h-full min-h-[560px] w-full overflow-hidden bg-white shadow-2xl" style={{maxWidth:`${Math.round(900*zoom/100)}px`}}><iframe key={reloadKey} title={document.title} src={`${url}#toolbar=0&navpanes=1&view=FitH`} className="h-full w-full bg-white"/></div>}
-      {document.document_type==='text'&&<div className="mx-auto min-h-[1056px] origin-top bg-white text-[#20252b] shadow-2xl" style={{width:'816px',transform:`scale(${zoom/100})`,marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}>{branded&&<PaperBrand/>}<div className={branded?'px-[9%] pb-[8%] pt-8':'px-[9%] py-[8%]'}><textarea readOnly={readOnly} value={text} onChange={e=>onTextChange(e.target.value)} className={`min-h-[820px] w-full resize-none bg-transparent font-serif text-[15px] leading-7 text-[#20252b] outline-none ${readOnly?'cursor-default':''}`} spellCheck={!readOnly}/></div>{branded&&<PaperFooter/>}</div>}
+      {document.document_type==='text'&&<div className="mx-auto min-h-[1056px] origin-top bg-white text-[#20252b] shadow-2xl" style={{width:'816px',transform:`scale(${zoom/100})`,marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}>{branded&&<PaperBrand/>}<div className={branded?'px-[9%] pb-[8%] pt-8':'px-[9%] py-[8%]'}><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</div>}
       {isImage&&<div className="mx-auto flex min-h-[500px] items-start justify-center"><img src={url} alt={document.title} style={{width:`${zoom}%`,maxWidth:'none'}} className="bg-white shadow-2xl"/></div>}
       {isDocx&&<div className="mx-auto origin-top bg-white text-[#20252b] shadow-2xl" style={{width:'816px',minHeight:'1056px',transform:`scale(${zoom/100})`,transformOrigin:'top center'}}>{branded&&<PaperBrand/>}<div className={branded?'px-[9%] pb-[8%] pt-8':'px-[9%] py-[8%]'}>{loading?<PreviewMessage text="Rendering DOCX…"/>:docxError?<PreviewMessage text={docxError}/>:docx?.map((b,i)=>b.type==='table'?<table key={i} className="my-5 w-full border-collapse text-sm"><tbody>{b.rows.map((row,r)=><tr key={r}>{row.map((cell,c)=><td key={c} className="border border-slate-300 p-2 align-top">{cell}</td>)}</tr>)}</tbody></table>:b.style?.toLowerCase().includes('heading')?<h2 key={i} className="mb-3 mt-6 font-serif text-xl font-semibold">{b.text}</h2>:<p key={i} className="mb-3 whitespace-pre-wrap font-serif text-[15px] leading-7">{b.text||' '}</p>)}</div>{branded&&<PaperFooter/>}</div>}
       {!isPdf&&!isImage&&!isDocx&&document.document_type!=='text'&&<div className="mx-auto grid min-h-[520px] max-w-2xl place-items-center bg-white p-10 text-center shadow-2xl"><div><FileText size={52} className="mx-auto text-slate-300"/><h3 className="mt-5 text-lg font-semibold text-slate-800">Preview unavailable for this file type</h3><p className="mt-2 text-sm leading-6 text-slate-500">The file remains stored securely in Document Hub. Open or download it to work with the original format.</p><a href={url} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Open document</a></div></div>}
     </div>
   </section>
+}
+
+function looksLikeHtml(value:string){
+  return /<[a-z][\s\S]*>/i.test(value)
+}
+
+function toEditorHtml(value:string){
+  if(!value) return ''
+  if(looksLikeHtml(value)) return value
+  return value
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/\n/g,'<br>')
+}
+
+function RichDocEditor({value,onChange,readOnly}:{value:string;onChange:(v:string)=>void;readOnly?:boolean}){
+  const ref=useRef<HTMLDivElement>(null)
+  useEffect(()=>{
+    const el=ref.current
+    if(!el) return
+    const html=toEditorHtml(value)
+    if(document.activeElement!==el && el.innerHTML!==html) el.innerHTML=html
+  },[value])
+  function run(command:string, arg?:string){
+    if(readOnly) return
+    document.execCommand(command,false,arg)
+    onChange(ref.current?.innerHTML||'')
+  }
+  return <div>
+    {!readOnly && <div className="doc-toolbar mb-3 flex flex-wrap gap-1 border-b border-slate-200 pb-2">
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('bold')} title="Bold"><Bold size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('italic')} title="Italic"><Italic size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('underline')} title="Underline"><Underline size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('formatBlock','H1')} title="Heading"><Heading1 size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('formatBlock','H2')} title="Subheading"><Heading2 size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('insertUnorderedList')} title="Bulleted list"><List size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('insertOrderedList')} title="Numbered list"><ListOrdered size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('justifyLeft')} title="Align left"><AlignLeft size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('justifyCenter')} title="Align center"><AlignCenter size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('justifyRight')} title="Align right"><AlignRight size={14}/></button>
+      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('undo')} title="Undo">Undo</button>
+    </div>}
+    <div
+      ref={ref}
+      contentEditable={!readOnly}
+      suppressContentEditableWarning
+      className={`doc-page min-h-[820px] w-full bg-transparent font-serif text-[15px] leading-7 text-[#20252b] outline-none ${readOnly?'cursor-default':''}`}
+      onInput={()=>onChange(ref.current?.innerHTML||'')}
+      spellCheck={!readOnly}
+    />
+  </div>
 }
 
 function PaperBrand(){return <header className="flex items-center justify-between border-b-2 border-[#c99a36] px-[9%] pb-4 pt-8"><div className="flex items-center gap-3"><img src="/logo-crest-transparent.png" alt="" className="h-12 w-12 object-contain"/><div><p className="font-serif text-[17px] font-bold tracking-wide text-[#0a1728]">Pinnacle Management Ventures</p><p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[.22em] text-[#9c7629]">Professional Services · South Florida</p></div></div><div className="text-right text-[9px] leading-4 text-slate-500"><p>pinnaclemanagementventures.com</p><p>Secure Document Hub</p></div></header>}
