@@ -12,7 +12,8 @@ export const INVITE_TTL_PRESETS = [
 
 /** Clamp a firm-wide invite link lifetime to 1 hour through 1 year. */
 export function parseInviteTtlHours(value: unknown, fallback = DEFAULT_INVITE_TTL_HOURS): number {
-  const n = typeof value === 'number' ? value : Number(String(value ?? '').trim())
+  if (value == null || String(value).trim() === '') return fallback
+  const n = typeof value === 'number' ? value : Number(String(value).trim())
   if (!Number.isFinite(n)) return fallback
   return Math.min(8760, Math.max(1, Math.round(n)))
 }
