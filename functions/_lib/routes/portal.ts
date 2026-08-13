@@ -234,10 +234,25 @@ portalRoutes.post('/messages', async (c) => {
 
 // ---------------- Calendar (appointments) ----------------
 portalRoutes.get('/calendar/feed', async (c) => {
-  const user = c.get('user')
-  const token = await signCalendarFeedToken(user.id, c.env.SESSION_SECRET)
-  const origin = new URL(c.req.url).origin
-  return c.json(calendarFeedUrls(origin, token))
+  // Wrapped so we surface a real diagnostic instead of the generic
+  // "internal error" from the global onError handler when SESSION_SECRET
+  // is missing or HMAC signing fails.
+  try {
+    const user = c.get('user')
+    const secret = String(c.env.SESSION_SECRET || '').trim()
+    if (!secret) {
+      return c.json({
+        error: 'Calendar subscription is not configured yet - the SESSION_SECRET environment variable is missing on the deployment.',
+      }, 503)
+    }
+    const token = await signCalendarFeedToken(user.id, secret)
+    const origin = new URL(c.req.url).origin
+    return c.json(calendarFeedUrls(origin, token))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Could not create a calendar link.'
+    console.error('[calendar-feed] token generation failed', err)
+    return c.json({ error: `Could not create a calendar link: ${message}` }, 500)
+  }
 })
 
 portalRoutes.get('/calendar', async (c) => c.json({ appointments: await listScoped(c, 'appointments', 'ORDER BY starts_at ASC') }))

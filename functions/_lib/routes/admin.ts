@@ -62,10 +62,19 @@ adminRoutes.get('/my-capabilities', requireStaff, async (c) => {
 })
 
 adminRoutes.get('/calendar/feed', requireStaff, async (c) => {
-  const user = c.get('user')
-  const token = await signCalendarFeedToken(user.id, c.env.SESSION_SECRET)
-  const origin = new URL(c.req.url).origin
-  return c.json(calendarFeedUrls(origin, token))
+  try {
+    const user = c.get('user')
+    const secret = String(c.env.SESSION_SECRET || '').trim()
+    if (!secret) {
+      return c.json({ error: 'Calendar subscription is not configured yet - SESSION_SECRET is missing on the deployment.' }, 503)
+    }
+    const token = await signCalendarFeedToken(user.id, secret)
+    const origin = new URL(c.req.url).origin
+    return c.json(calendarFeedUrls(origin, token))
+  } catch (err) {
+    console.error('[calendar-feed:admin] token generation failed', err)
+    return c.json({ error: `Could not create a calendar link: ${err instanceof Error ? err.message : 'unknown'}` }, 500)
+  }
 })
 
 // ---------------- staff + admin: cross-client views ----------------
