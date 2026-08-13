@@ -37,7 +37,8 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 | `PAYMENT_ENCRYPTION_KEY` | **Yes** | Secret | Encrypts ACH routing/account numbers at rest (`functions/_lib/crypto.ts`). Use a long random value, separate from `SESSION_SECRET`. The banking-info step of a service application 500s without it. |
 | `RESEND_API_KEY` | No | Secret | Enables real email delivery via Resend for notifications, Communications, account welcomes/invitations, vendor notices, and access reminders. Unset ordinary notification email no-ops; tracked account-email attempts are recorded as `skipped` in HQ instead of breaking account creation. |
 | `RESEND_FROM_EMAIL` | No | Var (`wrangler.toml` `[vars]`) | Verified sender identity. The code defaults to `Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>` if this is not set. |
-| `RESEND_WEBHOOK_SECRET` | No* | Secret | Verifies signed delivery callbacks at `POST /api/webhooks/resend`. Required once the production Resend webhook is enabled. |
+| `RESEND_WEBHOOK_SECRET` | No* | Secret | Verifies signed delivery and receiving callbacks at `POST /api/webhooks/resend`. Required once the production Resend webhook is enabled. |
+| `RESEND_INBOUND_DOMAIN` | No | Var (`wrangler.toml` `[vars]`) | Resend receiving domain. Defaults in wrangler to `ziloifaluk.resend.app`. Used only as Reply-To so replies can be received without changing pinnaclemanagementventures.com MX or the From address. |
 
 **Local dev:** copy `.dev.vars.example` to `.dev.vars` (gitignored) and fill in test values — `wrangler pages dev` reads it automatically.
 
@@ -74,11 +75,26 @@ PR #36 adds provider delivery tracking for account welcomes, invitations, vendor
    - `email.failed`
    - `email.complained`
    - `email.suppressed`
+   - `email.received` (inbound replies; webhook is metadata-only, HQ then fetches the body from `GET /emails/receiving/{id}`)
 3. Copy the webhook signing secret shown by Resend.
 4. Store it in Cloudflare Pages as a secret:
    `npx wrangler pages secret put RESEND_WEBHOOK_SECRET --project-name pmv-site`
 5. Redeploy if the Pages environment does not automatically pick up the new secret.
 6. Send a test account invitation from HQ → Users and confirm the Account email column advances from `sent` to `delivered` after the callback.
+
+## Resend receiving (threaded replies)
+
+HQ conversation mail still **sends from** the verified `pinnaclemanagementventures.com` address in `RESEND_FROM_EMAIL`. Do not point that domain's MX at Resend; Apple/iCloud continues to receive `orders@pinnaclemanagementventures.com`.
+
+Replies are captured on Resend's managed receiving domain (`anything@ziloifaluk.resend.app` unless `RESEND_INBOUND_DOMAIN` is overridden):
+
+1. In Resend → Emails → Receiving, confirm the receiving address (`ziloifaluk.resend.app` or the address shown for the team).
+2. On the same webhook as delivery events (`https://www.pinnaclemanagementventures.com/api/webhooks/resend`), enable `email.received`.
+3. HQ compose/reply sets `Reply-To` to `t-{threadId}@ziloifaluk.resend.app`. Recipients still see From as Pinnacle. When they hit Reply, Resend receives it, posts `email.received`, and HQ fetches HTML/text/headers from the Receiving API and attaches the message to that thread.
+4. Operational Email Center sends use `hq@ziloifaluk.resend.app` as Reply-To so those answers also land in HQ instead of a personal inbox.
+5. Invitations, invoices, quotes, and account mail keep Reply-To on `orders@` / `support@` so the human firm inbox is unchanged.
+
+The webhook body does **not** include the email body. That is Resend's current receiving design. HQ always follows `email.received` with `GET https://api.resend.com/emails/receiving/{email_id}`.
 
 ### Security behavior
 - The webhook reads and verifies the **raw request body** before JSON parsing.
