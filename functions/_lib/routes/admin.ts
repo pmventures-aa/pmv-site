@@ -6,7 +6,7 @@ import { scopeFilter, canAccessClient, ScopeError } from '../scope'
 import { visibleClientIds } from '../access'
 import { createActivationToken, revokeUserSessions } from '../session'
 import { activityInsert, logActivity } from '../activity'
-import { hasCapability, requireCapability } from '../capabilities'
+import { hasCapability, requireCapability, type NamedPermission } from '../capabilities'
 import { sendEmail, escapeHtml } from '../email'
 import { getService, getQuestions, prefillForQuestions, persistAnswers } from './serviceApplications'
 import { toDisplayCase } from '../../../shared/displayCase'
@@ -610,18 +610,11 @@ adminRoutes.patch('/inquiries/:id', requireStaff, async (c) => {
   return c.json({ ok: true })
 })
 
-const STAFF_ROLES = [
-  'representative',
-  'billing_specialist',
-  'funding_specialist',
-  'affiliate_paralegal',
-  'accountant',
-  'enrolled_agent',
-  'property_manager',
-  'support_specialist',
-  'auditor_readonly',
-  'pinnacle_admin',
-]
+function slugStaffRole(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const key = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80)
+  return key || null
+}
 
 // ---------------- users: admin, or staff granted can_manage_users ----------------
 // Role changes and capability grants stay strictly admin-only below (a
@@ -635,8 +628,10 @@ adminRoutes.get('/users', requireStaff, async (c) => {
     `SELECT u.id, u.email, u.role, u.full_name, u.first_name, u.last_name, u.status, u.created_at, u.last_login_at,
             tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
             tm.can_view_reports, tm.can_view_audit_log, tm.can_manage_communications, tm.is_owner,
-            tm.party_type, tm.vendor_category
-     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
+            tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name, rd.role_key role_code
+     FROM users u
+     LEFT JOIN team_members tm ON tm.user_id = u.id
+     LEFT JOIN role_definitions rd ON rd.id = tm.role_definition_id
      ORDER BY u.created_at DESC LIMIT 500`,
   ).all()
   return c.json({ users: res.results ?? [] })
@@ -649,8 +644,11 @@ adminRoutes.get('/users', requireStaff, async (c) => {
 // capabilities is itself a privilege-escalation-sensitive action.
 adminRoutes.patch('/users/:id/staff-profile', requireAdmin, async (c) => {
   const actor = c.get('user')
-  const id = c.req.param('id')
-  const target = await c.env.DB.prepare('SELECT role, full_name, email FROM users WHERE id = ?').bind(id).first<any>()
+  const id = c.req.param('id') || ''
+  const target = await c.env.DB.prepare(
+    `SELECT u.role, u.full_name, u.email, tm.id team_member_id
+     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE u.id = ?`,
+  ).bind(id).first<{ role: string; full_name: string | null; email: string; team_member_id: string | null }>()
   if (!target) return c.json({ error: 'not found' }, 404)
   if (target.role === 'client') return c.json({ error: 'only staff/admin accounts have a staff profile' }, 400)
 
@@ -667,25 +665,52 @@ adminRoutes.patch('/users/:id/staff-profile', requireAdmin, async (c) => {
     party_type?: string
     vendor_category?: string
     status?: string
+    account_role?: string
+    role_definition_id?: string | null
+    permission_overrides?: Record<string, boolean | null>
   }>().catch(() => ({}) as any)
-  const staffRole = STAFF_ROLES.includes(body.staff_role ?? '') ? body.staff_role : 'representative'
+
+  let staffRole = slugStaffRole(body.staff_role)
   const title = typeof body.title === 'string' ? body.title.trim().slice(0, 100) || null : null
-  // Owner is a superset of admin (see requireOwner in mid.ts) — only
-  // meaningful, and only settable, on an admin account.
-  const isOwner = body.is_owner && target.role === 'admin' ? 1 : 0
   const partyType = body.party_type === 'vendor' ? 'vendor' : 'employee'
   const vendorCategory = partyType === 'vendor' && typeof body.vendor_category === 'string'
     ? body.vendor_category.trim().slice(0, 100) || null
     : null
-  // Approving a pending vendor/employee signup, or suspending an existing
-  // account, happens through this same form — 'pending' isn't accepted
-  // here since login is already blocked for it and re-submitting it would
-  // be a no-op.
   const nextStatus = body.status === 'active' || body.status === 'suspended' ? body.status : null
+  const nextAccountRole = ['staff', 'admin'].includes(body.account_role ?? '') ? body.account_role : null
+  const isOwner = body.is_owner && (nextAccountRole === 'admin' || (!nextAccountRole && target.role === 'admin')) ? 1 : 0
 
-  const statements = [
-    c.env.DB.prepare(
-      `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, can_manage_communications, is_owner, party_type, vendor_category)
+  let roleDefinitionId: string | null | undefined
+  if (body.role_definition_id !== undefined) {
+    const requested = typeof body.role_definition_id === 'string' ? body.role_definition_id.trim() : ''
+    if (!requested) {
+      roleDefinitionId = null
+    } else {
+      const role = await c.env.DB.prepare(
+        'SELECT id, role_key, party_type, is_archived FROM role_definitions WHERE id = ?',
+      ).bind(requested).first<{ id: string; role_key: string; party_type: string; is_archived: number }>()
+      if (!role) return c.json({ error: 'role template not found' }, 404)
+      if (role.is_archived) return c.json({ error: 'that role is archived' }, 400)
+      if (role.party_type !== 'either' && role.party_type !== partyType) {
+        return c.json({ error: `this role is for ${role.party_type} accounts` }, 400)
+      }
+      roleDefinitionId = role.id
+      if (!staffRole) staffRole = role.role_key
+    }
+  }
+  if (!staffRole) staffRole = 'representative'
+
+  const overrides = body.permission_overrides && typeof body.permission_overrides === 'object'
+    ? body.permission_overrides
+    : null
+  const flag = (legacy: boolean | undefined, named: NamedPermission) => {
+    if (overrides && named in overrides) return overrides[named] === true ? 1 : 0
+    return legacy ? 1 : 0
+  }
+
+  const teamMemberId = target.team_member_id || uuid()
+  const profileSql = roleDefinitionId === undefined
+    ? `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, can_manage_communications, is_owner, party_type, vendor_category)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(user_id) DO UPDATE SET
          staff_role = excluded.staff_role, title = excluded.title,
@@ -697,31 +722,67 @@ adminRoutes.patch('/users/:id/staff-profile', requireAdmin, async (c) => {
          can_manage_communications = excluded.can_manage_communications,
          is_owner = excluded.is_owner,
          party_type = excluded.party_type,
-         vendor_category = excluded.vendor_category`,
-    ).bind(
-      uuid(),
-      id,
-      staffRole,
-      title,
-      body.can_reveal_payment_info ? 1 : 0,
-      body.can_manage_users ? 1 : 0,
-      body.can_manage_settings ? 1 : 0,
-      body.can_view_reports ? 1 : 0,
-      body.can_view_audit_log ? 1 : 0,
-      body.can_manage_communications ? 1 : 0,
-      isOwner,
-      partyType,
-      vendorCategory,
-    ),
+         vendor_category = excluded.vendor_category`
+    : `INSERT INTO team_members (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings, can_view_reports, can_view_audit_log, can_manage_communications, is_owner, party_type, vendor_category, role_definition_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         staff_role = excluded.staff_role, title = excluded.title,
+         can_reveal_payment_info = excluded.can_reveal_payment_info,
+         can_manage_users = excluded.can_manage_users,
+         can_manage_settings = excluded.can_manage_settings,
+         can_view_reports = excluded.can_view_reports,
+         can_view_audit_log = excluded.can_view_audit_log,
+         can_manage_communications = excluded.can_manage_communications,
+         is_owner = excluded.is_owner,
+         party_type = excluded.party_type,
+         vendor_category = excluded.vendor_category,
+         role_definition_id = excluded.role_definition_id`
+  const profileBinds = [
+    teamMemberId, id, staffRole, title,
+    flag(body.can_reveal_payment_info, 'reveal_payment_info'),
+    flag(body.can_manage_users, 'manage_users'),
+    flag(body.can_manage_settings, 'manage_settings'),
+    flag(body.can_view_reports, 'view_reports'),
+    flag(body.can_view_audit_log, 'view_audit_log'),
+    flag(body.can_manage_communications, 'manage_communications'),
+    isOwner, partyType, vendorCategory,
   ]
+  if (roleDefinitionId !== undefined) profileBinds.push(roleDefinitionId)
+
+  const statements = [c.env.DB.prepare(profileSql).bind(...profileBinds)]
   if (nextStatus) statements.push(c.env.DB.prepare('UPDATE users SET status = ? WHERE id = ?').bind(nextStatus, id))
+  if (nextAccountRole && nextAccountRole !== target.role) {
+    statements.push(c.env.DB.prepare('UPDATE users SET role = ? WHERE id = ?').bind(nextAccountRole, id))
+  }
+
+  if (overrides) {
+    const catalog = await c.env.DB.prepare('SELECT permission_key FROM permission_catalog').all<{ permission_key: string }>()
+    const allowedKeys = new Set((catalog.results || []).map((row) => row.permission_key))
+    statements.push(c.env.DB.prepare('DELETE FROM team_member_permission_overrides WHERE team_member_id = ?').bind(teamMemberId))
+    for (const [key, value] of Object.entries(overrides)) {
+      if (!allowedKeys.has(key) || value === null || value === undefined) continue
+      statements.push(c.env.DB.prepare(
+        `INSERT INTO team_member_permission_overrides(team_member_id, permission_key, granted, updated_at)
+         VALUES(?,?,?,datetime('now'))`,
+      ).bind(teamMemberId, key, value ? 1 : 0))
+    }
+  }
+
   await c.env.DB.batch(statements)
+  if (nextAccountRole && nextAccountRole !== target.role) await revokeUserSessions(c.env, id)
 
   await logActivity(c.env, {
     actorUserId: actor.id,
     clientUserId: null,
     kind: 'staff_profile_updated',
-    detail: { name: target.full_name || target.email, staff_role: staffRole, party_type: partyType, status: nextStatus ?? undefined },
+    detail: {
+      name: target.full_name || target.email,
+      staff_role: staffRole,
+      party_type: partyType,
+      status: nextStatus ?? undefined,
+      account_role: nextAccountRole ?? undefined,
+      role_definition_id: roleDefinitionId ?? undefined,
+    },
   })
   return c.json({ ok: true })
 })
