@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CheckCheck, ChevronLeft, MailPlus, PenLine, RefreshCw, Reply, Send, XCircle } from 'lucide-react'
+import { CheckCheck, ChevronLeft, MailPlus, MoreVertical, PenLine, RefreshCw, Reply, Send, XCircle } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Tag, btnPrimary, btnSecondary } from '../../components/admin/ui'
@@ -230,59 +230,171 @@ function EmailThreadDetail({
   onCompose: () => void
   onSignatures: () => void
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [expandedHeaders, setExpandedHeaders] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function onDown(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [menuOpen])
+
   if (!detail) return <div className="grid h-full place-items-center p-8 text-sm text-slate-500">Select a conversation or start a new email.</div>
 
+  const lastActivity = timeAgoShort(detail.thread.last_activity_at)
+  const lastOutboundId = [...detail.messages].reverse().find((m) => m.direction === 'outbound')?.id
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
-        <div className="flex min-w-0 items-start gap-2">
-          <button type="button" onClick={onBack} className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold md:hidden" aria-label="Back to inbox">
-            <ChevronLeft size={16}/>
-          </button>
-          <div className="min-w-0">
-            <p className="font-display text-lg font-semibold tracking-[-.02em] text-white sm:text-xl">{detail.thread.subject}</p>
-            <p className="mt-1 text-xs text-slate-500">{detail.messages.length} messages · Last activity {new Date(detail.thread.last_activity_at).toLocaleString()}</p>
-          </div>
+    <div className="relative flex h-full min-h-0 flex-col">
+      {/* Sticky compact header */}
+      <div className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-white/10 bg-navy-950/85 px-3 py-2.5 backdrop-blur md:static md:bg-transparent md:px-4 md:py-3">
+        <button type="button" onClick={onBack} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold md:hidden" aria-label="Back to inbox">
+          <ChevronLeft size={18}/>
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-base font-semibold leading-tight tracking-[-.02em] text-white sm:text-xl">{detail.thread.subject}</p>
+          <p className="mt-0.5 truncate text-[11px] text-slate-500">{detail.messages.length} {detail.messages.length === 1 ? 'message' : 'messages'} · {lastActivity}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        {/* Desktop primary actions */}
+        <div className="hidden flex-wrap gap-2 md:flex">
           <button type="button" className={btnPrimary} onClick={onReply}><Reply size={14}/>Reply</button>
           <button type="button" className={btnSecondary} onClick={onCompose}><MailPlus size={14}/>New Email</button>
           <button type="button" className={btnSecondary} onClick={onSignatures}><PenLine size={14}/>Signatures</button>
         </div>
+
+        {/* Mobile overflow menu */}
+        <div ref={menuRef} className="relative md:hidden">
+          <button type="button" onClick={() => setMenuOpen((v) => !v)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold" aria-label="More actions" aria-haspopup="menu" aria-expanded={menuOpen}>
+            <MoreVertical size={18}/>
+          </button>
+          {menuOpen && (
+            <div role="menu" className="absolute right-0 top-11 z-20 w-52 overflow-hidden rounded-xl border border-white/12 bg-navy-900 shadow-2xl">
+              <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onCompose() }} className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-sm text-slate-200 hover:bg-white/5">
+                <MailPlus size={15}/>New email
+              </button>
+              <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onSignatures() }} className="flex w-full items-center gap-2.5 border-t border-white/[.06] px-3.5 py-3 text-left text-sm text-slate-200 hover:bg-white/5">
+                <PenLine size={15}/>Signatures
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+      {/* Messages */}
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pb-24 md:space-y-4 md:p-4 md:pb-4">
         {detail.messages.map((m) => {
           const to = safeArray<{ email: string; name?: string }>(m.to_json)
           const isOut = m.direction === 'outbound'
+          const isLastOut = m.id === lastOutboundId
+          const showFailure = m.bounced_at || m.error || m.provider_status === 'failed' || m.provider_status === 'bounced'
+          const senderLabel = m.from_name || nameFromEmail(m.from_email)
+          const toLabel = summarizeRecipients(to)
+          const isExpanded = !!expandedHeaders[m.id]
+          const attachments = detail.attachments.filter((a) => a.email_message_id === m.id)
           return (
-            <article key={m.id} className={`rounded-lg border p-4 ${isOut ? 'border-white/10 bg-white/[.02]' : 'border-sky-400/25 bg-sky-400/[.05]'}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`grid h-5 w-5 place-items-center rounded ${isOut ? 'bg-gold/15 text-gold' : 'bg-sky-400/15 text-sky-300'}`}>{isOut ? <Send size={11}/> : <Reply size={11}/>}</span>
-                    <span className="text-xs font-bold text-white">{m.from_name || m.from_email}</span>
-                    <span className="truncate text-[10px] text-slate-500">to {to.map((a) => a.name || a.email).join(', ')}</span>
+            <article key={m.id} className={`overflow-hidden rounded-2xl border ${isOut ? 'border-gold/25 bg-gold/[.04]' : 'border-sky-400/25 bg-sky-400/[.05]'} md:rounded-lg`}>
+              <button
+                type="button"
+                onClick={() => setExpandedHeaders((prev) => ({ ...prev, [m.id]: !prev[m.id] }))}
+                className="flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left md:cursor-default md:px-4 md:py-3"
+                aria-expanded={isExpanded}
+                aria-label={isExpanded ? 'Hide message details' : 'Show message details'}
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${isOut ? 'bg-gold/20 text-gold' : 'bg-sky-400/20 text-sky-300'}`}>
+                    {isOut ? <Send size={11}/> : <Reply size={11}/>}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="truncate text-[13px] font-bold text-white">{senderLabel}</span>
+                      <span className="shrink-0 text-[10px] text-slate-500">{timeAgoShort(m.created_at)}</span>
+                    </div>
+                    <p className="truncate text-[11px] text-slate-500">to {toLabel}</p>
                   </div>
-                  <p className="mt-1 text-[10px] text-slate-500">{new Date(m.created_at).toLocaleString()}</p>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <StatusPill status={m.provider_status}/>
-                  {m.opened_at && <span title={`Opened ${new Date(m.opened_at).toLocaleString()}`} className="text-emerald-300"><CheckCheck size={13}/></span>}
-                  {m.bounced_at && <span title={`Bounced ${new Date(m.bounced_at).toLocaleString()}`} className="text-rose-400"><XCircle size={13}/></span>}
+                <div className="flex shrink-0 items-center gap-1">
+                  {isOut && m.opened_at && !showFailure && (
+                    <span title={`Opened ${new Date(m.opened_at).toLocaleString()}`} className="text-emerald-300"><CheckCheck size={14}/></span>
+                  )}
+                  {isOut && !m.opened_at && !showFailure && isLastOut && m.provider_status === 'delivered' && (
+                    <span title="Delivered" className="text-slate-500"><CheckCheck size={14}/></span>
+                  )}
+                  {showFailure && (
+                    <span title="Delivery failed" className="text-rose-400"><XCircle size={14}/></span>
+                  )}
+                  {showFailure && <StatusPill status={m.provider_status}/>}
                 </div>
-              </div>
-              {m.error && <div className="mt-2 rounded border border-red-400/25 bg-red-400/[.05] p-2 text-[11px] text-red-200">Delivery error: {m.error}</div>}
-              <div className="signature-preview prose prose-sm mt-3 max-w-none rounded-md bg-white p-5 font-serif text-[15px] leading-7 text-[#1b2430]" dangerouslySetInnerHTML={{ __html: previewSignatureHtml(m.body_html || '') || (m.body_text ? `<pre class="whitespace-pre-wrap font-serif">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
-              {detail.attachments.filter((a) => a.email_message_id === m.id).map((a) => (
-                <p key={a.id} className="mt-2 text-[11px] text-slate-500">Attachment: {a.file_name}</p>
-              ))}
+              </button>
+
+              {isExpanded && (
+                <div className="border-t border-white/10 bg-white/[.02] px-3 py-2 text-[11px] leading-5 text-slate-400 md:px-4">
+                  <p><span className="text-slate-500">From </span>{m.from_name ? `${m.from_name} <${m.from_email}>` : m.from_email}</p>
+                  <p className="mt-1"><span className="text-slate-500">To </span>{to.map((a) => a.name ? `${a.name} <${a.email}>` : a.email).join(', ') || '(no recipients)'}</p>
+                  <p className="mt-1"><span className="text-slate-500">Sent </span>{new Date(m.created_at).toLocaleString()}</p>
+                  {m.provider_status && <p className="mt-1"><span className="text-slate-500">Status </span>{m.provider_status}</p>}
+                </div>
+              )}
+
+              {m.error && <div className="mx-3 mb-2 mt-2 rounded-lg border border-red-400/25 bg-red-400/[.06] p-2.5 text-[11px] text-red-200 md:mx-4">Delivery error: {m.error}</div>}
+
+              <div className="signature-preview prose prose-sm mx-3 mb-3 mt-1 max-w-none rounded-lg bg-white p-4 font-serif text-[15px] leading-7 text-[#1b2430] md:mx-4 md:mb-4 md:p-5" dangerouslySetInnerHTML={{ __html: previewSignatureHtml(m.body_html || '') || (m.body_text ? `<pre class="whitespace-pre-wrap font-serif">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
+
+              {attachments.length > 0 && (
+                <div className="border-t border-white/10 px-3 py-2 md:px-4">
+                  {attachments.map((a) => (
+                    <p key={a.id} className="text-[11px] text-slate-400">📎 {a.file_name}</p>
+                  ))}
+                </div>
+              )}
             </article>
           )
         })}
       </div>
+
+      {/* Sticky bottom primary CTA on mobile */}
+      <div className="pointer-events-none sticky bottom-0 z-10 shrink-0 md:hidden">
+        <div className="pointer-events-auto border-t border-white/10 bg-navy-950/90 px-3 py-2.5 backdrop-blur">
+          <button
+            type="button"
+            onClick={onReply}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gold px-4 py-3 text-sm font-bold text-navy-950 shadow-lg shadow-gold/20 hover:bg-gold-300"
+          >
+            <Reply size={16}/>Reply
+          </button>
+        </div>
+      </div>
     </div>
   )
+}
+
+function nameFromEmail(email: string): string {
+  const at = email.indexOf('@')
+  if (at <= 0) return email
+  return email.slice(0, at)
+}
+
+function summarizeRecipients(to: Array<{ email: string; name?: string }>): string {
+  if (to.length === 0) return '(no recipients)'
+  const first = to[0].name || nameFromEmail(to[0].email)
+  if (to.length === 1) return first
+  return `${first} +${to.length - 1} others`
+}
+
+function timeAgoShort(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (!then) return ''
+  const diff = Date.now() - then
+  if (diff < 60_000) return 'just now'
+  const min = Math.round(diff / 60_000)
+  if (min < 60) return `${min}m ago`
+  const h = Math.round(min / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.round(h / 24)
+  if (d < 7) return `${d}d ago`
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 function splitAddresses(value: string): string[] {
