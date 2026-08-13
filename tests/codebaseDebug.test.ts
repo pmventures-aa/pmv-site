@@ -45,4 +45,12 @@ describe('debug regressions', () => {
       expect((err as ApiError).message).toBe('forbidden')
     }
   })
+
+  it('runs scheduled reports on the same Pages host as the other automations', () => {
+    const reports = readFileSync(new URL('../.github/workflows/scheduled-report-delivery.yml', import.meta.url), 'utf8')
+    const smoke = readFileSync(new URL('../.github/workflows/automation-auth-smoke.yml', import.meta.url), 'utf8')
+    expect(reports).toContain('https://pmv-site.pages.dev/api/automation/reports/run')
+    expect(reports).not.toContain('www.pinnaclemanagementventures.com/api/automation/reports/run')
+    expect(smoke).toContain('/api/automation/reports/run')
+  })
 })
