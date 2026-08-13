@@ -1,5 +1,11 @@
-import { Crest } from '../../components/ui'
-import { FIRM_NAME, FIRM_PHONE, FIRM_REGION, FIRM_SITE_HOST, FIRM_TAGLINE } from '../../../shared/letterhead'
+import { LetterheadCrest } from '../../components/admin/LetterheadCrest'
+import {
+  FIRM_NAME,
+  FIRM_PHONE,
+  FIRM_REGION,
+  FIRM_SITE_HOST,
+  FIRM_TAGLINE,
+} from '../../../shared/letterhead'
 import { previewSignatureHtml, type EmailSignature } from '../../lib/emailSignatures'
 
 const PHONE = FIRM_PHONE
@@ -27,7 +33,7 @@ export function SignatureLetterhead({
   return (
     <div className="max-w-[580px] text-[#0a1728]">
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-5">
-        <Crest size={76} tone="dark" decorative />
+        <LetterheadCrest />
         <div className="min-w-0">
           <p className="font-serif text-[18px] font-semibold leading-[22px] tracking-[.04em]">{FIRM_NAME}</p>
           <p className="mt-1.5 text-[10px] uppercase tracking-[.16em] text-[#5b6573]">{FIRM_TAGLINE}</p>
