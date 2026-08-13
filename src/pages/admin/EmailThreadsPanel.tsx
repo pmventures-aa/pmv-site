@@ -332,7 +332,7 @@ function EmailThreadDetail({
               {isExpanded && (
                 <div className="border-t border-white/10 bg-white/[.02] px-3 py-2 text-[11px] leading-5 text-slate-400 md:px-4">
                   <p><span className="text-slate-500">From </span>{m.from_name ? `${m.from_name} <${m.from_email}>` : m.from_email}</p>
-                  <p className="mt-1"><span className="text-slate-500">To </span>{to.map((a) => a.name ? `${a.name} <${a.email}>` : a.email).join(', ') || '—'}</p>
+                  <p className="mt-1"><span className="text-slate-500">To </span>{to.map((a) => a.name ? `${a.name} <${a.email}>` : a.email).join(', ') || '(no recipients)'}</p>
                   <p className="mt-1"><span className="text-slate-500">Sent </span>{new Date(m.created_at).toLocaleString()}</p>
                   {m.provider_status && <p className="mt-1"><span className="text-slate-500">Status </span>{m.provider_status}</p>}
                 </div>
@@ -377,7 +377,7 @@ function nameFromEmail(email: string): string {
 }
 
 function summarizeRecipients(to: Array<{ email: string; name?: string }>): string {
-  if (to.length === 0) return '—'
+  if (to.length === 0) return '(no recipients)'
   const first = to[0].name || nameFromEmail(to[0].email)
   if (to.length === 1) return first
   return `${first} +${to.length - 1} others`
