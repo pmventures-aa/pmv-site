@@ -219,9 +219,10 @@ function ContactFields({ value, onChange }: { value: ContactBlock; onChange: (ne
 export default function InvoicesAdmin() {
   const [params] = useSearchParams()
   const requestedClient = params.get('client') || ''
+  const requestedQuery = params.get('q') || ''
   const [clients, setClients] = useState<ClientOption[]>([])
   const [rows, setRows] = useState<InvoiceRow[]>([])
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(requestedQuery)
   const [status, setStatus] = useState('')
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -270,6 +271,7 @@ export default function InvoicesAdmin() {
 
   useEffect(() => { void load() }, [load])
   useLiveRefresh(load)
+  useEffect(() => { setSearch(requestedQuery) }, [requestedQuery])
   useEffect(() => {
     if (requestedClient) {
       setClientId(requestedClient)

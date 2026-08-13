@@ -3,16 +3,11 @@
 // outside the Pages Functions runtime, so this mirrors the same CRM audience
 // and suppression rules used by functions/_lib/routes/comms.ts.
 
+import { pathToFileURL } from 'node:url'
+
 const { CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_DATABASE_ID, RESEND_API_KEY, RESEND_FROM_EMAIL } = process.env
 
-for (const [name, value] of Object.entries({ CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_DATABASE_ID, RESEND_API_KEY, RESEND_FROM_EMAIL })) {
-  if (!value) {
-    console.error(`missing required env var: ${name}`)
-    process.exit(1)
-  }
-}
-
-async function d1(sql, params = []) {
+async function d1Query(sql, params = []) {
   const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database/${CLOUDFLARE_D1_DATABASE_ID}/query`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`, 'Content-Type': 'application/json' },
@@ -20,7 +15,11 @@ async function d1(sql, params = []) {
   })
   const json = await res.json()
   if (!json.success) throw new Error(`D1 query failed: ${JSON.stringify(json.errors)}`)
-  return json.result?.[0]?.results ?? []
+  return json.result?.[0] ?? { results: [], meta: {} }
+}
+
+async function d1(sql, params = []) {
+  return (await d1Query(sql, params)).results ?? []
 }
 
 function uuid() { return crypto.randomUUID() }
@@ -170,20 +169,48 @@ async function sendViaResend(to, subject, html) {
   return json.id
 }
 
-function nextOccurrence(fromIso, recurrence) {
+export function nextOccurrence(fromIso, recurrence) {
   const d = new Date(fromIso)
+  if (Number.isNaN(d.getTime())) throw new Error(`invalid next_run_at: ${fromIso}`)
   if (recurrence === 'daily') d.setUTCDate(d.getUTCDate() + 1)
   else if (recurrence === 'weekly') d.setUTCDate(d.getUTCDate() + 7)
-  else if (recurrence === 'monthly') d.setUTCMonth(d.getUTCMonth() + 1)
+  else if (recurrence === 'monthly') {
+    // Clamp to the destination month's last day so Jan 31 → Feb 28/29,
+    // not March (JS Date month overflow).
+    const day = d.getUTCDate()
+    d.setUTCDate(1)
+    d.setUTCMonth(d.getUTCMonth() + 1)
+    const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+    d.setUTCDate(Math.min(day, lastDay))
+  }
   return d.toISOString()
 }
 
 async function main() {
-  const due = await d1("SELECT * FROM comms_messages WHERE status = 'queued' AND next_run_at IS NOT NULL AND next_run_at <= datetime('now')")
+  for (const [name, value] of Object.entries({ CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_DATABASE_ID, RESEND_API_KEY, RESEND_FROM_EMAIL })) {
+    if (!value) {
+      console.error(`missing required env var: ${name}`)
+      process.exit(1)
+    }
+  }
+
+  // datetime() normalizes ISO (`…T…Z`) and SQLite (`… …`) timestamps so
+  // lexicographic `T` vs space never delays a due send by a full day.
+  const due = await d1("SELECT * FROM comms_messages WHERE status = 'queued' AND next_run_at IS NOT NULL AND datetime(next_run_at) <= datetime('now')")
   if (!due.length) { console.log('no due comms messages'); return }
   console.log(`${due.length} due message(s)`)
 
   for (const message of due) {
+    // Atomically claim the row so overlapping cron/manual runs cannot double-send.
+    const claim = await d1Query(
+      "UPDATE comms_messages SET status = 'sending', updated_at = datetime('now') WHERE id = ? AND status = 'queued'",
+      [message.id],
+    )
+    if (!(claim.meta?.changes > 0)) {
+      console.log(`message ${message.id} already claimed — skipping`)
+      continue
+    }
+
     const audience = JSON.parse(message.audience_json || '{}')
     const type = messageType(message.message_type)
     let compliance = null
@@ -198,6 +225,8 @@ async function main() {
     const recipients = await resolveAudience(audience, type)
     console.log(`message ${message.id} (${message.subject}) — ${recipients.length} eligible recipient(s)`)
 
+    let sentCount = 0
+    let failedCount = 0
     for (const recipient of recipients) {
       const recipientId = uuid()
       await d1(
@@ -208,6 +237,7 @@ async function main() {
         const deliveryHtml = compliance ? await marketingHtml(message.body_html, recipient.email, compliance) : message.body_html
         const providerMessageId = await sendViaResend(recipient.email, message.subject, deliveryHtml)
         await d1("UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE id = ?", [providerMessageId, recipientId])
+        sentCount += 1
         if (recipient.recipient_kind === 'lead' && recipient.inquiry_id) {
           await d1('INSERT INTO email_log (id, inquiry_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)', [uuid(), recipient.inquiry_id, message.created_by_user_id, recipient.email, message.subject, deliveryHtml])
           await d1("UPDATE contact_inquiries SET last_contacted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", [recipient.inquiry_id])
@@ -217,18 +247,30 @@ async function main() {
       } catch (err) {
         console.error(`send failed for ${recipient.email}:`, err.message)
         await d1("UPDATE comms_recipients SET status = 'failed', error = ? WHERE id = ?", [String(err.message).slice(0, 500), recipientId])
+        failedCount += 1
       }
     }
 
     if (message.recurrence) {
       const next = nextOccurrence(message.next_run_at, message.recurrence)
-      await d1("UPDATE comms_messages SET next_run_at = ?, last_sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", [next, message.id])
-      console.log(`  recurring (${message.recurrence}) — next run ${next}`)
+      // Recurring campaigns stay queued for the next occurrence; only bump last_sent when something went out.
+      if (sentCount > 0) {
+        await d1("UPDATE comms_messages SET status = 'queued', next_run_at = ?, last_sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", [next, message.id])
+      } else {
+        await d1("UPDATE comms_messages SET status = 'queued', next_run_at = ?, updated_at = datetime('now') WHERE id = ?", [next, message.id])
+      }
+      console.log(`  recurring (${message.recurrence}) — sent ${sentCount}, failed ${failedCount}; next run ${next}`)
     } else {
-      await d1("UPDATE comms_messages SET status = 'sent', sent_at = datetime('now'), last_sent_at = datetime('now'), next_run_at = NULL, updated_at = datetime('now') WHERE id = ?", [message.id])
-      console.log('  one-time — marked sent')
+      const status = sentCount === 0 ? 'failed' : 'sent'
+      await d1(
+        "UPDATE comms_messages SET status = ?, sent_at = CASE WHEN ? = 'sent' THEN datetime('now') ELSE sent_at END, last_sent_at = CASE WHEN ? = 'sent' THEN datetime('now') ELSE last_sent_at END, next_run_at = NULL, updated_at = datetime('now') WHERE id = ?",
+        [status, status, status, message.id],
+      )
+      console.log(`  one-time — marked ${status} (sent ${sentCount}, failed ${failedCount})`)
     }
   }
 }
 
-main().catch((err) => { console.error(err); process.exit(1) })
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => { console.error(err); process.exit(1) })
+}

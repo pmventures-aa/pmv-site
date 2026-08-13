@@ -27,11 +27,11 @@ async function resolveAssignee(env: Env, user: SessionUser, assigneeId?: string)
   return assigneeId
 }
 
-async function listScoped(c: any, table: string, extra = '') {
+async function listScoped(c: any, table: string, extra = '', orderBy = 'created_at DESC') {
   const user = c.get('user')
   const { where, params } = await scopeFilter(c.env, user)
   const res = await c.env.DB.prepare(
-    `SELECT * FROM ${table} WHERE ${where} ${extra} ORDER BY created_at DESC LIMIT 200`,
+    `SELECT * FROM ${table} WHERE ${where} ${extra} ORDER BY ${orderBy} LIMIT 200`,
   ).bind(...params).all()
   return res.results ?? []
 }
@@ -255,7 +255,7 @@ portalRoutes.get('/calendar/feed', async (c) => {
   }
 })
 
-portalRoutes.get('/calendar', async (c) => c.json({ appointments: await listScoped(c, 'appointments', 'ORDER BY starts_at ASC') }))
+portalRoutes.get('/calendar', async (c) => c.json({ appointments: await listScoped(c, 'appointments', '', 'starts_at ASC') }))
 
 portalRoutes.post('/calendar', async (c) => {
   const user = c.get('user')

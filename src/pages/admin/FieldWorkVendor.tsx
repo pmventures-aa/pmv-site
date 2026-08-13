@@ -111,6 +111,7 @@ async function getPosition(): Promise<GeolocationPosition | null> {
 // -------------------------------------------------------------
 
 export function FieldWorkList() {
+  const navigate = useNavigate()
   const p = useAppPath()
   const { user, workspace } = useAuth()
   const copy = hqWorkspaceCopy(workspace.party_type, workspace.vendor_category, workspace.role_name)
@@ -167,8 +168,7 @@ export function FieldWorkList() {
               <button
                 key={assignment.id}
                 type="button"
-                onClick={() => p(`field-work/${assignment.id}`)}
-                onMouseUp={(e) => { e.preventDefault(); window.location.href = p(`field-work/${assignment.id}`) }}
+                onClick={() => navigate(p(`field-work/${assignment.id}`))}
                 className="w-full rounded-md border border-white/10 bg-white/[.02] p-4 text-left transition hover:border-gold/40 hover:bg-white/[.04]"
               >
                 <div className="flex items-start justify-between gap-3">

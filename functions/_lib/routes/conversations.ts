@@ -209,6 +209,9 @@ conversationRoutes.get('/conversations/:id', async (c) => {
 // Body: { kind, subject, participant_user_ids[], scope_client_user_id?, initial_body? }
 conversationRoutes.post('/conversations', async (c) => {
   const user = c.get('user')
+  // Mounted under both /admin and /portal; creation is staff-only even though
+  // clients may read conversations they participate in.
+  if (!isStaffLike(user.role)) return c.json({ error: 'forbidden' }, 403)
   const body = await c.req.json<any>().catch(() => null)
   if (!body) return c.json({ error: 'invalid body' }, 400)
   const kind = clean(body.kind, 20) || 'dm'

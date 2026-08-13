@@ -37,13 +37,15 @@ export function nextScheduledReportRun(kind: string | null, timeValue: string | 
   const localTarget = new Date(`${values.year}-${values.month}-${values.day}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`)
 
   if (kind === 'weekly') {
-    const desired = Math.min(Math.max(Number(dayValue) || 1, 0), 6)
+    const parsedDay = Number(dayValue)
+    const desired = Math.min(Math.max(Number.isFinite(parsedDay) ? parsedDay : 1, 0), 6)
     const current = localNow.getDay()
     let add = (desired - current + 7) % 7
     if (add === 0 && localTarget <= localNow) add = 7
     localTarget.setDate(localTarget.getDate() + add)
   } else if (kind === 'monthly') {
-    const desired = Math.min(Math.max(Number(dayValue) || 1, 1), 28)
+    const parsedDay = Number(dayValue)
+    const desired = Math.min(Math.max(Number.isFinite(parsedDay) ? parsedDay : 1, 1), 28)
     localTarget.setDate(desired)
     if (localTarget <= localNow) {
       localTarget.setMonth(localTarget.getMonth() + 1)

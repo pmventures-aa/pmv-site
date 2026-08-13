@@ -16,7 +16,12 @@ scheduledReportRoutes.patch('/report-templates/:id/schedule', requireStaff, requ
   const body=await c.req.json<ScheduleBody>().catch(()=>({} as ScheduleBody))
   const kind=['daily','weekly','monthly'].includes(String(body.schedule_kind))?String(body.schedule_kind):null
   const time=typeof body.schedule_time==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(body.schedule_time)?body.schedule_time:'08:00'
-  const day=kind==='weekly'?Math.min(Math.max(Number(body.schedule_day)||1,0),6):kind==='monthly'?Math.min(Math.max(Number(body.schedule_day)||1,1),28):null
+  const parsedDay=Number(body.schedule_day)
+  const day=kind==='weekly'
+    ? Math.min(Math.max(Number.isFinite(parsedDay)?parsedDay:1,0),6)
+    : kind==='monthly'
+      ? Math.min(Math.max(Number.isFinite(parsedDay)?parsedDay:1,1),28)
+      : null
   const recipients=[...new Set((body.recipients||[]).map((v:string)=>String(v).trim().toLowerCase()).filter((v:string)=>v.includes('@')))].slice(0,25)
   const enabled=body.enabled!==false&&!!kind
   const next=enabled?nextScheduledReportRun(kind,time,day):null

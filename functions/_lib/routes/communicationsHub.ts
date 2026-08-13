@@ -16,15 +16,29 @@ communicationsHubRoutes.get('/communications/overview', requireStaff, async (c) 
   const dayAgo = new Date(now - 86_400_000).toISOString().replace('T', ' ').slice(0, 19)
 
   const [unreadThreads, activeThreads, agingThreads, campaignsThisWeek, sentThisWeek, avgResponse] = await Promise.all([
-    // Threads with new messages since I last read them
+    // Client inbox threads + staff/group DMs with new messages since I last read them
     c.env.DB.prepare(`
-      SELECT COUNT(*) n FROM message_threads t
-      LEFT JOIN thread_reads r ON r.thread_id = t.id AND r.user_id = ?
-      WHERE t.last_message_at > COALESCE(r.last_read_at, '1970-01-01')
-    `).bind(me.id).first() as Promise<{ n: number } | null>,
+      SELECT (
+        (SELECT COUNT(*) FROM message_threads t
+         LEFT JOIN thread_reads r ON r.thread_id = t.id AND r.user_id = ?
+         WHERE t.last_message_at > COALESCE(r.last_read_at, '1970-01-01'))
+        +
+        (SELECT COUNT(*) FROM conversations c
+         JOIN conversation_participants cp ON cp.conversation_id = c.id AND cp.user_id = ? AND cp.removed_at IS NULL
+         LEFT JOIN conversation_reads r ON r.conversation_id = c.id AND r.user_id = ?
+         WHERE c.kind IN ('dm','group_dm')
+           AND c.last_message_at > COALESCE(r.last_read_at, '1970-01-01'))
+      ) n
+    `).bind(me.id, me.id, me.id).first() as Promise<{ n: number } | null>,
 
-    // Threads with any activity in the last 7 days
-    c.env.DB.prepare(`SELECT COUNT(*) n FROM message_threads WHERE last_message_at > ?`).bind(weekAgo).first() as Promise<{ n: number } | null>,
+    // Threads with any activity in the last 7 days (legacy inbox + polymorphic DMs)
+    c.env.DB.prepare(`
+      SELECT (
+        (SELECT COUNT(*) FROM message_threads WHERE last_message_at > ?)
+        +
+        (SELECT COUNT(*) FROM conversations WHERE kind IN ('dm','group_dm') AND last_message_at > ?)
+      ) n
+    `).bind(weekAgo, weekAgo).first() as Promise<{ n: number } | null>,
 
     // Threads where the last message was FROM a client and it's been >24h with no staff response
     c.env.DB.prepare(`
@@ -38,7 +52,8 @@ communicationsHubRoutes.get('/communications/overview', requireStaff, async (c) 
 
     c.env.DB.prepare(`SELECT COUNT(*) n FROM comms_messages WHERE status = 'sent' AND sent_at > ?`).bind(weekAgo).first() as Promise<{ n: number } | null>,
 
-    c.env.DB.prepare(`SELECT COUNT(*) n FROM comms_recipients WHERE status = 'sent' AND sent_at > ?`).bind(weekAgo).first() as Promise<{ n: number } | null>,
+    // Delivery webhooks promote recipients from 'sent' → 'delivered'; count both.
+    c.env.DB.prepare(`SELECT COUNT(*) n FROM comms_recipients WHERE status IN ('sent','delivered') AND sent_at > ?`).bind(weekAgo).first() as Promise<{ n: number } | null>,
 
     // Rough average staff response time in minutes over the past week:
     // for each client-authored message that got a staff reply within 7 days,
@@ -84,7 +99,7 @@ communicationsHubRoutes.get('/communications/reporting', requireStaff, async (c)
 
     c.env.DB.prepare(`
       SELECT substr(sent_at, 1, 10) day, COUNT(*) n
-      FROM comms_recipients WHERE status = 'sent' AND sent_at > ? GROUP BY day ORDER BY day
+      FROM comms_recipients WHERE status IN ('sent','delivered') AND sent_at > ? GROUP BY day ORDER BY day
     `).bind(cutoff).all(),
 
     c.env.DB.prepare(`

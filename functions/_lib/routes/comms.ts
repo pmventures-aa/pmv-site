@@ -291,7 +291,7 @@ async function dispatchNow(
   messageType: MessageType,
 ) {
   const marketingConfig = messageType === 'marketing' ? await getMarketingComplianceConfig(env) : null
-  await Promise.all(recipients.map(async (r) => {
+  const outcomes = await Promise.all(recipients.map(async (r) => {
     try {
       const deliveryHtml = marketingConfig
         ? appendMarketingFooter(bodyHtml, marketingConfig, await createUnsubscribeToken(env, r.email))
@@ -318,14 +318,18 @@ async function dispatchNow(
         )
       }
       await env.DB.batch(statements)
+      return 'sent' as const
     } catch (err) {
       await env.DB.prepare("UPDATE comms_recipients SET status = 'failed', error = ? WHERE id = ?")
         .bind(String(err).slice(0, 500), r.row_id).run()
+      return 'failed' as const
     }
   }))
+  const sentCount = outcomes.filter((o) => o === 'sent').length
+  const status = recipients.length === 0 || sentCount === 0 ? 'failed' : 'sent'
   await env.DB.prepare(
-    "UPDATE comms_messages SET status = 'sent', sent_at = datetime('now'), last_sent_at = datetime('now'), next_run_at = NULL, updated_at = datetime('now') WHERE id = ?",
-  ).bind(messageId).run()
+    "UPDATE comms_messages SET status = ?, sent_at = CASE WHEN ? = 'sent' THEN datetime('now') ELSE sent_at END, last_sent_at = CASE WHEN ? = 'sent' THEN datetime('now') ELSE last_sent_at END, next_run_at = NULL, updated_at = datetime('now') WHERE id = ?",
+  ).bind(status, status, status, messageId).run()
 }
 
 commsRoutes.post('/comms/messages', requireStaff, requireCapability('can_manage_communications'), async (c) => {
