@@ -3,7 +3,7 @@ import { Search, Mail, MailOpen, Send } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
-import { PageIntro, Panel, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { Panel, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { ThreadView } from '../../components/kit/ThreadView'
 import { PresenceDot } from '../../components/kit/PresenceDot'
 import { usePresence } from '../../lib/presence'
@@ -13,6 +13,7 @@ import { timeAgo } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
 import { ConversationsPanel } from './ConversationsPanel'
 import { EmailThreadsPanel } from './EmailThreadsPanel'
+import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 import { NotificationsTab, OverviewTab, ReportingTab } from './CommunicationsHub'
 
 interface ThreadRow {
@@ -143,32 +144,44 @@ export default function MessagesAdmin() {
   const rawTab = searchParams.get('tab')
   const tab: MessageTab = TABS.some((item) => item.id === rawTab) ? rawTab as MessageTab : 'inbox'
   const initialClientId = searchParams.get('client')
+  const { count: emailUnread } = useEmailUnreadCount()
 
   function setTab(next: MessageTab) {
     setSearchParams((current) => {
       const params = new URLSearchParams(current)
       if (next === 'inbox') params.delete('tab')
       else params.set('tab', next)
+      if (next !== 'email') params.delete('thread')
       return params
     }, { replace: true })
   }
 
-  return <div className="mx-auto max-w-[1500px]">
-    <PageIntro
-      kicker="Communications"
-      title="Messages"
-      subtitle="Client inbox, outbound email, staff DMs, and notification preferences in one workspace."
-      action={<Link to={p('communications/email')} className={btnOutline}><Send size={14} />Email Center</Link>}
-    />
-    <div className="mb-3 flex gap-1 overflow-x-auto border-b border-white/10">
-      {TABS.map((item) => (
-        <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`shrink-0 border-b-2 px-3 py-2 text-sm font-semibold transition ${tab === item.id ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{item.label}</button>
-      ))}
+  return (
+    <div className="flex h-full min-h-0 flex-col px-3 py-3 sm:px-5 lg:px-6 lg:py-4">
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/85">Communications</p>
+          <h1 className="mt-1 text-xl font-bold text-white">Mail</h1>
+        </div>
+        <Link to={p('communications/email')} className={btnOutline}><Send size={14} />Campaigns</Link>
+      </div>
+      <div className="mb-3 flex shrink-0 gap-1 overflow-x-auto border-b border-white/10">
+        {TABS.map((item) => (
+          <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`relative shrink-0 border-b-2 px-3 py-2 text-sm font-semibold transition ${tab === item.id ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>
+            {item.label}
+            {item.id === 'email' && emailUnread > 0 && (
+              <span className="ml-2 inline-grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{emailUnread > 99 ? '99+' : emailUnread}</span>
+            )}
+          </button>
+        ))}
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
+        {tab === 'email' && <EmailThreadsPanel />}
+        {tab === 'staff' && <ConversationsPanel />}
+        {tab === 'notifications' && <NotificationsTab />}
+        {tab === 'pulse' && <PulseTab />}
+      </div>
     </div>
-    {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
-    {tab === 'email' && <EmailThreadsPanel />}
-    {tab === 'staff' && <ConversationsPanel />}
-    {tab === 'notifications' && <NotificationsTab />}
-    {tab === 'pulse' && <PulseTab />}
-  </div>
+  )
 }

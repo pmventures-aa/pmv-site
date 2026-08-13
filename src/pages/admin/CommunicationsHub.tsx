@@ -82,13 +82,13 @@ export default function CommunicationsHub() {
           <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex">
             <Link to={p('communications/email')} className={btnSecondary}><Send size={14}/>Email Center</Link>
             <Link to={p('messages')} className={btnSecondary}><Inbox size={14}/>Inbox</Link>
-            <button className={btnSecondary} onClick={() => void loadOverview()}><RefreshCw size={14}/>Refresh</button>
+            <button className={btnSecondary} onClick={() => { window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } })); void loadOverview() }}><RefreshCw size={14}/>Refresh</button>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 pb-2 sm:hidden">
           <Link to={p('communications/email')} className={btnSecondary}><Send size={14}/>Email Center</Link>
           <Link to={p('messages')} className={btnSecondary}><Inbox size={14}/>Inbox</Link>
-          <button className={btnSecondary} onClick={() => void loadOverview()}><RefreshCw size={14}/>Refresh</button>
+          <button className={btnSecondary} onClick={() => { window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } })); void loadOverview() }}><RefreshCw size={14}/>Refresh</button>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import type { Env } from './types'
 import { uuid } from './crypto'
 import { pushNotification } from './notificationFeed'
+import { logActivity } from './activity'
 
 export const DEFAULT_INBOUND_DOMAIN = 'ziloifaluk.resend.app'
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
@@ -252,13 +253,9 @@ async function notifyInbound(env: Env, threadId: string, from: { email: string; 
   ).bind(threadId).first<{ id: string; conversation_id: string; subject: string; scope_client_user_id: string | null }>()
   if (!thread) return
   const staff = await env.DB.prepare(
-    `SELECT DISTINCT u.id FROM users u
-     WHERE u.status = 'active' AND u.role IN ('staff','admin')
-       AND (u.id IN (SELECT user_id FROM conversation_participants WHERE conversation_id = ? AND removed_at IS NULL)
-            OR ? IS NOT NULL AND u.id IN (SELECT staff_user_id FROM staff_assignments WHERE client_user_id = ?)
-            OR u.role = 'admin')`,
-  ).bind(thread.conversation_id, thread.scope_client_user_id, thread.scope_client_user_id).all<{ id: string }>()
-  const link = `/hq/communications?tab=email&thread=${thread.id}`
+    `SELECT id FROM users WHERE status = 'active' AND role IN ('staff','admin')`,
+  ).all<{ id: string }>()
+  const link = `/messages?tab=email&thread=${thread.id}`
   const body = `${thread.subject}: ${preview.replace(/<[^>]+>/g, '').slice(0, 180)}`
   for (const row of staff.results || []) {
     await pushNotification(env, {
@@ -268,4 +265,12 @@ async function notifyInbound(env: Env, threadId: string, from: { email: string; 
       body, deepLinkPath: link, dedupeWindowSeconds: 90,
     })
   }
+  try {
+    await logActivity(env, {
+      actorUserId: null,
+      clientUserId: thread.scope_client_user_id,
+      kind: 'email.inbound',
+      detail: { email_thread_id: thread.id, subject: thread.subject, from: from.email, from_name: from.name },
+    })
+  } catch {}
 }

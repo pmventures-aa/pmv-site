@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AtSign, Check, CheckCheck, Loader2, MailPlus, Reply, Send, X, XCircle } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { AtSign, CheckCheck, MailPlus, PenLine, RefreshCw, Reply, Send, XCircle } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { Panel, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
+import { useLiveRefresh } from '../../lib/liveRefresh'
+import { Tag, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
-import { Dialog, DialogContent } from '../../components/kit/Dialog'
 import { ResendWebhookPanel } from './settings/ResendWebhookPanel'
+import { EmailComposePane, type ComposeDraft } from './EmailComposePane'
+import { EmailSignaturesPanel } from './EmailSignaturesPanel'
+import type { EmailSignature } from '../../lib/emailSignatures'
 
 type Thread = {
   id: string; subject: string; scope_client_user_id: string|null
   last_activity_at: string; created_at: string; conversation_id: string
   message_count: number; client_name: string|null
   last_direction: 'inbound'|'outbound'|null; last_status: string|null
+  unread?: number
 }
 
 type Message = {
@@ -24,114 +29,222 @@ type Message = {
 
 type Detail = { thread: Thread; messages: Message[]; attachments: any[] }
 
-const POLL_MS = 6000
+const POLL_MS = 4000
 
 export function EmailThreadsPanel() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [threads, setThreads] = useState<Thread[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('thread'))
   const [detail, setDetail] = useState<Detail | null>(null)
-  const [composerOpen, setComposerOpen] = useState(false)
+  const [signatures, setSignatures] = useState<EmailSignature[]>([])
+  const [draft, setDraft] = useState<ComposeDraft | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [managingSignatures, setManagingSignatures] = useState(false)
+
+  const loadSignatures = useCallback(async () => {
+    try {
+      const r = await api.get<{ signatures: EmailSignature[] }>('/admin/email-signatures')
+      setSignatures(r.signatures || [])
+    } catch (err) { if (err instanceof ApiError) toast.error(err.message) }
+  }, [])
 
   const load = useCallback(async () => {
     try {
       const r = await api.get<{ threads: Thread[] }>('/admin/email-threads')
       setThreads(r.threads)
-      if (!selectedId && r.threads[0]) setSelectedId(r.threads[0].id)
+      setSelectedId((current) => {
+        const fromUrl = new URLSearchParams(window.location.search).get('thread')
+        if (fromUrl && r.threads.some((t) => t.id === fromUrl)) return fromUrl
+        if (current && r.threads.some((t) => t.id === current)) return current
+        return r.threads[0]?.id ?? null
+      })
     } catch (err) { if (err instanceof ApiError) toast.error(err.message) }
-  }, [selectedId])
-  useEffect(() => { void load() }, [load])
-  useEffect(() => { const t = setInterval(() => void load(), POLL_MS); return () => clearInterval(t) }, [load])
+  }, [])
 
   const loadDetail = useCallback(async () => {
     if (!selectedId) { setDetail(null); return }
     try { setDetail(await api.get<Detail>(`/admin/email-threads/${selectedId}`)) }
     catch (err) { if (err instanceof ApiError) toast.error(err.message) }
   }, [selectedId])
+
+  useEffect(() => { void load(); void loadSignatures() }, [load, loadSignatures])
   useEffect(() => { void loadDetail() }, [loadDetail])
-  useEffect(() => { if (!selectedId) return; const t = setInterval(() => void loadDetail(), POLL_MS); return () => clearInterval(t) }, [selectedId, loadDetail])
+  useEffect(() => {
+    const timer = window.setInterval(() => { void load(); if (selectedId && !draft) void loadDetail() }, POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [load, loadDetail, selectedId, draft])
+  useLiveRefresh(useCallback(() => { void load(); if (!draft) void loadDetail(); void loadSignatures() }, [load, loadDetail, loadSignatures, draft]))
+
+  useEffect(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (selectedId) next.set('thread', selectedId)
+      else next.delete('thread')
+      if (next.toString() === current.toString()) return current
+      return next
+    }, { replace: true })
+  }, [selectedId, setSearchParams])
+
+  function selectThread(id: string) {
+    setDraft(null)
+    setManagingSignatures(false)
+    setSelectedId(id)
+  }
+
+  function startCompose() {
+    setManagingSignatures(false)
+    setDraft({ mode: 'new', to: '', cc: '', bcc: '', subject: '', html: '' })
+  }
+
+  function startReply() {
+    if (!detail) return
+    const lastInbound = [...detail.messages].reverse().find((m) => m.direction === 'inbound')
+    const firstOut = detail.messages.find((m) => m.direction === 'outbound')
+    const to = lastInbound
+      ? (lastInbound.from_name ? `${lastInbound.from_name} <${lastInbound.from_email}>` : lastInbound.from_email)
+      : safeArray<{ email: string; name?: string }>(firstOut?.to_json).map((a) => a.name ? `${a.name} <${a.email}>` : a.email).join(', ')
+    const subject = /^re:/i.test(detail.thread.subject) ? detail.thread.subject : `Re: ${detail.thread.subject}`
+    setManagingSignatures(false)
+    setDraft({ mode: 'reply', threadId: detail.thread.id, to, cc: '', bcc: '', subject, html: '' })
+  }
+
+  async function send(signatureId: string | null) {
+    if (!draft) return
+    setBusy(true)
+    try {
+      const to = splitAddresses(draft.to)
+      const cc = splitAddresses(draft.cc)
+      const bcc = splitAddresses(draft.bcc)
+      if (draft.mode === 'reply' && draft.threadId) {
+        await api.post(`/admin/email-threads/${draft.threadId}/reply`, {
+          body_html: draft.html, cc, bcc, signature_id: signatureId,
+        })
+        toast.success('Reply sent')
+        setDraft(null)
+        void load(); void loadDetail()
+      } else {
+        const r = await api.post<{ thread_id: string }>('/admin/email-threads', {
+          subject: draft.subject.trim(), to, cc, bcc,
+          body_html: draft.html, signature_id: signatureId,
+        })
+        toast.success('Email sent')
+        setDraft(null)
+        setSelectedId(r.thread_id)
+        void load()
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Send failed')
+    } finally { setBusy(false) }
+  }
+
+  const unread = threads.filter((t) => t.unread).length
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col">
       <ResendWebhookPanel compact />
-      <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-      <Panel className="!p-0">
-        <div className="flex items-center justify-between border-b border-white/10 p-3">
-          <p className="text-sm font-extrabold text-white">Email threads</p>
-          <button className={btnPrimary} onClick={() => setComposerOpen(true)}><MailPlus size={14}/>Compose</button>
-        </div>
-        <div className="max-h-[70vh] divide-y divide-white/10 overflow-y-auto">
-          {threads.length === 0 && <p className="p-4 text-xs text-slate-500">No email threads yet. Compose one to start.</p>}
-          {threads.map((t) => (
-            <button key={t.id} onClick={() => setSelectedId(t.id)} className={`block w-full px-3 py-3 text-left transition ${selectedId === t.id ? 'bg-gold/[.05]' : 'hover:bg-white/[.02]'}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2"><AtSign size={13} className="text-slate-500"/><p className="truncate text-sm font-bold text-white">{t.subject}</p></div>
-                  <p className="mt-1 truncate text-[11px] text-slate-500">
-                    {t.client_name && <>Client: {t.client_name} · </>}
-                    {t.message_count} msg · {new Date(t.last_activity_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                  </p>
-                </div>
-                {t.last_status && <StatusPill status={t.last_status}/>}
-              </div>
-              <div className="mt-1.5 text-[10px] uppercase tracking-[.12em] text-slate-500">
-                Last: {t.last_direction === 'inbound' ? '← reply received' : '→ sent by us'}
-              </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border border-white/10 bg-navy-900/40">
+        <aside className="flex w-[min(100%,320px)] shrink-0 flex-col border-r border-white/10">
+          <div className="flex items-center gap-2 border-b border-white/10 p-2.5">
+            <button type="button" className={btnPrimary} onClick={startCompose}><MailPlus size={14}/>New Email</button>
+            <button type="button" className={btnSecondary} onClick={() => { void load(); void loadDetail() }} aria-label="Refresh mail" title="Refresh mail">
+              <RefreshCw size={14}/>
             </button>
-          ))}
-        </div>
-      </Panel>
+            <p className="ml-auto text-[11px] font-semibold text-slate-500">{unread ? `${unread} unread` : 'Inbox'}</p>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {threads.length === 0 && <p className="p-4 text-xs text-slate-500">No email threads yet. Compose one to start.</p>}
+            {threads.map((t) => (
+              <button key={t.id} type="button" onClick={() => selectThread(t.id)} className={`block w-full border-b border-white/[.05] px-3 py-3 text-left transition ${selectedId === t.id && !draft ? 'bg-gold/[.08]' : 'hover:bg-white/[.03]'}`}>
+                <div className="flex items-start gap-2">
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${t.unread ? 'bg-rose-500' : 'bg-transparent'}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <AtSign size={12} className="shrink-0 text-slate-500"/>
+                      <p className={`truncate text-sm ${t.unread ? 'font-extrabold text-white' : 'font-semibold text-slate-200'}`}>{t.subject}</p>
+                    </div>
+                    <p className="mt-1 truncate text-[11px] text-slate-500">
+                      {t.client_name && <>{t.client_name} · </>}
+                      {t.message_count} · {new Date(t.last_activity_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </p>
+                    <p className="mt-1 text-[10px] uppercase tracking-[.12em] text-slate-500">
+                      {t.last_direction === 'inbound' ? 'Reply received' : 'Sent by us'}
+                    </p>
+                  </div>
+                  {t.last_status && <StatusPill status={t.last_status}/>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </aside>
 
-      <EmailThreadDetail detail={detail} onReplied={() => { void load(); void loadDetail() }}/>
+        <section className="relative min-w-0 flex-1 bg-navy-950/40">
+          {managingSignatures ? (
+            <EmailSignaturesPanel signatures={signatures} onClose={() => setManagingSignatures(false)} onChanged={() => void loadSignatures()} />
+          ) : draft ? (
+            <EmailComposePane
+              draft={draft}
+              signatures={signatures}
+              busy={busy}
+              onChange={setDraft}
+              onSend={(id) => void send(id)}
+              onDiscard={() => setDraft(null)}
+              onManageSignatures={() => setManagingSignatures(true)}
+            />
+          ) : (
+            <EmailThreadDetail
+              detail={detail}
+              onReply={startReply}
+              onCompose={startCompose}
+              onSignatures={() => setManagingSignatures(true)}
+            />
+          )}
+        </section>
       </div>
-
-      <ComposerDialog open={composerOpen} onClose={() => setComposerOpen(false)} onSent={(id) => { setComposerOpen(false); setSelectedId(id); void load() }}/>
     </div>
   )
 }
 
 function StatusPill({ status }: { status: string }) {
-  const tone: any = status === 'delivered' ? 'green' : status === 'bounced' || status === 'failed' ? 'red' : status === 'received' ? 'blue' : 'slate'
+  const tone: 'green' | 'red' | 'blue' | 'slate' = status === 'delivered' ? 'green' : status === 'bounced' || status === 'failed' ? 'red' : status === 'received' ? 'blue' : 'slate'
   return <Tag tone={tone}>{status}</Tag>
 }
 
-function EmailThreadDetail({ detail, onReplied }: { detail: Detail | null; onReplied: () => void }) {
-  const [reply, setReply] = useState('')
-  const [busy, setBusy] = useState(false)
-  useEffect(() => { setReply('') }, [detail?.thread.id])
-
-  if (!detail) return <Panel><p className="p-8 text-center text-sm text-slate-500">Select an email thread to view.</p></Panel>
-
-  async function send() {
-    if (!reply.trim()) return
-    setBusy(true)
-    try {
-      const html = reply.trim().split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`).join('')
-      await api.post(`/admin/email-threads/${detail!.thread.id}/reply`, { body_html: html, body_text: reply.trim() })
-      setReply(''); toast.success('Reply sent'); onReplied()
-    } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Send failed') }
-    finally { setBusy(false) }
-  }
+function EmailThreadDetail({
+  detail, onReply, onCompose, onSignatures,
+}: {
+  detail: Detail | null
+  onReply: () => void
+  onCompose: () => void
+  onSignatures: () => void
+}) {
+  if (!detail) return <div className="grid h-full place-items-center p-8 text-sm text-slate-500">Select a conversation or start a new email.</div>
 
   return (
-    <Panel className="!p-0">
-      <div className="border-b border-white/10 p-4">
-        <p className="text-lg font-extrabold text-white">{detail.thread.subject}</p>
-        <p className="mt-1 text-xs text-slate-500">{detail.messages.length} messages · Last activity {new Date(detail.thread.last_activity_at).toLocaleString()}</p>
-        <p className="mt-1 text-[11px] text-slate-600">Sent as Pinnacle. Reply-To is a private Resend receiving address so the answer threads here instead of a personal inbox.</p>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-lg font-extrabold text-white">{detail.thread.subject}</p>
+          <p className="mt-1 text-xs text-slate-500">{detail.messages.length} messages · Last activity {new Date(detail.thread.last_activity_at).toLocaleString()}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={btnPrimary} onClick={onReply}><Reply size={14}/>Reply</button>
+          <button type="button" className={btnSecondary} onClick={onCompose}><MailPlus size={14}/>New Email</button>
+          <button type="button" className={btnSecondary} onClick={onSignatures}><PenLine size={14}/>Signatures</button>
+        </div>
       </div>
 
-      <div className="max-h-[52vh] min-h-[320px] space-y-3 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
         {detail.messages.map((m) => {
           const to = safeArray<{ email: string; name?: string }>(m.to_json)
           const isOut = m.direction === 'outbound'
           return (
-            <div key={m.id} className={`rounded-lg border p-4 ${isOut ? 'border-white/10 bg-white/[.02]' : 'border-blue-400/25 bg-blue-400/[.04]'}`}>
+            <article key={m.id} className={`rounded-lg border p-4 ${isOut ? 'border-white/10 bg-white/[.02]' : 'border-sky-400/25 bg-sky-400/[.05]'}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`grid h-5 w-5 place-items-center rounded ${isOut ? 'bg-gold/15 text-gold' : 'bg-blue-400/15 text-blue-300'}`}>{isOut ? <Send size={11}/> : <Reply size={11}/>}</span>
+                    <span className={`grid h-5 w-5 place-items-center rounded ${isOut ? 'bg-gold/15 text-gold' : 'bg-sky-400/15 text-sky-300'}`}>{isOut ? <Send size={11}/> : <Reply size={11}/>}</span>
                     <span className="text-xs font-bold text-white">{m.from_name || m.from_email}</span>
-                    <span className="text-[10px] text-slate-500">to {to.map((a) => a.name || a.email).join(', ')}</span>
+                    <span className="truncate text-[10px] text-slate-500">to {to.map((a) => a.name || a.email).join(', ')}</span>
                   </div>
                   <p className="mt-1 text-[10px] text-slate-500">{new Date(m.created_at).toLocaleString()}</p>
                 </div>
@@ -142,80 +255,20 @@ function EmailThreadDetail({ detail, onReplied }: { detail: Detail | null; onRep
                 </div>
               </div>
               {m.error && <div className="mt-2 rounded border border-red-400/25 bg-red-400/[.05] p-2 text-[11px] text-red-200">Delivery error: {m.error}</div>}
-              <div className="prose prose-sm prose-invert mt-3 max-w-none text-sm text-slate-200" dangerouslySetInnerHTML={{ __html: m.body_html || (m.body_text ? `<pre class="whitespace-pre-wrap font-sans">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
+              <div className="prose prose-sm mt-3 max-w-none rounded-md bg-white p-4 text-sm text-navy-950" dangerouslySetInnerHTML={{ __html: m.body_html || (m.body_text ? `<pre class="whitespace-pre-wrap font-sans">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
               {detail.attachments.filter((a) => a.email_message_id === m.id).map((a) => (
                 <p key={a.id} className="mt-2 text-[11px] text-slate-500">Attachment: {a.file_name}</p>
               ))}
-            </div>
+            </article>
           )
         })}
       </div>
-
-      <div className="border-t border-white/10 p-3">
-        <textarea value={reply} onChange={(e) => setReply(e.target.value)} className={`${inputCls} min-h-24 resize-y`} placeholder="Write a reply. It goes out from Pinnacle and stays on this thread."/>
-        <div className="mt-2 flex items-center justify-end">
-          <button className={btnPrimary} disabled={busy || !reply.trim()} onClick={() => void send()}>{busy ? <Loader2 size={14} className="animate-spin"/> : <Reply size={14}/>}Send reply</button>
-        </div>
-      </div>
-    </Panel>
+    </div>
   )
 }
 
-function ComposerDialog({ open, onClose, onSent }: { open: boolean; onClose: () => void; onSent: (id: string) => void }) {
-  const [subject, setSubject] = useState('')
-  const [toStr, setToStr] = useState('')
-  const [ccStr, setCcStr] = useState('')
-  const [body, setBody] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => { if (!open) { setSubject(''); setToStr(''); setCcStr(''); setBody('') } }, [open])
-
-  const canSend = subject.trim() && toStr.trim() && body.trim()
-
-  async function send() {
-    setBusy(true)
-    try {
-      const html = body.trim().split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`).join('')
-      const r = await api.post<{ thread_id: string }>('/admin/email-threads', {
-        subject: subject.trim(),
-        to: toStr.split(/[,;]/).map((s) => s.trim()).filter(Boolean),
-        cc: ccStr.split(/[,;]/).map((s) => s.trim()).filter(Boolean),
-        body_html: html, body_text: body.trim(),
-      })
-      toast.success('Email sent')
-      onSent(r.thread_id)
-    } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Send failed') }
-    finally { setBusy(false) }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
-      <DialogContent size="lg" title="Compose email" description="Sends from pinnaclemanagementventures.com. Replies come back through Resend receiving and land on this thread.">
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-slate-400">To</label>
-            <input className={inputCls} value={toStr} onChange={(e) => setToStr(e.target.value)} placeholder="name@example.com, another@example.com"/>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-400">CC (optional)</label>
-            <input className={inputCls} value={ccStr} onChange={(e) => setCcStr(e.target.value)} placeholder="cc@example.com"/>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-400">Subject</label>
-            <input className={inputCls} value={subject} onChange={(e) => setSubject(e.target.value)}/>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-400">Message</label>
-            <textarea className={`${inputCls} min-h-40`} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your email…"/>
-          </div>
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button className={btnSecondary} onClick={onClose}>Cancel</button>
-          <button className={btnPrimary} disabled={!canSend || busy} onClick={() => void send()}>{busy && <Loader2 size={14} className="animate-spin"/>}Send email</button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
+function splitAddresses(value: string): string[] {
+  return value.split(/[,;]/).map((s) => s.trim()).filter(Boolean)
 }
 
 function safeArray<T>(json: string | null | undefined): T[] {

@@ -10,4 +10,11 @@ describe('migration chain regression checks', () => {
     expect(presence).not.toMatch(/ALTER TABLE users ADD COLUMN last_seen_at TEXT/i)
     expect(presence).toMatch(/CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users\(last_seen_at\)/i)
   })
+
+  it('adds email signatures and per-user thread reads once', () => {
+    const sql = readFileSync(new URL('../migrations/0065_email_signatures_and_reads.sql', import.meta.url), 'utf8')
+    expect(sql).toMatch(/CREATE TABLE email_signatures/i)
+    expect(sql).toMatch(/CREATE TABLE email_thread_reads/i)
+    expect(sql).toMatch(/kind TEXT NOT NULL CHECK \(kind IN \('company','personal','support','custom'\)\)/)
+  })
 })

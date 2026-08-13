@@ -1,20 +1,21 @@
 import { useEffect, useRef } from 'react'
 import { btnOutline } from './ui'
 
-// Lightweight in-house rich text editor for Communications Center drafts: // bold/italic/underline/link/image/signature. Deliberately not a full WYSIWYG
-// library: this repo has no existing rich-text dependency anywhere (message
-// threads and notes are plain textareas), and the ask here is "plain text
-// but with images and a signature", not a full editor. Uses contentEditable
-// + document.execCommand, which is deprecated but still broadly supported
-// and is the simplest way to get inline formatting without a new dependency.
+// Lightweight in-house rich text editor for Communications Center drafts:
+// bold/italic/underline/link/image. Uses contentEditable + document.execCommand,
+// which is deprecated but still broadly supported and avoids a new dependency.
 export function RichTextComposer({
   value,
   onChange,
   onUploadImage,
+  fill = false,
+  placeholder,
 }: {
   value: string
   onChange: (html: string) => void
-  onUploadImage: (file: File) => Promise<string>
+  onUploadImage?: (file: File) => Promise<string>
+  fill?: boolean
+  placeholder?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -50,7 +51,7 @@ export function RichTextComposer({
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file) return
+    if (!file || !onUploadImage) return
     try {
       const url = await onUploadImage(file)
       exec('insertImage', url)
@@ -60,10 +61,11 @@ export function RichTextComposer({
   }
 
   const toolBtn = `${btnOutline} !px-2.5 !py-1 text-xs`
+  const empty = !value || value === '<br>' || value === '<div><br></div>'
 
   return (
-    <div className="rounded-md border border-white/10 bg-navy-900">
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-white/10 p-2">
+    <div className={`flex min-h-0 flex-col rounded-md border border-white/10 bg-navy-900 ${fill ? 'h-full' : ''}`}>
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-white/10 p-2">
         <button type="button" className={toolBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('bold')}>
           <strong>B</strong>
         </button>
@@ -79,19 +81,28 @@ export function RichTextComposer({
         <button type="button" className={toolBtn} onMouseDown={(e) => e.preventDefault()} onClick={insertLink}>
           Link
         </button>
-        <button type="button" className={toolBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => fileInputRef.current?.click()}>
-          Image
-        </button>
-        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickImage} />
+        {onUploadImage && (
+          <>
+            <button type="button" className={toolBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => fileInputRef.current?.click()}>
+              Image
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickImage} />
+          </>
+        )}
       </div>
-      <div
-        ref={ref}
-        contentEditable
-        suppressContentEditableWarning
-        onInput={emit}
-        onBlur={emit}
-        className="min-h-48 max-w-none px-4 py-3 text-sm text-white outline-none [&_a]:text-gold [&_a]:underline [&_img]:my-2 [&_img]:max-w-full"
-      />
+      <div className={`relative min-h-0 ${fill ? 'flex-1' : ''}`}>
+        {empty && placeholder && (
+          <p className="pointer-events-none absolute left-4 top-3 text-sm text-slate-500">{placeholder}</p>
+        )}
+        <div
+          ref={ref}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={emit}
+          onBlur={emit}
+          className={`${fill ? 'h-full min-h-[280px]' : 'min-h-48'} max-w-none overflow-y-auto px-4 py-3 text-sm text-navy-950 outline-none bg-white [&_a]:text-sky-700 [&_a]:underline [&_img]:my-2 [&_img]:max-w-full`}
+        />
+      </div>
     </div>
   )
 }
