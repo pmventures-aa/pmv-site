@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Menu, X, Search, RotateCw, PanelLeftClose, PanelLeftOpen, Settings, LogOut, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react'
+import { Menu, X, Search, RotateCw, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react'
 import { Logo } from '../ui'
-import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import type { NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
@@ -12,10 +11,10 @@ import { ImpersonationBanner } from '../kit/ImpersonationBanner'
 import { GlobalSearch } from './GlobalSearch'
 import { MailBell } from '../kit/MailBell'
 import { EmailCenterBell } from '../kit/EmailCenterBell'
-import { Avatar } from '../kit/Avatar'
 import { SlaAlertChip } from './SlaAlertChip'
 import { MailWorkspaceLauncher } from './MailWorkspaceLauncher'
 import { AdminPageBoundary } from './AdminPageBoundary'
+import { WhoMenu } from './WhoMenu'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 
@@ -23,10 +22,8 @@ import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 // anywhere in the layout - it was showing as "STAFF CONSOLE" chrome the
 // user asked to remove.
 export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: string }) {
-  const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.localStorage.getItem('pmv_hq_sidebar_open') !== '0'
@@ -117,17 +114,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
       </nav>
 
       <div className="relative shrink-0 border-t border-white/10 pt-3">
-        <button type="button" onClick={() => setProfileOpen((v) => !v)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-white/[.04]">
-          {user && <Avatar userId={user.id} name={user.full_name} size={36} editable uploadPath="/me/avatar" />}
-          <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p><p className="truncate text-xs text-slate-500">{user?.email}</p></div>
-          <ChevronDown size={14} className={`shrink-0 text-slate-500 transition ${profileOpen ? 'rotate-180' : ''}`} />
-        </button>
-        <AnimatePresence initial={false}>{profileOpen && (
-          <motion.div initial={{opacity:0,y:6,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:5,scale:.985}} transition={pmvMotion.ui} className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-lg border border-white/10 bg-navy-900 shadow-2xl">
-            {canOpenSettings && <NavLink to={p('settings')} onClick={() => { setProfileOpen(false); setMobileOpen(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white"><Settings size={15} /> Settings</NavLink>}
-            <button onClick={() => logout()} className={`flex w-full items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/5 hover:text-white ${canOpenSettings ? 'border-t border-white/10' : ''}`}><LogOut size={15} /> Sign out</button>
-          </motion.div>
-        )}</AnimatePresence>
+        <WhoMenu placement="up" canOpenSettings={canOpenSettings} />
       </div>
     </>
   )
@@ -154,6 +141,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <MailBell />
             <NotificationBell />
             <NotificationFeedPanel surface="admin" />
+            {hideHqNav && <WhoMenu placement="down" compact canOpenSettings={canOpenSettings} />}
             {!hideHqNav && <button onClick={() => setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-white/[.04] text-white transition hover:bg-white/[.08]" aria-label="Open navigation"><Menu size={20} /></button>}
           </div>
         </div>
@@ -192,6 +180,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <MailBell />
             <NotificationBell />
             <NotificationFeedPanel surface="admin" />
+            {hideHqNav && <WhoMenu placement="down" compact canOpenSettings={canOpenSettings} />}
           </div>
         </div>
         <AnimatePresence mode="sync" initial={false}>

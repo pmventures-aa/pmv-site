@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight, BellRing, Inbox, Mail, MessageSquare, Refres
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, btnSecondary, btnPrimary, inputCls } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
+import { SessionWho } from '../../components/kit/WhoSection'
 import { useAppPath } from '../../lib/basePath'
 import { ConversationsPanel } from './ConversationsPanel'
 import { EmailThreadsPanel } from './EmailThreadsPanel'
@@ -216,6 +217,7 @@ export function NotificationsTab() {
 
   return (
     <div className="space-y-5">
+      <SessionWho hint="These alerts go to your HQ session and the mailbox on this account." />
       <Panel>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
