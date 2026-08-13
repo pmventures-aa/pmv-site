@@ -42,9 +42,9 @@ export default function AdminDashboard(){
 
   return <div className="pb-24 lg:pb-0">
     {loadError&&<div role="alert" className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[.04] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-amber-100">Overview data is temporarily unavailable</p><p className="mt-1 text-xs text-slate-400">{loadError} Existing navigation and tools remain available.</p></div><button type="button" onClick={()=>void load()} className="shrink-0 rounded-lg border border-amber-300/25 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-300/10">Try again</button></div>}
-    <div className="mb-7 rounded-2xl border border-white/[.08] bg-gradient-to-br from-white/[.035] to-transparent p-5 sm:p-6">
+    <div className="mb-7">
       <DashboardWelcome name={user?.first_name||user?.full_name} userId={user?.id} variant="admin" subtitle={hqCopy.homeSubtitle}/>
-      <div className="mt-5 hidden flex-wrap items-center gap-2 border-t border-white/[.07] pt-4 sm:flex">
+      <div className="mt-4 hidden flex-wrap items-center gap-2 sm:flex">
         <span className="mr-1 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">Quick actions</span>
         {experience.quickActions.map((action) => (
           <Link key={action.to} to={p(action.to)} className={quick}><Icon name={action.icon} size={13}/>{action.label}</Link>

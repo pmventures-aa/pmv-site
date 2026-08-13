@@ -71,22 +71,18 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   return (
     <AuthLayout
       surface={surface}
+      liveCopy
       eyebrow={surface === 'staff' ? hqCopy.loginEyebrow : clientCopy.loginEyebrow}
-      title="Welcome back"
-      subtitle={surface === 'staff'
-        ? hqCopy.loginBody
-        : serviceKey
-          ? 'Sign in and we will return you to the service you were exploring.'
-          : clientCopy.loginBody}
+      title={surface === 'staff' ? 'Come back in' : 'Your workspace'}
       sideLabel={surface === 'staff' ? hqCopy.badge : clientCopy.badge}
-      sideTitle={surface === 'staff' ? hqCopy.loginTitle : clientCopy.loginTitle}
-      sideBody={surface === 'staff' ? hqCopy.loginBody : clientCopy.loginBody}
-      sidePoints={surface === 'staff' ? undefined : clientCopy.loginPoints}
       footer={surface === 'client'
         ? <span>New to Pinnacle? <Link to={`../signup${signupQuery}`} className="font-bold text-gold transition hover:text-gold-300">Start your workspace</Link></span>
         : <span className="text-slate-500">HQ and provider access is provisioned by Pinnacle.</span>}
     >
       <ErrorBanner message={error} />
+      {serviceKey && surface === 'client' && (
+        <p className="mb-4 text-xs leading-5 text-slate-400">After you sign in, we will return you to the service you were exploring.</p>
+      )}
       <form onSubmit={onSubmit} className="space-y-5">
         <Field label="Email Address">
           <input className={inputCls} type="email" autoComplete="email" inputMode="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
