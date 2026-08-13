@@ -27,8 +27,16 @@ describe('HQ navigation contract', () => {
     expect(keys).not.toContain('esign-platform')
     expect(keys).not.toContain('community-documents')
     expect(keys).not.toContain('envelopes')
-    expect(keys).not.toContain('assignments')
     expect(adminNav.find((item) => item.key === 'inquiries')?.section).toBe('Revenue')
     expect(adminNav.find((item) => item.key === 'audit-log')?.section).toBe('Administration')
+  })
+
+  it('surfaces role control and previously hidden operator tools', () => {
+    const keys = new Set(adminNav.map((item) => item.key))
+    for (const key of ['roles', 'invitations', 'service-assignments', 'assignments']) {
+      expect(keys, `missing HQ nav key: ${key}`).toContain(key)
+    }
+    expect(keys.has('communications')).toBe(false)
+    expect(keys.has('client-banners')).toBe(false)
   })
 })

@@ -18,7 +18,7 @@ const PRIORITY_TONE: Record<Notice['priority'], 'blue'|'gold'|'red'> = {
   info: 'blue', warning: 'gold', critical: 'red',
 }
 
-export default function ClientBannersAdmin() {
+export default function ClientBannersAdmin({ embedded = false }: { embedded?: boolean }) {
   const [notices, setNotices] = useState<Notice[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -40,7 +40,7 @@ export default function ClientBannersAdmin() {
 
   return (
     <div className="space-y-6">
-      <PageIntro kicker="Client Login Banners" title="Announcements clients see when they sign in" subtitle="Post per-client banners that appear on the client's next portal login. Optional forced redirect on acknowledge." />
+      {!embedded && <PageIntro kicker="Client Login Banners" title="Announcements clients see when they sign in" subtitle="Post per-client banners that appear on the client's next portal login. Optional forced redirect on acknowledge." />}
 
       <div className="flex justify-end">
         <button className={btnPrimary} onClick={() => setCreating(true)}><Plus size={14}/>New banner</button>

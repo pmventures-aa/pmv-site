@@ -138,6 +138,25 @@ textarea {
   transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 
+[data-pmv-surface='admin'] .input,
+[data-pmv-surface='admin'] .pmv-hq-control {
+  min-height: 36px;
+  border-radius: .375rem;
+  padding: .4rem .7rem;
+  font-size: 13px;
+  box-shadow: none;
+}
+
+[data-pmv-surface='admin'] textarea.input,
+[data-pmv-surface='admin'] textarea.pmv-hq-control {
+  min-height: 88px;
+}
+
+[data-pmv-surface='admin'] .pmv-hq-control:focus,
+[data-pmv-surface='admin'] .input:focus {
+  box-shadow: 0 0 0 2px rgba(201,162,39,.14);
+}
+
 textarea.input {
   min-height: 112px;
   padding-top: .8rem;

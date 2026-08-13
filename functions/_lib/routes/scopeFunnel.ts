@@ -3,7 +3,7 @@ import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
 import { escapeHtml, notifyStaff } from '../email'
-import { requireOwner, requireUser } from '../mid'
+import { requireOwner, requireStaff, requireUser } from '../mid'
 import { calculateCleaningEstimate, CLIENT_PORTAL_BASE, sendScopeConfirmation, twoBusinessHoursFrom, type QuoteRule } from '../scopeFunnel'
 import { ensureServiceOfferingsSeeded } from './serviceOfferings'
 import { createActivationToken } from '../session'
@@ -283,6 +283,18 @@ scopeFunnelPublicRoutes.get('/public-proof', async (c) => {
   }
   c.header('Cache-Control','public, max-age=3600, s-maxage=2592000')
   return c.json({case_studies:cases.results||[],metrics})
+})
+
+scopeFunnelAdminRoutes.get('/scope-intake', requireStaff, async (c) => {
+  const requests = await c.env.DB.prepare(
+    `SELECT id, job_type, service_key, location_type, city, state, postal_code, timing, details,
+            contact_name, email, phone, status, answers_json, estimate_low_cents, estimate_high_cents,
+            reserved_user_id, created_at
+     FROM public_scope_requests
+     ORDER BY created_at DESC
+     LIMIT 50`,
+  ).all()
+  return c.json({ requests: requests.results || [] })
 })
 
 scopeFunnelAdminRoutes.get('/public-funnel', requireOwner, async (c) => {

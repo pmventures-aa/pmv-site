@@ -4,6 +4,8 @@ import { PageIntro, Panel, EmptyState, Tag, StatCard, inputCls, btnPrimary, btnO
 import { toast } from '../../components/kit/toast'
 import { services } from '../../data/services'
 import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../components/admin/RecentWindow'
+import { ScopeIntakePicker } from '../../components/admin/ScopeIntakePicker'
+import { quotePrefillFromScope } from '../../../shared/scopeIntakePrefill'
 
 interface QuoteRow {
   id: string
@@ -353,6 +355,19 @@ function QuoteBuilder({ templates, offerings, onClose, onSaved }: { templates: T
       <div><h2 className="text-xl font-bold text-white">New quote</h2><p className="mt-1 text-xs text-slate-500">Start from a template or build line by line from the service catalog.</p></div>
       <button className={btnOutline} onClick={onClose}>Close</button>
     </div>
+    <div className="mt-4"><ScopeIntakePicker onPick={(row) => {
+      const prefill = quotePrefillFromScope(row)
+      setForm((current) => ({
+        ...current,
+        title: prefill.title,
+        recipient_name: prefill.recipient_name,
+        recipient_email: prefill.recipient_email,
+        recipient_phone: prefill.recipient_phone,
+        property_address: prefill.property_address,
+        intro_message: prefill.intro_message,
+      }))
+      setLinesState(prefill.lines)
+    }} /></div>
     <div className="mt-5 grid gap-3 sm:grid-cols-2">
       <label className="text-xs font-bold text-slate-400 sm:col-span-2">Template
         <select className={`${inputCls} mt-1`} value={templateId} onChange={(e) => applyTemplate(e.target.value)}>

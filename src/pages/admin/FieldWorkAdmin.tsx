@@ -7,6 +7,9 @@ import { AddressAutocomplete } from '../../components/kit/AddressAutocomplete'
 import { useAppPath } from '../../lib/basePath'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { toast } from '../../components/kit/toast'
+import { FieldLiveMap, type FieldMapPin } from '../../components/admin/FieldLiveMap'
+import { ScopeIntakePicker } from '../../components/admin/ScopeIntakePicker'
+import { fieldPrefillFromScope } from '../../../shared/scopeIntakePrefill'
 
 interface StaffOption { id: string; full_name: string | null; email: string; party_type: string | null; vendor_category: string | null }
 interface ClientOption { id: string; full_name: string | null; email: string; business_name: string | null }
@@ -19,12 +22,42 @@ interface Assignment {
   title: string | null
   site_label: string | null
   site_address: string | null
+  site_lat?: number | null
+  site_lng?: number | null
   scheduled_at: string | null
   client_name: string | null
   vendor_name: string | null
   vendor_user_id: string
   completed_at: string | null
   audit_email_sent_at: string | null
+}
+
+type MapPayload = {
+  assignments: Array<{
+    id: string
+    kind: string
+    status: string
+    title: string | null
+    site_label: string | null
+    site_address: string | null
+    site_lat: number | null
+    site_lng: number | null
+    depart_lat: number | null
+    depart_lng: number | null
+    arrival_lat: number | null
+    arrival_lng: number | null
+    vendor_user_id: string
+    vendor_name: string | null
+  }>
+  agents: Array<{
+    user_id: string
+    assignment_id: string | null
+    lat: number
+    lng: number
+    updated_at: string
+    full_name: string | null
+    email: string
+  }>
 }
 
 function toneFor(status: string) {
@@ -41,6 +74,7 @@ const KIND_LABEL = { field: 'Field visit', ron: 'RON session' } as const
 export default function FieldWorkAdmin() {
   const p = useAppPath()
   const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [mapPins, setMapPins] = useState<FieldMapPin[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [kindFilter, setKindFilter] = useState<'all' | 'field' | 'ron'>('all')
@@ -48,8 +82,50 @@ export default function FieldWorkAdmin() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      const res = await api.get<{ assignments: Assignment[] }>('/admin/field-assignments')
+      const [res, map] = await Promise.all([
+        api.get<{ assignments: Assignment[] }>('/admin/field-assignments'),
+        api.get<MapPayload>('/admin/field-map').catch(() => ({ assignments: [], agents: [] } as MapPayload)),
+      ])
       setAssignments(res.assignments)
+      const pins: FieldMapPin[] = []
+      for (const agent of map.agents || []) {
+        pins.push({
+          id: `agent-${agent.user_id}`,
+          kind: 'agent',
+          label: agent.full_name || agent.email,
+          sublabel: `Updated ${new Date(agent.updated_at.includes('T') ? agent.updated_at : `${agent.updated_at}Z`).toLocaleTimeString()}`,
+          lat: agent.lat,
+          lng: agent.lng,
+          href: agent.assignment_id ? `field-work/${agent.assignment_id}` : undefined,
+          stale: Date.now() - Date.parse(agent.updated_at.includes('T') ? agent.updated_at : `${agent.updated_at}Z`) > 15 * 60_000,
+        })
+      }
+      for (const row of map.assignments || []) {
+        if (row.site_lat != null && row.site_lng != null) {
+          pins.push({
+            id: `site-${row.id}`,
+            kind: 'site',
+            label: row.title || row.site_label || row.site_address || 'Job site',
+            sublabel: `${row.status.replace(/_/g, ' ')}${row.vendor_name ? ` · ${row.vendor_name}` : ''}`,
+            status: row.status,
+            lat: row.site_lat,
+            lng: row.site_lng,
+            href: `field-work/${row.id}`,
+          })
+        } else if (row.arrival_lat != null && row.arrival_lng != null) {
+          pins.push({
+            id: `arrive-${row.id}`,
+            kind: 'agent',
+            label: row.vendor_name || 'Provider',
+            sublabel: 'Last arrival ping',
+            lat: row.arrival_lat,
+            lng: row.arrival_lng,
+            href: `field-work/${row.id}`,
+            stale: true,
+          })
+        }
+      }
+      setMapPins(pins)
     } finally {
       if (!silent) setLoading(false)
     }
@@ -66,7 +142,7 @@ export default function FieldWorkAdmin() {
       <PageIntro
         kicker="Field & mobile work"
         title="Field assignments"
-        subtitle="Property visits, mobile notary jobs, and Remote Online Notarizations across your professional network."
+        subtitle="Property visits, mobile notary jobs, and Remote Online Notarizations. Live map shows vendor GPS and job sites."
         action={
           <div className="flex flex-wrap gap-2">
             <Link to={p('service-assignments')} className={btnOutline}>Client services</Link>
@@ -76,6 +152,8 @@ export default function FieldWorkAdmin() {
           </div>
         }
       />
+
+      <FieldLiveMap pins={mapPins} className="mb-4" />
 
       {showCreate && (
         <CreateAssignment
@@ -235,6 +313,37 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
 
   return (
     <Panel className="mb-6">
+      <div className="mb-4">
+        <ScopeIntakePicker
+          label="Prefill from occupancy / photos / reports"
+          onPick={(row) => {
+            const prefill = fieldPrefillFromScope(row)
+            setForm((current) => ({
+              ...current,
+              kind: prefill.kind,
+              service_key: prefill.service_key,
+              title: prefill.title,
+              site_address: prefill.site_address,
+              site_city: prefill.site_city,
+              site_state: prefill.site_state,
+              site_postal_code: prefill.site_postal_code,
+              notes: prefill.notes,
+              client_user_id: row.reserved_user_id || current.client_user_id,
+            }))
+            if (!row.reserved_user_id) {
+              setClientMode('new')
+              setNewClient({
+                full_name: prefill.new_client.full_name,
+                email: prefill.new_client.email,
+                phone: prefill.new_client.phone,
+                business_name: '',
+              })
+            } else {
+              setClientMode('existing')
+            }
+          }}
+        />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label><span className="mb-1 block text-xs text-slate-400">Assignment kind</span><select className={inputCls} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as 'field' | 'ron', service_key: e.target.value === 'ron' ? 'ron' : form.service_key })}><option value="field">Field visit (Property Management / Mobile Notary)</option><option value="ron">Remote Online Notarization</option></select></label>
         <label><span className="mb-1 block text-xs text-slate-400">Service</span><input className={inputCls} placeholder="e.g. mobile_notary, property_management, ron" value={form.service_key} onChange={(e) => setForm({ ...form, service_key: e.target.value })}/></label>
@@ -262,7 +371,7 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
         <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Title</span><input className={inputCls} placeholder='e.g. "Loan signing: Boca Raton office"' value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Scheduled for</span><input className={inputCls} type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Site label (optional)</span><input className={inputCls} placeholder="Client home, conference room…" value={form.site_label} onChange={(e) => setForm({ ...form, site_label: e.target.value })}/></label>
-        {form.kind === 'field' && <div className="sm:col-span-2 space-y-3"><div><span className="mb-1 block text-xs text-slate-400">Site address</span><AddressAutocomplete value={form.site_address} inputClassName={inputCls} onChange={(line1) => setForm({ ...form, site_address: line1 })} onSelect={(address) => setForm({ ...form, site_address: address.line1, site_city: address.city || form.site_city, site_state: address.state || form.site_state, site_postal_code: address.postal_code || form.site_postal_code })}/></div><div className="grid gap-3 sm:grid-cols-3"><label><span className="mb-1 block text-xs text-slate-400">City</span><input className={inputCls} value={form.site_city} onChange={(e) => setForm({ ...form, site_city: e.target.value })}/></label><label><span className="mb-1 block text-xs text-slate-400">State</span><input className={inputCls} value={form.site_state} onChange={(e) => setForm({ ...form, site_state: e.target.value })}/></label><label><span className="mb-1 block text-xs text-slate-400">Postal code</span><input className={inputCls} value={form.site_postal_code} onChange={(e) => setForm({ ...form, site_postal_code: e.target.value })}/></label></div><div className="grid gap-3 sm:grid-cols-2"><label><span className="mb-1 block text-xs text-slate-400">Site latitude (optional)</span><input className={inputCls} type="number" step="0.00001" value={form.site_lat} onChange={(e) => setForm({ ...form, site_lat: e.target.value })}/></label><label><span className="mb-1 block text-xs text-slate-400">Site longitude (optional)</span><input className={inputCls} type="number" step="0.00001" value={form.site_lng} onChange={(e) => setForm({ ...form, site_lng: e.target.value })}/></label></div><p className="text-xs text-slate-500 flex items-center gap-1"><MapPin size={12}/> With lat/lng set, the vendor's phone will auto-mark them "on site" when they arrive within 150 m.</p></div>}
+        {form.kind === 'field' && <div className="sm:col-span-2 space-y-3"><div><span className="mb-1 block text-xs text-slate-400">Site address</span><AddressAutocomplete value={form.site_address} inputClassName={inputCls} onChange={(line1) => setForm({ ...form, site_address: line1 })} onSelect={(address) => setForm({ ...form, site_address: address.line1, site_city: address.city || form.site_city, site_state: address.state || form.site_state, site_postal_code: address.postal_code || form.site_postal_code, site_lat: address.lat != null ? String(address.lat) : form.site_lat, site_lng: address.lng != null ? String(address.lng) : form.site_lng })}/></div><div className="grid gap-3 sm:grid-cols-3"><label><span className="mb-1 block text-xs text-slate-400">City</span><input className={inputCls} value={form.site_city} onChange={(e) => setForm({ ...form, site_city: e.target.value })}/></label><label><span className="mb-1 block text-xs text-slate-400">State</span><input className={inputCls} value={form.site_state} onChange={(e) => setForm({ ...form, site_state: e.target.value })}/></label><label><span className="mb-1 block text-xs text-slate-400">Postal code</span><input className={inputCls} value={form.site_postal_code} onChange={(e) => setForm({ ...form, site_postal_code: e.target.value })}/></label></div><div className="grid gap-3 sm:grid-cols-2"><label><span className="mb-1 block text-xs text-slate-400">Site latitude (optional)</span><input className={inputCls} type="number" step="0.00001" value={form.site_lat} onChange={(e) => setForm({ ...form, site_lat: e.target.value })}/></label><label><span className="mb-1 block text-xs text-slate-400">Site longitude (optional)</span><input className={inputCls} type="number" step="0.00001" value={form.site_lng} onChange={(e) => setForm({ ...form, site_lng: e.target.value })}/></label></div><p className="text-xs text-slate-500 flex items-center gap-1"><MapPin size={12}/> With lat/lng set, the vendor's phone will auto-mark them "on site" when they arrive within 150 m.</p></div>}
         <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Notes for the provider (optional)</span><textarea className={`${inputCls} min-h-20`} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}/></label>
       </div>
       <div className="mt-4 flex gap-2"><button type="button" onClick={onCancel} className={btnOutline}>Cancel</button><button type="button" onClick={submit} disabled={saving} className={`${btnPrimary} disabled:opacity-60`}>{saving ? <Loader2 size={14} className="animate-spin"/> : <Plus size={14}/>} Create assignment</button></div>

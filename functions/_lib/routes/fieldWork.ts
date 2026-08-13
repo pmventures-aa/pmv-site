@@ -375,6 +375,62 @@ fieldWorkRoutes.post('/field-assignments/:id/cancel', requireStaff, async (c) =>
   return c.json({ ok: true })
 })
 
+fieldWorkRoutes.post('/field-assignments/:id/ping', requireStaff, async (c) => {
+  const user = c.get('user')
+  const row = await loadAssignment(c.env, c.req.param('id'))
+  if (!row) return c.json({ error: 'not found' }, 404)
+  if (row.vendor_user_id !== user.id && user.role !== 'admin') return c.json({ error: 'forbidden' }, 403)
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
+  const lat = num(body.lat)
+  const lng = num(body.lng)
+  if (lat == null || lng == null) return c.json({ error: 'lat and lng are required' }, 400)
+  await c.env.DB.prepare(
+    `INSERT INTO field_agent_locations (user_id, assignment_id, lat, lng, accuracy_m, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET
+       assignment_id = excluded.assignment_id,
+       lat = excluded.lat,
+       lng = excluded.lng,
+       accuracy_m = excluded.accuracy_m,
+       updated_at = datetime('now')`,
+  ).bind(user.id, row.id, lat, lng, num(body.accuracy_m)).run()
+  return c.json({ ok: true })
+})
+
+fieldWorkRoutes.get('/field-map', requireStaff, async (c) => {
+  const user = c.get('user')
+  const clauses: string[] = ["fa.status NOT IN ('completed', 'cancelled')"]
+  const params: unknown[] = []
+  if (user.role !== 'admin') {
+    clauses.push('(fa.vendor_user_id = ? OR fa.assigned_by_user_id = ?)')
+    params.push(user.id, user.id)
+  }
+  const assignments = await c.env.DB.prepare(
+    `SELECT fa.id, fa.kind, fa.service_key, fa.status, fa.title, fa.site_label, fa.site_address,
+            fa.site_city, fa.site_state, fa.site_lat, fa.site_lng, fa.scheduled_at,
+            fa.depart_lat, fa.depart_lng, fa.arrival_lat, fa.arrival_lng,
+            fa.vendor_user_id, vu.full_name AS vendor_name
+     FROM field_assignments fa
+     LEFT JOIN users vu ON vu.id = fa.vendor_user_id
+     WHERE ${clauses.join(' AND ')}
+     ORDER BY fa.updated_at DESC
+     LIMIT 200`,
+  ).bind(...params).all()
+  let agents: { results?: Array<{ user_id: string; assignment_id: string | null; lat: number; lng: number; accuracy_m: number | null; updated_at: string; full_name: string | null; email: string }> } = { results: [] }
+  try {
+    agents = await c.env.DB.prepare(
+      `SELECT loc.user_id, loc.assignment_id, loc.lat, loc.lng, loc.accuracy_m, loc.updated_at,
+              u.full_name, u.email
+       FROM field_agent_locations loc
+       JOIN users u ON u.id = loc.user_id
+       WHERE julianday('now') - julianday(loc.updated_at) < 1`,
+    ).all()
+  } catch {
+    agents = { results: [] }
+  }
+  return c.json({ assignments: assignments.results ?? [], agents: agents.results ?? [] })
+})
+
 // Suppress unused import warnings for helpers we intentionally re-export
 void activityInsert
 void renderPinnacleEmailLayout

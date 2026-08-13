@@ -1,7 +1,7 @@
 import {
   Home, Layers, FileText, MessageSquare, Calendar, Receipt, HelpCircle, Building2, Users,
-  Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, MapPinned,
-  Bot, Gauge, ShieldCheck, Globe, Wrench, type LucideIcon,
+  Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned,
+  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, type LucideIcon,
 } from 'lucide-react'
 import { clientWorkspace, resolveWorld, type OperatingWorld } from '../../lib/workspace'
 
@@ -51,9 +51,10 @@ export const adminNav: NavItem[] = [
   {key:'invoices',label:'Invoices',to:'invoices',icon:Receipt,section:'Revenue'},
   {key:'clients',label:'Clients',to:'clients',icon:Users,section:'Revenue'},
   {key:'inquiries',label:'Leads',to:'inquiries',icon:UserPlus,section:'Revenue'},
-  {key:'messages',label:'Inbox',to:'messages',icon:MessageSquare,section:'Operations'},
+  {key:'messages',label:'Messages',to:'messages',icon:MessageSquare,section:'Operations'},
   {key:'cases',label:'Cases & SLA',to:'cases',icon:HelpCircle,section:'Operations'},
   {key:'field-work',label:'Field Work & RON',to:'field-work',icon:MapPinned,section:'Operations'},
+  {key:'service-assignments',label:'Service Assignments',to:'service-assignments',icon:Wrench,section:'Operations'},
   {key:'document-center',label:'Documents',to:'document-center',icon:FileText,section:'Operations'},
   {key:'automation-center',label:'Automation Center',to:'automation-center',icon:Bot,section:'Operations'},
   {key:'management',label:'Management',to:'management',icon:Gauge,section:'Intelligence'},
@@ -63,6 +64,9 @@ export const adminNav: NavItem[] = [
   {key:'audit-log',label:'Audit Log',to:'audit-log',icon:ClipboardList,section:'Administration'},
   {key:'network',label:'Network & Dispatch',to:'network',icon:UsersRound,section:'Administration'},
   {key:'users',label:'Users',to:'users',icon:UserCog,section:'Administration'},
+  {key:'assignments',label:'Staff Coverage',to:'assignments',icon:ArrowLeftRight,section:'Administration'},
+  {key:'invitations',label:'Invitations',to:'invitations',icon:MailPlus,section:'Administration'},
+  {key:'roles',label:'Roles & Permissions',to:'roles',icon:KeyRound,section:'Administration'},
   {key:'public-funnel',label:'Website Studio',to:'public-funnel',icon:Globe,section:'Administration'},
   {key:'settings',label:'Settings',to:'settings',icon:Settings,section:'Administration'},
 ]
