@@ -6,10 +6,15 @@ export const documentSignerFileRoutes=new Hono<AppEnv>()
 const now=()=>new Date().toISOString()
 
 async function recipientForToken(c:any){const hash=await sha256Hex(c.req.param('token'));return c.env.DB.prepare(`SELECT r.*,e.source_file_id,e.status envelope_status,e.expires_at FROM envelope_recipients r JOIN envelopes e ON e.id=r.envelope_id WHERE r.invitation_token_hash=?`).bind(hash).first() as Promise<any>}
+async function signerSession(c:any){const raw=c.req.header('x-signing-session')||'';if(!raw)return null;const v=await c.env.SESSIONS.get(`sign:${raw}`);return v?JSON.parse(v):null}
 
 documentSignerFileRoutes.get('/sign/:token/documents/:documentId/file',async c=>{
   if(!c.env.UPLOADS)return c.json({error:'document storage is not configured'},503)
-  const r=await recipientForToken(c);if(!r)return c.json({error:'invalid or revoked link'},404);if(r.access_revoked_at)return c.json({error:'access revoked'},410);if(r.invitation_expires_at&&r.invitation_expires_at<now())return c.json({error:'link expired'},410);if(r.expires_at&&r.expires_at<now())return c.json({error:'envelope expired'},410);if(['voided','expired','declined'].includes(r.envelope_status))return c.json({error:`envelope ${r.envelope_status}`},410)
+  const ses=await signerSession(c)
+  if(!ses)return c.json({error:'authentication required'},401)
+  const r=await recipientForToken(c);if(!r)return c.json({error:'invalid or revoked link'},404)
+  if(r.id!==ses.recipient_id||r.envelope_id!==ses.envelope_id)return c.json({error:'forbidden'},403)
+  if(r.access_revoked_at)return c.json({error:'access revoked'},410);if(r.invitation_expires_at&&r.invitation_expires_at<now())return c.json({error:'link expired'},410);if(r.expires_at&&r.expires_at<now())return c.json({error:'envelope expired'},410);if(['voided','expired','declined'].includes(r.envelope_status))return c.json({error:`envelope ${r.envelope_status}`},410)
   const documentId=c.req.param('documentId');let fileId:string|null=null
   if(documentId==='source')fileId=r.source_file_id||null
   else{const d=await c.env.DB.prepare('SELECT document_file_id FROM envelope_documents WHERE id=? AND envelope_id=?').bind(documentId,r.envelope_id).first() as any;fileId=d?.document_file_id||null}

@@ -212,7 +212,15 @@ trustedContactRoutes.get('/trusted/:clientId/:section', requireUser, async (c) =
   }
   if (section === 'messages') {
     const rows = await c.env.DB.prepare(
-      `SELECT id,subject,body,created_at,sender_user_id FROM secure_messages WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100`,
+      `SELECT t.id,
+              t.subject,
+              (SELECT m.body FROM thread_messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS body,
+              t.last_message_at AS created_at,
+              (SELECT m.sender_user_id FROM thread_messages m WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS sender_user_id
+       FROM message_threads t
+       WHERE t.client_user_id = ?
+       ORDER BY t.last_message_at DESC
+       LIMIT 100`,
     ).bind(clientId).all()
     return c.json({ mode: access.permissions[section], rows: rows.results || [] })
   }

@@ -161,7 +161,7 @@ scopeFunnelPublicRoutes.post('/scope-requests/:token/book', async (c) => {
     c.env.DB.prepare(`UPDATE public_scope_requests SET preferred_slot_at=(SELECT starts_at FROM public_service_slots WHERE id=?),booked_at=datetime('now'),status='booked',updated_at=datetime('now')
       WHERE id=? AND EXISTS(SELECT 1 FROM public_scope_bookings WHERE id=?)`).bind(slotId,request.id,bookingId),
   ])
-  if(!Number((results[1] as any)?.meta?.changes||0))return c.json({error:'that appointment is no longer available; choose another time'},409)
+  if(!Number((results[0] as any)?.meta?.changes||0)||!Number((results[1] as any)?.meta?.changes||0))return c.json({error:'that appointment is no longer available; choose another time'},409)
   const slot=await c.env.DB.prepare('SELECT starts_at,ends_at FROM public_service_slots WHERE id=?').bind(slotId).first<any>()
   c.executionCtx.waitUntil(notifyStaff(c.env,{staffUserIds:[],kind:'lead_created',subject:`Appointment booked: ${request.contact_name}`,html:`<p><strong>${escapeHtml(request.contact_name)}</strong> confirmed an online appointment.</p><p><strong>Starts:</strong> ${escapeHtml(slot.starts_at)}</p><p><strong>Request:</strong> ${escapeHtml(request.job_type.replace(/_/g,' '))}</p>`}))
   return c.json({ok:true,booking:{id:bookingId,starts_at:slot.starts_at,ends_at:slot.ends_at,status:'confirmed'}},201)
@@ -170,8 +170,12 @@ scopeFunnelPublicRoutes.post('/scope-requests/:token/book', async (c) => {
 scopeFunnelPublicRoutes.post('/scope-requests/:token/convert', requireUser, async (c) => {
   const user = c.get('user')
   if (user.role !== 'client') return c.json({error:'client account required'},403)
-  const row = await c.env.DB.prepare('SELECT id,inquiry_id FROM public_scope_requests WHERE public_token=?').bind(c.req.param('token')).first<any>()
+  const row = await c.env.DB.prepare('SELECT id,inquiry_id,email,converted_user_id FROM public_scope_requests WHERE public_token=?').bind(c.req.param('token')).first<any>()
   if (!row) return c.json({error:'request not found'},404)
+  if (row.converted_user_id) return c.json({error:'request already linked to an account'},409)
+  if (String(user.email || '').toLowerCase() !== String(row.email || '').toLowerCase()) {
+    return c.json({error:'this scope request belongs to a different email address'},403)
+  }
   await c.env.DB.batch([
     c.env.DB.prepare("UPDATE public_scope_requests SET converted_user_id=?,status='converted',updated_at=datetime('now') WHERE id=?").bind(user.id,row.id),
     c.env.DB.prepare("UPDATE contact_inquiries SET client_user_id=?,lifecycle_stage='converted',converted_at=datetime('now'),updated_at=datetime('now') WHERE id=?").bind(user.id,row.inquiry_id),
