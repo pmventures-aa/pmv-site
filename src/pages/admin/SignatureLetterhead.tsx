@@ -60,20 +60,17 @@ export function SignatureLetterhead({
   )
 }
 
-export function SignaturePreview({ signature }: { signature: EmailSignature }) {
-  if (signature.kind === 'custom') {
-    return (
-      <div
-        className="signature-preview"
-        dangerouslySetInnerHTML={{ __html: previewSignatureHtml(signature.html) }}
-      />
-    )
-  }
+export function SignaturePreview({
+  signature,
+  html,
+}: {
+  signature: EmailSignature
+  html?: string
+}) {
   return (
-    <SignatureLetterhead
-      kind={signature.kind}
-      personName={signature.kind === 'support' ? 'PMV Support' : signature.name}
-      title={signature.kind === 'support' ? 'Client Care' : undefined}
+    <div
+      className="signature-preview"
+      dangerouslySetInnerHTML={{ __html: previewSignatureHtml(html ?? signature.html) }}
     />
   )
 }

@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { appendSignature, absolutizeSignatureAssets, brandedSignatureHtml, htmlToPlainText } from '../functions/_lib/emailSignatures'
+import { sendEmailStrict } from '../functions/_lib/email'
+import { CREST_ABSOLUTE_URL, CREST_CID } from '../shared/letterhead'
+import { withEmbeddedCrest } from '../shared/emailSignatureHtml'
 import { resolveHqDeepLink } from '../src/components/kit/NotificationFeedPanel'
+import { readFileSync } from 'node:fs'
 
 describe('branded email signatures', () => {
   it('builds a professional company block with crest, phone, and site', () => {
@@ -51,9 +55,52 @@ describe('branded email signatures', () => {
     expect(html).not.toContain('https://www.pinnaclemanagementventures.com/logo-crest-letterhead.png')
   })
 
-  it('absolutizes the crest for outbound mail', () => {
+  it('absolutizes the crest when a hosted URL is required', () => {
     const html = absolutizeSignatureAssets(brandedSignatureHtml('company'))
-    expect(html).toContain('https://www.pinnaclemanagementventures.com/logo-crest-letterhead.png')
+    expect(html).toContain(CREST_ABSOLUTE_URL)
+  })
+
+  it('embeds the crest as an inline CID image for outbound mail', () => {
+    const { html, attachments } = withEmbeddedCrest(brandedSignatureHtml('personal', {
+      name: 'C.R. Jenkins',
+      title: 'Principal',
+      email: 'cody@pinnaclemanagementventures.com',
+    }))
+    expect(html).toContain(`src="cid:${CREST_CID}"`)
+    expect(html).not.toContain('src="/logo-crest-letterhead.png"')
+    expect(attachments).toEqual([
+      expect.objectContaining({
+        filename: 'logo-crest-letterhead.png',
+        content_id: CREST_CID,
+        content_type: 'image/png',
+        path: CREST_ABSOLUTE_URL,
+      }),
+    ])
+  })
+
+  it('embeds the crest from transactional hosted URLs too', () => {
+    const { html, attachments } = withEmbeddedCrest(`<img src="${CREST_ABSOLUTE_URL}" alt="Pinnacle"/>`)
+    expect(html).toContain(`cid:${CREST_CID}`)
+    expect(attachments[0]?.content_id).toBe(CREST_CID)
+  })
+
+  it('does not attach a crest when the message has no letterhead image', () => {
+    const { html, attachments } = withEmbeddedCrest('<p>Hello</p>')
+    expect(html).toBe('<p>Hello</p>')
+    expect(attachments).toEqual([])
+  })
+
+  it('puts the person name and title on the shared Pinnacle letterhead', () => {
+    const html = brandedSignatureHtml('personal', {
+      name: 'Jordan Lee',
+      title: 'Field vendor',
+      email: 'jordan@pinnaclemanagementventures.com',
+      phone: '(561) 388-7879',
+    })
+    expect(html).toContain('Pinnacle Management Ventures')
+    expect(html).toContain('Jordan Lee')
+    expect(html).toContain('Field vendor')
+    expect(html).toContain('data-pmv-person="1"')
   })
 
   it('rewrites the padded transparent crest onto the letterhead mark', () => {
@@ -81,5 +128,34 @@ describe('HQ notification deep links', () => {
     const local = (path: string) => path ? `/admin/${path}` : '/admin'
     expect(resolveHqDeepLink('/messages?tab=email&thread=abc', local)).toBe('/admin/messages?tab=email&thread=abc')
     expect(resolveHqDeepLink('/hq/communications?tab=email&thread=abc', local)).toBe('/admin/messages?tab=email&thread=abc')
+  })
+})
+
+describe('outbound crest embedding', () => {
+  it('sends the crest as a CID attachment through Resend', async () => {
+    const payloads: Record<string, unknown>[] = []
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      payloads.push(JSON.parse(String(init?.body || '{}')))
+      return { ok: true, json: async () => ({ id: 're_test' }) } as Response
+    })
+    await sendEmailStrict(
+      { RESEND_API_KEY: 're_test_key' } as any,
+      { to: 'jordan@example.com', subject: 'Hello', html: brandedSignatureHtml('company') },
+    )
+    vi.unstubAllGlobals()
+    expect(payloads[0].html).toContain(`cid:${CREST_CID}`)
+    expect(payloads[0].attachments).toEqual([
+      expect.objectContaining({ content_id: CREST_CID, filename: 'logo-crest-letterhead.png' }),
+    ])
+  })
+
+  it('lets HQ edit branded signatures for staff and vendors', () => {
+    const panel = readFileSync(new URL('../src/pages/admin/EmailSignaturesPanel.tsx', import.meta.url), 'utf8')
+    const routes = readFileSync(new URL('../functions/_lib/routes/emailSignatures.ts', import.meta.url), 'utf8')
+    const profile = readFileSync(new URL('../src/pages/admin/ProviderProfile.tsx', import.meta.url), 'utf8')
+    expect(panel).toContain('Vendors')
+    expect(panel).toContain('Staff')
+    expect(routes).toContain('/email-signatures/roster/:userId')
+    expect(profile).toContain('Branded email signature')
   })
 })
