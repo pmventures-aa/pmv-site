@@ -231,7 +231,6 @@ export function EmailSignaturesPanel({
                 />
               )}
               <div className="rounded-md border border-[#e4dfd4] bg-white p-6">
-                <p className="mb-4 text-[10px] font-semibold uppercase tracking-[.16em] text-[#9a7838]">Letterhead as sent</p>
                 <SignaturePreview
                   signature={selected || {
                     id: selectedPerson?.user_id || 'roster',
@@ -245,9 +244,6 @@ export function EmailSignaturesPanel({
                   }}
                   html={previewHtml}
                 />
-                <p className="mt-4 max-w-[36rem] text-[11px] leading-[16px] text-[#8b939e]">
-                  The crest travels inside the email. Name, title, and contact lines are text on the Pinnacle letterhead.
-                </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="inline-flex items-center gap-2 rounded-md bg-[#c9a227] px-3 py-1.5 text-sm font-semibold text-[#07111f] disabled:opacity-50" disabled={busy || !(personName || name).trim()} onClick={() => void save()}>

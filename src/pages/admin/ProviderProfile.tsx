@@ -193,10 +193,7 @@ export default function ProviderProfile() {
 
           {sigReady && (
             <Panel>
-              <h2 className="text-sm font-semibold text-white">Branded email signature</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                {provider ? 'This vendor' : 'This staff member'} gets the same Pinnacle letterhead, with their name and contact on it, when they send from HQ.
-              </p>
+              <h2 className="text-sm font-semibold text-white">Signature</h2>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <Field label="Name"><input className={inputCls} value={sigName} onChange={(x) => setSigName(x.target.value)} /></Field>
                 <Field label="Title"><input className={inputCls} value={sigTitle} onChange={(x) => setSigTitle(x.target.value)} placeholder="Principal, Field vendor…" /></Field>

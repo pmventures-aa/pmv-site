@@ -177,14 +177,8 @@ export function EmailComposePane({
           />
         </div>
         {selected && (
-          <div className="relative z-10 shrink-0 border-t border-[#eeeae2] bg-white px-8 pb-8 pt-5">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[.14em] text-[#9aa3ae]">
-              Signature · attached when you send
-            </p>
+          <div className="relative z-10 shrink-0 bg-white px-8 pb-10 pt-6">
             <SignaturePreview signature={selected} />
-            <p className="mt-3 max-w-[34rem] text-[11px] leading-[16px] text-[#8b939e]">
-              This Pinnacle letterhead is attached under your message. The crest is included in the email itself.
-            </p>
           </div>
         )}
       </div>
