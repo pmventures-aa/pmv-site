@@ -235,6 +235,7 @@ export function LeadPipelineBoard({
         {lead.message && <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{lead.message}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
           <Link to={leadEmailHref(p, { id: lead.id, email: lead.email, name: lead.name })} className="text-xs font-bold text-gold hover:underline">Email</Link>
+          <Link to={`${p('quotes')}?new=1&email=${encodeURIComponent(lead.email)}&name=${encodeURIComponent(lead.name)}`} className="text-xs font-bold text-gold hover:underline">Quote</Link>
           <Link to={p(`leads/${lead.id}`)} className="text-xs font-bold text-gold hover:underline">Open</Link>
           {stage === 'ready' && <button type="button" onClick={() => setConversionTarget(lead)} className="text-xs font-bold text-emerald-300 hover:underline">Convert</button>}
         </div>

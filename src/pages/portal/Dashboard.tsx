@@ -22,6 +22,7 @@ interface DashboardData {
     open_invoices: number
     open_tickets: number
     pending_calls: number
+    pending_quotes?: number
   }
   upcoming_appointments: { id: string; title: string; starts_at: string }[]
   recent_messages: { id: string; body: string; sender_user_id: string; created_at: string }[]
@@ -61,7 +62,7 @@ export default function Dashboard() {
   const cases = data?.active_cases ?? []
   const needsYou = cases.filter((item) => waitingOnYou(item.waiting_on))
   const nextAppointment = data?.upcoming_appointments?.[0]
-  const clientActions = (stats?.pending_documents ?? 0) + (stats?.open_invoices ?? 0) + (stats?.open_tasks ?? 0) + needsYou.length
+  const clientActions = (stats?.pending_documents ?? 0) + (stats?.open_invoices ?? 0) + (stats?.open_tasks ?? 0) + (stats?.pending_quotes ?? 0) + needsYou.length
 
   const nextMove = useMemo(() => {
     if (!loaded) return null
@@ -72,6 +73,15 @@ export default function Dashboard() {
         body: 'Pinnacle cannot move this request forward until you respond or send what was asked for.',
         to: p('support'),
         label: 'Open request',
+      }
+    }
+    if ((stats?.pending_quotes ?? 0) > 0) {
+      return {
+        eyebrow: 'Waiting on you',
+        title: stats!.pending_quotes === 1 ? 'A quote needs your reply' : `${stats!.pending_quotes} quotes need your reply`,
+        body: 'Accept or decline with optional notes. Nothing is charged on the quote page.',
+        to: p('billing'),
+        label: 'Review quotes',
       }
     }
     if ((stats?.pending_documents ?? 0) > 0) {
@@ -123,7 +133,7 @@ export default function Dashboard() {
     properties: { label: 'Properties', to: p('property-management'), icon: Building2, note: data?.properties.length },
     documents: { label: 'Documents', to: p('documents'), icon: FileText, note: stats?.pending_documents },
     messages: { label: 'Messages', to: p('messages'), icon: MessageSquare, note: undefined as number | undefined },
-    billing: { label: 'Billing', to: p('billing'), icon: Receipt, note: stats?.open_invoices },
+    billing: { label: 'Billing', to: p('billing'), icon: Receipt, note: (stats?.pending_quotes || 0) + (stats?.open_invoices || 0) || undefined },
     calendar: { label: 'Calendar', to: p('calendar'), icon: Calendar, note: undefined as number | undefined },
     team: { label: 'My Team', to: p('my-team'), icon: Users, note: undefined as number | undefined },
     account: { label: 'Account', to: p('business-profile'), icon: ShieldCheck, note: undefined as number | undefined },
@@ -233,6 +243,7 @@ export default function Dashboard() {
                 [copy.pulseOpenLabel, loaded ? `${stats?.open_tickets ?? 0} request${(stats?.open_tickets ?? 0) === 1 ? '' : 's'}` : '…'],
                 ['Needs you', loaded ? `${clientActions} item${clientActions === 1 ? '' : 's'}` : '…'],
                 ['Next visit', nextAppointment ? new Date(nextAppointment.starts_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Nothing scheduled'],
+                ['Quotes to review', loaded ? String(stats?.pending_quotes ?? 0) : '…'],
                 ['Open invoices', loaded ? String(stats?.open_invoices ?? 0) : '…'],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-4 py-3 text-sm">
