@@ -61,7 +61,8 @@ export default function PipelinesAdmin(){
   const[hideLost,setHideLost]=useState(true)
   const[compact,setCompact]=useState(()=>typeof window!=='undefined'&&window.localStorage.getItem('pmv_pipeline_compact')==='1')
   const[conversionTarget,setConversionTarget]=useState<LeadRecord|null>(null)
-  const[draft,setDraft]=useState({name:'',email:'',source:''})
+  const[draft,setDraft]=useState({record_type:'person' as 'person'|'business',first_name:'',last_name:'',company_name:'',job_title:'',email:'',phone:'',source:'',lifecycle_stage:'lead' as 'lead'|'prospect'|'opportunity',message:''})
+  const[sendInvite,setSendInvite]=useState(false)
   const[creating,setCreating]=useState(false)
   const movingRef=useRef(new Set<string>())
 
@@ -186,14 +187,42 @@ export default function PipelinesAdmin(){
   function toggleDensity(){setCompact(value=>{const next=!value;window.localStorage.setItem('pmv_pipeline_compact',next?'1':'0');return next})}
 
   async function createLead(){
-    const name=draft.name.trim()
     const email=draft.email.trim().toLowerCase()
-    if(!name||!email){toast.error('Enter a name and email.');return}
+    const first=draft.first_name.trim()
+    const last=draft.last_name.trim()
+    const company=draft.company_name.trim()
+    const name=draft.record_type==='business'?company:`${first} ${last}`.trim()
+    if(!email){toast.error('Enter an email address.');return}
+    if(!name){toast.error(draft.record_type==='business'?'Enter a business name.':'Enter a first name.');return}
     setCreating(true)
     try{
-      await api.post('/admin/crm/records',{name,email,source:draft.source.trim()||'Pipeline',record_type:'person',lifecycle_stage:'lead',status:'new'})
-      toast.success(`${name} is on the board.`)
-      setDraft({name:'',email:'',source:''})
+      const result=await api.post<{id:string}>('/admin/crm/records',{
+        record_type:draft.record_type,
+        first_name:draft.record_type==='person'?first:undefined,
+        last_name:draft.record_type==='person'?last:undefined,
+        company_name:company||undefined,
+        job_title:draft.job_title.trim()||undefined,
+        name,
+        email,
+        phone:draft.phone.trim()||undefined,
+        source:draft.source.trim()||'Pipeline',
+        lifecycle_stage:draft.lifecycle_stage,
+        status:'new',
+        message:draft.message.trim()||undefined,
+      })
+      let inviteSent=false
+      if(sendInvite){
+        try{
+          const invite=await api.post<{email_status:string;email_error?:string}>('/admin/invitations',{invite_type:'client',email,full_name:name,lead_id:result.id})
+          inviteSent=invite.email_status==='sent'
+          if(!inviteSent)toast.error(`Lead created, but the invitation email was not sent. ${invite.email_error||''}`)
+        }catch(err){
+          toast.error(err instanceof ApiError?`Lead created, but the invitation could not be sent: ${err.message}`:'Lead created, but the invitation could not be sent.')
+        }
+      }
+      toast.success(inviteSent?`${name} is on the board and a client invitation was emailed.`:`${name} is on the board.`)
+      setDraft({record_type:'person',first_name:'',last_name:'',company_name:'',job_title:'',email:'',phone:'',source:'',lifecycle_stage:'lead',message:''})
+      setSendInvite(false)
       await Promise.all([load('inquiries',true),loadCounts()])
     }catch(err){
       toast.error(err instanceof ApiError?err.message:'Could not create the lead.')
@@ -201,7 +230,7 @@ export default function PipelinesAdmin(){
   }
 
   return <div className={compact?'[&_.pmv-kanban-card]:text-xs':''}>
-    <PageIntro kicker="Revenue & Delivery" title="Pipeline" subtitle="One board for the client journey: win the work, deliver it, and track capital work. Add a lead here, then open the CRM for lists and imports." action={<div className="flex flex-wrap items-center gap-2">{tab==='quotes'?<Link to={p('quotes')} className={btnOutline}>Open Quotes</Link>:tab==='inquiries'?<Link to={p('inquiries')} className={btnOutline}>CRM records</Link>:null}</div>}/>
+    <PageIntro kicker="Revenue & Delivery" title="Pipeline" subtitle="One board for the client journey: win the work, deliver it, and track capital work. Capture a real relationship here, then open the CRM for lists and imports." action={<div className="flex flex-wrap items-center gap-2">{tab==='quotes'?<Link to={p('quotes')} className={btnOutline}>Open Quotes</Link>:tab==='inquiries'?<Link to={p('inquiries')} className={btnOutline}>CRM records</Link>:null}</div>}/>
 
     <div className="mb-5 overflow-hidden rounded-xl border border-white/[.08] bg-white/[.018]">
       <div className="grid grid-cols-2 divide-x divide-white/[.06] sm:grid-cols-5">
@@ -233,11 +262,40 @@ export default function PipelinesAdmin(){
       </div>
     </div>
 
-    {tab==='inquiries'&&<form className="mb-4 grid gap-2 rounded-lg border border-white/[.08] bg-white/[.018] p-3 sm:grid-cols-[1fr_1fr_160px_auto]" onSubmit={e=>{e.preventDefault();void createLead()}}>
-      <input className={inputCls} placeholder="Name" value={draft.name} onChange={e=>setDraft(current=>({...current,name:e.target.value}))} />
-      <input className={inputCls} type="email" placeholder="Email" value={draft.email} onChange={e=>setDraft(current=>({...current,email:e.target.value}))} />
-      <input className={inputCls} placeholder="Source" value={draft.source} onChange={e=>setDraft(current=>({...current,source:e.target.value}))} />
-      <button type="submit" disabled={creating} className={btnPrimary}>{creating?'Adding…':'Add lead'}</button>
+    {tab==='inquiries'&&<form className="mb-4 space-y-3 rounded-xl border border-white/[.08] bg-white/[.018] p-4" onSubmit={e=>{e.preventDefault();void createLead()}}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold">New relationship</p>
+          <p className="mt-1 text-sm font-semibold text-white">Add a lead to the board</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select className={`${inputCls} !min-h-10 w-auto min-w-[140px]`} value={draft.record_type} onChange={e=>setDraft(current=>({...current,record_type:e.target.value as 'person'|'business'}))}>
+            <option value="person">Person</option>
+            <option value="business">Business</option>
+          </select>
+          <Link to={`${p('leads/new')}?from=pipelines`} className="text-xs font-bold text-slate-500 hover:text-gold">Full CRM form</Link>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {draft.record_type==='person'?<>
+          <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">First name</span><input className={inputCls} required placeholder="Jordan" value={draft.first_name} onChange={e=>setDraft(current=>({...current,first_name:e.target.value}))}/></label>
+          <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Last name</span><input className={inputCls} placeholder="Lee" value={draft.last_name} onChange={e=>setDraft(current=>({...current,last_name:e.target.value}))}/></label>
+          <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Company</span><input className={inputCls} placeholder="Optional" value={draft.company_name} onChange={e=>setDraft(current=>({...current,company_name:e.target.value}))}/></label>
+          <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Job title</span><input className={inputCls} placeholder="Optional" value={draft.job_title} onChange={e=>setDraft(current=>({...current,job_title:e.target.value}))}/></label>
+        </>:<label className="sm:col-span-2"><span className="mb-1 block text-[11px] font-semibold text-slate-400">Business name</span><input className={inputCls} required placeholder="Practice or company" value={draft.company_name} onChange={e=>setDraft(current=>({...current,company_name:e.target.value}))}/></label>}
+        <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Email</span><input className={inputCls} type="email" required placeholder="name@example.com" value={draft.email} onChange={e=>setDraft(current=>({...current,email:e.target.value}))}/></label>
+        <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Phone</span><input className={inputCls} type="tel" placeholder="Optional" value={draft.phone} onChange={e=>setDraft(current=>({...current,phone:e.target.value}))}/></label>
+        <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Source</span><input className={inputCls} placeholder="Referral, website, outbound" value={draft.source} onChange={e=>setDraft(current=>({...current,source:e.target.value}))}/></label>
+        <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Lifecycle</span><select className={inputCls} value={draft.lifecycle_stage} onChange={e=>setDraft(current=>({...current,lifecycle_stage:e.target.value as 'lead'|'prospect'|'opportunity'}))}><option value="lead">Lead</option><option value="prospect">Prospect</option><option value="opportunity">Application</option></select></label>
+        <label className="sm:col-span-2 xl:col-span-4"><span className="mb-1 block text-[11px] font-semibold text-slate-400">What they need / notes</span><textarea className={`${inputCls} min-h-[72px]`} placeholder="Service interest, how they found Pinnacle, and anything the next person should know." value={draft.message} onChange={e=>setDraft(current=>({...current,message:e.target.value}))}/></label>
+      </div>
+      <div className="flex flex-col gap-3 border-t border-white/[.06] pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-300">
+          <input type="checkbox" className="mt-1 h-4 w-4 accent-[#c9a227]" checked={sendInvite} onChange={e=>setSendInvite(e.target.checked)}/>
+          <span>Send a branded client invitation after creating this lead. Tracking stays on the invitation; delivered updates when the mailbox accepts it.</span>
+        </label>
+        <button type="submit" disabled={creating} className={`${btnPrimary} shrink-0`}>{creating?'Adding…':sendInvite?'Add lead & invite':'Add lead'}</button>
+      </div>
     </form>}
 
     {loading?<Panel><p className="text-sm text-slate-400">Loading pipeline data...</p></Panel>

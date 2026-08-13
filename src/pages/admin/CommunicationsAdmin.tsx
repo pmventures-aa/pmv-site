@@ -6,7 +6,7 @@ import { RichTextComposer } from '../../components/admin/RichTextComposer'
 import { Dialog, DialogContent, DialogTrigger } from '../../components/kit/Dialog'
 
 interface AudienceData {
-  counts: { employees: number; vendors: number }
+  counts: { employees: number; vendors: number; pending_vendors?: number }
   vendor_categories: { category: string; n: number }[]
   people: { id: string; email: string; full_name: string | null; status: string; party_type: string | null; vendor_category: string | null; title: string | null }[]
 }
@@ -220,6 +220,10 @@ export default function CommunicationsAdmin() {
                   <label className="flex items-center gap-2 text-sm text-slate-200">
                     <input type="checkbox" checked={segments.includes('all_vendors')} onChange={() => toggleSegment('all_vendors')} />
                     All vendors ({audience?.counts.vendors ?? 0})
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-200">
+                    <input type="checkbox" checked={segments.includes('pending_vendors')} onChange={() => toggleSegment('pending_vendors')} />
+                    Pending vendors ({audience?.counts.pending_vendors ?? 0})
                   </label>
                   {audience?.vendor_categories.map((c) => (
                     <label key={c.category} className="flex items-center gap-2 pl-4 text-sm text-slate-400">

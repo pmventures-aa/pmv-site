@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import type { AppEnv, SessionUser } from '../types'
 import { requireAdmin, requireOwner, requireStaff } from '../mid'
 import { NAMED_PERMISSIONS, namedPermissionColumn, requireNamedPermission, resolveNamedPermission } from '../capabilities'
-import { createInvite, rotateInviteToken, sendInviteEmail, type InviteType } from '../invites'
+import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult, type InviteType } from '../invites'
+import { stageVendorProfile, VendorInviteConflict } from '../vendorStaging'
 import { logAudit, actorIp, actorUserAgent } from '../auditLog'
 import { uuid } from '../crypto'
 import { toDisplayCase } from '../../../shared/displayCase'
@@ -29,12 +30,14 @@ invitationAdminRoutes.get('/invitations', requireStaff, requireNamedPermission('
   ).run()
   const rows = await c.env.DB.prepare(
     `SELECT ai.*,inviter.full_name inviter_name,rd.name role_name,
-            COALESCE(cp.business_name,client.full_name,client.email) client_name
+            COALESCE(cp.business_name,client.full_name,client.email) client_name,
+            staged.full_name staged_user_name, staged.status staged_user_status, staged.email staged_user_email
      FROM access_invites ai
      LEFT JOIN users inviter ON inviter.id = ai.invited_by_user_id
      LEFT JOIN role_definitions rd ON rd.id = ai.role_definition_id
      LEFT JOIN users client ON client.id = ai.client_user_id
      LEFT JOIN client_profiles cp ON cp.user_id = ai.client_user_id
+     LEFT JOIN users staged ON staged.id = ai.staged_user_id
      ORDER BY ai.created_at DESC LIMIT 500`,
   ).all()
   return c.json({ invitations: rows.results || [], can_invite_staff: await isOwner(c, c.get('user')) })
@@ -91,6 +94,23 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
     personal_note: inviteType === 'vendor' ? clean(body.personal_note, 800) || undefined : undefined,
     lead_id: clean(body.lead_id, 120) || undefined,
   }
+
+  let stagedUserId: string | null = null
+  if (inviteType === 'vendor') {
+    try {
+      const staged = await stageVendorProfile(c.env, {
+        email,
+        fullName,
+        vendorCategory: metadata.vendor_category,
+        companyName: metadata.company_name,
+      })
+      stagedUserId = staged.userId
+    } catch (err) {
+      if (err instanceof VendorInviteConflict) return c.json({ error: err.message }, 409)
+      throw err
+    }
+  }
+
   const invite = await createInvite(c.env, {
     inviteType,
     email,
@@ -98,15 +118,18 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
     roleDefinitionId,
     invitedByUserId: actor.id,
     metadata,
+    stagedUserId,
   })
 
   let emailStatus = 'sent'
   let emailError: string | null = null
   try {
-    await sendInviteEmail(c.env, { id: invite.id, invite_type: inviteType, email, full_name: fullName || null, metadata_json: JSON.stringify(metadata) }, invite.token, invite.expiresAt)
+    const providerId = await sendInviteEmail(c.env, { id: invite.id, invite_type: inviteType, email, full_name: fullName || null, metadata_json: JSON.stringify(metadata) }, invite.token, invite.expiresAt)
+    await recordInviteEmailResult(c.env, invite.id, { status: 'sent', providerId })
   } catch (err) {
     emailStatus = 'failed'
     emailError = err instanceof Error ? err.message : 'email failed'
+    await recordInviteEmailResult(c.env, invite.id, { status: 'failed', error: emailError })
   }
 
   await logAudit(c.env, {
@@ -116,9 +139,9 @@ invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission(
     action: 'record_created',
     entityType: 'access_invite',
     entityId: invite.id,
-    after: { type: inviteType, email, expires_at: invite.expiresAt, lead_id: metadata.lead_id },
+    after: { type: inviteType, email, expires_at: invite.expiresAt, lead_id: metadata.lead_id, staged_user_id: stagedUserId },
   })
-  return c.json({ ok: true, id: invite.id, expires_at: invite.expiresAt, email_status: emailStatus, email_error: emailError }, 201)
+  return c.json({ ok: true, id: invite.id, expires_at: invite.expiresAt, email_status: emailStatus, email_error: emailError, staged_user_id: stagedUserId }, 201)
 })
 
 invitationAdminRoutes.post('/invitations/:id/resend', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
@@ -126,9 +149,34 @@ invitationAdminRoutes.post('/invitations/:id/resend', requireStaff, requireNamed
   if (!row) return c.json({ error: 'invitation not found' }, 404)
   if (row.invite_type === 'staff' && !(await isOwner(c, c.get('user')))) return c.json({ error: 'only the Pinnacle Owner can manage staff invitations' }, 403)
   if (row.status === 'accepted') return c.json({ error: 'accepted invitations cannot be resent' }, 400)
+
+  let stagedUserId = row.staged_user_id as string | null
+  if (row.invite_type === 'vendor' && !stagedUserId) {
+    try {
+      let metadata: Record<string, unknown> = {}
+      try { metadata = JSON.parse(row.metadata_json || '{}') as Record<string, unknown> } catch { metadata = {} }
+      const staged = await stageVendorProfile(c.env, {
+        email: row.email,
+        fullName: row.full_name,
+        vendorCategory: typeof metadata.vendor_category === 'string' ? metadata.vendor_category : null,
+        companyName: typeof metadata.company_name === 'string' ? metadata.company_name : null,
+      })
+      stagedUserId = staged.userId
+      await c.env.DB.prepare("UPDATE access_invites SET staged_user_id = ?, updated_at = datetime('now') WHERE id = ?").bind(stagedUserId, row.id).run()
+    } catch (err) {
+      if (!(err instanceof VendorInviteConflict)) throw err
+    }
+  }
+
   const rotated = await rotateInviteToken(c.env, row.id)
-  await sendInviteEmail(c.env, row, rotated.token, rotated.expiresAt)
-  return c.json({ ok: true, expires_at: rotated.expiresAt })
+  try {
+    const providerId = await sendInviteEmail(c.env, row, rotated.token, rotated.expiresAt)
+    await recordInviteEmailResult(c.env, row.id, { status: 'sent', providerId })
+  } catch (err) {
+    await recordInviteEmailResult(c.env, row.id, { status: 'failed', error: err instanceof Error ? err.message : 'email failed' })
+    throw err
+  }
+  return c.json({ ok: true, expires_at: rotated.expiresAt, staged_user_id: stagedUserId })
 })
 
 invitationAdminRoutes.post('/invitations/:id/revoke', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {

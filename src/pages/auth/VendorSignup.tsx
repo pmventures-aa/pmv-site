@@ -231,6 +231,7 @@ export default function VendorSignup() {
         provider_agreement_version:agreementVersion,
         provider_agreement_accepted:form.provider_agreement_accepted,
         provider_signature_name:form.signature_name,
+        invite_token:inviteToken || undefined,
       })
       if (uploadToken) {
         try { await api.post(`/vendor-application/session/${uploadToken}/finalize`, { email:form.email, application_data:applicationData }) }
