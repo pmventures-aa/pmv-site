@@ -1,26 +1,116 @@
-/* Mobile enterprise hardening for PMV HQ, mail, document, and dashboard surfaces. */
-@media (max-width: 767px) {
-  html, body, #root { max-width: 100%; overflow-x: hidden; }
+/* Mobile hardening for PMV - public site, portal, HQ, mail, and shared shell. */
 
+/* --- Universal: prevent horizontal overflow anywhere on any surface --- */
+html, body, #root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+body { -webkit-text-size-adjust: 100%; }
+
+/* --- iOS/Android 16px input rule (below which mobile Safari zooms on focus) --- */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* --- Public site mobile pass --- */
+@media (max-width: 767px) {
+  /* Container: match with a comfortable 16px gutter */
+  .container-pmv {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Kill any oversized fixed dimensions that spill viewport */
+  [data-pmv-surface='public'] img,
+  [data-pmv-surface='public'] video,
+  [data-pmv-surface='public'] svg,
+  [data-pmv-surface='public'] iframe {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Hero display type: cap absurdly large font-sizes so long words don't
+     push overflow. Uses !important to defeat inline `text-[3.75rem]` etc. */
+  [data-pmv-surface='public'] h1 {
+    font-size: clamp(2rem, 8.5vw, 2.75rem) !important;
+    line-height: 1.05 !important;
+    letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    hyphens: auto;
+  }
+  [data-pmv-surface='public'] h2 { font-size: clamp(1.5rem, 6vw, 2rem) !important; line-height: 1.15 !important; overflow-wrap: anywhere; }
+  [data-pmv-surface='public'] h3 { font-size: clamp(1.15rem, 5vw, 1.5rem) !important; line-height: 1.2 !important; overflow-wrap: anywhere; }
+
+  /* Long-word / URL protection everywhere */
+  [data-pmv-surface='public'] p,
+  [data-pmv-surface='public'] a,
+  [data-pmv-surface='public'] li,
+  [data-pmv-surface='public'] span {
+    overflow-wrap: anywhere;
+  }
+
+  /* Any grid that stubbornly stays 2+ cols on mobile: force single column
+     unless the caller explicitly set grid-cols-1 or a mobile variant */
+  [data-pmv-surface='public'] .grid[class*='lg:grid-cols']:not([class*='grid-cols-1']):not([class*='sm:grid-cols']):not([class*='xs:grid-cols']) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  /* Buttons + links: ensure real tap targets */
+  [data-pmv-surface='public'] a[class*='btn'],
+  [data-pmv-surface='public'] button {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Sticky top offsets: honor the mobile header height (~56-60px), not the desktop 68 */
+  [data-pmv-surface='public'] [class*='sticky'][class*='top-[68px]'] {
+    top: 56px !important;
+  }
+}
+
+/* --- Portal + admin: keep the existing rules --- */
+@media (max-width: 767px) {
   [data-pmv-surface='admin'] button,
   [data-pmv-surface='admin'] a,
   [data-pmv-surface='admin'] input,
-  [data-pmv-surface='admin'] select {
+  [data-pmv-surface='admin'] select,
+  [data-pmv-surface='portal'] button,
+  [data-pmv-surface='portal'] a[class*='btn'],
+  [data-pmv-surface='portal'] input,
+  [data-pmv-surface='portal'] select {
     min-height: 44px;
   }
 
-  [data-pmv-surface='admin'] textarea { min-height: 96px; }
+  [data-pmv-surface='admin'] textarea,
+  [data-pmv-surface='portal'] textarea { min-height: 96px; }
 
-  [data-pmv-surface='admin'] table {
+  [data-pmv-surface='admin'] table,
+  [data-pmv-surface='portal'] table {
     font-size: 12px;
   }
 
-  [data-pmv-surface='admin'] .overflow-x-auto {
+  /* Any wide table should horizontal-scroll gracefully inside its parent */
+  [data-pmv-surface='admin'] table,
+  [data-pmv-surface='portal'] table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
   }
 
-  [data-pmv-surface='admin'] iframe {
+  [data-pmv-surface='admin'] iframe,
+  [data-pmv-surface='portal'] iframe {
     max-width: 100%;
   }
 
@@ -29,11 +119,6 @@
     max-width: calc(100vw - 1rem);
     overflow-y: auto;
     overscroll-behavior: contain;
-  }
-
-  .container-pmv {
-    padding-left: 1rem;
-    padding-right: 1rem;
   }
 
   /* Rich email and document editors should never force desktop width. */
@@ -53,22 +138,63 @@
     padding-bottom: .25rem;
     -webkit-overflow-scrolling: touch;
   }
-
   .pmv-mobile-action-strip > * { flex: 0 0 auto; }
+
+  /* Sticky/fixed banners (impersonation, login notice) push page content
+     down so they don't overlap the mobile header row */
+  [data-pmv-surface='admin'] > .pmv-imp-banner + *,
+  [data-pmv-surface='portal'] > .pmv-imp-banner + * {
+    margin-top: 44px;
+  }
+
+  /* Multi-column dashboards: default to single-column stacking so tiles
+     don't wedge side-by-side at phone widths */
+  .pmv-stack-mobile {
+    display: block !important;
+  }
+  .pmv-stack-mobile > * + * {
+    margin-top: 1rem;
+  }
+
+  /* Chip / tab strips that overflow: default to scrollable */
+  .pmv-tab-strip {
+    display: flex;
+    gap: .5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .pmv-tab-strip::-webkit-scrollbar { display: none; }
+  .pmv-tab-strip > * { flex: 0 0 auto; }
 }
 
 @media (max-width: 420px) {
   .container-pmv { padding-left: .8rem; padding-right: .8rem; }
+
   [data-pmv-surface='admin'] input,
   [data-pmv-surface='admin'] select,
   [data-pmv-surface='admin'] textarea { font-size: 16px; }
+
+  [data-pmv-surface='public'] h1 { font-size: clamp(1.75rem, 9vw, 2.5rem) !important; }
+
+  /* Ultra-small: shrink stat tile numbers so they don't wrap */
+  [data-pmv-surface='admin'] .font-display.text-3xl { font-size: 1.5rem !important; }
 }
 
+/* Safe-area insets on notched devices */
 @supports (padding: max(0px)) {
   @media (max-width: 767px) {
     body {
       padding-left: env(safe-area-inset-left);
       padding-right: env(safe-area-inset-right);
     }
+  }
+}
+
+/* Landscape phones: keep hero from taking full viewport when height is limited */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  [data-pmv-surface='public'] .pmv-hero-story {
+    min-height: 0 !important;
   }
 }
