@@ -5,7 +5,7 @@ import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { Card, EmptyState, PageHeader, StatusBadge } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
-import { MATTER_TYPES, matterTypeLabel, responsibilityBanner } from '../../../shared/matterWorkspace'
+import { MATTER_TYPES, matterTypeLabel, responsibilityBanner, responsibilityRank } from '../../../shared/matterWorkspace'
 import { propertyDisplayName } from '../../../shared/propertyProfile'
 
 interface MatterRow {
@@ -55,7 +55,14 @@ export default function Matters() {
   }, [])
   useEffect(() => { void load() }, [load])
 
-  const open = useMemo(() => items.filter((row) => row.status !== 'closed'), [items])
+  const open = useMemo(
+    () => items.filter((row) => row.status !== 'closed').sort((a, b) => {
+      const rank = responsibilityRank(a.responsibility_state, a.status) - responsibilityRank(b.responsibility_state, b.status)
+      if (rank !== 0) return rank
+      return String(a.next_action_due_at || a.due_date || '').localeCompare(String(b.next_action_due_at || b.due_date || ''))
+    }),
+    [items],
+  )
   const closed = useMemo(() => items.filter((row) => row.status === 'closed'), [items])
 
   async function onCreate(e: React.FormEvent) {
@@ -138,7 +145,7 @@ export default function Matters() {
         </Card>
       )}
 
-      {loading ? <Card><p className="text-sm text-slate-400">Loading projects…</p></Card> : items.length === 0 ? (
+      {loading ? <Card><p className="text-sm text-slate-400">Loading work…</p></Card> : items.length === 0 ? (
         <Card><EmptyState label="No work yet. Open an item when Pinnacle should track it." /></Card>
       ) : (
         <div className="space-y-8">

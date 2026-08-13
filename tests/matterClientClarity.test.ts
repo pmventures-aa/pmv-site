@@ -7,6 +7,7 @@ import {
   nextActionHref,
   resolveResponsibility,
   responsibilityBanner,
+  responsibilityRank,
 } from '../shared/matterWorkspace'
 
 describe('matter client clarity', () => {
@@ -27,6 +28,7 @@ describe('matter client clarity', () => {
     expect(inferMilestoneStatus('closed', 3, 4)).toBe('current')
     expect(nextActionHref('upload', 'abc')).toBe('documents')
     expect(nextActionHref('message', 'abc')).toBe('matters/abc')
+    expect(responsibilityRank('client', 'in_progress')).toBeLessThan(responsibilityRank('pinnacle', 'in_progress'))
   })
 
   it('keeps Work as a first-class portal destination and stores client-safe fields', () => {

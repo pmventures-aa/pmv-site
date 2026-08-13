@@ -23,10 +23,19 @@ export const MATTER_TYPES = [
 ] as const
 
 export function matterTypeLabel(type: string | null | undefined): string {
+  if (type === 'document') return 'Documents'
   const match = MATTER_TYPES.find((item) => item.key === type)
   if (match) return match.label
   if (!type) return 'Work'
   return type.replace(/_/g, ' ')
+}
+
+export function responsibilityRank(state: string | null | undefined, status: string | null | undefined): number {
+  const resolved = resolveResponsibility(state, status)
+  if (resolved === 'client') return 0
+  if (resolved === 'third_party') return 1
+  if (resolved === 'pinnacle') return 2
+  return 3
 }
 
 export const RESPONSIBILITY_STATES = ['client', 'pinnacle', 'third_party', 'none'] as const
