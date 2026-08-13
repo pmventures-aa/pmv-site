@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api'
 import { Panel, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
+import { ResendWebhookPanel } from './settings/ResendWebhookPanel'
 
 type Thread = {
   id: string; subject: string; scope_client_user_id: string|null
@@ -50,7 +51,9 @@ export function EmailThreadsPanel() {
   useEffect(() => { if (!selectedId) return; const t = setInterval(() => void loadDetail(), POLL_MS); return () => clearInterval(t) }, [selectedId, loadDetail])
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+    <div className="space-y-4">
+      <ResendWebhookPanel compact />
+      <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
       <Panel className="!p-0">
         <div className="flex items-center justify-between border-b border-white/10 p-3">
           <p className="text-sm font-extrabold text-white">Email threads</p>
@@ -79,6 +82,7 @@ export function EmailThreadsPanel() {
       </Panel>
 
       <EmailThreadDetail detail={detail} onReplied={() => { void load(); void loadDetail() }}/>
+      </div>
 
       <ComposerDialog open={composerOpen} onClose={() => setComposerOpen(false)} onSent={(id) => { setComposerOpen(false); setSelectedId(id); void load() }}/>
     </div>

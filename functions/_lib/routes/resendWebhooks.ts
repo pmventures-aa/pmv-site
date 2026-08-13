@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import type { AppEnv } from '../types'
 import { verifyResendWebhookSignature } from '../resendWebhookVerify'
+import { listResendWebhookSecrets } from '../resendWebhookSetup'
 import { uuid } from '../crypto'
 import { fetchReceivedEmail, ingestReceivedEmail, parseMailbox, parseMailboxList, type ReceivedEmail } from '../resendInbound'
 
@@ -35,6 +37,20 @@ function deliveryStatus(eventType: string): { status: string; failure: boolean }
   }
 }
 
+async function verifiedResendPayload(c: Context<AppEnv>) {
+  const secrets = await listResendWebhookSecrets(c.env)
+  if (!secrets.length) return { error: 'webhook not configured' as const, status: 503 as const }
+  const payload = await c.req.raw.text()
+  const id = c.req.header('svix-id') || null
+  const timestamp = c.req.header('svix-timestamp') || null
+  const signature = c.req.header('svix-signature') || null
+  for (const secret of secrets) {
+    const ok = await verifyResendWebhookSignature({ secret, payload, id, timestamp, signature })
+    if (ok) return { payload }
+  }
+  return { error: 'invalid webhook signature' as const, status: 400 as const }
+}
+
 function eventError(event: ResendEvent): string | null {
   const failedReason = event.data?.failed?.reason
   if (typeof failedReason === 'string') return failedReason.slice(0, 1000)
@@ -44,20 +60,10 @@ function eventError(event: ResendEvent): string | null {
 }
 
 resendWebhookRoutes.post('/webhooks/resend', async (c) => {
-  if (!c.env.RESEND_WEBHOOK_SECRET) return c.json({ error: 'webhook not configured' }, 503)
-
-  const payload = await c.req.raw.text()
+  const verified = await verifiedResendPayload(c)
+  if ('error' in verified) return c.json({ error: verified.error }, verified.status)
+  const { payload } = verified
   const svixId = c.req.header('svix-id') || null
-  const svixTimestamp = c.req.header('svix-timestamp') || null
-  const svixSignature = c.req.header('svix-signature') || null
-  const verified = await verifyResendWebhookSignature({
-    secret: c.env.RESEND_WEBHOOK_SECRET,
-    payload,
-    id: svixId,
-    timestamp: svixTimestamp,
-    signature: svixSignature,
-  })
-  if (!verified) return c.json({ error: 'invalid webhook signature' }, 400)
 
   let event: ResendEvent
   try {
@@ -139,15 +145,9 @@ resendWebhookRoutes.post('/webhooks/resend', async (c) => {
 })
 
 resendWebhookRoutes.post('/webhooks/resend/inbound', async (c) => {
-  if (!c.env.RESEND_WEBHOOK_SECRET) return c.json({ error: 'webhook not configured' }, 503)
-  const payload = await c.req.raw.text()
-  const verified = await verifyResendWebhookSignature({
-    secret: c.env.RESEND_WEBHOOK_SECRET, payload,
-    id: c.req.header('svix-id') || null,
-    timestamp: c.req.header('svix-timestamp') || null,
-    signature: c.req.header('svix-signature') || null,
-  })
-  if (!verified) return c.json({ error: 'invalid webhook signature' }, 400)
+  const verified = await verifiedResendPayload(c)
+  if ('error' in verified) return c.json({ error: verified.error }, verified.status)
+  const { payload } = verified
 
   let event: any
   try { event = JSON.parse(payload) } catch { return c.json({ error: 'invalid payload' }, 400) }

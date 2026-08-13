@@ -1098,15 +1098,19 @@ adminRoutes.delete('/services/questions/:id', requireStaff, requireCapability('c
 })
 
 // ---------------- admin-only: settings ----------------
+const HIDDEN_APP_SETTINGS = new Set(['resend_webhook_signing_secret', 'resend_webhook_id'])
+
 adminRoutes.get('/settings', requireStaff, requireCapability('can_manage_settings'), async (c) => {
-  const res = await c.env.DB.prepare('SELECT * FROM app_settings').all()
-  return c.json({ settings: res.results ?? [] })
+  const res = await c.env.DB.prepare('SELECT * FROM app_settings').all<{ key: string; value: string }>()
+  const settings = (res.results ?? []).filter((row) => !HIDDEN_APP_SETTINGS.has(row.key))
+  return c.json({ settings })
 })
 
 adminRoutes.patch('/settings', requireStaff, requireCapability('can_manage_settings'), async (c) => {
   const body = await c.req.json<Record<string, string>>().catch(() => ({} as Record<string, string>))
   const entries = Object.entries(body).slice(0, 50)
   for (const [key, value] of entries) {
+    if (HIDDEN_APP_SETTINGS.has(key)) continue
     await c.env.DB.prepare(
       'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
     ).bind(key, String(value)).run()
