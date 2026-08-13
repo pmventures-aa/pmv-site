@@ -3,6 +3,8 @@ import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
 import { notifyStaff, escapeHtml } from '../email'
+import { icsResponse, loadFeedAppointments, verifyCalendarFeedToken } from '../calendarFeed'
+import type { SessionUser } from '../types'
 
 const CONTACT_MAX_PER_HOUR = 10
 
@@ -74,4 +76,16 @@ publicRoutes.post('/contact', async (c) => {
   )
 
   return c.json({ ok: true }, 201)
+})
+
+publicRoutes.get('/calendar-feed/:token', async (c) => {
+  const token = c.req.param('token') || ''
+  const userId = await verifyCalendarFeedToken(token, c.env.SESSION_SECRET)
+  if (!userId) return c.json({ error: 'invalid calendar link' }, 404)
+  const user = await c.env.DB.prepare(
+    'SELECT id, email, role, full_name, status FROM users WHERE id = ?',
+  ).bind(userId).first<SessionUser & { status: string }>()
+  if (!user || user.status === 'suspended') return c.json({ error: 'invalid calendar link' }, 404)
+  const events = await loadFeedAppointments(c.env, user)
+  return icsResponse(events, 'Pinnacle')
 })

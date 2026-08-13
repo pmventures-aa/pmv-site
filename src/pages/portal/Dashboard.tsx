@@ -11,6 +11,7 @@ import { SlaClock } from '../../components/kit/SlaClock'
 import { GetStartedPrompt } from '../../components/portal/GetStartedPrompt'
 import { pmvFadeUp, pmvStagger } from '../../lib/motionTheme'
 import { clientWorkspace } from '../../lib/workspace'
+import { AddToCalendarButton } from '../../components/kit/AddToCalendar'
 
 interface DashboardData {
   stats: {
@@ -266,9 +267,12 @@ export default function Dashboard() {
               </div>
               <ul className="space-y-3">
                 {(data?.upcoming_appointments ?? []).slice(0, 3).map((appointment) => (
-                  <li key={appointment.id}>
-                    <p className="text-sm font-medium text-white">{appointment.title}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">{new Date(appointment.starts_at).toLocaleString()}</p>
+                  <li key={appointment.id} className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-white">{appointment.title}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">{new Date(appointment.starts_at).toLocaleString()}</p>
+                    </div>
+                    <AddToCalendarButton event={{ id: appointment.id, title: appointment.title, startsAt: appointment.starts_at }} />
                   </li>
                 ))}
               </ul>

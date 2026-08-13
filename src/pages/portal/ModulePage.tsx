@@ -34,6 +34,7 @@ export interface ModuleConfig {
   clientCanSetStatus?: boolean
   clientCancelValue?: string
   transformBeforeSubmit?: (form: Record<string, string>) => Record<string, unknown>
+  rowActions?: (row: any) => React.ReactNode
 }
 
 function statusTone(status: string): Tone {
@@ -222,6 +223,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                     </div>
                   ))}
                   {config.statusField && <div className="pt-1">{statusControls(row)}</div>}
+                  {config.rowActions && <div className="pt-1">{config.rowActions(row)}</div>}
                 </li>
               ))}
             </ul>
@@ -234,6 +236,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                     </th>
                   ))}
                   {config.statusField && <th className="whitespace-nowrap px-5 py-3 font-medium">Status</th>}
+                  {config.rowActions && <th className="whitespace-nowrap px-5 py-3 font-medium">Calendar</th>}
                 </tr>
               </thead>
               <tbody>
@@ -246,6 +249,9 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                     ))}
                     {config.statusField && (
                       <td className="whitespace-nowrap px-5 py-3">{statusControls(row)}</td>
+                    )}
+                    {config.rowActions && (
+                      <td className="whitespace-nowrap px-5 py-3">{config.rowActions(row)}</td>
                     )}
                   </tr>
                 ))}

@@ -10,6 +10,7 @@ import { hasCapability, requireCapability } from '../capabilities'
 import { sendEmail, escapeHtml } from '../email'
 import { getService, getQuestions, prefillForQuestions, persistAnswers } from './serviceApplications'
 import { toDisplayCase } from '../../../shared/displayCase'
+import { calendarFeedUrls, signCalendarFeedToken } from '../calendarFeed'
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -58,6 +59,13 @@ adminRoutes.get('/my-capabilities', requireStaff, async (c) => {
     can_manage_communications: !!row?.can_manage_communications,
     is_owner: false,
   })
+})
+
+adminRoutes.get('/calendar/feed', requireStaff, async (c) => {
+  const user = c.get('user')
+  const token = await signCalendarFeedToken(user.id, c.env.SESSION_SECRET)
+  const origin = new URL(c.req.url).origin
+  return c.json(calendarFeedUrls(origin, token))
 })
 
 // ---------------- staff + admin: cross-client views ----------------

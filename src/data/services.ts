@@ -105,7 +105,7 @@ export const services: ServiceInfo[] = [
     tag: 'Property Services',
     popular: true,
     planFamily: 'property',
-    shortDescription: 'From single-visit vendor coordination to full management through our licensed partner, priced against the South Florida market.',
+    shortDescription: 'Licensed property managers and CAM agents in the Pinnacle network, at a lower cost than the typical 8-12% shop, plus on-call Property Care if you keep the keys.',
     heroDescription:
       'South Florida full-service management typically runs 8-12% of collected rent plus a stack of fees that rarely gets explained up front. Pinnacle gives owners a straighter path: coordination and field services a la carte, monthly Property Care plans from $89, and tenant placement or full management through our licensed broker partner at the lower end of the market band - with every fee in writing before you sign anything.',
     highlights: [
