@@ -4,6 +4,7 @@ import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { createActivationToken } from '../session'
 import { toDisplayCase } from '../../../shared/displayCase'
+import { crmInviteName, crmPersonName } from '../../../shared/crmRecord'
 import { activityInsert } from '../activity'
 import { sendAccountWelcome, CLIENT_PORTAL_URL } from '../accountEmails'
 import { logAudit, actorGeo, actorIp, actorUserAgent } from '../auditLog'
@@ -38,7 +39,7 @@ async function conversionPreview(env: AppEnv['Bindings'], id: string) {
   const attribution = {
     source: inquiry.source || null, record_type: inquiry.record_type || null, lifecycle_stage: inquiry.lifecycle_stage || null,
     lead_status: inquiry.status || null, service_key: inquiry.service_key || null, owner_staff_user_id: inquiry.owner_staff_user_id || null,
-    company_name: inquiry.company_name || null, created_at: inquiry.created_at || null, last_contacted_at: inquiry.last_contacted_at || null,
+    company_name: inquiry.company_name || null, contact_name: crmPersonName(inquiry) || null, created_at: inquiry.created_at || null, last_contacted_at: inquiry.last_contacted_at || null,
   }
   return {
     inquiry, blockers, ready: blockers.length === 0, link_existing: linkExisting,
@@ -59,7 +60,7 @@ conversionRoutes.get('/inquiries/:id/conversion-preview', requireStaff, async (c
       transfer: preview.transfer,
       attribution: preview.attribution,
       link_existing: preview.link_existing,
-      lead: { id: preview.inquiry.id, name: preview.inquiry.name, email: preview.inquiry.email, phone: preview.inquiry.phone, company_name: preview.inquiry.company_name, service_key: preview.inquiry.service_key },
+      lead: { id: preview.inquiry.id, name: preview.inquiry.name, email: preview.inquiry.email, phone: preview.inquiry.phone, company_name: preview.inquiry.company_name, first_name: preview.inquiry.first_name, last_name: preview.inquiry.last_name, job_title: preview.inquiry.job_title, service_key: preview.inquiry.service_key },
       existing_user: preview.existing_user,
     },
   })
@@ -74,13 +75,12 @@ conversionRoutes.post('/inquiries/:id/convert', requireStaff, async (c) => {
   if (!preview.ready) return c.json({ error: preview.blockers[0], blockers: preview.blockers }, 409)
   const inquiry = preview.inquiry
 
-  const displayName = toDisplayCase(inquiry.name)
-  const businessName = toDisplayCase(inquiry.company_name) || null
-  const nameParts = displayName.trim().split(/\s+/).filter(Boolean)
-  const firstName = nameParts[0] ?? null
-  const lastName = nameParts.slice(1).join(' ') || null
+  const displayName = crmInviteName(inquiry) || toDisplayCase(inquiry.name)
+  const businessName = toDisplayCase(inquiry.company_name) || (inquiry.record_type === 'business' ? toDisplayCase(inquiry.name) : null)
+  const firstName = toDisplayCase(inquiry.first_name) || (inquiry.record_type === 'business' ? null : displayName.trim().split(/\s+/).filter(Boolean)[0] || null)
+  const lastName = toDisplayCase(inquiry.last_name) || (inquiry.record_type === 'business' ? null : displayName.trim().split(/\s+/).filter(Boolean).slice(1).join(' ') || null)
   const conversionId = uuid()
-  const previewSnapshot = { lead: { id: inquiry.id, name: inquiry.name, email: inquiry.email, phone: inquiry.phone, company_name: inquiry.company_name }, transfer: preview.transfer, blockers: [], linked_existing: preview.link_existing }
+  const previewSnapshot = { lead: { id: inquiry.id, name: inquiry.name, email: inquiry.email, phone: inquiry.phone, company_name: inquiry.company_name, first_name: inquiry.first_name, last_name: inquiry.last_name }, transfer: preview.transfer, blockers: [], linked_existing: preview.link_existing }
 
   const existingClient = preview.existing_user?.role === 'client' ? preview.existing_user : null
   const clientId = existingClient?.id || uuid()

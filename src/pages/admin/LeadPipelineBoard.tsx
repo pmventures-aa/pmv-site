@@ -19,13 +19,17 @@ import {
   leadBoardStage,
   type LeadBoardStage,
 } from '../../../shared/leadPipeline'
+import { crmInviteName, crmRecordLine } from '../../../shared/crmRecord'
 
 export interface LeadRecord {
   id: string
   name: string
   email: string
   phone: string | null
+  first_name: string | null
+  last_name: string | null
   company_name: string | null
+  job_title: string | null
   record_type: 'person' | 'business'
   lifecycle_stage: string
   source: string | null
@@ -52,6 +56,7 @@ const emptyDraft = {
   first_name: '',
   last_name: '',
   company_name: '',
+  job_title: '',
   email: '',
   phone: '',
   source: '',
@@ -119,7 +124,7 @@ export function LeadPipelineBoard({
       if (focus === 'ready' && stage !== 'ready') return false
       if (focus === 'mine' && (lead.owner_email || '').toLowerCase() !== myEmail) return false
       if (!needle) return true
-      return [lead.name, lead.email, lead.company_name, lead.service_name, lead.source, lead.owner_name, lead.owner_email, lead.message].some((value) => String(value || '').toLowerCase().includes(needle))
+      return [lead.name, lead.email, lead.company_name, lead.first_name, lead.last_name, lead.job_title, lead.service_name, lead.source, lead.owner_name, lead.owner_email, lead.message].some((value) => String(value || '').toLowerCase().includes(needle))
     }).sort(compareLeadsByUrgency)
   }, [leads, query, recordType, ownerFilter, sourceFilter, hideLost, focus, user?.email])
 
@@ -156,9 +161,10 @@ export function LeadPipelineBoard({
     try {
       const result = await api.post<{ id: string }>('/admin/crm/records', {
         record_type: draft.record_type,
-        first_name: draft.record_type === 'person' ? first : undefined,
-        last_name: draft.record_type === 'person' ? last : undefined,
+        first_name: first || undefined,
+        last_name: last || undefined,
         company_name: company || undefined,
+        job_title: draft.job_title.trim() || undefined,
         name,
         email,
         phone: draft.phone.trim() || undefined,
@@ -170,7 +176,12 @@ export function LeadPipelineBoard({
       let inviteSent = false
       if (sendInvite) {
         try {
-          const invite = await api.post<{ email_status: string; email_error?: string }>('/admin/invitations', { invite_type: 'client', email, full_name: name, lead_id: result.id })
+          const invite = await api.post<{ email_status: string; email_error?: string }>('/admin/invitations', {
+            invite_type: 'client',
+            email,
+            full_name: crmInviteName({ ...draft, name }),
+            lead_id: result.id,
+          })
           inviteSent = invite.email_status === 'sent'
           if (!inviteSent) toast.error(`Lead created, but the invitation email was not sent. ${invite.email_error || ''}`)
         } catch (err) {
@@ -212,7 +223,7 @@ export function LeadPipelineBoard({
           <Link to={p(`leads/${lead.id}`)} className="font-bold text-white hover:text-gold">{lead.name}</Link>
           {stale && <Tag tone="red">Needs follow-up</Tag>}
         </div>
-        <p className="mt-1 text-xs text-slate-400">{lead.record_type === 'business' ? 'Business' : lead.company_name || 'Person'} · {lead.email}</p>
+        <p className="mt-1 text-xs text-slate-400">{crmRecordLine(lead)}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           <Tag tone={stale ? 'red' : 'slate'}>{ageLabel(lead.updated_at || lead.created_at)} idle</Tag>
           {lead.source && <Tag tone="slate">{lead.source}</Tag>}
@@ -259,11 +270,11 @@ export function LeadPipelineBoard({
             </select>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {draft.record_type === 'person' ? <>
-              <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">First name</span><input className={inputCls} required placeholder="Jordan" value={draft.first_name} onChange={(e) => setDraft((current) => ({ ...current, first_name: e.target.value }))} /></label>
-              <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Last name</span><input className={inputCls} placeholder="Lee" value={draft.last_name} onChange={(e) => setDraft((current) => ({ ...current, last_name: e.target.value }))} /></label>
-              <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Company</span><input className={inputCls} placeholder="Optional" value={draft.company_name} onChange={(e) => setDraft((current) => ({ ...current, company_name: e.target.value }))} /></label>
-            </> : <label className="sm:col-span-2"><span className="mb-1 block text-[11px] font-semibold text-slate-400">Business name</span><input className={inputCls} required placeholder="Practice or company" value={draft.company_name} onChange={(e) => setDraft((current) => ({ ...current, company_name: e.target.value }))} /></label>}
+            {draft.record_type === 'business' && <label className="sm:col-span-2"><span className="mb-1 block text-[11px] font-semibold text-slate-400">Business name</span><input className={inputCls} required placeholder="Practice or company" value={draft.company_name} onChange={(e) => setDraft((current) => ({ ...current, company_name: e.target.value }))} /></label>}
+            <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">{draft.record_type === 'business' ? 'Contact first name' : 'First name'}</span><input className={inputCls} required={draft.record_type === 'person'} placeholder="Jordan" value={draft.first_name} onChange={(e) => setDraft((current) => ({ ...current, first_name: e.target.value }))} /></label>
+            <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">{draft.record_type === 'business' ? 'Contact last name' : 'Last name'}</span><input className={inputCls} placeholder="Lee" value={draft.last_name} onChange={(e) => setDraft((current) => ({ ...current, last_name: e.target.value }))} /></label>
+            {draft.record_type === 'person' && <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Company</span><input className={inputCls} placeholder="Optional" value={draft.company_name} onChange={(e) => setDraft((current) => ({ ...current, company_name: e.target.value }))} /></label>}
+            <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">{draft.record_type === 'business' ? 'Contact title' : 'Job title'}</span><input className={inputCls} placeholder="Optional" value={draft.job_title} onChange={(e) => setDraft((current) => ({ ...current, job_title: e.target.value }))} /></label>
             <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Email</span><input className={inputCls} type="email" required placeholder="name@example.com" value={draft.email} onChange={(e) => setDraft((current) => ({ ...current, email: e.target.value }))} /></label>
             <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Phone</span><input className={inputCls} type="tel" placeholder="Optional" value={draft.phone} onChange={(e) => setDraft((current) => ({ ...current, phone: e.target.value }))} /></label>
             <label><span className="mb-1 block text-[11px] font-semibold text-slate-400">Source</span><input className={inputCls} placeholder="Referral, website, outbound" value={draft.source} onChange={(e) => setDraft((current) => ({ ...current, source: e.target.value }))} /></label>
@@ -291,7 +302,7 @@ export function LeadPipelineBoard({
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/10 text-slate-500"><Search size={14} /></span>
-          <input className={`${inputCls} min-w-[180px] flex-1`} placeholder="Search name, email, company, source" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className={`${inputCls} min-w-[180px] flex-1`} placeholder="Search name, contact, email, company, source" value={query} onChange={(e) => setQuery(e.target.value)} />
           <select className={`${inputCls} !min-h-9 w-auto min-w-[140px]`} value={recordType} onChange={(e) => setRecordType(e.target.value)}><option value="">People and businesses</option><option value="person">People</option><option value="business">Businesses</option></select>
           <select className={`${inputCls} !min-h-9 w-auto min-w-[140px]`} value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}><option value="">All owners</option>{ownerOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select>
           <select className={`${inputCls} !min-h-9 w-auto min-w-[140px]`} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}><option value="">All sources</option>{sourceOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select>
@@ -328,7 +339,7 @@ export function LeadPipelineBoard({
                     <tr key={lead.id} className={`border-t border-white/5 transition hover:bg-white/[0.025] ${stale ? 'bg-rose-500/[.04]' : ''}`}>
                       <td className="px-4 py-3">
                         <Link to={p(`leads/${lead.id}`)} className="font-semibold text-white hover:text-gold">{lead.name}</Link>
-                        <p className="mt-0.5 text-xs text-slate-500">{lead.company_name || lead.email}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{crmRecordLine(lead)}</p>
                       </td>
                       <td className="hidden px-4 py-3 md:table-cell"><Tag tone={stage === 'ready' ? 'gold' : stage === 'lost' ? 'red' : stage === 'prospects' ? 'blue' : 'slate'}>{leadBoardLabel(stage)}</Tag></td>
                       <td className="hidden px-4 py-3 text-slate-300 lg:table-cell">{lead.owner_name || lead.owner_email || 'Unassigned'}</td>

@@ -29,12 +29,12 @@ searchRoutes.get('/search', requireStaff, async (c) => {
        ORDER BY u.full_name LIMIT ?`,
     ).bind(...clientScope.params, like, like, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
-      `SELECT id, name, email, phone, company_name, record_type, lifecycle_stage, status
+      `SELECT id, name, email, phone, company_name, first_name, last_name, job_title, record_type, lifecycle_stage, status
        FROM contact_inquiries
        WHERE converted_at IS NULL AND archived_at IS NULL
-         AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR company_name LIKE ?)
+         AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR company_name LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR job_title LIKE ?)
        ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ?`,
-    ).bind(like, like, like, like, RESULT_LIMIT).all(),
+    ).bind(like, like, like, like, like, like, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
       `SELECT m.id, m.title, m.status, m.client_user_id, u.full_name AS client_name, u.email AS client_email
        FROM matters m JOIN users u ON u.id = m.client_user_id

@@ -20,4 +20,15 @@ describe('relationship graph SQL writes', () => {
     const source = readFileSync('functions/_lib/routes/clientRelationships.ts', 'utf8')
     expect(source).toContain('relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,?,?,?,?,?)')
   })
+
+  it('creates an inline contact person when a business is added without picking someone existing', () => {
+    const source = readFileSync('functions/_lib/routes/clientRelationships.ts', 'utf8')
+    expect(source).toContain('contact_first_name')
+    expect(source).toContain("relationship_type,label,created_by_user_id) VALUES (?,?,?,?,?,?)")
+    const ui = readFileSync('src/pages/admin/ClientRelationships.tsx', 'utf8')
+    expect(ui).toContain('Optional Contact Person')
+    expect(ui).toContain('No contact listed')
+    expect(ui).not.toContain('Every business requires')
+    expect(ui).not.toContain('disabled={busy || !business.primary_contact_party_id}')
+  })
 })
