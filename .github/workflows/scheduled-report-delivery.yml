@@ -21,4 +21,4 @@ jobs:
             --retry 2 --retry-all-errors \
             -X POST \
             -H "x-pmv-automation-secret: $PMV_AUTOMATION_SECRET" \
-            https://www.pinnaclemanagementventures.com/api/automation/reports/run
+            https://pmv-site.pages.dev/api/automation/reports/run

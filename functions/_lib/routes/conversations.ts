@@ -45,22 +45,23 @@ function renderBody(md: string): string {
   return withBold.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('')
 }
 
+export function mentionLookup(usernames: Iterable<string>) {
+  const unique = [...new Set([...usernames].map((name) => name.toLowerCase()).filter(Boolean))]
+  if (!unique.length) return null
+  return {
+    sql: `SELECT id FROM users WHERE ${unique.map(() => 'LOWER(email) LIKE ?').join(' OR ')}`,
+    binds: unique.map((name) => `${name}@%`),
+  }
+}
+
 async function resolveMentions(env: Env, body: string): Promise<string[]> {
   const usernames = new Set<string>()
   for (const m of body.matchAll(/@([a-z0-9._-]+)/gi)) usernames.add(m[1].toLowerCase())
-  if (!usernames.size) return []
-  const placeholders = [...usernames].map(() => '?').join(',')
-  const res = await env.DB.prepare(`SELECT id FROM users WHERE LOWER(email) IN (${placeholders}) OR LOWER(email) LIKE ? || '@%'`).bind(...usernames, [...usernames][0]).all()
+  const lookup = mentionLookup(usernames)
+  if (!lookup) return []
+  const res = await env.DB.prepare(lookup.sql).bind(...lookup.binds).all()
   const ids = new Set<string>()
   for (const row of (res.results as any[]) || []) ids.add(row.id)
-  // Simple email-local-part match: for each mention, try LOWER(SUBSTR(email, 1, INSTR(email,'@')-1))
-  if (ids.size < usernames.size) {
-    const remaining = [...usernames]
-    const localMatch = await env.DB.prepare(`SELECT id, LOWER(SUBSTR(email,1,INSTR(email,'@')-1)) local FROM users`).all()
-    for (const row of (localMatch.results as any[]) || []) {
-      if (remaining.includes(String(row.local))) ids.add(row.id)
-    }
-  }
   return [...ids]
 }
 

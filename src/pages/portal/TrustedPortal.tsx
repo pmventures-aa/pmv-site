@@ -75,7 +75,7 @@ export default function TrustedPortal() {
             <aside className="space-y-2">{allowed.map(([key, mode]) => { const meta = sectionMeta[key] || { label: key, icon: 'file' as IconName }; return <button key={key} onClick={() => setSection(key)} className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition ${section === key ? 'border-gold/40 bg-gold/[0.08] text-white' : 'border-white/10 bg-white/[0.02] text-slate-400 hover:border-white/20 hover:text-white'}`}><Icon name={meta.icon} size={17}/><span className="flex-1 text-sm font-medium">{meta.label}</span><span className="text-[10px] uppercase tracking-wide text-gold">{mode}</span></button> })}</aside>
             <section className="min-w-0 rounded-xl border border-white/10 bg-white/[0.025] p-5 sm:p-6">
               {section && <div className="mb-5 flex items-center justify-between"><div><p className="eyebrow">Shared by client</p><h2 className="mt-1 text-xl font-semibold text-white">{sectionMeta[section]?.label || section}</h2></div>{data?.mode && <span className="rounded-full border border-gold/20 px-2.5 py-1 text-xs text-gold">{data.mode} access</span>}</div>}
-              {!data ? <p className="text-sm text-slate-500">Loading…</p> : <SectionView section={section} clientId={clientId} data={data} onRefresh={() => api.get<SectionData>(`/portal/trusted/${clientId}/${section}`).then(setData)} />}
+              {!data ? <p className="text-sm text-slate-500">Loading…</p> : <SectionView key={`${clientId}-${section}`} section={section} clientId={clientId} data={data} onRefresh={() => api.get<SectionData>(`/portal/trusted/${clientId}/${section}`).then(setData)} />}
             </section>
           </div>
         )}

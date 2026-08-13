@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
+import { toast } from '../../components/kit/toast'
 
 interface Ticket {
   id: string
@@ -79,10 +80,14 @@ export default function Support() {
 
   async function sendReply(id: string) {
     if (!reply.trim()) return
-    await api.post(`/portal/support/${id}/messages`, { body: reply.trim() })
-    setReply('')
-    const res = await api.get<{ messages: Msg[] }>(`/portal/support/${id}/messages`)
-    setThread(res.messages)
+    try {
+      await api.post(`/portal/support/${id}/messages`, { body: reply.trim() })
+      setReply('')
+      const res = await api.get<{ messages: Msg[] }>(`/portal/support/${id}/messages`)
+      setThread(res.messages)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'The reply could not be sent.')
+    }
   }
 
   async function setStatus(id: string, status: string) {

@@ -109,6 +109,17 @@ function nowIso(): string {
 
 // ---------- Staff: create + list all ----------
 
+fieldWorkRoutes.get('/field-assignment-providers', requireStaff, async (c) => {
+  const res = await c.env.DB.prepare(
+    `SELECT u.id, u.full_name, u.email, tm.party_type, tm.vendor_category
+     FROM users u
+     JOIN team_members tm ON tm.user_id = u.id
+     WHERE u.role IN ('staff', 'admin') AND u.status IN ('active', 'pending') AND tm.party_type = 'vendor'
+     ORDER BY COALESCE(u.full_name, u.email)`,
+  ).all()
+  return c.json({ providers: res.results ?? [] })
+})
+
 fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   const user = c.get('user')
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>

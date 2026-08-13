@@ -30,3 +30,14 @@ export function useAppPath() {
     return clean ? `${base}/${clean}` : base || '/'
   }
 }
+
+/** Map a stored portal path (often `/portal/...`) onto the current app base. */
+export function resolvePortalDeepLink(path: string, p: (s: string) => string): string {
+  const raw = String(path || '').trim()
+  if (!raw || /^https?:/i.test(raw)) return raw
+  const qIndex = raw.indexOf('?')
+  const pathname = qIndex >= 0 ? raw.slice(0, qIndex) : raw
+  const search = qIndex >= 0 ? raw.slice(qIndex) : ''
+  const stripped = pathname.replace(/^\/portal\/?/i, '').replace(/^\/+/, '')
+  return `${p(stripped)}${search}`
+}

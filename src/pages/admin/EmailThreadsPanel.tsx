@@ -102,8 +102,11 @@ export function EmailThreadsPanel() {
   }
 
   useEffect(() => {
+    if (searchParams.get('compose') !== '1') {
+      seededCompose.current = false
+      return
+    }
     if (seededCompose.current) return
-    if (searchParams.get('compose') !== '1') return
     seededCompose.current = true
     const to = searchParams.get('to') || ''
     const name = searchParams.get('name') || ''

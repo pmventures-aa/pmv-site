@@ -312,6 +312,12 @@ function genInvoiceNumber(): string {
   return `INV-${date}-${uuid().slice(0, 4).toUpperCase()}`
 }
 
+function parseBillTo(raw: unknown): { name?: string | null; email?: string | null; company?: string | null; phone?: string | null; address_line1?: string | null; city?: string | null; state?: string | null; postal_code?: string | null } {
+  if (!raw) return {}
+  if (typeof raw === 'object') return raw as ReturnType<typeof parseBillTo>
+  try { return JSON.parse(String(raw)) } catch { return {} }
+}
+
 portalRoutes.get('/billing', async (c) => c.json({ invoices: await listScoped(c, 'invoices') }))
 
 portalRoutes.get('/billing/:id', async (c) => {
@@ -379,30 +385,31 @@ portalRoutes.post('/billing', async (c) => {
   const amountCents = subtotalCents - discountCents + taxCents
 
   const billTo = body.bill_to ?? {}
+  const billToRecord = {
+    name: billTo.name || client?.full_name || null,
+    company: billTo.company || client?.business_name || null,
+    email: billTo.email || client?.email || null,
+    phone: billTo.phone || client?.phone || null,
+    address_line1: billTo.address_line1 || null,
+    city: billTo.city || null,
+    state: billTo.state || client?.state || null,
+    postal_code: billTo.postal_code || null,
+  }
   const id = uuid()
   const stmts = [
     c.env.DB.prepare(
       `INSERT INTO invoices (
         id, client_user_id, amount_cents, currency, due_date, status,
-        invoice_number, title, message, subtotal_cents, discount_cents, tax_rate_bps, tax_cents,
-        bill_to_name, bill_to_company, bill_to_email, bill_to_phone, bill_to_address_line1, bill_to_city, bill_to_state, bill_to_postal_code,
-        created_by_user_id
-      ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        invoice_number, title, message, subtotal_cents, discount_cents, tax_cents,
+        bill_to_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     ).bind(
       id, clientId, amountCents, (body.currency || 'usd').toLowerCase().slice(0, 10), body.due_date ?? null,
       (body.invoice_number || genInvoiceNumber()).slice(0, 60),
       body.title ? body.title.slice(0, 200) : null,
       body.message ? body.message.slice(0, 2000) : null,
-      subtotalCents, discountCents, taxRateBps, taxCents,
-      (billTo.name || client?.full_name || null),
-      (billTo.company || client?.business_name || null),
-      (billTo.email || client?.email || null),
-      (billTo.phone || client?.phone || null),
-      billTo.address_line1 || null,
-      billTo.city || null,
-      (billTo.state || client?.state || null),
-      billTo.postal_code || null,
-      user.id,
+      subtotalCents, discountCents, taxCents,
+      JSON.stringify(billToRecord),
     ),
     activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'invoice_created', detail: { amount_cents: amountCents, title: body.title } }),
     ...normalizedItems.map((item, index) =>
@@ -439,17 +446,17 @@ portalRoutes.post('/billing/:id/remind', async (c) => {
   if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
   const row = await loadScopedRow<any>(c.env, user, 'invoices', c.req.param('id'))
   if (row.status !== 'open') return c.json({ error: 'only open invoices can be reminded' }, 400)
-  const to = row.bill_to_email
+  const billTo = parseBillTo(row.bill_to_json)
+  const to = billTo.email || null
   if (!to) return c.json({ error: 'this invoice has no billing email on file' }, 400)
   const amount = `$${(row.amount_cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const due = row.due_date ? new Date(row.due_date).toLocaleDateString() : 'as soon as possible'
   await sendEmail(c.env, {
     to,
-    subject: `Payment reminder${row.invoice_number ? ` — ${escapeHtml(row.invoice_number)}` : ''}`,
-    html: `<p>Hi ${escapeHtml(row.bill_to_name || 'there')},</p><p>This is a reminder that ${escapeHtml(row.title || 'your invoice')} for <strong>${amount}</strong> is due ${escapeHtml(due)}.</p>${row.message ? `<p>${escapeHtml(row.message)}</p>` : ''}<p>If you've already paid this, please disregard.</p>`,
+    subject: `Payment reminder${row.invoice_number ? ` - ${escapeHtml(row.invoice_number)}` : ''}`,
+    html: `<p>Hi ${escapeHtml(billTo.name || 'there')},</p><p>This is a reminder that ${escapeHtml(row.title || 'your invoice')} for <strong>${amount}</strong> is due ${escapeHtml(due)}.</p>${row.message ? `<p>${escapeHtml(row.message)}</p>` : ''}<p>If you've already paid this, please disregard.</p>`,
   })
   await c.env.DB.batch([
-    c.env.DB.prepare(`UPDATE invoices SET last_reminded_at = datetime('now') WHERE id = ?`).bind(row.id),
     activityInsert(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'invoice_reminder_sent', detail: { amount_cents: row.amount_cents, invoice_number: row.invoice_number } }),
   ])
   return c.json({ ok: true })

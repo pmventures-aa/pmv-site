@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Info, ShieldAlert, X } from 'lucide-react'
 import { api } from '../../lib/api'
+import { resolvePortalDeepLink, useAppPath } from '../../lib/basePath'
 
 type Notice = {
   id: string
@@ -21,6 +22,7 @@ export function LoginBanner() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [dismissing, setDismissing] = useState(false)
   const navigate = useNavigate()
+  const p = useAppPath()
 
   useEffect(() => {
     let cancelled = false
@@ -48,7 +50,7 @@ export function LoginBanner() {
     try { await api.post(`/portal/pending-login-notice/${notice!.id}/acknowledge`) } catch {}
     const redirect = notice!.force_redirect_path
     setNotice(null)
-    if (redirect) navigate(redirect)
+    if (redirect) navigate(resolvePortalDeepLink(redirect, p))
   }
 
   return (

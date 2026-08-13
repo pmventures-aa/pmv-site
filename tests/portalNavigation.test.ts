@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { clientMobilePrimary, clientPortalNav, portalMobilePrimary, portalNav } from '../src/components/layout/nav'
+import { resolvePortalDeepLink } from '../src/lib/basePath'
 
 describe('Client portal navigation', () => {
   it('keeps a short default sidebar instead of a tile directory', () => {
@@ -30,5 +31,17 @@ describe('Client portal navigation', () => {
     expect(clientMobilePrimary(['property_management'])).toEqual(['dashboard', 'properties', 'support', 'documents'])
     expect(clientMobilePrimary(['mobile_notary'])).toEqual(['dashboard', 'documents', 'support', 'messages'])
     expect(clientMobilePrimary(['funding'])).toEqual(['dashboard', 'funding', 'documents', 'support'])
+  })
+})
+
+describe('portal deep links', () => {
+  it('maps stored /portal paths onto the current app base', () => {
+    const nested = (path: string) => `/portal/${path}`
+    const rooted = (path: string) => `/${path}`
+    expect(resolvePortalDeepLink('/portal/billing', nested)).toBe('/portal/billing')
+    expect(resolvePortalDeepLink('/portal/billing', rooted)).toBe('/billing')
+    expect(resolvePortalDeepLink('documents', nested)).toBe('/portal/documents')
+    expect(resolvePortalDeepLink('/billing?tab=open', rooted)).toBe('/billing?tab=open')
+    expect(resolvePortalDeepLink('https://example.com/x', nested)).toBe('https://example.com/x')
   })
 })

@@ -148,7 +148,7 @@ export default function CommunicationsCRMAdmin() {
     if (!subject.trim()) return window.alert('Enter a subject before continuing.')
     if (!bodyHtml.trim()) return window.alert('Enter a message before continuing.')
     if (segments.length + userIds.length + inquiryIds.length + listIds.length === 0) return window.alert('Add at least one recipient.')
-    if ((action === 'send_now' || action === 'schedule') && eligibleCount === 0) return window.alert('No eligible recipients match this audience.')
+    if ((action === 'send_now' || action === 'schedule') && (eligibleCount == null || eligibleCount === 0)) return window.alert(eligibleCount == null ? 'Wait until the audience preview finishes before sending.' : 'No eligible recipients match this audience.')
     if (action === 'send_now' && !window.confirm(`Send this message now to ${eligibleCount ?? 'the selected'} recipient${eligibleCount === 1 ? '' : 's'}?`)) return
     if (action === 'schedule' && !scheduledAt) return window.alert('Choose a delivery date and time.')
     setBusy(true)

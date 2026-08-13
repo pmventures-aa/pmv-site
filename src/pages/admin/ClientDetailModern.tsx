@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
@@ -128,22 +128,32 @@ export default function ClientDetailModern() {
   const [note, setNote] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set())
+  const loadedTabsRef = useRef(new Set<string>())
+  const activeIdRef = useRef(id)
+  activeIdRef.current = id
 
   const load = useCallback(async (section: Tab = tab, force = false) => {
     if (!id) return
-    if (!force && loadedTabs.has(section)) return
-    const result = await api.get<Partial<Bundle>>(`/admin/clients/${id}?section=${section}`)
-    setData((current) => ({
-      account: result.account ?? current?.account,
-      profile: result.profile === undefined ? current?.profile ?? null : result.profile,
-      assigned_staff: result.assigned_staff ?? current?.assigned_staff ?? [], recent_activity: result.recent_activity ?? current?.recent_activity ?? [],
-      services: result.services ?? current?.services ?? [], matters: result.matters ?? current?.matters ?? [], tasks: result.tasks ?? current?.tasks ?? [], documents: result.documents ?? current?.documents ?? [], invoices: result.invoices ?? current?.invoices ?? [], funding: result.funding ?? current?.funding ?? [], properties: result.properties ?? current?.properties ?? [], tax_filings: result.tax_filings ?? current?.tax_filings ?? [], tickets: result.tickets ?? current?.tickets ?? [], calls: result.calls ?? current?.calls ?? [], appointments: result.appointments ?? current?.appointments ?? [], application_answers: result.application_answers ?? current?.application_answers ?? [], payment_methods: result.payment_methods ?? current?.payment_methods ?? [], notes: result.notes ?? current?.notes ?? [], onboarding_progress: result.onboarding_progress ?? current?.onboarding_progress ?? { answered: 0, total: 0 }, service_catalog: result.service_catalog ?? current?.service_catalog ?? [], service_applications: result.service_applications ?? current?.service_applications ?? [],
-    } as Bundle))
-    setLoadedTabs((current) => new Set(current).add(section))
-  }, [id, loadedTabs, tab])
+    const requestId = id
+    const cacheKey = `${requestId}:${section}`
+    if (!force && loadedTabsRef.current.has(cacheKey)) return
+    const result = await api.get<Partial<Bundle>>(`/admin/clients/${requestId}?section=${section}`)
+    if (activeIdRef.current !== requestId) return
+    setData((current) => {
+      const sameClient = current?.account?.id === requestId
+      const prior = sameClient ? current : null
+      return {
+        account: result.account ?? prior?.account,
+        profile: result.profile === undefined ? prior?.profile ?? null : result.profile,
+        assigned_staff: result.assigned_staff ?? prior?.assigned_staff ?? [], recent_activity: result.recent_activity ?? prior?.recent_activity ?? [],
+        services: result.services ?? prior?.services ?? [], matters: result.matters ?? prior?.matters ?? [], tasks: result.tasks ?? prior?.tasks ?? [], documents: result.documents ?? prior?.documents ?? [], invoices: result.invoices ?? prior?.invoices ?? [], funding: result.funding ?? prior?.funding ?? [], properties: result.properties ?? prior?.properties ?? [], tax_filings: result.tax_filings ?? prior?.tax_filings ?? [], tickets: result.tickets ?? prior?.tickets ?? [], calls: result.calls ?? prior?.calls ?? [], appointments: result.appointments ?? prior?.appointments ?? [], application_answers: result.application_answers ?? prior?.application_answers ?? [], payment_methods: result.payment_methods ?? prior?.payment_methods ?? [], notes: result.notes ?? prior?.notes ?? [], onboarding_progress: result.onboarding_progress ?? prior?.onboarding_progress ?? { answered: 0, total: 0 }, service_catalog: result.service_catalog ?? prior?.service_catalog ?? [], service_applications: result.service_applications ?? prior?.service_applications ?? [],
+      } as Bundle
+    })
+    loadedTabsRef.current.add(cacheKey)
+  }, [id, tab])
 
-  useEffect(() => { load(tab).catch(() => setData(null)) }, [tab])
+  useEffect(() => { loadedTabsRef.current = new Set(); setData(null) }, [id])
+  useEffect(() => { load(tab).catch(() => { if (activeIdRef.current === id) setData(null) }) }, [id, tab, load])
   useEffect(() => { if(id&&!section)navigate(p(`clients/${id}/overview`),{replace:true}) },[id,section,navigate,p])
 
   const timeline = useMemo(() => {
@@ -241,7 +251,7 @@ export default function ClientDetailModern() {
     {tab === 'overview' && <div className="mt-7 grid gap-9 xl:grid-cols-[minmax(0,1fr)_380px]">
       <main>
         <SectionTitle eyebrow="Relationship" title="Client at a glance" action={<button className="text-sm font-medium text-gold hover:underline" onClick={() => setEditing((v) => !v)}>{editing ? 'Cancel' : 'Edit profile'}</button>} />
-        {editing ? <ProfileEditor account={account} profile={profile} onSaved={async () => { setEditing(false); await load() }} /> : <dl className="border-y border-white/10">
+        {editing ? <ProfileEditor account={account} profile={profile} onSaved={async () => { setEditing(false); await load(tab, true) }} /> : <dl className="border-y border-white/10">
           <DetailRow label="Business" value={profile?.business_name || 'Not provided'} />
           <DetailRow label="Entity" value={profile?.entity_type || 'Not provided'} />
           <DetailRow label="Assigned team">{data.assigned_staff.length ? data.assigned_staff.map((s) => s.full_name || s.email).join(', ') : <span className="text-slate-500">Unassigned</span>}</DetailRow>
@@ -310,7 +320,7 @@ export default function ClientDetailModern() {
 
     {tab === 'relationships' && <div className="mt-7"><ClientRelationships clientId={account.id}/></div>}
 
-    {tab === 'details' && <div className="mt-7 max-w-5xl"><SectionTitle eyebrow="Account" title="Client & business details" action={<button className="text-sm font-medium text-gold hover:underline" onClick={() => setEditing((v) => !v)}>{editing ? 'Cancel' : 'Edit'}</button>} />{editing ? <ProfileEditor account={account} profile={profile} onSaved={async () => { setEditing(false); await load() }} /> : <dl className="border-y border-white/10"><DetailRow label="Full name" value={account.full_name || 'Not provided'} /><DetailRow label="Email" value={account.email} /><DetailRow label="Phone" value={account.phone || 'Not provided'} /><DetailRow label="Business name" value={profile?.business_name || 'Not provided'} /><DetailRow label="Entity type" value={profile?.entity_type || 'Not provided'} /><DetailRow label="EIN" value={profile?.ein || 'Not provided'} /><DetailRow label="State" value={profile?.state || 'Not provided'} /><DetailRow label="Account created" value={displayDate(account.created_at)} /><DetailRow label="Last login" value={displayDate(account.last_login_at)} /><DetailRow label="Assigned team" value={data.assigned_staff.map((s) => s.full_name || s.email).join(', ') || 'Unassigned'} /></dl>}</div>}
+    {tab === 'details' && <div className="mt-7 max-w-5xl"><SectionTitle eyebrow="Account" title="Client & business details" action={<button className="text-sm font-medium text-gold hover:underline" onClick={() => setEditing((v) => !v)}>{editing ? 'Cancel' : 'Edit'}</button>} />{editing ? <ProfileEditor account={account} profile={profile} onSaved={async () => { setEditing(false); await load(tab, true) }} /> : <dl className="border-y border-white/10"><DetailRow label="Full name" value={account.full_name || 'Not provided'} /><DetailRow label="Email" value={account.email} /><DetailRow label="Phone" value={account.phone || 'Not provided'} /><DetailRow label="Business name" value={profile?.business_name || 'Not provided'} /><DetailRow label="Entity type" value={profile?.entity_type || 'Not provided'} /><DetailRow label="EIN" value={profile?.ein || 'Not provided'} /><DetailRow label="State" value={profile?.state || 'Not provided'} /><DetailRow label="Account created" value={displayDate(account.created_at)} /><DetailRow label="Last login" value={displayDate(account.last_login_at)} /><DetailRow label="Assigned team" value={data.assigned_staff.map((s) => s.full_name || s.email).join(', ') || 'Unassigned'} /></dl>}</div>}
   </div>
 }
 

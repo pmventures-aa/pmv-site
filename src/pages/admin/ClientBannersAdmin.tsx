@@ -171,7 +171,7 @@ function ComposerDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
           </div>
           <div>
             <label className="text-xs font-semibold text-slate-400">Force redirect on acknowledge (optional)</label>
-            <input className={inputCls} value={forceRedirect} onChange={(e) => setForceRedirect(e.target.value)} placeholder="e.g. /portal/documents"/>
+            <input className={inputCls} value={forceRedirect} onChange={(e) => setForceRedirect(e.target.value)} placeholder="e.g. documents or /portal/documents"/>
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">

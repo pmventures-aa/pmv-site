@@ -81,6 +81,19 @@ export default function Messages() {
     load()
   }, [load])
 
+  useEffect(() => {
+    const refresh = () => { void load() }
+    const onVisibility = () => { if (document.visibilityState === 'visible') refresh() }
+    window.addEventListener('focus', refresh)
+    window.addEventListener('pmv:activity', refresh)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('pmv:activity', refresh)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [load])
+
   function onCreated(id: string) {
     setActiveId(id)
     load()

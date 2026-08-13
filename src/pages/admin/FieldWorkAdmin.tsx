@@ -249,7 +249,7 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
 
   useEffect(() => {
     api.get<{ clients: ClientOption[] }>('/admin/clients').then((r) => setClients(r.clients ?? [])).catch(() => {})
-    api.get<{ employees: StaffOption[] }>('/admin/employees').then((r) => setVendors(r.employees ?? [])).catch(() => {})
+    api.get<{ providers: StaffOption[] }>('/admin/field-assignment-providers').then((r) => setVendors(r.providers ?? [])).catch(() => toast.error('Could not load the provider roster.'))
   }, [])
 
   useEffect(() => {
