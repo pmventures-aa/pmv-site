@@ -1,8 +1,23 @@
-import { Crest } from '../../components/ui'
 import type { EmailSignature } from '../../lib/emailSignatures'
 
+const LETTERHEAD_CREST = '/logo-crest-letterhead.png'
+const CREST_W = 73
+const CREST_H = 94
 const PHONE = '(561) 388-7879'
 const SITE = 'pinnaclemanagementventures.com'
+
+export function LetterheadCrest({ decorative = true }: { decorative?: boolean }) {
+  return (
+    <img
+      src={LETTERHEAD_CREST}
+      alt={decorative ? '' : 'Pinnacle Management Ventures crest'}
+      width={CREST_W}
+      height={CREST_H}
+      className="block shrink-0"
+      style={{ width: CREST_W, height: CREST_H }}
+    />
+  )
+}
 
 export function SignatureLetterhead({
   kind,
@@ -26,7 +41,7 @@ export function SignatureLetterhead({
   return (
     <div className="max-w-[580px] text-[#0a1728]">
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-5">
-        <Crest size={76} tone="dark" decorative />
+        <LetterheadCrest />
         <div className="min-w-0">
           <p className="font-serif text-[18px] font-semibold leading-[22px] tracking-[.04em]">Pinnacle Management Ventures</p>
           <p className="mt-1.5 text-[10px] uppercase tracking-[.16em] text-[#5b6573]">Property · Documents · Operations</p>

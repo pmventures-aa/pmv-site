@@ -24,11 +24,11 @@ export interface SignaturePerson {
 }
 
 export const SITE_URL = 'https://www.pinnaclemanagementventures.com'
-export const CREST_PATH = '/logo-crest-transparent.png'
+export const CREST_PATH = '/logo-crest-letterhead.png'
 export const CREST_ABSOLUTE = `${SITE_URL}${CREST_PATH}`
 const FIRM_PHONE = '(561) 388-7879'
 const SUPPORT_EMAIL = 'support@pinnaclemanagementventures.com'
-const SIG_MARK = '<!--pmv-sig:v3-->'
+const SIG_MARK = '<!--pmv-sig:v4-->'
 
 function esc(value: string): string {
   return value
@@ -55,8 +55,8 @@ function letterheadTable(personHtml: string): string {
     <td style="padding:0 0 14px">
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse">
         <tr>
-          <td valign="middle" style="width:88px;padding:0 18px 0 0">
-            <img src="${CREST_PATH}" width="76" height="76" alt="Pinnacle" style="display:block;border:0;outline:none;width:76px;height:76px"/>
+          <td valign="middle" style="width:90px;padding:0 16px 0 0">
+            <img src="${CREST_PATH}" width="73" height="94" alt="Pinnacle" style="display:block;border:0;outline:none;width:73px;height:94px"/>
           </td>
           <td valign="middle" style="padding:0 12px 0 0">
             <div style="font-family:Georgia,'Times New Roman',Times,serif;font-size:18px;line-height:22px;letter-spacing:.04em;color:#0a1728">Pinnacle Management Ventures</div>
@@ -168,7 +168,7 @@ async function upsertShared(
     ).bind(row.id, row.name, row.slug, row.kind, row.html, row.isDefault, row.sortOrder).run()
     return
   }
-  if (!existing.html.includes('pmv-sig:v3')) {
+  if (!existing.html.includes('pmv-sig:v4')) {
     await env.DB.prepare(
       `UPDATE email_signatures SET html = ?, name = ?, updated_at = datetime('now') WHERE id = ?`,
     ).bind(row.html, row.name, existing.id).run()
@@ -223,7 +223,7 @@ export async function ensurePersonalSignature(env: Env, user: SessionUser): Prom
   })
 
   if (!existing) {
-    const html = (profile?.signature_html || '').trim().includes('pmv-sig:v3')
+    const html = (profile?.signature_html || '').trim().includes('pmv-sig:v4')
       ? profile!.signature_html!
       : letterhead
     await env.DB.prepare(
@@ -233,7 +233,7 @@ export async function ensurePersonalSignature(env: Env, user: SessionUser): Prom
     return
   }
 
-  if (!existing.html.includes('pmv-sig:v3')) {
+  if (!existing.html.includes('pmv-sig:v4')) {
     await env.DB.prepare(
       `UPDATE email_signatures SET html = ?, name = ?, updated_at = datetime('now') WHERE id = ?`,
     ).bind(letterhead, name || 'My signature', existing.id).run()

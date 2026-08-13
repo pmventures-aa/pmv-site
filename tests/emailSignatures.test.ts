@@ -5,9 +5,9 @@ import { resolveHqDeepLink } from '../src/components/kit/NotificationFeedPanel'
 describe('branded email signatures', () => {
   it('builds a professional company block with crest, phone, and site', () => {
     const html = brandedSignatureHtml('company')
-    expect(html).toContain('<!--pmv-sig:v3-->')
+    expect(html).toContain('<!--pmv-sig:v4-->')
     expect(html).toContain('Pinnacle Management Ventures')
-    expect(html).toContain('logo-crest-transparent.png')
+    expect(html).toContain('logo-crest-letterhead.png')
     expect(html).toContain('(561) 388-7879')
     expect(html).toContain('pinnaclemanagementventures.com')
     expect(html).toContain('Property')
@@ -20,7 +20,7 @@ describe('branded email signatures', () => {
     expect(html).toContain('PMV Support')
     expect(html).toContain('Client Care')
     expect(html).toContain('support@pinnaclemanagementventures.com')
-    expect(html).toContain('logo-crest-transparent.png')
+    expect(html).toContain('logo-crest-letterhead.png')
   })
 
   it('builds a personal block with the sender name and title', () => {
@@ -47,13 +47,13 @@ describe('branded email signatures', () => {
 
   it('keeps the crest on a same-origin path so HQ can display it', () => {
     const html = brandedSignatureHtml('company')
-    expect(html).toContain('src="/logo-crest-transparent.png"')
-    expect(html).not.toContain('https://www.pinnaclemanagementventures.com/logo-crest-transparent.png')
+    expect(html).toContain('src="/logo-crest-letterhead.png"')
+    expect(html).not.toContain('https://www.pinnaclemanagementventures.com/logo-crest-letterhead.png')
   })
 
   it('absolutizes the crest for outbound mail', () => {
     const html = absolutizeSignatureAssets(brandedSignatureHtml('company'))
-    expect(html).toContain('https://www.pinnaclemanagementventures.com/logo-crest-transparent.png')
+    expect(html).toContain('https://www.pinnaclemanagementventures.com/logo-crest-letterhead.png')
   })
 
   it('turns composed HTML into readable plain text', () => {
