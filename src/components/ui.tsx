@@ -75,7 +75,11 @@ export function Logo({ className = '', showText = true, markSize = 54, tone = 'a
 }
 
 export function Crest({ size = 96, className = '', tone = 'auto', decorative = false }: { size?: number; className?: string; tone?: CrestTone; decorative?: boolean }) {
-  return <CrestArtwork size={size} tone={tone} className={className} decorative={decorative} />
+  return (
+    <span className={`inline-block shrink-0 ${className}`} style={{ width: size, height: size }}>
+      <CrestArtwork size={size} tone={tone} decorative={decorative} />
+    </span>
+  )
 }
 
 export function BrandMark3D({ size = 120, className = '', decorative = false, variant = 'standard' }: { size?: number; className?: string; decorative?: boolean; variant?: BrandMarkVariant }) {
