@@ -210,8 +210,40 @@ documentPlatformV2AdminRoutes.post('/document-platform/envelopes/bulk',async c=>
   const status=failed&&success?'partial':failed?'failed':'success';await c.env.DB.prepare(`UPDATE envelope_bulk_jobs SET succeeded_count=?,failed_count=?,status=?,result_json=?,finished_at=? WHERE id=?`).bind(success,failed,status,JSON.stringify(results),now(),jobId).run();return c.json({job_id:jobId,status,succeeded:success,failed,results})
 })
 
+async function safeAll(env:any, sql:string, ...binds:any[]){
+  try{
+    const rows=binds.length?await env.DB.prepare(sql).bind(...binds).all():await env.DB.prepare(sql).all()
+    return rows.results||[]
+  }catch{return []}
+}
+
+async function sweepStaleRuns(env:any, key:string, maxAgeMs=15*60*1000){
+  const rows=await safeAll(env,"SELECT id,started_at FROM automation_runs WHERE automation_key=? AND status='running'",key)
+  for(const row of rows){
+    const raw=String(row.started_at||'')
+    const started=new Date(raw.includes('T')?raw:`${raw.replace(' ','T')}Z`).getTime()
+    const age=Number.isFinite(started)?Date.now()-started:maxAgeMs+1
+    if(age<=maxAgeMs) continue
+    await env.DB.prepare(`UPDATE automation_runs SET status='failed',detail_json=?,finished_at=? WHERE id=?`).bind(JSON.stringify({error:'Run did not finish. Marked stale after 15 minutes.'}),now(),row.id).run()
+  }
+}
+
+async function isAutomationPaused(env:any, key:string){
+  try{
+    const row=await env.DB.prepare('SELECT enabled FROM automation_controls WHERE automation_key=?').bind(key).first() as any
+    if(!row) return false
+    return Number(row.enabled)===0
+  }catch{return false}
+}
+
 // Automation Center rules and manual run
-documentPlatformV2AdminRoutes.get('/document-platform/automation',async c=>{const [rules,runs]=await Promise.all([c.env.DB.prepare('SELECT * FROM envelope_automation_rules ORDER BY rule_type,name').all(),c.env.DB.prepare("SELECT * FROM automation_runs WHERE automation_key='document_envelopes' ORDER BY started_at DESC LIMIT 50").all()]);return c.json({rules:rules.results||[],runs:runs.results||[]})})
+documentPlatformV2AdminRoutes.get('/document-platform/automation',async c=>{
+  const [rules,runs]=await Promise.all([
+    safeAll(c.env,'SELECT * FROM envelope_automation_rules ORDER BY rule_type,name'),
+    safeAll(c.env,"SELECT * FROM automation_runs WHERE automation_key='document_envelopes' ORDER BY started_at DESC LIMIT 50"),
+  ])
+  return c.json({rules,runs})
+})
 documentPlatformV2AdminRoutes.patch('/document-platform/automation/rules/:ruleId',requireActualOwner,async c=>{const b=await c.req.json<any>().catch(()=>({}));await c.env.DB.prepare('UPDATE envelope_automation_rules SET name=COALESCE(?,name),enabled=COALESCE(?,enabled),config_json=COALESCE(?,config_json),updated_by_user_id=?,updated_at=? WHERE id=?').bind(b.name!==undefined?String(b.name).slice(0,180):null,b.enabled!==undefined?(b.enabled?1:0):null,b.config!==undefined?JSON.stringify(b.config):null,c.get('user').id,now(),c.req.param('ruleId')).run();return c.json({ok:true})})
 documentPlatformV2AdminRoutes.post('/document-platform/automation/run',requireActualOwner,async c=>{const result=await runDocumentAutomation(c.env,100,c.get('user').id,'manual');return c.json({ok:true,...result})})
 
@@ -236,38 +268,112 @@ documentPlatformV2PublicRoutes.post('/sign/:token/fields/:fieldId',async c=>{
 
 // Scheduled document automation route
 documentPlatformV2AutomationRoutes.post('/automation/document-envelopes/run',requireAutomation,async c=>{
-  // The prior implementation let any thrown error hit Hono's default 500
-  // handler, which returned {"error":"internal error"} - a message
-  // opaque enough that the GitHub Actions cron has been failing every 10
-  // minutes with no way to diagnose what actually went wrong.
-  //
-  // Now: wrap the automation run, catch any error, and return HTTP 200
-  // with a status:'error' body carrying the real message. The cron
-  // considers the invocation successful (it did reach us and did try),
-  // and the error text is preserved in the workflow log for the operator
-  // to fix. If the automation succeeds, behavior is unchanged.
   try {
     const result = await runDocumentAutomation(c.env, 150, undefined, 'scheduled')
     return c.json({ ok: true, ...result })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return c.json({
-      ok: true,
+      ok: false,
       status: 'error',
       message,
-      hint: 'Endpoint reached and authorized. The document-envelope automation itself failed - see message. Common causes: missing migration (0044_esign_platform_v2 for envelope_automation_rules) or D1 unavailable.',
-    })
+      hint: 'Endpoint reached and authorized. The document-envelope automation itself failed - see message.',
+    }, 500)
   }
 })
 
 export async function runDocumentAutomation(env:any,limit=100,actorUserId?:string,triggerType:'scheduled'|'manual'='scheduled'){
-  const runId=uuid();await env.DB.prepare(`INSERT INTO automation_runs(id,automation_key,trigger_type,status,triggered_by_user_id) VALUES (?,'document_envelopes',?,'running',?)`).bind(runId,triggerType,actorUserId||null).run()
+  await sweepStaleRuns(env,'document_envelopes')
+  if(await isAutomationPaused(env,'document_envelopes')){
+    return {run_id:null,status:'success',processed:0,sent:0,expired:0,retained:0,failed:0,paused:true}
+  }
+  const stillRunning=await env.DB.prepare("SELECT id FROM automation_runs WHERE automation_key='document_envelopes' AND status='running' ORDER BY started_at DESC LIMIT 1").first()
+  if(stillRunning) return {run_id:stillRunning.id,status:'running',processed:0,sent:0,expired:0,retained:0,failed:0,skipped:true}
+
+  const runId=uuid()
+  await env.DB.prepare(`INSERT INTO automation_runs(id,automation_key,trigger_type,status,triggered_by_user_id) VALUES (?,'document_envelopes',?,'running',?)`).bind(runId,triggerType,actorUserId||null).run()
   let processed=0,sent=0,expired=0,retained=0,failed=0
+  const errors:string[]=[]
+  const note=(phase:string,err:unknown)=>{const message=err instanceof Error?err.message:String(err);if(errors.length<8)errors.push(`${phase}: ${message}`)}
+
   try{
-    const rules=await env.DB.prepare('SELECT rule_type,enabled,config_json FROM envelope_automation_rules').all() as any,enabled=new Set((rules.results||[]).filter((r:any)=>Number(r.enabled)===1).map((r:any)=>r.rule_type))
-    if(enabled.has('expiration')){const due=await env.DB.prepare(`SELECT id FROM envelopes WHERE status IN ('sent','viewed','in_progress') AND expires_at IS NOT NULL AND expires_at<=? LIMIT ?`).bind(now(),limit).all() as any;for(const e of due.results||[]){try{await env.DB.batch([env.DB.prepare(`UPDATE envelopes SET status='expired',updated_at=? WHERE id=?`).bind(now(),e.id),env.DB.prepare(`UPDATE envelope_recipients SET status=CASE WHEN status='completed' THEN status ELSE 'expired' END,access_revoked_at=CASE WHEN status='completed' THEN access_revoked_at ELSE ? END,invitation_token_hash=NULL,updated_at=? WHERE envelope_id=?`).bind(now(),now(),e.id)]);await appendSystemEvent(env,e.id,'envelope.expired',{automation_run_id:runId});expired+=1;processed+=1}catch{failed+=1}}}
-    if(enabled.has('reminder')){const active=await env.DB.prepare(`SELECT * FROM envelopes WHERE status IN ('sent','viewed','in_progress') AND reminder_frequency!='none' AND (expires_at IS NULL OR expires_at>?) ORDER BY COALESCE(last_reminder_at,sent_at) ASC LIMIT ?`).bind(now(),limit).all() as any;for(const e of active.results||[]){try{const base=new Date(e.last_reminder_at||e.sent_at||e.updated_at).getTime(),days=e.reminder_frequency==='daily'?1:e.reminder_frequency==='every_3_days'?3:7;if(Date.now()-base<days*86400000)continue;const rs=await env.DB.prepare(`SELECT * FROM envelope_recipients WHERE envelope_id=? AND access_revoked_at IS NULL AND status NOT IN ('completed','declined','expired') AND role IN ('signer','approver','witness','notary') ORDER BY routing_order`).bind(e.id).all() as any;let targets=rs.results||[];if(e.signing_order_mode==='sequential'&&targets.length){const min=Math.min(...targets.map((r:any)=>Number(r.routing_order||1)));targets=targets.filter((r:any)=>Number(r.routing_order||1)===min)}for(const r of targets)await issueRecipientInvitation(env,e,r,'reminder');await env.DB.prepare('UPDATE envelopes SET last_reminder_at=?,next_reminder_at=?,updated_at=? WHERE id=?').bind(now(),new Date(Date.now()+days*86400000).toISOString(),now(),e.id).run();await appendSystemEvent(env,e.id,'envelope.automatic_reminder_sent',{automation_run_id:runId,recipient_count:targets.length});sent+=targets.length;processed+=1}catch{failed+=1}}}
-    if(enabled.has('retention')){const due=await env.DB.prepare(`SELECT * FROM retention_assignments WHERE disposition_at IS NOT NULL AND disposition_at<=? AND disposed_at IS NULL LIMIT ?`).bind(now(),limit).all() as any;for(const a of due.results||[]){try{const globalHold=await env.DB.prepare(`SELECT 1 FROM retention_legal_holds WHERE status='active' AND (scope_type='global' OR (scope_type=? AND scope_id=?)) LIMIT 1`).bind(a.scope_type,a.scope_id).first();if(globalHold)continue;if(a.scope_type==='document')await env.DB.prepare(`UPDATE internal_documents SET status='archived',archived_at=COALESCE(archived_at,?),updated_at=? WHERE id=?`).bind(now(),now(),a.scope_id).run();else if(a.scope_type==='envelope'){const e=await env.DB.prepare('SELECT tags_json FROM envelopes WHERE id=?').bind(a.scope_id).first() as any;if(e){const tags=safeJson<string[]>(e.tags_json,[]);if(!tags.includes('retention-archived'))tags.push('retention-archived');await env.DB.prepare('UPDATE envelopes SET tags_json=?,updated_at=? WHERE id=?').bind(JSON.stringify(tags),now(),a.scope_id).run();await appendSystemEvent(env,a.scope_id,'retention.disposition_applied',{automation_run_id:runId})}}await env.DB.prepare('UPDATE retention_assignments SET disposed_at=? WHERE id=?').bind(now(),a.id).run();retained+=1;processed+=1}catch{failed+=1}}}
-    const status=failed&&processed?'partial':failed?'failed':'success';await env.DB.prepare(`UPDATE automation_runs SET status=?,items_processed=?,items_succeeded=?,items_failed=?,detail_json=?,finished_at=? WHERE id=?`).bind(status,processed,Math.max(0,processed-failed),failed,JSON.stringify({sent,expired,retained}),now(),runId).run();return {run_id:runId,status,processed,sent,expired,retained,failed}
-  }catch(err){await env.DB.prepare(`UPDATE automation_runs SET status='failed',items_processed=?,items_failed=?,detail_json=?,finished_at=? WHERE id=?`).bind(processed,failed+1,JSON.stringify({error:err instanceof Error?err.message:'automation failed'}),now(),runId).run();throw err}
+    const ruleRows=await safeAll(env,'SELECT rule_type,enabled,config_json FROM envelope_automation_rules')
+    const enabled=new Set((ruleRows.length?ruleRows:[{rule_type:'reminder',enabled:1},{rule_type:'expiration',enabled:1},{rule_type:'retention',enabled:1}]).filter((r:any)=>Number(r.enabled)===1).map((r:any)=>r.rule_type))
+    const reminderRule=ruleRows.find((r:any)=>r.rule_type==='reminder')
+    const reminderConfig=safeJson<any>(reminderRule?.config_json,{max_reminders:20})
+    const maxReminders=Math.max(1,Number(reminderConfig.max_reminders||20))
+
+    if(enabled.has('expiration')){
+      try{
+        const due=await env.DB.prepare(`SELECT id FROM envelopes WHERE status IN ('sent','viewed','in_progress') AND expires_at IS NOT NULL AND expires_at<=? LIMIT ?`).bind(now(),limit).all() as any
+        for(const e of due.results||[]){
+          try{
+            await env.DB.batch([
+              env.DB.prepare(`UPDATE envelopes SET status='expired',updated_at=? WHERE id=?`).bind(now(),e.id),
+              env.DB.prepare(`UPDATE envelope_recipients SET status=CASE WHEN status='completed' THEN status ELSE 'expired' END,access_revoked_at=CASE WHEN status='completed' THEN access_revoked_at ELSE ? END,invitation_token_hash=NULL,updated_at=? WHERE envelope_id=?`).bind(now(),now(),e.id),
+            ])
+            await appendSystemEvent(env,e.id,'envelope.expired',{automation_run_id:runId})
+            expired+=1;processed+=1
+          }catch(err){failed+=1;note('expiration',err)}
+        }
+      }catch(err){failed+=1;note('expiration query',err)}
+    }
+
+    if(enabled.has('reminder')){
+      try{
+        const active=await env.DB.prepare(`SELECT * FROM envelopes WHERE status IN ('sent','viewed','in_progress') AND COALESCE(reminder_frequency,'none')!='none' AND (expires_at IS NULL OR expires_at>?) ORDER BY COALESCE(last_reminder_at,sent_at) ASC LIMIT ?`).bind(now(),limit).all() as any
+        for(const e of active.results||[]){
+          try{
+            const base=new Date(e.last_reminder_at||e.sent_at||e.updated_at).getTime()
+            const days=e.reminder_frequency==='daily'?1:e.reminder_frequency==='every_3_days'?3:7
+            if(Date.now()-base<days*86400000) continue
+            const rs=await env.DB.prepare(`SELECT * FROM envelope_recipients WHERE envelope_id=? AND access_revoked_at IS NULL AND status NOT IN ('completed','declined','expired') AND role IN ('signer','approver','witness','notary') ORDER BY routing_order`).bind(e.id).all() as any
+            let targets=rs.results||[]
+            if(e.signing_order_mode==='sequential'&&targets.length){
+              const min=Math.min(...targets.map((r:any)=>Number(r.routing_order||1)))
+              targets=targets.filter((r:any)=>Number(r.routing_order||1)===min)
+            }
+            targets=targets.filter((r:any)=>Number(r.reminder_count||0)<maxReminders)
+            if(!targets.length) continue
+            for(const r of targets) await issueRecipientInvitation(env,e,r,'reminder')
+            await env.DB.prepare('UPDATE envelopes SET last_reminder_at=?,next_reminder_at=?,updated_at=? WHERE id=?').bind(now(),new Date(Date.now()+days*86400000).toISOString(),now(),e.id).run()
+            await appendSystemEvent(env,e.id,'envelope.automatic_reminder_sent',{automation_run_id:runId,recipient_count:targets.length})
+            sent+=targets.length;processed+=1
+          }catch(err){failed+=1;note('reminder',err)}
+        }
+      }catch(err){failed+=1;note('reminder query',err)}
+    }
+
+    if(enabled.has('retention')){
+      try{
+        const due=await env.DB.prepare(`SELECT * FROM retention_assignments WHERE disposition_at IS NOT NULL AND disposition_at<=? AND disposed_at IS NULL LIMIT ?`).bind(now(),limit).all() as any
+        for(const a of due.results||[]){
+          try{
+            const globalHold=await env.DB.prepare(`SELECT 1 FROM retention_legal_holds WHERE status='active' AND (scope_type='global' OR (scope_type=? AND scope_id=?)) LIMIT 1`).bind(a.scope_type,a.scope_id).first()
+            if(globalHold) continue
+            if(a.scope_type==='document') await env.DB.prepare(`UPDATE internal_documents SET status='archived',archived_at=COALESCE(archived_at,?),updated_at=? WHERE id=?`).bind(now(),now(),a.scope_id).run()
+            else if(a.scope_type==='envelope'){
+              const e=await env.DB.prepare('SELECT tags_json FROM envelopes WHERE id=?').bind(a.scope_id).first() as any
+              if(e){
+                const tags=safeJson<string[]>(e.tags_json,[])
+                if(!tags.includes('retention-archived')) tags.push('retention-archived')
+                await env.DB.prepare('UPDATE envelopes SET tags_json=?,updated_at=? WHERE id=?').bind(JSON.stringify(tags),now(),a.scope_id).run()
+                await appendSystemEvent(env,a.scope_id,'retention.disposition_applied',{automation_run_id:runId})
+              }
+            }
+            await env.DB.prepare('UPDATE retention_assignments SET disposed_at=? WHERE id=?').bind(now(),a.id).run()
+            retained+=1;processed+=1
+          }catch(err){failed+=1;note('retention',err)}
+        }
+      }catch(err){failed+=1;note('retention query',err)}
+    }
+
+    const status=failed&&processed?'partial':failed?'failed':'success'
+    await env.DB.prepare(`UPDATE automation_runs SET status=?,items_processed=?,items_succeeded=?,items_failed=?,detail_json=?,finished_at=? WHERE id=?`).bind(status,processed,Math.max(0,processed-failed),failed,JSON.stringify({sent,expired,retained,errors}),now(),runId).run()
+    return {run_id:runId,status,processed,sent,expired,retained,failed,errors}
+  }catch(err){
+    const message=err instanceof Error?err.message:'automation failed'
+    await env.DB.prepare(`UPDATE automation_runs SET status='failed',items_processed=?,items_failed=?,detail_json=?,finished_at=? WHERE id=?`).bind(processed,failed+1,JSON.stringify({error:message,errors}),now(),runId).run()
+    return {run_id:runId,status:'failed',processed,sent,expired,retained,failed:failed+1,errors:[...errors,message]}
+  }
 }

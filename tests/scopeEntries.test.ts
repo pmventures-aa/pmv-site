@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GUIDE_ENTRIES, resolveScopeEntry, SERVICE_ENTRIES } from '../shared/scopeEntries'
+import { GUIDE_ENTRIES, resolveScopeEntry, SERVICE_ENTRIES, visibleQuestions } from '../shared/scopeEntries'
 import { services } from '../src/data/services'
 
 const PUBLISHED_GUIDES = [
@@ -64,5 +64,31 @@ describe('entry-aware scope requests', () => {
     expect(SERVICE_ENTRIES['eviction-support']?.job).toBe('eviction_reo')
     expect(resolveScopeEntry({ offering: 'pos-terminal-swap' })?.job).toBe('pos_payments')
     expect(resolveScopeEntry({ offering: 'field-exterior-light' })?.job).toBe('property_inspection')
+  })
+
+  it('shows inspection photo follow-ups only after a photo-related type is chosen', () => {
+    const entry = resolveScopeEntry({ job: 'property_inspection' })
+    expect(entry).not.toBeNull()
+    const before = visibleQuestions(entry!.questions, {}, 'onsite').map((q) => q.key)
+    expect(before).toContain('inspection_type')
+    expect(before).not.toContain('photo_set')
+    const after = visibleQuestions(entry!.questions, { inspection_type: 'Field photos / BPO' }, 'onsite').map((q) => q.key)
+    expect(after).toContain('photo_set')
+    expect(after).toContain('platform')
+    const remote = visibleQuestions(entry!.questions, {}, 'remote').map((q) => q.key)
+    expect(remote).not.toContain('access')
+  })
+
+  it('reveals notary and courier questions from the document kind selection', () => {
+    const entry = resolveScopeEntry({ job: 'documents_notary' })
+    const base = visibleQuestions(entry!.questions, {}, 'onsite').map((q) => q.key)
+    expect(base).toContain('document_kind')
+    expect(base).not.toContain('pickup')
+    const courier = visibleQuestions(entry!.questions, { document_kind: ['Courier / delivery'] }, 'onsite').map((q) => q.key)
+    expect(courier).toContain('pickup')
+    expect(courier).toContain('dropoff')
+    const notary = visibleQuestions(entry!.questions, { document_kind: ['Mobile notary'] }, 'remote').map((q) => q.key)
+    expect(notary).toContain('notary_kind')
+    expect(notary).not.toContain('meeting_location')
   })
 })

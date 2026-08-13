@@ -7,6 +7,7 @@ import { SlaClock } from '../../components/kit/SlaClock'
 import { useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
 import { toast } from '../../components/kit/toast'
+import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../components/admin/RecentWindow'
 
 interface CaseRow {
   id: string
@@ -192,40 +193,47 @@ export default function CasesAdmin() {
       ) : visible.length === 0 ? (
         <Panel><EmptyState label="No cases match these filters." /></Panel>
       ) : (
-        <Panel className="divide-y divide-white/5 !p-0">
-          {visible.map((row) => {
-            const overdue = isOverSla(row, now)
-            return (
-              <div key={row.id} className={`flex flex-wrap items-start justify-between gap-3 px-5 py-4 ${overdue ? 'border-l-2 border-l-rose-500/70 bg-rose-500/[.03]' : ''}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Tag tone={STATUS_TONE[row.status] ?? 'slate'}>{row.status.replace(/_/g, ' ')}</Tag>
-                    <Tag tone={row.priority === 'urgent' ? 'red' : row.priority === 'high' ? 'gold' : 'slate'}>
-                      {PRIORITY_LABEL[row.priority] || row.priority}
-                    </Tag>
-                    <span className="text-[11px] text-slate-500">Waiting on {row.waiting_on === 'pinnacle' ? 'Pinnacle' : row.waiting_on}</span>
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-white">{row.subject}</p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    <Link to={p(`clients/${row.client_user_id}`)} className="text-slate-300 hover:text-gold hover:underline">
-                      {row.client_name || row.client_email || 'Unknown client'}
-                    </Link>
-                    {' · '}
-                    {row.category || 'General'}
-                    {row.assignee_name ? <> {' · '} <span className="text-slate-400">Assigned to {row.assignee_name}</span></> : <> {' · '} <span className="text-amber-300">Unassigned</span></>}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs">
-                  <SlaClock due={row.response_due_at} complete={!!row.first_response_at} label="Response" />
-                  <SlaClock due={row.resolution_due_at} complete={row.status === 'closed'} label="Resolution" />
-                  <span className="text-[10px] text-slate-500">Opened {new Date(row.created_at).toLocaleString()}</span>
-                </div>
-              </div>
-            )
-          })}
-        </Panel>
+        <CaseRows rows={visible} now={now} p={p} />
       )}
     </div>
+  )
+}
+
+function CaseRows({ rows, now, p }: { rows: CaseRow[]; now: number; p: (path: string) => string }) {
+  const windowed = useRecentWindow(rows)
+  return (
+    <RecentListShell footer={<RecentWindowBar extra={windowed.extra} expanded={windowed.expanded} onToggle={() => windowed.setExpanded((v) => !v)} showing={windowed.showing} total={windowed.total} noun="cases" />}>
+      {windowed.visible.map((row) => {
+        const overdue = isOverSla(row, now)
+        return (
+          <div key={row.id} className={`flex flex-wrap items-start justify-between gap-3 border-b border-white/5 px-5 py-4 last:border-0 ${overdue ? 'border-l-2 border-l-rose-500/70 bg-rose-500/[.03]' : ''}`}>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Tag tone={STATUS_TONE[row.status] ?? 'slate'}>{row.status.replace(/_/g, ' ')}</Tag>
+                <Tag tone={row.priority === 'urgent' ? 'red' : row.priority === 'high' ? 'gold' : 'slate'}>
+                  {PRIORITY_LABEL[row.priority] || row.priority}
+                </Tag>
+                <span className="text-[11px] text-slate-500">Waiting on {row.waiting_on === 'pinnacle' ? 'Pinnacle' : row.waiting_on}</span>
+              </div>
+              <p className="mt-2 text-sm font-semibold text-white">{row.subject}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                <Link to={p(`clients/${row.client_user_id}`)} className="text-slate-300 hover:text-gold hover:underline">
+                  {row.client_name || row.client_email || 'Unknown client'}
+                </Link>
+                {' · '}
+                {row.category || 'General'}
+                {row.assignee_name ? <> {' · '} <span className="text-slate-400">Assigned to {row.assignee_name}</span></> : <> {' · '} <span className="text-amber-300">Unassigned</span></>}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs">
+              <SlaClock due={row.response_due_at} complete={!!row.first_response_at} label="Response" />
+              <SlaClock due={row.resolution_due_at} complete={row.status === 'closed'} label="Resolution" />
+              <span className="text-[10px] text-slate-500">Opened {new Date(row.created_at).toLocaleString()}</span>
+            </div>
+          </div>
+        )
+      })}
+    </RecentListShell>
   )
 }
 

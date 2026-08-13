@@ -1,11 +1,19 @@
 import { JOB_WORLD, SERVICE_WORLD, type OperatingWorld } from './workspace'
 
+export type ScopeQuestionWhen = {
+  key?: string
+  in?: string[]
+  includes?: string
+  location?: 'onsite' | 'remote'
+}
+
 export type ScopeQuestion = {
   key: string
   label: string
   hint?: string
   type: 'select' | 'multiselect' | 'text' | 'number'
   options?: string[]
+  when?: ScopeQuestionWhen
 }
 
 export type ScopeEntry = {
@@ -33,14 +41,16 @@ const CLEAN_QUESTIONS: ScopeQuestion[] = [
   q('property_type', 'Property type', 'select', { options: ['Single-family', 'Condo', 'Townhome', 'Multi-unit 2-4', 'Small multi-family 5-20', 'Vacation / STR', 'Commercial'] }),
   q('square_feet', 'Approx square footage', 'number', { hint: 'Best guess is fine' }),
   q('occupancy', 'Current occupancy', 'select', { options: ['Occupied', 'Vacant / on market', 'Vacant / off market', 'Transitioning', 'Owner-occupied'] }),
-  q('access', 'Access instructions', 'text', { hint: 'Lockbox, key hidden, tenant present, etc.' }),
+  q('access', 'Access instructions', 'text', { hint: 'Lockbox, key hidden, tenant present, etc.', when: { location: 'onsite' } }),
 ]
 
 const INSPECTION_QUESTIONS: ScopeQuestion[] = [
-  q('inspection_type', 'What kind of inspection?', 'select', { options: ['Occupancy check (drive-by / knock)', 'Interior + photo package', 'Move-in / move-out condition report', 'Insurance / underwriting package', 'Rehab / construction progress', '30/60/90-day rental', 'Vacant property check', 'Damage assessment'] }),
+  q('inspection_type', 'What kind of inspection?', 'select', { options: ['Occupancy check (drive-by / knock)', 'Interior + photo package', 'Move-in / move-out condition report', 'Insurance / underwriting package', 'Rehab / construction progress', '30/60/90-day rental', 'Vacant property check', 'Damage assessment', 'Field photos / BPO'] }),
   q('property_type', 'Property type', 'select', { options: ['Single-family', 'Condo', 'Townhome', 'Multi-unit', 'Commercial', 'Land / lot'] }),
+  q('photo_set', 'What photo set do you need?', 'select', { options: ['Exterior / drive-by (3-6 photos)', 'Exterior + street scenes', 'BPO photo set - exterior', 'BPO photo set - interior / full', 'Licensed exterior BPO', 'Licensed interior BPO', 'Commercial / signage audit'], when: { key: 'inspection_type', in: ['Interior + photo package', 'Insurance / underwriting package', 'Field photos / BPO'] } }),
+  q('platform', 'BPO or inspection platform, if any', 'text', { hint: 'Clear Capital, ServiceLink, interior checklist, etc.', when: { key: 'inspection_type', in: ['Interior + photo package', 'Insurance / underwriting package', 'Field photos / BPO'] } }),
   q('recurring', 'One-time or recurring?', 'select', { options: ['One-time', 'Weekly', 'Bi-weekly', 'Monthly', 'Quarterly'] }),
-  q('access', 'Access instructions', 'text'),
+  q('access', 'Access instructions', 'text', { when: { location: 'onsite' } }),
 ]
 
 const PHOTO_QUESTIONS: ScopeQuestion[] = [
@@ -60,9 +70,13 @@ const EVICTION_QUESTIONS: ScopeQuestion[] = [
 
 const DOCUMENT_QUESTIONS: ScopeQuestion[] = [
   q('document_kind', 'What kind of document work?', 'multiselect', { options: ['Mobile notary', 'Remote Online Notary (RON)', 'Document prep / packet', 'Courier / delivery', 'Courthouse filing', 'Signing coordination', 'Attorney handoff'] }),
-  q('signer_count', 'How many signers?', 'select', { options: ['1', '2', '3', '4+'] }),
+  q('notary_kind', 'In person or remote?', 'select', { options: ['Mobile notary at a location', 'Remote Online Notarization (RON)', 'Loan signing package', 'Not sure yet'], when: { key: 'document_kind', includes: 'notary' } }),
+  q('document_type', 'What is being signed or prepared?', 'text', { hint: 'POA, affidavit, closing package, lease, etc.', when: { key: 'document_kind', includes: 'notary' } }),
+  q('signer_count', 'How many signers?', 'select', { options: ['1', '2', '3', '4+'], when: { key: 'document_kind', includes: 'notary' } }),
+  q('pickup', 'Pickup location', 'text', { when: { key: 'document_kind', includes: 'Courier' } }),
+  q('dropoff', 'Drop-off or filing location', 'text', { when: { key: 'document_kind', includes: 'Courier' } }),
   q('has_document', 'Do you already have the document?', 'select', { options: ['Yes, ready to go', 'Yes, needs review', 'No, need help preparing it'] }),
-  q('meeting_location', 'Where does it need to happen?', 'text', { hint: 'Address, office, care facility, courthouse, remote' }),
+  q('meeting_location', 'Where does it need to happen?', 'text', { hint: 'Address, office, care facility, courthouse, remote', when: { location: 'onsite' } }),
 ]
 
 const NOTARY_QUESTIONS: ScopeQuestion[] = [
@@ -362,6 +376,34 @@ const OFFERING_PREFIX_JOB: [string, string][] = [
 
 export function questionsForJob(job: string): ScopeQuestion[] {
   return JOB_QUESTIONS[job] || OTHER_QUESTIONS
+}
+
+export function questionIsVisible(
+  question: ScopeQuestion,
+  answers: Record<string, string | string[]>,
+  locationType?: 'onsite' | 'remote',
+): boolean {
+  const when = question.when
+  if (!when) return true
+  if (when.location && locationType && when.location !== locationType) return false
+  if (when.key) {
+    const raw = answers[when.key]
+    const values = Array.isArray(raw) ? raw : raw ? [raw] : []
+    if (when.in && !when.in.some((option) => values.includes(option))) return false
+    if (when.includes) {
+      const needle = when.includes.toLowerCase()
+      if (!values.some((value) => value.toLowerCase().includes(needle))) return false
+    }
+  }
+  return true
+}
+
+export function visibleQuestions(
+  questions: ScopeQuestion[],
+  answers: Record<string, string | string[]>,
+  locationType?: 'onsite' | 'remote',
+): ScopeQuestion[] {
+  return questions.filter((question) => questionIsVisible(question, answers, locationType))
 }
 
 export function resolveScopeEntry(input: {

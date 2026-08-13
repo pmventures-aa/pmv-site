@@ -4,6 +4,7 @@ import { api } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
 import { useLiveRefresh } from '../../lib/liveRefresh'
+import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../components/admin/RecentWindow'
 
 interface ClientRow {
   id: string
@@ -54,9 +55,11 @@ export default function ClientsList() {
     })
   }, [clients, q, onboarding])
 
+  const windowed = useRecentWindow(filtered)
+
   return (
     <div>
-      <PageIntro kicker="Client accounts" title="Clients" subtitle={loading ? 'Everyone you have access to.' : `${filtered.length} of ${clients.length} client${clients.length === 1 ? '' : 's'}.`} />
+      <PageIntro kicker="Client accounts" title="Clients" subtitle={loading ? 'Everyone you have access to.' : `${filtered.length} of ${clients.length} client${clients.length === 1 ? '' : 's'}, most recent first.`} />
       <div className="mb-4 flex flex-wrap gap-3">
         <input
           className={`${inputCls} max-w-xs`}
@@ -72,14 +75,13 @@ export default function ClientsList() {
           ))}
         </select>
       </div>
-      <Panel className="overflow-x-auto !p-0">
-        {loading ? (
-          <div className="p-6 text-sm text-slate-400">Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-6">
-            <EmptyState label={clients.length === 0 ? 'No clients yet.' : 'No clients match your search.'} />
-          </div>
-        ) : (
+      {loading ? (
+        <Panel className="overflow-x-auto !p-0"><div className="p-6 text-sm text-slate-400">Loading…</div></Panel>
+      ) : filtered.length === 0 ? (
+        <Panel className="overflow-x-auto !p-0"><div className="p-6"><EmptyState label={clients.length === 0 ? 'No clients yet.' : 'No clients match your search.'} /></div></Panel>
+      ) : (
+        <RecentListShell footer={<RecentWindowBar extra={windowed.extra} expanded={windowed.expanded} onToggle={() => windowed.setExpanded((v) => !v)} showing={windowed.showing} total={windowed.total} noun="clients" />}>
+          <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -90,7 +92,7 @@ export default function ClientsList() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => (
+              {windowed.visible.map((c) => (
                 <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                   <td className="px-5 py-3">
                     <Link to={p(`clients/${c.id}/overview`)} className="font-medium text-white hover:text-gold">
@@ -109,8 +111,9 @@ export default function ClientsList() {
               ))}
             </tbody>
           </table>
-        )}
-      </Panel>
+          </div>
+        </RecentListShell>
+      )}
     </div>
   )
 }

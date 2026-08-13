@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, StatCard, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { services } from '../../data/services'
+import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../components/admin/RecentWindow'
 
 interface QuoteRow {
   id: string
@@ -116,6 +117,8 @@ export default function QuotesAdmin() {
     }
   }, [quotes])
 
+  const quoteWindow = useRecentWindow(quotes || [])
+
   return <div className="space-y-6">
     <PageIntro kicker="Revenue" title="Quotes" subtitle="Branded quotes built from your service catalog and reusable templates. Recipients review and accept on a Pinnacle-branded page - no account needed." action={<button className={btnPrimary} onClick={() => setBuilding(true)}>New Quote</button>} />
     {error && <div className="rounded-xl border border-red-400/20 bg-red-400/[.06] p-4 text-sm text-red-200">{error}</div>}
@@ -145,14 +148,16 @@ export default function QuotesAdmin() {
     {tab === 'quotes' && (
       quotes === null ? <p className="text-sm text-slate-400">Loading…</p>
       : quotes.length === 0 ? <EmptyState label="No quotes yet. Build the first one from a template - it takes about a minute." />
-      : <Panel className="!p-0 overflow-x-auto">
+      : <RecentListShell footer={<RecentWindowBar extra={quoteWindow.extra} expanded={quoteWindow.expanded} onToggle={() => quoteWindow.setExpanded((v) => !v)} showing={quoteWindow.showing} total={quoteWindow.total} noun="quotes" />}>
+          <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Quote</th><th>Recipient</th><th>Status</th><th>Total</th><th>Valid until</th><th /></tr></thead>
             <tbody className="divide-y divide-white/10">
-              {quotes.map((q) => <QuoteListRow key={q.id} quote={q} expanded={detailId === q.id} onToggle={() => setDetailId(detailId === q.id ? null : q.id)} onChanged={load} offerings={offerings} />)}
+              {quoteWindow.visible.map((q) => <QuoteListRow key={q.id} quote={q} expanded={detailId === q.id} onToggle={() => setDetailId(detailId === q.id ? null : q.id)} onChanged={load} offerings={offerings} />)}
             </tbody>
           </table>
-        </Panel>
+          </div>
+        </RecentListShell>
     )}
 
     {tab === 'templates' && <TemplateManager templates={templates} offerings={offerings} onChanged={load} />}
