@@ -5,6 +5,7 @@ import { uuid } from '../crypto'
 import { sendEmailStrict } from '../email'
 import { logActivity } from '../activity'
 import { sendingFrom, threadReplyAddress, formattedReplyTo } from '../resendInbound'
+import { applySelectedSignature } from '../emailSignatures'
 
 export const emailThreadRoutes = new Hono<AppEnv>()
 emailThreadRoutes.use('*', requireStaff)
@@ -40,23 +41,48 @@ function generateMessageId(env: Env): string {
   return `<${uuid()}@${host}>`
 }
 
+const UNREAD_SQL = `EXISTS (
+  SELECT 1 FROM email_messages em
+  WHERE em.email_thread_id = et.id AND em.direction = 'inbound'
+    AND em.created_at > COALESCE(
+      (SELECT r.last_read_at FROM email_thread_reads r WHERE r.user_id = ? AND r.email_thread_id = et.id),
+      '1970-01-01'
+    )
+)`
+
+emailThreadRoutes.get('/email-threads/unread-count', async (c) => {
+  const user = c.get('user')
+  const row = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM email_threads et WHERE ${UNREAD_SQL}`,
+  ).bind(user.id).first<{ n: number }>()
+  return c.json({ count: Number(row?.n || 0) })
+})
+
 emailThreadRoutes.get('/email-threads', async (c) => {
+  const user = c.get('user')
   const rows = await c.env.DB.prepare(
     `SELECT et.id, et.subject, et.scope_client_user_id, et.last_activity_at, et.created_at,
             et.conversation_id,
             (SELECT COUNT(*) FROM email_messages em WHERE em.email_thread_id = et.id) message_count,
             (SELECT full_name FROM users WHERE id = et.scope_client_user_id) client_name,
             (SELECT direction FROM email_messages WHERE email_thread_id = et.id ORDER BY created_at DESC LIMIT 1) last_direction,
-            (SELECT provider_status FROM email_messages WHERE email_thread_id = et.id ORDER BY created_at DESC LIMIT 1) last_status
+            (SELECT provider_status FROM email_messages WHERE email_thread_id = et.id ORDER BY created_at DESC LIMIT 1) last_status,
+            CASE WHEN ${UNREAD_SQL} THEN 1 ELSE 0 END AS unread
      FROM email_threads et
      ORDER BY et.last_activity_at DESC LIMIT 200`
-  ).all()
+  ).bind(user.id).all()
   return c.json({ threads: (rows.results as any[]) || [] })
 })
 
 emailThreadRoutes.get('/email-threads/:id', async (c) => {
+  const user = c.get('user')
   const thread = await c.env.DB.prepare(`SELECT * FROM email_threads WHERE id = ?`).bind(c.req.param('id')).first() as any
   if (!thread) return c.json({ error: 'not found' }, 404)
+  await c.env.DB.prepare(
+    `INSERT INTO email_thread_reads (user_id, email_thread_id, last_read_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(user_id, email_thread_id) DO UPDATE SET last_read_at = datetime('now')`,
+  ).bind(user.id, thread.id).run().catch(() => {})
   const [messagesRes, attachmentsRes] = await Promise.all([
     c.env.DB.prepare(
       `SELECT id, direction, from_email, from_name, to_json, cc_json, subject, body_html, body_text,
@@ -86,9 +112,11 @@ emailThreadRoutes.post('/email-threads', async (c) => {
   if (!to.length) return c.json({ error: 'to required' }, 400)
   const cc = parseAddresses(body.cc)
   const bcc = parseAddresses(body.bcc)
-  const bodyHtml = clean(body.body_html, 60_000)
-  if (!bodyHtml) return c.json({ error: 'body_html required' }, 400)
-  const bodyText = clean(body.body_text, 60_000) || undefined
+  const rawHtml = clean(body.body_html, 60_000)
+  if (!rawHtml) return c.json({ error: 'body_html required' }, 400)
+  const signed = await applySelectedSignature(c.env, user.id, rawHtml, clean(body.signature_id, 40) || null)
+  const bodyHtml = signed.html
+  const bodyText = clean(body.body_text, 60_000) || signed.text || undefined
 
   const scopeClientId = clean(body.scope_client_user_id, 40) || null
   let conversationId = clean(body.conversation_id, 40) || null
@@ -165,9 +193,11 @@ emailThreadRoutes.post('/email-threads/:id/reply', async (c) => {
   const thread = await c.env.DB.prepare(`SELECT * FROM email_threads WHERE id = ?`).bind(c.req.param('id')).first() as any
   if (!thread) return c.json({ error: 'not found' }, 404)
   const body = await c.req.json<any>().catch(() => null)
-  const bodyHtml = clean(body?.body_html, 60_000)
-  if (!bodyHtml) return c.json({ error: 'body_html required' }, 400)
-  const bodyText = clean(body?.body_text, 60_000) || undefined
+  const rawHtml = clean(body?.body_html, 60_000)
+  if (!rawHtml) return c.json({ error: 'body_html required' }, 400)
+  const signed = await applySelectedSignature(c.env, user.id, rawHtml, clean(body?.signature_id, 40) || null)
+  const bodyHtml = signed.html
+  const bodyText = clean(body?.body_text, 60_000) || signed.text || undefined
   const cc = parseAddresses(body?.cc)
   const bcc = parseAddresses(body?.bcc)
 

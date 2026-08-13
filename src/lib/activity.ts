@@ -61,6 +61,8 @@ const COMMUNICATIONS_KINDS = new Set<string>([
   'vendor_application_email_sent',
   'vendor_approval_email_sent',
   'account_email_failed',
+  'email.inbound',
+  'email.sent',
 ])
 
 export function categorizeActivity(kind: string): ActivityCategory {
@@ -157,6 +159,8 @@ export function describeActivity(e: ActivityEvent): string {
     case 'message_received': return `${client} sent a message: “${d.subject}”`
     case 'message_sent': return `${actor} sent a message to ${client}: “${d.subject}”`
     case 'message_attachment_added': return `${actor} attached “${d.file_name}” to a message${d.subject ? `: “${d.subject}”` : ''}`
+    case 'email.inbound': return `Email reply from ${d.from_name || d.from || 'a sender'}: “${d.subject || 'no subject'}”`
+    case 'email.sent': return `${actor} sent an email: “${d.subject || 'no subject'}”`
     default: return fmtStatus(e.kind)
   }
 }

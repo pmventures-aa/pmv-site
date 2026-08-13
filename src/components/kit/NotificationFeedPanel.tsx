@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AtSign, Bell, Check, Mail, MessageSquare, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
+import { useAppPath } from '../../lib/basePath'
 
 type FeedItem = {
   id: string; kind: string; subject_type: string | null; subject_id: string | null
@@ -10,18 +11,25 @@ type FeedItem = {
   read_at: string | null; dismissed_at: string | null; created_at: string
 }
 
-const POLL_MS = 10_000
+const POLL_MS = 4000
 
-// The bell + dropdown surface that surfaces the unified notification
-// feed. Deliberately generic - works for staff (mounts in HQ chrome) and
-// clients (mounts in portal chrome). Mount both places with a `surface`
-// prop to change the API base if you want kind-specific styling later.
+export function resolveHqDeepLink(path: string, p: (s: string) => string): string {
+  const raw = String(path || '').trim()
+  if (!raw || /^https?:/i.test(raw)) return raw
+  const qIndex = raw.indexOf('?')
+  const pathname = qIndex >= 0 ? raw.slice(0, qIndex) : raw
+  const search = qIndex >= 0 ? raw.slice(qIndex) : ''
+  const stripped = pathname.replace(/^\/hq\/?/i, '').replace(/^\//, '')
+  return `${p(stripped)}${search}`
+}
+
 export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin' | 'portal' }) {
   const [open, setOpen] = useState(false)
   const [unread, setUnread] = useState(0)
   const [items, setItems] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(false)
   const base = surface === 'portal' ? '/portal' : '/admin'
+  const p = useAppPath()
 
   const loadCount = useCallback(async () => {
     try {
@@ -41,7 +49,24 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
   }, [base])
 
   useEffect(() => { void loadCount() }, [loadCount])
-  useEffect(() => { const t = setInterval(() => void loadCount(), POLL_MS); return () => clearInterval(t) }, [loadCount])
+  useEffect(() => {
+    const timer = window.setInterval(() => void loadCount(), POLL_MS)
+    const onFocus = () => void loadCount()
+    const onVisibility = () => { if (document.visibilityState === 'visible') void loadCount() }
+    const onRefresh = () => void loadCount()
+    const onActivity = () => void loadCount()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('pmv:refresh', onRefresh)
+    window.addEventListener('pmv:activity', onActivity)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('pmv:refresh', onRefresh)
+      window.removeEventListener('pmv:activity', onActivity)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [loadCount])
   useEffect(() => { if (open) void loadFull() }, [open, loadFull])
 
   async function markAllRead() {
@@ -58,7 +83,7 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
     <div className="relative">
       <button onClick={() => setOpen((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:border-gold/40 hover:bg-gold/5 hover:text-gold" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}>
         <Bell size={16}/>
-        {unread > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-gold px-1 text-[10px] font-bold text-navy-950">{unread > 99 ? '99+' : unread}</span>}
+        {unread > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{unread > 99 ? '99+' : unread}</span>}
       </button>
 
       {open && (
@@ -76,7 +101,7 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
               {loading && !items.length && <p className="p-4 text-xs text-slate-500">Loading…</p>}
               {!loading && !items.length && <p className="p-4 text-xs text-slate-500">Nothing new. When there is, it'll show up here.</p>}
               {items.map((n) => (
-                <div key={n.id} className={`group relative flex items-start gap-3 border-b border-white/[.05] px-3 py-3 ${n.read_at ? '' : 'bg-gold/[.03]'}`}>
+                <div key={n.id} className={`group relative flex items-start gap-3 border-b border-white/[.05] px-3 py-3 ${n.read_at ? '' : 'bg-rose-500/[.06]'}`}>
                   <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/[.03] text-gold">{iconFor(n.kind)}</span>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-white">{n.title}</p>
@@ -84,7 +109,7 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
                     <div className="mt-1.5 flex items-center gap-3 text-[10px] text-slate-500">
                       <span>{new Date(n.created_at).toLocaleString(undefined, { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })}</span>
                       {n.deep_link_path && (
-                        <Link to={n.deep_link_path} onClick={() => { void markRead(n.id); setOpen(false) }} className="font-semibold text-gold hover:underline">Open →</Link>
+                        <Link to={resolveHqDeepLink(n.deep_link_path, p)} onClick={() => { void markRead(n.id); setOpen(false) }} className="font-semibold text-gold hover:underline">Open</Link>
                       )}
                       {!n.read_at && <button onClick={() => void markRead(n.id)} className="text-slate-500 hover:text-gold">Mark read</button>}
                     </div>

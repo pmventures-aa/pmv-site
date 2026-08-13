@@ -14,7 +14,7 @@ export class AdminPageBoundary extends Component<Props, State> {
   }
 
   render() {
-    if (!this.state.error) return this.props.children
+    if (!this.state.error) return <div className="flex h-full min-h-0 flex-1 flex-col">{this.props.children}</div>
     return <div role="alert" className="mx-auto mt-12 max-w-xl rounded-2xl border border-amber-400/20 bg-amber-400/[.04] p-6 text-center">
       <AlertTriangle className="mx-auto text-amber-300" size={28}/>
       <h1 className="mt-4 text-lg font-semibold text-white">This workspace needs to be reloaded</h1>

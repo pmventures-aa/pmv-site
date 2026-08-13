@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { adminNav, vendorNavForWorld } from '../../components/layout/nav'
@@ -78,7 +78,12 @@ function CatchAll(){const p=useAppPath();return <Navigate to={p()} replace/>}
 
 function RedirectToMessages({ tab }: { tab?: string }) {
   const p = useAppPath()
-  return <Navigate to={tab ? `${p('messages')}?tab=${tab}` : p('messages')} replace />
+  const [params] = useSearchParams()
+  const next = new URLSearchParams(params)
+  if (tab && !next.get('tab')) next.set('tab', tab)
+  if (next.get('tab') === 'threads') next.set('tab', 'staff')
+  const qs = next.toString()
+  return <Navigate to={qs ? `${p('messages')}?${qs}` : p('messages')} replace />
 }
 
 export default function AdminApp({basePath}:{basePath:string}){
