@@ -62,9 +62,13 @@ function Wordmark() {
 }
 
 export function Logo({ className = '', showText = true, markSize = 54, tone = 'auto', compact = false }: { className?: string; showText?: boolean; markSize?: number; tone?: CrestTone; compact?: boolean }) {
+  const size = compact ? 46 : markSize
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <CrestArtwork size={compact ? 42 : markSize} tone={compact ? 'auto' : tone} decorative />
+      <span className="pmv-logo-mark relative inline-block shrink-0" style={{ width: size, height: size }}>
+        <span className="pmv-logo-mark-aura pointer-events-none absolute inset-[-14%] rounded-full" aria-hidden="true" />
+        <CrestArtwork size={size} tone={compact ? 'auto' : tone} decorative />
+      </span>
       {showText && <Wordmark />}
     </div>
   )
