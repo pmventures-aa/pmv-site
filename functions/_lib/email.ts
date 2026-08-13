@@ -1,6 +1,7 @@
 import type { Env } from './types'
 import { renderPinnacleEmailLayout } from './emailTemplates/layout'
 import { renderHqEmailBySlug } from './hqEmailTemplates'
+import { withEmbeddedCrest } from '../../shared/emailSignatureHtml'
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -9,6 +10,14 @@ export function escapeHtml(s: string): string {
 export interface EmailTag {
   name: string
   value: string
+}
+
+export interface EmailAttachment {
+  filename: string
+  content?: string
+  path?: string
+  content_type?: string
+  content_id?: string
 }
 
 export interface SendEmailOptions {
@@ -22,6 +31,7 @@ export interface SendEmailOptions {
   replyTo?: string
   idempotencyKey?: string
   tags?: EmailTag[]
+  attachments?: EmailAttachment[]
   // Extra RFC-822 headers to attach on outbound. Used by the email-thread
   // path to inject Message-ID / In-Reply-To / References so provider
   // replies can be threaded back to our email_messages rows.
@@ -31,13 +41,16 @@ export interface SendEmailOptions {
 export async function sendEmailStrict(env: Env, opts: SendEmailOptions): Promise<string> {
   if (!env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured')
   const from = opts.from || env.RESEND_FROM_EMAIL || 'Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>'
-  const body: Record<string, unknown> = { from, to: opts.to, subject: opts.subject, html: opts.html }
+  const prepared = withEmbeddedCrest(opts.html)
+  const attachments = [...(opts.attachments || []), ...prepared.attachments]
+  const body: Record<string, unknown> = { from, to: opts.to, subject: opts.subject, html: prepared.html }
   if (opts.cc) body.cc = opts.cc
   if (opts.bcc) body.bcc = opts.bcc
   if (typeof opts.text === 'string') body.text = opts.text
   if (opts.replyTo) body.reply_to = opts.replyTo
   if (opts.headers && Object.keys(opts.headers).length) body.headers = opts.headers
   if (opts.tags?.length) body.tags = opts.tags.slice(0, 10).map((tag) => ({ name: tag.name, value: tag.value }))
+  if (attachments.length) body.attachments = attachments
   const headers: Record<string, string> = { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' }
   if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey.slice(0, 256)
   const res = await fetch('https://api.resend.com/emails', { method: 'POST', headers, body: JSON.stringify(body) })

@@ -183,7 +183,7 @@ export function EmailComposePane({
             </p>
             <SignaturePreview signature={selected} />
             <p className="mt-3 max-w-[34rem] text-[11px] leading-[16px] text-[#8b939e]">
-              Only the crest is a picture, loaded from the site. The firm name, tagline, and contact lines are text in the email. Some inboxes hide the crest until the recipient shows images.
+              This Pinnacle letterhead is attached under your message. The crest is included in the email itself.
             </p>
           </div>
         )}

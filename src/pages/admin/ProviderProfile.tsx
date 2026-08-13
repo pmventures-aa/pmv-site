@@ -6,6 +6,8 @@ import { PageIntro, Panel, Tag, inputCls, btnPrimary } from '../../components/ad
 import { Avatar } from '../../components/kit/Avatar'
 import { useAppPath } from '../../lib/basePath'
 import { toast } from '../../components/kit/toast'
+import { liveLetterheadHtml, type SignatureRosterPerson } from '../../lib/emailSignatures'
+import { SignaturePreview } from './SignatureLetterhead'
 
 interface Data {
   employee: any
@@ -36,11 +38,29 @@ export default function ProviderProfile() {
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [sigName, setSigName] = useState('')
+  const [sigTitle, setSigTitle] = useState('')
+  const [sigEmail, setSigEmail] = useState('')
+  const [sigPhone, setSigPhone] = useState('')
+  const [sigReady, setSigReady] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      setData(await api.get<Data>(`/admin/employees/${id}`))
+      const next = await api.get<Data>(`/admin/employees/${id}`)
+      setData(next)
       setError('')
+      try {
+        const sigs = await api.get<{ roster?: SignatureRosterPerson[] }>('/admin/email-signatures')
+        const person = (sigs.roster || []).find((row) => row.user_id === id)
+        const emp = next.employee
+        setSigName(person?.full_name || emp?.full_name || '')
+        setSigTitle(person?.title || emp?.title || '')
+        setSigEmail(person?.email || emp?.email || '')
+        setSigPhone(person?.phone || emp?.phone || '')
+        setSigReady(true)
+      } catch {
+        setSigReady(false)
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Provider profile could not load.')
     }
@@ -61,6 +81,21 @@ export default function ProviderProfile() {
       toast.success('Provider profile updated.')
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'Could not update provider.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveSignature() {
+    if (!id) return
+    setSaving(true)
+    try {
+      await api.post(`/admin/email-signatures/roster/${id}`, {
+        person: { name: sigName, title: sigTitle, email: sigEmail, phone: sigPhone },
+      })
+      toast.success('Branded signature saved.')
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Could not save signature.')
     } finally {
       setSaving(false)
     }
@@ -124,6 +159,7 @@ export default function ProviderProfile() {
 
       {tab === 'profile' && (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,.85fr)]">
+          <div className="space-y-5">
           <Panel>
             <h2 className="text-sm font-semibold text-white">Relationship</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">Status, coverage, and whether this person is preferred for dispatch.</p>
@@ -154,6 +190,38 @@ export default function ProviderProfile() {
             </div>
             <button className={`${btnPrimary} mt-4`} disabled={saving} onClick={saveNetwork}><Save size={14} />Save relationship</button>
           </Panel>
+
+          {sigReady && (
+            <Panel>
+              <h2 className="text-sm font-semibold text-white">Branded email signature</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {provider ? 'This vendor' : 'This staff member'} gets the same Pinnacle letterhead, with their name and contact on it, when they send from HQ.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <Field label="Name"><input className={inputCls} value={sigName} onChange={(x) => setSigName(x.target.value)} /></Field>
+                <Field label="Title"><input className={inputCls} value={sigTitle} onChange={(x) => setSigTitle(x.target.value)} placeholder="Principal, Field vendor…" /></Field>
+                <Field label="Email"><input className={inputCls} value={sigEmail} onChange={(x) => setSigEmail(x.target.value)} /></Field>
+                <Field label="Phone"><input className={inputCls} value={sigPhone} onChange={(x) => setSigPhone(x.target.value)} /></Field>
+              </div>
+              <div className="mt-4 overflow-x-auto rounded-xl bg-white p-5">
+                <SignaturePreview
+                  signature={{
+                    id: id,
+                    name: sigName || e.email,
+                    slug: null,
+                    kind: 'personal',
+                    html: liveLetterheadHtml('personal', { name: sigName, title: sigTitle, email: sigEmail, phone: sigPhone }),
+                    owner_user_id: id,
+                    is_default: 0,
+                    sort_order: 30,
+                  }}
+                  html={liveLetterheadHtml('personal', { name: sigName, title: sigTitle, email: sigEmail, phone: sigPhone })}
+                />
+              </div>
+              <button className={`${btnPrimary} mt-4`} disabled={saving || !sigName.trim()} onClick={() => void saveSignature()}><Save size={14} />Save signature</button>
+            </Panel>
+          )}
+          </div>
 
           <div className="space-y-5">
             <Panel>

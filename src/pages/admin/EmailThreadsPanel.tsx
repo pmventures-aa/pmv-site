@@ -9,7 +9,7 @@ import { WhoSection } from '../../components/kit/WhoSection'
 import { ResendWebhookPanel } from './settings/ResendWebhookPanel'
 import { EmailComposePane, type ComposeDraft } from './EmailComposePane'
 import { EmailSignaturesPanel } from './EmailSignaturesPanel'
-import { previewSignatureHtml, type EmailSignature } from '../../lib/emailSignatures'
+import { previewSignatureHtml, type EmailSignature, type SignatureRosterPerson } from '../../lib/emailSignatures'
 import { composeAddress } from '../../lib/engagements'
 import { readComposeQuery, stripComposeQuery } from '../../lib/emailComposeQuery'
 import { parseWhoAddresses, uniqueWhoPeople, type WhoPerson, type WhoRow } from '../../lib/who'
@@ -45,6 +45,8 @@ export function EmailThreadsPanel() {
   const [detail, setDetail] = useState<Detail | null>(null)
   const [signatures, setSignatures] = useState<EmailSignature[]>([])
   const [templates, setTemplates] = useState<{ company: string; support: string; personal: string } | undefined>()
+  const [roster, setRoster] = useState<SignatureRosterPerson[]>([])
+  const [canManageRoster, setCanManageRoster] = useState(false)
   const [draft, setDraft] = useState<ComposeDraft | null>(null)
   const [busy, setBusy] = useState(false)
   const [managingSignatures, setManagingSignatures] = useState(false)
@@ -53,9 +55,16 @@ export function EmailThreadsPanel() {
 
   const loadSignatures = useCallback(async () => {
     try {
-      const r = await api.get<{ signatures: EmailSignature[]; templates?: { company: string; support: string; personal: string } }>('/admin/email-signatures')
+      const r = await api.get<{
+        signatures: EmailSignature[]
+        templates?: { company: string; support: string; personal: string }
+        roster?: SignatureRosterPerson[]
+        can_manage_roster?: boolean
+      }>('/admin/email-signatures')
       setSignatures(r.signatures || [])
       setTemplates(r.templates)
+      setRoster(r.roster || [])
+      setCanManageRoster(!!r.can_manage_roster)
     } catch (err) { if (err instanceof ApiError) toast.error(err.message) }
   }, [])
 
@@ -178,7 +187,14 @@ export function EmailThreadsPanel() {
   if (managingSignatures) {
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-white/10">
-        <EmailSignaturesPanel signatures={signatures} templates={templates} onClose={() => setManagingSignatures(false)} onChanged={() => void loadSignatures()} />
+        <EmailSignaturesPanel
+          signatures={signatures}
+          roster={roster}
+          canManageRoster={canManageRoster}
+          templates={templates}
+          onClose={() => setManagingSignatures(false)}
+          onChanged={() => void loadSignatures()}
+        />
       </div>
     )
   }
