@@ -37,9 +37,21 @@ export async function inviteTokenHash(token: string): Promise<string> {
   return hex(new Uint8Array(digest))
 }
 
+/** SQLite-friendly UTC stamp so SQL `datetime('now')` comparisons work. */
 export function inviteExpiry(hours = 24): string {
-  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+  return new Date(Date.now() + hours * 60 * 60 * 1000)
+    .toISOString()
+    .replace('T', ' ')
+    .replace(/\.\d{3}Z$/, '')
 }
+
+/**
+ * SQL predicate that marks an invite expired under both storage shapes:
+ * ISO (`2026-08-13T10:00:00.000Z`) and SQLite (`2026-08-13 10:00:00`).
+ * Lexical compare of raw ISO against `datetime('now')` fails because `'T' > ' '`.
+ */
+export const INVITE_EXPIRED_SQL =
+  "datetime(replace(substr(expires_at, 1, 19), 'T', ' ')) <= datetime('now')"
 
 const CLIENT_BASE = wwwPortalUrl()
 const HQ_BASE = hqUrl()

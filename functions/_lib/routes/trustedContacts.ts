@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireClient, requireUser } from '../mid'
-import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult } from '../invites'
+import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult, INVITE_EXPIRED_SQL } from '../invites'
 import { normalizeTrustedPermissions, TRUSTED_SECTION_LABELS, TRUSTED_SECTIONS, trustedAccess, trustedContexts, type TrustedSection } from '../trustedAccess'
 import { uuid } from '../crypto'
 
@@ -18,7 +18,8 @@ trustedContactRoutes.get('/trusted-contacts', requireClient, async (c) => {
   const user = c.get('user')
   await c.env.DB.prepare(
     `UPDATE access_invites SET status = 'expired', updated_at = datetime('now')
-     WHERE invite_type = 'trusted_contact' AND client_user_id = ? AND status = 'pending' AND expires_at <= datetime('now')`,
+     WHERE invite_type = 'trusted_contact' AND client_user_id = ? AND status = 'pending'
+       AND ${INVITE_EXPIRED_SQL}`,
   ).bind(user.id).run()
 
   const rows = await c.env.DB.prepare(

@@ -298,10 +298,21 @@ authRoutes.post('/bootstrap', async (c) => {
   if ((count?.n ?? 0) > 0) return c.json({ error: 'bootstrap disabled because an account already exists' }, 403)
 
   const id = uuid()
-  await c.env.DB.prepare(
-    `INSERT INTO users (id, email, password_hash, role, full_name, two_factor_enabled, status)
-     VALUES (?, ?, NULL, 'admin', ?, 0, 'active')`,
-  ).bind(id, e, full_name ?? null).run()
+  // First account is the Owner: admin role + team_members.is_owner=1 with
+  // full capability flags so impersonation, permanent delete, and HQ
+  // controls work without a manual SQL patch after bootstrap.
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, role, full_name, two_factor_enabled, status)
+       VALUES (?, ?, NULL, 'admin', ?, 0, 'active')`,
+    ).bind(id, e, full_name ?? null),
+    c.env.DB.prepare(
+      `INSERT INTO team_members
+        (id, user_id, staff_role, title, can_reveal_payment_info, can_manage_users, can_manage_settings,
+         can_view_reports, can_view_audit_log, can_manage_communications, is_owner, party_type)
+       VALUES (?, ?, 'pinnacle_admin', 'Owner', 1, 1, 1, 1, 1, 1, 1, 'employee')`,
+    ).bind(uuid(), id),
+  ])
 
   const setupToken = await createActivationToken(c.env, id)
   return c.json({ ok: true, user: { id, email: e, role: 'admin', full_name: full_name ?? null }, setup_token: setupToken }, 201)

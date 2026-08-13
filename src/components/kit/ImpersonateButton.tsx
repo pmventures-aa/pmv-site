@@ -34,7 +34,7 @@ export function ImpersonateButton({ targetUserId, targetLabel, className = '' }:
           <label className="block text-xs font-semibold text-slate-400">Reason (required)</label>
           <textarea className="mt-1 w-full min-h-24 rounded-md border border-white/10 bg-navy-950 px-3 py-2 text-sm text-white" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Reproducing bug reported by the client on invoice #123"/>
           <div className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/[.06] p-3 text-[11px] leading-5 text-amber-100">
-            <strong>Blocked while impersonating:</strong> password change, 2FA disable, account deletion, session revoke, nested impersonation. Every request is written to the audit log.
+            <strong>Blocked while impersonating:</strong> password change, logout, session revoke, and nested impersonation. Every mutating request is written to the audit log. End the session from HQ before changing credentials.
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <button onClick={() => { setOpen(false); setReason('') }} className="rounded-md border border-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-white/5">Cancel</button>

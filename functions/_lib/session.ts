@@ -69,6 +69,13 @@ export async function currentSessionId(env: Env, request: Request): Promise<stri
   return env.SESSIONS.get(`sessmeta:${token}`)
 }
 
+/** Cheap check used by the global impersonation denylist before getUser(). */
+export async function activeImpersonationSessionId(env: Env, request: Request): Promise<string | null> {
+  const token = cookieToken(request)
+  if (!token) return null
+  return env.SESSIONS.get(`impersonate:${token}`)
+}
+
 async function touchSession(env: Env, token: string, userId: string, request: Request): Promise<void> {
   const sessionId = await env.SESSIONS.get(`sessmeta:${token}`)
   if (!sessionId) return

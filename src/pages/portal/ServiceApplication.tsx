@@ -530,6 +530,12 @@ export default function ServiceApplication() {
     setBusy(true)
     setError(null)
     try {
+      // Persist the electronic signature first — submit middleware rejects drafts
+      // that have not recorded client_signature_* columns via /sign.
+      await api.post(`/portal/service-applications/${application.id}/sign`, {
+        signature_name: signedName.trim(),
+        intent: true,
+      })
       const payload: Record<string, unknown> = { answers, current_step: pageIdx, signed_name: signedName.trim(), signature_ack: signatureAck }
       if (bankingSupported && !skipBanking && banking.account_holder_name && banking.routing_number && banking.account_number) payload.banking = banking
       await api.post(`/portal/service-applications/${application.id}/submit`, payload)

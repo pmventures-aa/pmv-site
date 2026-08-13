@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, FileText, LockKeyhole, ShieldCheck } from 'lucide-react'
+import { AlertCircle, Check, CheckCircle2, ChevronDown, ChevronRight, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { Logo } from '../../components/ui'
 import { btnPrimary, btnOutline } from '../../components/public/ui'
 
@@ -9,10 +9,30 @@ type FieldData={id:string;envelope_document_id?:string|null;page_number:number;f
 type Data={recipient:{id:string;name:string;email:string;status:string};envelope:{id:string;title:string;message:string|null;public_id:string;status:string;expires_at:string|null;branding_profile_id?:string|null};documents?:PacketDoc[];fields:FieldData[]}
 
 export default function SignerExperience(){
-  const {token=''}=useParams();const [data,setData]=useState<Data|null>(null),[error,setError]=useState(''),[challenge,setChallenge]=useState(''),[code,setCode]=useState(''),[session,setSession]=useState(''),[busy,setBusy]=useState(false),[done,setDone]=useState(false),[activeDoc,setActiveDoc]=useState(''),[mobilePreview,setMobilePreview]=useState(false)
+  const {token=''}=useParams();const [data,setData]=useState<Data|null>(null),[error,setError]=useState(''),[challenge,setChallenge]=useState(''),[code,setCode]=useState(''),[session,setSession]=useState(''),[busy,setBusy]=useState(false),[done,setDone]=useState(false),[activeDoc,setActiveDoc]=useState(''),[mobilePreview,setMobilePreview]=useState(false),[previewUrl,setPreviewUrl]=useState('')
   const fieldRefs=useRef<Record<string,HTMLDivElement|null>>({})
+  const previewUrlRef=useRef('')
   async function load(){try{const r=await fetch(`/api/sign/${encodeURIComponent(token)}`);const j:any=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Unable to open document');setData(j as Data);setError('');const docs=(j.documents||[]) as PacketDoc[];setActiveDoc(v=>v||docs[0]?.id||'source')}catch(e:any){setError(e.message)}}
   useEffect(()=>{void load()},[token])
+  useEffect(()=>{
+    let cancelled=false
+    async function loadPreview(){
+      if(!session||!activeDoc){if(previewUrlRef.current){URL.revokeObjectURL(previewUrlRef.current);previewUrlRef.current='';setPreviewUrl('')}return}
+      try{
+        const r=await fetch(`/api/sign/${encodeURIComponent(token)}/documents/${encodeURIComponent(activeDoc)}/file`,{headers:{'x-signing-session':session}})
+        if(!r.ok){const j:any=await r.json().catch(()=>({}));throw new Error(j.error||'Could not open document preview')}
+        const blob=await r.blob()
+        if(cancelled)return
+        const url=URL.createObjectURL(blob)
+        if(previewUrlRef.current)URL.revokeObjectURL(previewUrlRef.current)
+        previewUrlRef.current=url
+        setPreviewUrl(url)
+      }catch(e:any){if(!cancelled)setError(e.message||'Could not open document preview')}
+    }
+    void loadPreview()
+    return()=>{cancelled=true}
+  },[token,session,activeDoc])
+  useEffect(()=>()=>{if(previewUrlRef.current)URL.revokeObjectURL(previewUrlRef.current)},[])
   async function requestOtp(){setBusy(true);setError('');try{const r=await fetch(`/api/sign/${encodeURIComponent(token)}/otp`,{method:'POST'});const j:any=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Could not send code');setChallenge(String(j.challenge_id||''))}catch(e:any){setError(e.message)}finally{setBusy(false)}}
   async function verify(){setBusy(true);setError('');try{const r=await fetch(`/api/sign/${encodeURIComponent(token)}/otp/verify`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({challenge_id:challenge,code})});const j:any=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Could not verify code');setSession(String(j.session_token||''));await load()}catch(e:any){setError(e.message)}finally{setBusy(false)}}
   async function saveField(id:string,payload:any){const r=await fetch(`/api/sign/${encodeURIComponent(token)}/fields/${id}`,{method:'POST',headers:{'Content-Type':'application/json','x-signing-session':session},body:JSON.stringify(payload)});const j:any=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Could not save field');await load()}
@@ -41,7 +61,7 @@ export default function SignerExperience(){
       {!authed?<VerificationPanel challenge={challenge} code={code} setCode={setCode} busy={busy} requestOtp={requestOtp} verify={verify} error={error}/>:<div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,.55fr)]">
         <PanelCard className="overflow-hidden !p-0">
           <div className="border-b border-white/10 p-3 sm:p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold text-white">Document packet</p><p className="mt-1 text-[11px] text-slate-500">{docs.length} document{docs.length===1?'':'s'} in this envelope</p></div><div className="flex gap-2 overflow-x-auto pb-1">{docs.map((d,i)=><button key={d.id} onClick={()=>{setActiveDoc(d.id);setMobilePreview(true)}} className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-bold ${activeDoc===d.id?'border-gold/35 bg-gold/[.08] text-gold':'border-white/10 text-slate-400'}`}>{i+1}. {d.title}</button>)}</div></div></div>
-          <div className={`${mobilePreview?'block':'hidden'} xl:block`}><iframe title="Secure document preview" src={`/api/sign/${encodeURIComponent(token)}/documents/${encodeURIComponent(activeDoc||'source')}/file`} className="h-[58vh] w-full bg-white sm:h-[66vh] xl:h-[72vh]"/></div>
+          <div className={`${mobilePreview?'block':'hidden'} xl:block`}>{previewUrl?<iframe title="Secure document preview" src={previewUrl} className="h-[58vh] w-full bg-white sm:h-[66vh] xl:h-[72vh]"/>:<div className="grid h-[58vh] place-items-center bg-white text-sm text-slate-500 sm:h-[66vh] xl:h-[72vh]">Loading protected document…</div>}</div>
           <button onClick={()=>setMobilePreview(v=>!v)} className="flex w-full items-center justify-between border-t border-white/10 px-4 py-3 text-xs font-bold text-slate-300 xl:hidden"><span>{mobilePreview?'Hide document preview':'Show document preview'}</span><ChevronDown size={14} className={mobilePreview?'rotate-180 transition':'transition'}/></button>
         </PanelCard>
 

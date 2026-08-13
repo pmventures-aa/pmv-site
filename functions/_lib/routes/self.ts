@@ -5,6 +5,7 @@ import { uuid, hashPassword, verifyPassword, encryptSensitive } from '../crypto'
 import { MIN_PASSWORD } from './auth'
 import { activityInsert } from '../activity'
 import { notifyStaff, escapeHtml } from '../email'
+import { currentSessionId, revokeUserSessions } from '../session'
 
 // Self-service endpoints for the authenticated client: profile + dynamic onboarding.
 //
@@ -194,6 +195,10 @@ selfRoutes.post('/change-password', requireClient, async (c) => {
 
   const hash = await hashPassword(new_password, c.env.SESSION_SECRET)
   await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, user.id).run()
+  // Match password-reset behavior: a successful change invalidates every
+  // other live session so a stolen cookie cannot outlive the new secret.
+  const currentId = await currentSessionId(c.env, c.req.raw)
+  await revokeUserSessions(c.env, user.id, user.id, currentId)
   return c.json({ ok: true })
 })
 

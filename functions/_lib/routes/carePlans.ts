@@ -4,6 +4,7 @@ import { uuid } from '../crypto'
 import { logActivity } from '../activity'
 import { escapeHtml, notifyStaff } from '../email'
 import { CARE_PLANS, findTier, findService, type PlanFamilyKey } from '../../../shared/carePlans'
+import { twoBusinessHoursFrom } from '../scopeFunnel'
 
 export const carePlanPublicRoutes = new Hono<AppEnv>()
 
@@ -18,11 +19,6 @@ async function throttled(c: any) {
   if (count >= MAX_PER_HOUR) return true
   await c.env.SESSIONS.put(key, String(count + 1), { expirationTtl: 3600 })
   return false
-}
-
-function twoBusinessHoursFrom(now: Date) {
-  const d = new Date(now.getTime() + 2 * 60 * 60 * 1000)
-  return d.toISOString().replace('T', ' ').slice(0, 19)
 }
 
 carePlanPublicRoutes.post('/care-plan-leads', async (c) => {

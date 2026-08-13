@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv, SessionUser } from '../types'
 import { requireAdmin, requireOwner, requireStaff } from '../mid'
 import { NAMED_PERMISSIONS, namedPermissionColumn, requireNamedPermission, resolveNamedPermission } from '../capabilities'
-import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult, type InviteType } from '../invites'
+import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult, INVITE_EXPIRED_SQL, type InviteType } from '../invites'
 import { stageVendorProfile, VendorInviteConflict } from '../vendorStaging'
 import { logAudit, actorIp, actorUserAgent } from '../auditLog'
 import { uuid } from '../crypto'
@@ -26,7 +26,7 @@ async function isOwner(c: { env: AppEnv['Bindings'] }, user: SessionUser): Promi
 invitationAdminRoutes.get('/invitations', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
   await c.env.DB.prepare(
     `UPDATE access_invites SET status = 'expired', updated_at = datetime('now')
-     WHERE status = 'pending' AND expires_at <= datetime('now')`,
+     WHERE status = 'pending' AND ${INVITE_EXPIRED_SQL}`,
   ).run()
   const rows = await c.env.DB.prepare(
     `SELECT ai.*,inviter.full_name inviter_name,rd.name role_name,
