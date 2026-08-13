@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Loader2, Send, X } from 'lucide-react'
 import { RichTextComposer } from '../../components/admin/RichTextComposer'
-import { pickDefaultSignature, previewSignatureHtml, rememberSignatureId, signatureLabel, type EmailSignature } from '../../lib/emailSignatures'
+import { pickDefaultSignature, rememberSignatureId, signatureLabel, type EmailSignature } from '../../lib/emailSignatures'
+import { SignaturePreview } from './SignatureLetterhead'
 
 export type ComposeDraft = {
   mode: 'new' | 'reply'
@@ -135,7 +136,7 @@ export function EmailComposePane({
         </div>
         {selected && (
           <div className="shrink-0 px-8 pb-10 pt-2">
-            <div className="signature-preview" dangerouslySetInnerHTML={{ __html: previewSignatureHtml(selected.html) }} />
+            <SignaturePreview signature={selected} />
           </div>
         )}
       </div>

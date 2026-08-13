@@ -8,7 +8,7 @@ import { toast } from '../../components/kit/toast'
 import { ResendWebhookPanel } from './settings/ResendWebhookPanel'
 import { EmailComposePane, type ComposeDraft } from './EmailComposePane'
 import { EmailSignaturesPanel } from './EmailSignaturesPanel'
-import type { EmailSignature } from '../../lib/emailSignatures'
+import { previewSignatureHtml, type EmailSignature } from '../../lib/emailSignatures'
 
 type Thread = {
   id: string; subject: string; scope_client_user_id: string|null
@@ -266,7 +266,7 @@ function EmailThreadDetail({
                 </div>
               </div>
               {m.error && <div className="mt-2 rounded border border-red-400/25 bg-red-400/[.05] p-2 text-[11px] text-red-200">Delivery error: {m.error}</div>}
-              <div className="prose prose-sm mt-3 max-w-none rounded-md bg-white p-5 font-serif text-[15px] leading-7 text-[#1b2430]" dangerouslySetInnerHTML={{ __html: m.body_html || (m.body_text ? `<pre class="whitespace-pre-wrap font-serif">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
+              <div className="signature-preview prose prose-sm mt-3 max-w-none rounded-md bg-white p-5 font-serif text-[15px] leading-7 text-[#1b2430]" dangerouslySetInnerHTML={{ __html: previewSignatureHtml(m.body_html || '') || (m.body_text ? `<pre class="whitespace-pre-wrap font-serif">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
               {detail.attachments.filter((a) => a.email_message_id === m.id).map((a) => (
                 <p key={a.id} className="mt-2 text-[11px] text-slate-500">Attachment: {a.file_name}</p>
               ))}

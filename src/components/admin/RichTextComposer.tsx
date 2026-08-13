@@ -1,4 +1,16 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { AlignCenter, AlignLeft, AlignRight, Highlighter } from 'lucide-react'
+
+const LETTER_COLORS = [
+  { label: 'Navy', value: '#0a1728' },
+  { label: 'Gold', value: '#c9a227' },
+  { label: 'Blue', value: '#1d4e89' },
+  { label: 'Slate', value: '#5b6573' },
+  { label: 'Green', value: '#1f6b4a' },
+  { label: 'Red', value: '#9a3b32' },
+  { label: 'Black', value: '#111111' },
+  { label: 'White', value: '#ffffff' },
+]
 
 export function RichTextComposer({
   value,
@@ -18,7 +30,9 @@ export function RichTextComposer({
   const ref = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const lastValue = useRef(value)
+  const savedRange = useRef<Range | null>(null)
   const letter = surface === 'letter'
+  const [ink, setInk] = useState(LETTER_COLORS[0].value)
 
   useEffect(() => {
     if (ref.current && value !== lastValue.current && value !== ref.current.innerHTML) {
@@ -33,10 +47,35 @@ export function RichTextComposer({
     onChange(ref.current.innerHTML)
   }
 
+  function saveSelection() {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return
+    const node = sel.anchorNode
+    if (!node || !ref.current?.contains(node)) return
+    savedRange.current = sel.getRangeAt(0).cloneRange()
+  }
+
+  function restoreSelection() {
+    const el = ref.current
+    if (!el) return
+    el.focus()
+    const sel = window.getSelection()
+    if (!sel || !savedRange.current) return
+    sel.removeAllRanges()
+    sel.addRange(savedRange.current)
+  }
+
   function exec(command: string, arg?: string) {
-    ref.current?.focus()
+    restoreSelection()
+    document.execCommand('styleWithCSS', false, 'true')
     document.execCommand(command, false, arg)
+    saveSelection()
     emit()
+  }
+
+  function applyColor(color: string) {
+    setInk(color)
+    exec('foreColor', color)
   }
 
   function insertLink() {
@@ -58,15 +97,49 @@ export function RichTextComposer({
 
   const empty = !value || value === '<br>' || value === '<div><br></div>'
   const tool = letter
-    ? 'grid h-7 min-w-7 place-items-center rounded px-1.5 text-[13px] text-[#3d4a5c] hover:bg-black/[.06]'
+    ? 'grid h-8 min-w-8 place-items-center rounded px-1.5 text-[13px] text-[#3d4a5c] hover:bg-black/[.06]'
     : 'inline-flex items-center justify-center rounded-md border border-white/12 bg-white/[.025] px-2.5 py-1 text-xs font-semibold text-slate-200 hover:border-gold/45 hover:text-gold'
+  const selectCls = letter
+    ? 'h-8 rounded border border-[#ddd6c8] bg-white px-2 text-[12px] text-[#0a1728] outline-none'
+    : 'h-8 rounded border border-white/12 bg-white/[.04] px-2 text-[12px] text-slate-200 outline-none'
 
   return (
     <div className={`flex min-h-0 flex-col ${fill ? 'h-full' : ''} ${letter ? 'bg-transparent' : 'rounded-md border border-white/10 bg-navy-900'}`}>
-      <div className={`flex shrink-0 flex-wrap items-center gap-0.5 ${letter ? 'border-b border-[#e7e4dc] bg-[#f4f1ea] px-3 py-1.5' : 'border-b border-white/10 p-2 gap-1.5'}`}>
-        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('bold')}><strong>B</strong></button>
-        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('italic')}><em>I</em></button>
-        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('underline')}><span className="underline">U</span></button>
+      <div className={`flex shrink-0 flex-wrap items-center gap-1 ${letter ? 'border-b border-[#e7e4dc] bg-[#f4f1ea] px-3 py-1.5' : 'border-b border-white/10 p-2 gap-1.5'}`}>
+        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('bold')} title="Bold"><strong>B</strong></button>
+        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('italic')} title="Italic"><em>I</em></button>
+        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('underline')} title="Underline"><span className="underline">U</span></button>
+        <span className={`mx-1 h-4 w-px ${letter ? 'bg-[#ddd6c8]' : 'bg-white/10'}`} />
+        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('justifyLeft')} title="Align left"><AlignLeft size={15} /></button>
+        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('justifyCenter')} title="Align center"><AlignCenter size={15} /></button>
+        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('justifyRight')} title="Align right"><AlignRight size={15} /></button>
+        <span className={`mx-1 h-4 w-px ${letter ? 'bg-[#ddd6c8]' : 'bg-white/10'}`} />
+        <label className={`flex items-center gap-1.5 ${letter ? 'text-[11px] font-semibold uppercase tracking-[.12em] text-[#5b6573]' : 'text-[11px] font-semibold uppercase tracking-[.12em] text-slate-400'}`}>
+          Color
+          <select
+            className={selectCls}
+            value={ink}
+            title="Font color"
+            onMouseDown={saveSelection}
+            onChange={(e) => applyColor(e.target.value)}
+          >
+            {LETTER_COLORS.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        </label>
+        <input
+          type="color"
+          title="Custom color"
+          value={ink}
+          className="h-8 w-8 cursor-pointer border-0 bg-transparent p-0"
+          onMouseDown={saveSelection}
+          onChange={(e) => applyColor(e.target.value)}
+        />
+        <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('hiliteColor', '#f5e6b8')} title="Highlight">
+          <Highlighter size={14} />
+        </button>
+        <span className={`mx-1 h-4 w-px ${letter ? 'bg-[#ddd6c8]' : 'bg-white/10'}`} />
         <button type="button" className={`${tool} text-[12px]`} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('insertUnorderedList')}>List</button>
         <button type="button" className={`${tool} text-[12px]`} onMouseDown={(e) => e.preventDefault()} onClick={insertLink}>Link</button>
         {onUploadImage && (
@@ -86,9 +159,11 @@ export function RichTextComposer({
           suppressContentEditableWarning
           onInput={emit}
           onBlur={emit}
+          onMouseUp={saveSelection}
+          onKeyUp={saveSelection}
           className={letter
-            ? `${fill ? 'h-full min-h-[240px]' : 'min-h-48'} overflow-y-auto px-8 py-5 font-serif text-[15px] leading-[1.75] text-[#1b2430] outline-none [&_a]:text-[#0a1728] [&_a]:underline [&_img]:my-2 [&_img]:max-w-full`
-            : `${fill ? 'h-full min-h-[280px]' : 'min-h-48'} max-w-none overflow-y-auto bg-white px-4 py-3 text-sm text-navy-950 outline-none [&_a]:text-sky-700 [&_a]:underline [&_img]:my-2 [&_img]:max-w-full`}
+            ? `${fill ? 'h-full min-h-[240px]' : 'min-h-48'} overflow-y-auto px-8 py-5 font-serif text-[15px] leading-[1.75] text-[#1b2430] outline-none [&_a]:text-[#0a1728] [&_a]:underline [&_img]:my-2 [&_img]:max-w-full [&_[align=center]]:text-center [&_[align=right]]:text-right [&_[align=left]]:text-left`
+            : `${fill ? 'h-full min-h-[280px]' : 'min-h-48'} max-w-none overflow-y-auto bg-white px-4 py-3 text-sm text-navy-950 outline-none [&_a]:text-sky-700 [&_a]:underline [&_img]:my-2 [&_img]:max-w-full [&_[align=center]]:text-center [&_[align=right]]:text-right [&_[align=left]]:text-left`}
         />
       </div>
     </div>

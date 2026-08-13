@@ -187,6 +187,6 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
 :root[data-theme='light'] .pmv-process-step h3 { color:#111827; }
 :root[data-theme='light'] .pmv-process-step p { color:#4b5563; }
 
-.signature-preview img { display:block; width:64px; height:64px; object-fit:contain; }
+.signature-preview img { display:block; width:76px; height:76px; object-fit:contain; }
 .signature-preview table { max-width:100%; border-collapse:collapse; }
 .signature-preview a { color:#334155; }

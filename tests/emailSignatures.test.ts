@@ -5,6 +5,7 @@ import { resolveHqDeepLink } from '../src/components/kit/NotificationFeedPanel'
 describe('branded email signatures', () => {
   it('builds a professional company block with crest, phone, and site', () => {
     const html = brandedSignatureHtml('company')
+    expect(html).toContain('<!--pmv-sig:v3-->')
     expect(html).toContain('Pinnacle Management Ventures')
     expect(html).toContain('logo-crest-transparent.png')
     expect(html).toContain('(561) 388-7879')

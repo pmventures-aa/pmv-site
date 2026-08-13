@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Loader2, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { toast } from '../../components/kit/toast'
-import { previewSignatureHtml, signatureLabel, type EmailSignature } from '../../lib/emailSignatures'
+import { signatureLabel, type EmailSignature } from '../../lib/emailSignatures'
+import { SignaturePreview } from './SignatureLetterhead'
 
 export function EmailSignaturesPanel({
   signatures,
@@ -112,7 +113,7 @@ export function EmailSignaturesPanel({
               />
               <div className="rounded-md border border-[#e4dfd4] bg-white p-6">
                 <p className="mb-4 text-[10px] font-semibold uppercase tracking-[.16em] text-[#9a7838]">Letterhead preview</p>
-                <div className="signature-preview" dangerouslySetInnerHTML={{ __html: previewSignatureHtml(html) }} />
+                <SignaturePreview signature={selected} />
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="inline-flex items-center gap-2 rounded-md bg-[#c9a227] px-3 py-1.5 text-sm font-semibold text-[#07111f] disabled:opacity-50" disabled={busy || !name.trim()} onClick={() => void save()}>
