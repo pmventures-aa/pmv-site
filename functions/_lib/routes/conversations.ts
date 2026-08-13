@@ -333,6 +333,15 @@ conversationRoutes.post('/conversations/:id/messages', async (c) => {
     }
   })())
 
+  try {
+    await logActivity(c.env, {
+      actorUserId: user.id,
+      clientUserId: gate.conversation.scope_client_user_id || null,
+      kind: isInternalNote ? 'conversation.internal_note' : 'conversation.message',
+      detail: { conversation_id: gate.conversation.id, subject: gate.conversation.subject },
+    })
+  } catch {}
+
   return c.json({ ok: true, id: messageId }, 201)
 })
 

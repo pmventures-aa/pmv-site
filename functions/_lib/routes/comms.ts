@@ -4,9 +4,10 @@ import { requireStaff } from '../mid'
 import { requireCapability } from '../capabilities'
 import { uuid } from '../crypto'
 import { sendEmailStrict } from '../email'
-import { logActivity } from '../activity'
+import { activityInsert, logActivity } from '../activity'
 import { getMarketingComplianceConfig, createUnsubscribeToken, appendMarketingFooter } from '../marketingCompliance'
 import { hqInboundAddress, formattedReplyTo } from '../resendInbound'
+import { applySelectedSignature } from '../emailSignatures'
 
 export const commsRoutes = new Hono<AppEnv>()
 
@@ -299,17 +300,22 @@ async function dispatchNow(
       const statements = [
         env.DB.prepare("UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE id = ?").bind(providerMessageId, r.row_id),
       ]
+      const engagementDetail = { subject, to: r.email, comms_message_id: messageId, message_type: messageType }
       if (r.recipient_kind === 'lead' && r.inquiry_id) {
         statements.push(
           env.DB.prepare(
             `INSERT INTO email_log (id, inquiry_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)`,
           ).bind(uuid(), r.inquiry_id, actorUserId, r.email, subject, deliveryHtml),
           env.DB.prepare("UPDATE contact_inquiries SET last_contacted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").bind(r.inquiry_id),
+          activityInsert(env, { actorUserId, inquiryId: r.inquiry_id, kind: 'comms_message_sent', detail: engagementDetail }),
         )
       } else if (r.user_id && r.role === 'client') {
-        statements.push(env.DB.prepare(
-          `INSERT INTO email_log (id, client_user_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)`,
-        ).bind(uuid(), r.user_id, actorUserId, r.email, subject, deliveryHtml))
+        statements.push(
+          env.DB.prepare(
+            `INSERT INTO email_log (id, client_user_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)`,
+          ).bind(uuid(), r.user_id, actorUserId, r.email, subject, deliveryHtml),
+          activityInsert(env, { actorUserId, clientUserId: r.user_id, kind: 'comms_message_sent', detail: engagementDetail }),
+        )
       }
       await env.DB.batch(statements)
     } catch (err) {
@@ -326,9 +332,11 @@ commsRoutes.post('/comms/messages', requireStaff, requireCapability('can_manage_
   const user = c.get('user')
   const body = await c.req.json<any>().catch(() => ({}))
   const subject = typeof body.subject === 'string' ? body.subject.trim().slice(0, 200) : ''
-  const bodyHtml = typeof body.body_html === 'string' ? body.body_html.slice(0, 200000) : ''
+  const rawHtml = typeof body.body_html === 'string' ? body.body_html.slice(0, 200000) : ''
   if (!subject) return c.json({ error: 'a subject is required' }, 400)
-  if (!bodyHtml.trim()) return c.json({ error: 'a message body is required' }, 400)
+  if (!rawHtml.trim()) return c.json({ error: 'a message body is required' }, 400)
+  const signed = await applySelectedSignature(c.env, user.id, rawHtml, typeof body.signature_id === 'string' ? body.signature_id : null)
+  const bodyHtml = signed.html
 
   const audience = parseAudience(body)
   if (audience.segments.length + audience.user_ids.length + audience.inquiry_ids.length + audience.list_ids.length === 0) {

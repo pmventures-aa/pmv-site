@@ -2,8 +2,9 @@ import type { Env } from './types'
 import { uuid } from './crypto'
 import { sendEmailStrict } from './email'
 import { CLIENT_NURTURE_STEPS, renderNurtureEmail } from './emailTemplates/relationship'
+import { portalUrl } from './appUrls'
 
-export const CLIENT_PORTAL_BASE = 'https://client.pinnaclemanagementventures.com'
+export const CLIENT_PORTAL_BASE = portalUrl()
 
 export async function enrollClientNurture(env: Env, userId: string): Promise<void> {
   await env.DB.prepare(

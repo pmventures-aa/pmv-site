@@ -5,7 +5,8 @@ import { useAppPath } from '../../lib/basePath'
 import { lifecycleLabel } from '../../../shared/lifecycle'
 import { Panel, Tag, inputCls, btnPrimary, btnOutline, EmptyState } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
-import { timeAgo } from '../../lib/activity'
+import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
+import { campaignAudienceHref, leadEmailHref } from '../../lib/engagements'
 import { InlineLoading } from '../../components/LoadingScreen'
 
 interface LeadRecord {
@@ -60,10 +61,6 @@ function lifecycleTone(stage: string): 'gold' | 'green' | 'blue' | 'slate' | 're
   return 'slate'
 }
 
-function prettyKind(kind: string) {
-  return kind.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
-}
-
 function plainText(html: string) {
   return html.replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim()
 }
@@ -99,7 +96,7 @@ export default function LeadDetail() {
     const rows = [
       ...data.notes.map((n) => ({ id: `note-${n.id}`, at: n.created_at, type: 'note', title: 'Internal note', body: n.body, meta: n.author_name || n.author_email })),
       ...data.emails.map((e) => ({ id: `email-${e.id}`, at: e.created_at, type: 'email', title: e.subject, body: plainText(e.body), meta: `Email to ${e.to_address}` })),
-      ...data.activity.map((a) => ({ id: `activity-${a.id}`, at: a.created_at, type: 'activity', title: prettyKind(a.kind), body: '', meta: a.actor_name || a.actor_email || 'Pinnacle' })),
+      ...data.activity.filter((a) => a.kind !== 'email.sent' && a.kind !== 'comms_message_sent').map((a) => ({ id: `activity-${a.id}`, at: a.created_at, type: 'activity', title: describeActivity({ id: a.id, actor_user_id: null, actor_name: a.actor_name, actor_email: a.actor_email, client_user_id: null, kind: a.kind, detail: a.detail, created_at: a.created_at } satisfies ActivityEvent), body: '', meta: a.actor_name || a.actor_email || 'Pinnacle' })),
     ]
     return rows.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
   }, [data])
@@ -176,7 +173,8 @@ export default function LeadDetail() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link to={`${p('communications')}?lead=${encodeURIComponent(r.id)}`} className={btnPrimary}>Email</Link>
+            <Link to={leadEmailHref(p, { id: r.id, email: r.email, name: r.name })} className={btnPrimary}>Email</Link>
+            <Link to={campaignAudienceHref(p, { lead: r.id })} className={btnOutline}>Campaign</Link>
             <Link className={btnOutline} to={p(`leads/${r.id}/activity`)}>Add note</Link>
             {!r.converted_at && !data.conversion && <button className={btnOutline} disabled={busy} onClick={convert}>Convert to client</button>}
             {(r.converted_at || data.conversion) && <Link to={p(`clients/${r.client_user_id || data.conversion?.client_user_id}/overview`)} className={btnOutline}>Open client</Link>}
@@ -213,10 +211,10 @@ export default function LeadDetail() {
 
       {tab === 'activity' && <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section><div className="mb-5"><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Relationship history</p><h2 className="mt-1 text-xl font-semibold text-white">Activity & communication</h2></div>{timeline.length ? <Timeline rows={timeline} /> : <EmptyState label="No activity yet." />}</section>
-        <aside className="xl:border-l xl:border-white/10 xl:pl-7"><h3 className="font-semibold text-white">Add internal note</h3><p className="mt-1 text-xs leading-5 text-slate-500">Staff-only. This note follows the record if it becomes a client.</p><form onSubmit={addNote} className="mt-4"><textarea className={inputCls} rows={6} placeholder="Add context, call notes, next steps…" value={note} onChange={(e) => setNote(e.target.value)} /><button className={`${btnPrimary} mt-3 w-full`} disabled={busy || !note.trim()}>Save note</button></form><Link to={`${p('communications')}?lead=${encodeURIComponent(r.id)}`} className={`${btnOutline} mt-3 w-full`}>Compose email</Link></aside>
+        <aside className="xl:border-l xl:border-white/10 xl:pl-7"><h3 className="font-semibold text-white">Add internal note</h3><p className="mt-1 text-xs leading-5 text-slate-500">Staff-only. This note follows the record if it becomes a client.</p><form onSubmit={addNote} className="mt-4"><textarea className={inputCls} rows={6} placeholder="Add context, call notes, next steps…" value={note} onChange={(e) => setNote(e.target.value)} /><button className={`${btnPrimary} mt-3 w-full`} disabled={busy || !note.trim()}>Save note</button></form><Link to={leadEmailHref(p, { id: r.id, email: r.email, name: r.name })} className={`${btnOutline} mt-3 w-full`}>Compose email</Link></aside>
       </div>}
 
-      {tab === 'lists' && <div className="mt-6 max-w-4xl"><div className="mb-5"><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Audience organization</p><h2 className="mt-1 text-xl font-semibold text-white">Lists & segments</h2></div><div className="border-y border-white/10">{data.lists.length === 0 ? <p className="py-6 text-sm text-slate-500">This record is not in any static lists yet.</p> : data.lists.map((list) => <div key={list.id} className="flex items-center justify-between border-t border-white/5 py-4 first:border-t-0"><div><p className="font-medium text-white">{list.name}</p><p className="text-xs text-slate-500">{list.list_type}</p></div><Link to={`${p('communications')}?list=${list.id}`} className="text-sm font-medium text-gold hover:underline">Email list →</Link></div>)}</div>{unusedLists.length > 0 && <div className="mt-5 flex gap-2"><select className={inputCls} value={listId} onChange={(e) => setListId(e.target.value)}><option value="">Add to a static list…</option>{unusedLists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><button className={btnPrimary} disabled={!listId || busy} onClick={addToList}>Add</button></div>}</div>}
+      {tab === 'lists' && <div className="mt-6 max-w-4xl"><div className="mb-5"><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Audience organization</p><h2 className="mt-1 text-xl font-semibold text-white">Lists & segments</h2></div><div className="border-y border-white/10">{data.lists.length === 0 ? <p className="py-6 text-sm text-slate-500">This record is not in any static lists yet.</p> : data.lists.map((list) => <div key={list.id} className="flex items-center justify-between border-t border-white/5 py-4 first:border-t-0"><div><p className="font-medium text-white">{list.name}</p><p className="text-xs text-slate-500">{list.list_type}</p></div><Link to={campaignAudienceHref(p, { list: list.id })} className="text-sm font-medium text-gold hover:underline">Email list →</Link></div>)}</div>{unusedLists.length > 0 && <div className="mt-5 flex gap-2"><select className={inputCls} value={listId} onChange={(e) => setListId(e.target.value)}><option value="">Add to a static list…</option>{unusedLists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><button className={btnPrimary} disabled={!listId || busy} onClick={addToList}>Add</button></div>}</div>}
 
       {tab === 'details' && <div className="mt-6 max-w-5xl"><div className="mb-5 flex items-end justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Record data</p><h2 className="mt-1 text-xl font-semibold text-white">Contact & business details</h2></div><button onClick={() => setEditing((v) => !v)} className="text-sm font-medium text-gold hover:underline">{editing ? 'Cancel' : 'Edit'}</button></div>{editing ? <RecordEditor record={r} staff={staff} onSave={async (patch) => { await updateRecord(patch); setEditing(false) }} /> : <dl className="grid border-y border-white/10 sm:grid-cols-2"><Info label="Record type" value={r.record_type} /><Info label="Email status" value={r.email_status} /><Info label="Email" value={r.email} /><Info label="Phone" value={r.phone || 'Not provided'} /><Info label="Job title" value={r.job_title || 'Not provided'} /><Info label="Website" value={r.website || 'Not provided'} /><Info label="Industry" value={r.industry || 'Not provided'} /><Info label="Owner" value={r.owner_name || r.owner_email || 'Unassigned'} /><Info label="Address" value={[r.address_line1, r.address_line2, r.city, r.state, r.postal_code, r.country].filter(Boolean).join(', ') || 'Not provided'} /><Info label="Created" value={new Date(r.created_at).toLocaleString()} /></dl>}</div>}
     </div>

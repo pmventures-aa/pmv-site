@@ -11,6 +11,7 @@ import {
   type AccountRole,
   type RenderedEmail,
 } from './emailTemplates/welcome'
+import { HQ_WWW_LOGIN, PORTAL_WWW_BASE, PORTAL_WWW_LOGIN } from './appUrls'
 
 export type AccountEmailKind = 'account_welcome' | 'setup_invite' | 'portal_reminder' | 'vendor_application_received' | 'vendor_approved'
 export type AccountEmailStatus = 'queued' | 'skipped' | 'sent' | 'delivered' | 'delayed' | 'bounced' | 'failed' | 'complained' | 'suppressed'
@@ -40,9 +41,9 @@ interface TrackedSendInput {
 // Use the public site's routed application surfaces until the dedicated
 // secure. hostname finishes DNS activation. These routes are first-class app
 // entry points and keep account emails usable throughout the DNS cutover.
-export const CLIENT_PORTAL_URL = 'https://www.pinnaclemanagementventures.com/portal/'
-export const CLIENT_LOGIN_URL = 'https://www.pinnaclemanagementventures.com/portal/login'
-export const HQ_LOGIN_URL = 'https://www.pinnaclemanagementventures.com/admin/login'
+export const CLIENT_PORTAL_URL = `${PORTAL_WWW_BASE}/`
+export const CLIENT_LOGIN_URL = PORTAL_WWW_LOGIN
+export const HQ_LOGIN_URL = HQ_WWW_LOGIN
 
 function eventKind(kind: AccountEmailKind, status: AccountEmailStatus): string {
   if (status === 'failed' || status === 'skipped') return 'account_email_failed'

@@ -2,6 +2,7 @@ import type { Env } from './types'
 import { sendEmail } from './email'
 import { notificationPreference } from './relationshipAutomation'
 import { renderRelationshipEvent } from './emailTemplates/relationship'
+import { portalUrl } from './appUrls'
 
 interface TemplateOverride { subject:string|null;preheader:string|null;eyebrow:string|null;title:string|null;body_html:string|null;cta_label:string|null;enabled:number|null }
 const tokens=(value:string,subject:string,body:string)=>value.replace(/\{\{event_subject\}\}/g,subject).replace(/\{\{event_body\}\}/g,body)
@@ -17,7 +18,7 @@ export async function notifyClientEvent(env:Env,input:{
   if(override?.enabled===0)return {sent:false}
   const subject=override?.subject?tokens(override.subject,input.subject,input.body):input.subject
   const body=override?.body_html?tokens(override.body_html,input.subject,input.body):input.body
-  const portal='https://client.pinnaclemanagementventures.com'
+  const portal = portalUrl()
   const rendered=renderRelationshipEvent({
     eventKey:input.eventKey,firstName:user.first_name||user.full_name,subject,title:override?.title||input.title,body,
     preheader:override?.preheader||subject,eyebrow:override?.eyebrow||input.eyebrow||'Your Pinnacle relationship',ctaLabel:override?.cta_label||input.ctaLabel,ctaUrl:input.ctaPath?`${portal}${input.ctaPath}`:undefined,

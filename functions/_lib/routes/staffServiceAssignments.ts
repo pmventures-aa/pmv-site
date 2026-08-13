@@ -6,6 +6,7 @@ import { uuid } from '../crypto'
 import { activityInsert, logActivity } from '../activity'
 import { logAudit, actorIp, actorUserAgent } from '../auditLog'
 import { sendEmail, escapeHtml } from '../email'
+import { portalUrl } from '../appUrls'
 
 export const staffServiceAssignmentRoutes = new Hono<AppEnv>()
 export const clientApplicationSignatureRoutes = new Hono<AppEnv>()
@@ -228,12 +229,12 @@ staffServiceAssignmentRoutes.post('/clients/:clientId/services/:serviceKey/assig
     after: { client_user_id: clientId, service_key: serviceKey, prefilled_answers: prefilledCount },
   })
 
-  const portalUrl = `https://client.pinnaclemanagementventures.com/services/${encodeURIComponent(serviceKey)}/apply`
+  const applyUrl = portalUrl(`/services/${encodeURIComponent(serviceKey)}/apply`)
   await sendEmail(c.env, {
     to: client.email,
     subject: `Action requested: review your ${service.name} application`,
-    html: `<p>Hi ${escapeHtml(client.first_name || client.full_name || 'there')},</p><p>Your Pinnacle team started a <strong>${escapeHtml(service.name)}</strong> application for you and prefilled the information already on file.</p><p>Please sign in to review the details, complete anything still needed, and sign the application before submitting it.</p><p><a href="${portalUrl}">Review application</a></p>`,
-    text: `Your Pinnacle team started a ${service.name} application. Sign in to review, complete, and sign it before submitting: ${portalUrl}`,
+    html: `<p>Hi ${escapeHtml(client.first_name || client.full_name || 'there')},</p><p>Your Pinnacle team started a <strong>${escapeHtml(service.name)}</strong> application for you and prefilled the information already on file.</p><p>Please sign in to review the details, complete anything still needed, and sign the application before submitting it.</p><p><a href="${applyUrl}">Review application</a></p>`,
+    text: `Your Pinnacle team started a ${service.name} application. Sign in to review, complete, and sign it before submitting: ${applyUrl}`,
   })
 
   return c.json({ ok: true, requires_application: true, application_id: applicationId, prefilled_answers: prefilledCount }, 201)

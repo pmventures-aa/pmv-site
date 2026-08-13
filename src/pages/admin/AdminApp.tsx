@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth'
 import { useCapabilities } from '../../lib/capabilities'
 import { hqWorkspaceCopy } from '../../lib/workspace'
 import { BasePathProvider, useAppPath } from '../../lib/basePath'
+import { isCampaignAudienceQuery } from '../../lib/engagements'
 import Login from '../auth/Login'
 import ForgotPassword from '../auth/ForgotPassword'
 import ResetPassword from '../auth/ResetPassword'
@@ -78,6 +79,9 @@ function CatchAll(){const p=useAppPath();return <Navigate to={p()} replace/>}
 function RedirectToMessages({ tab }: { tab?: string }) {
   const p = useAppPath()
   const [params] = useSearchParams()
+  if (isCampaignAudienceQuery(params)) {
+    return <Navigate to={`${p('communications/email')}?${params.toString()}`} replace />
+  }
   const next = new URLSearchParams(params)
   if (tab && !next.get('tab')) next.set('tab', tab)
   if (next.get('tab') === 'threads') next.set('tab', 'staff')

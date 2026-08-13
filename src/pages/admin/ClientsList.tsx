@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnOutline } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
+import { clientEmailHref, clientInboxHref } from '../../lib/engagements'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../components/admin/RecentWindow'
 
@@ -89,6 +90,7 @@ export default function ClientsList() {
                 <th className="px-5 py-3 font-medium">Business</th>
                 <th className="px-5 py-3 font-medium">Onboarding</th>
                 <th className="px-5 py-3 font-medium">Joined</th>
+                <th className="px-5 py-3 font-medium">Engage</th>
               </tr>
             </thead>
             <tbody>
@@ -107,6 +109,12 @@ export default function ClientsList() {
                     </Tag>
                   </td>
                   <td className="px-5 py-3 text-slate-400">{new Date(c.created_at.replace(' ', 'T') + 'Z').toLocaleDateString()}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Link to={clientEmailHref(p, { id: c.id, email: c.email, name: c.full_name })} className="text-xs font-semibold text-gold hover:underline">Email</Link>
+                      <Link to={clientInboxHref(p, c.id)} className="text-xs font-semibold text-slate-400 hover:text-gold hover:underline">Message</Link>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

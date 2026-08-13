@@ -1,3 +1,15 @@
+import {
+  CREST_ABSOLUTE_URL,
+  CREST_PATH as SHARED_CREST_PATH,
+  FIRM_NAME,
+  FIRM_PHONE,
+  FIRM_PHONE_TEL,
+  FIRM_REGION,
+  FIRM_SITE_HOST,
+  FIRM_TAGLINE,
+  PUBLIC_SITE_URL,
+  SUPPORT_EMAIL,
+} from '../../shared/letterhead'
 import type { Env, SessionUser } from './types'
 import { uuid } from './crypto'
 
@@ -23,11 +35,9 @@ export interface SignaturePerson {
   phone?: string | null
 }
 
-export const SITE_URL = 'https://www.pinnaclemanagementventures.com'
-export const CREST_PATH = '/logo-crest-transparent.png'
-export const CREST_ABSOLUTE = `${SITE_URL}${CREST_PATH}`
-const FIRM_PHONE = '(561) 388-7879'
-const SUPPORT_EMAIL = 'support@pinnaclemanagementventures.com'
+export const SITE_URL = PUBLIC_SITE_URL
+export const CREST_PATH = SHARED_CREST_PATH
+export const CREST_ABSOLUTE = CREST_ABSOLUTE_URL
 const SIG_MARK = '<!--pmv-sig:v3-->'
 
 function esc(value: string): string {
@@ -59,13 +69,13 @@ function letterheadTable(personHtml: string): string {
             <img src="${CREST_PATH}" width="76" height="76" alt="Pinnacle" style="display:block;border:0;outline:none;width:76px;height:76px"/>
           </td>
           <td valign="middle" style="padding:0 12px 0 0">
-            <div style="font-family:Georgia,'Times New Roman',Times,serif;font-size:18px;line-height:22px;letter-spacing:.04em;color:#0a1728">Pinnacle Management Ventures</div>
-            <div style="margin-top:5px;font-family:Arial,Helvetica,sans-serif;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5b6573">Property · Documents · Operations</div>
+            <div style="font-family:Georgia,'Times New Roman',Times,serif;font-size:18px;line-height:22px;letter-spacing:.04em;color:#0a1728">${FIRM_NAME}</div>
+            <div style="margin-top:5px;font-family:Arial,Helvetica,sans-serif;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5b6573">${FIRM_TAGLINE}</div>
           </td>
           <td valign="top" align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;color:#64748b;white-space:nowrap">
-            South Florida<br/>
-            <a href="tel:+15613887879" style="color:#64748b;text-decoration:none">${FIRM_PHONE}</a><br/>
-            <a href="${SITE_URL}" style="color:#64748b;text-decoration:none">pinnaclemanagementventures.com</a>
+            ${FIRM_REGION}<br/>
+            <a href="tel:${FIRM_PHONE_TEL}" style="color:#64748b;text-decoration:none">${FIRM_PHONE}</a><br/>
+            <a href="${SITE_URL}" style="color:#64748b;text-decoration:none">${FIRM_SITE_HOST}</a>
           </td>
         </tr>
       </table>
@@ -80,7 +90,7 @@ function letterheadTable(personHtml: string): string {
 
 function personBlock(kind: SignatureKind, person?: SignaturePerson): string {
   const name = (person?.name || '').trim()
-    || (kind === 'support' ? 'PMV Support' : kind === 'personal' ? '' : 'Pinnacle Management Ventures')
+    || (kind === 'support' ? 'PMV Support' : kind === 'personal' ? '' : FIRM_NAME)
   const title = (person?.title || '').trim()
     || (kind === 'support' ? 'Client Care' : kind === 'company' ? 'Private Client Services' : '')
   const email = (person?.email || '').trim()
