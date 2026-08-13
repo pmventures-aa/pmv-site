@@ -112,8 +112,11 @@ export function EmailSignaturesPanel({
                 placeholder="Signature name"
               />
               <div className="rounded-md border border-[#e4dfd4] bg-white p-6">
-                <p className="mb-4 text-[10px] font-semibold uppercase tracking-[.16em] text-[#9a7838]">Letterhead preview</p>
-                <SignaturePreview signature={selected} />
+                <p className="mb-4 text-[10px] font-semibold uppercase tracking-[.16em] text-[#9a7838]">What recipients get</p>
+                <SignaturePreview signature={selected} html={html} />
+                <p className="mt-4 max-w-[36rem] text-[11px] leading-[16px] text-[#8b939e]">
+                  This is the HTML attached under your message. The crest is a PNG on the site; everything else is text. Gmail and Outlook may hide the crest until images are shown.
+                </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="inline-flex items-center gap-2 rounded-md bg-[#c9a227] px-3 py-1.5 text-sm font-semibold text-[#07111f] disabled:opacity-50" disabled={busy || !name.trim()} onClick={() => void save()}>

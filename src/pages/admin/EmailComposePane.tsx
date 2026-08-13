@@ -166,8 +166,8 @@ export function EmailComposePane({
         </FieldRow>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white">
-        <div className="min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+        <div className="min-h-0 flex-1 overflow-hidden">
           <RichTextComposer
             fill
             surface="letter"
@@ -177,8 +177,14 @@ export function EmailComposePane({
           />
         </div>
         {selected && (
-          <div className="shrink-0 px-8 pb-10 pt-2">
+          <div className="relative z-10 shrink-0 border-t border-[#eeeae2] bg-white px-8 pb-8 pt-5">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[.14em] text-[#9aa3ae]">
+              Signature · attached when you send
+            </p>
             <SignaturePreview signature={selected} />
+            <p className="mt-3 max-w-[34rem] text-[11px] leading-[16px] text-[#8b939e]">
+              Only the crest is a picture, loaded from the site. The firm name, tagline, and contact lines are text in the email. Some inboxes hide the crest until the recipient shows images.
+            </p>
           </div>
         )}
       </div>
