@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ChevronDown, LogOut, Settings } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
+import { useFixedBelowAnchor } from '../../lib/anchoredPopover'
 import { Avatar } from '../kit/Avatar'
 import { pmvMotion } from '../../lib/motionTheme'
 
@@ -19,17 +20,20 @@ export function WhoMenu({
   const { user, logout } = useAuth()
   const p = useAppPath()
   const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const pinDown = placement === 'down'
+  const fixedStyle = useFixedBelowAnchor(open && pinDown, btnRef)
+
   if (!user) return null
 
-  const menuCls = placement === 'up'
-    ? 'absolute bottom-full left-0 right-0 mb-2'
-    : compact
-      ? 'absolute right-0 top-full mt-2 w-64'
-      : 'absolute left-0 right-0 top-full mt-2'
+  const menuCls = pinDown
+    ? 'w-64'
+    : 'absolute bottom-full left-0 right-0 mb-2'
 
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-2.5 rounded-lg text-left transition hover:bg-white/[.04] ${compact ? 'max-w-[220px] px-1.5 py-1' : 'w-full px-2 py-2'}`}
@@ -52,7 +56,8 @@ export function WhoMenu({
             exit={{ opacity: 0, y: placement === 'up' ? 5 : -5, scale: 0.985 }}
             transition={pmvMotion.ui}
             role="menu"
-            className={`${menuCls} z-40 overflow-hidden rounded-lg border border-white/10 bg-navy-900 shadow-2xl`}
+            style={pinDown ? fixedStyle : undefined}
+            className={`${menuCls} z-[80] overflow-hidden rounded-lg border border-white/10 bg-navy-900 shadow-2xl`}
           >
             <div className="border-b border-white/10 px-3 py-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Who</p>

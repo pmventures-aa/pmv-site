@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Search, Mail, MailOpen, ChevronLeft } from 'lucide-react'
-import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
@@ -16,6 +16,7 @@ import { EmailThreadsPanel } from './EmailThreadsPanel'
 import { EmailTemplatesPanel } from './EmailTemplatesPanel'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 import { OverviewTab, ReportingTab } from './CommunicationsHub'
+import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
 import { SessionWho } from '../../components/kit/WhoSection'
 
 interface ThreadRow {
@@ -33,12 +34,13 @@ interface ClientOption {
   email: string
 }
 
-type MessageTab = 'inbox' | 'email' | 'staff' | 'pulse' | 'templates'
+type MessageTab = 'inbox' | 'email' | 'staff' | 'pulse' | 'templates' | 'campaigns'
 const TABS: { id: MessageTab; label: string }[] = [
   { id: 'inbox', label: 'Client inbox' },
   { id: 'email', label: 'Email' },
   { id: 'staff', label: 'Staff DMs' },
   { id: 'templates', label: 'Templates' },
+  { id: 'campaigns', label: 'Campaigns' },
   { id: 'pulse', label: 'Pulse' },
 ]
 
@@ -164,7 +166,7 @@ export default function MessagesAdmin() {
   const [searchParams, setSearchParams] = useSearchParams()
   const rawTab = searchParams.get('tab')
   const tab: MessageTab = TABS.some((item) => item.id === rawTab) ? rawTab as MessageTab : 'inbox'
-  const initialClientId = searchParams.get('client')
+  const initialClientId = tab === 'inbox' ? searchParams.get('client') : null
   const { count: emailUnread } = useEmailUnreadCount()
 
   if (rawTab === 'notifications') {
@@ -179,6 +181,8 @@ export default function MessagesAdmin() {
       if (next !== 'email') params.delete('thread')
       if (next !== 'staff') params.delete('conv')
       if (next !== 'inbox') params.delete('inbox')
+      if (next !== 'inbox' && next !== 'campaigns') params.delete('client')
+      if (next !== 'campaigns') { params.delete('lead'); params.delete('leadIds'); params.delete('list') }
       if (next !== 'templates') { params.delete('template'); params.delete('slug') }
       return params
     }, { replace: true })
@@ -195,13 +199,13 @@ export default function MessagesAdmin() {
             )}
           </button>
         ))}
-        <Link to={p('communications/email')} className="ml-auto mb-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-400 hover:text-gold">Campaigns</Link>
       </div>
       <div className="flex min-h-0 flex-1 flex-col pb-3">
         {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} initialThreadId={searchParams.get('inbox')} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
         {tab === 'email' && <EmailThreadsPanel />}
         {tab === 'templates' && <EmailTemplatesPanel />}
         {tab === 'staff' && <ConversationsPanel />}
+        {tab === 'campaigns' && <CommunicationsCRMAdmin embedded />}
         {tab === 'pulse' && <PulseTab />}
       </div>
     </div>

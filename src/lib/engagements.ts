@@ -26,13 +26,12 @@ export function campaignAudienceHref(
   p: (path: string) => string,
   audience: { lead?: string; leadIds?: string[]; list?: string; client?: string },
 ): string {
-  const q = new URLSearchParams()
+  const q = new URLSearchParams({ tab: 'campaigns' })
   if (audience.lead) q.set('lead', audience.lead)
   if (audience.leadIds?.length) q.set('leadIds', audience.leadIds.join(','))
   if (audience.list) q.set('list', audience.list)
   if (audience.client) q.set('client', audience.client)
-  const qs = q.toString()
-  return qs ? `${p('communications/email')}?${qs}` : p('communications/email')
+  return `${p('messages')}?${q.toString()}`
 }
 
 export function composeAddress(name: string | null | undefined, email: string | null | undefined): string {

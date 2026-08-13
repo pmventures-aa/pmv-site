@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AtSign, Bell, Check, Mail, MessageSquare, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
+import { useFixedBelowAnchor } from '../../lib/anchoredPopover'
 
 type FeedItem = {
   id: string; kind: string; subject_type: string | null; subject_id: string | null
@@ -21,6 +22,10 @@ export function resolveHqDeepLink(path: string, p: (s: string) => string): strin
   const search = qIndex >= 0 ? raw.slice(qIndex + 1) : ''
   let stripped = pathname.replace(/^\/hq\/?/i, '').replace(/^\//, '')
   const params = new URLSearchParams(search)
+  if (stripped === 'communications/email') {
+    stripped = 'messages'
+    params.set('tab', 'campaigns')
+  }
   if (stripped === 'communications') {
     stripped = 'messages'
     if (!params.get('tab')) params.set('tab', 'email')
@@ -35,6 +40,8 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
   const [unread, setUnread] = useState(0)
   const [items, setItems] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const panelStyle = useFixedBelowAnchor(open, btnRef)
   const base = surface === 'portal' ? '/portal' : '/admin'
   const p = useAppPath()
 
@@ -88,7 +95,7 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:border-gold/40 hover:bg-gold/5 hover:text-gold" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}>
+      <button ref={btnRef} onClick={() => setOpen((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:border-gold/40 hover:bg-gold/5 hover:text-gold" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}>
         <Bell size={16}/>
         {unread > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{unread > 99 ? '99+' : unread}</span>}
       </button>
@@ -96,7 +103,7 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)}/>
-          <div className="absolute right-0 top-11 z-50 w-[380px] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-white/10 bg-navy-900 shadow-2xl">
+          <div style={panelStyle} className="z-[80] w-[380px] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-white/10 bg-navy-900 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 p-3">
               <p className="text-sm font-extrabold text-white">Notifications</p>
               <div className="flex items-center gap-2">

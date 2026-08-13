@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, Inbox, Mail, MessageSquare, RefreshCw, Send, Timer, TrendingUp, Users } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Mail, MessageSquare, Send, Timer, TrendingUp, Users } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, Tag, btnSecondary, inputCls } from '../../components/admin/ui'
+import { Panel, Tag, inputCls } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { useAppPath } from '../../lib/basePath'
-import { ConversationsPanel } from './ConversationsPanel'
-import { EmailThreadsPanel } from './EmailThreadsPanel'
 
 type Overview = {
   unread_threads: number
@@ -24,67 +22,6 @@ type ReportingResponse = {
   daily_email_volume: Array<{ day: string; n: number }>
   top_responders: Array<{ id: string; full_name: string; email: string; reply_count: number }>
   aging_threads: Array<{ id: string; subject: string; client_name: string; client_email: string; last_message_at: string }>
-}
-
-type Tab = 'overview' | 'threads' | 'email' | 'reporting'
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'threads', label: 'DM Threads' },
-  { id: 'email', label: 'Email' },
-  { id: 'reporting', label: 'Reporting' },
-]
-
-export default function CommunicationsHub() {
-  const p = useAppPath()
-  const [tab, setTab] = useState<Tab>('overview')
-  const [overview, setOverview] = useState<Overview | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const loadOverview = useCallback(async () => {
-    setLoading(true)
-    try {
-      setOverview(await api.get<Overview>('/admin/communications/overview'))
-    } catch (err) {
-      if (err instanceof ApiError) toast.error(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { void loadOverview() }, [loadOverview])
-
-  return (
-    <div className="space-y-6">
-      <PageIntro kicker="Communications Hub" title="One view. Every channel." subtitle="Client threads, staff DMs, and outbound email in one place. Day-to-day client messages stay in Inbox. Notification channels live in Settings." action={<Link to={p('messages')} className={btnSecondary}>Open Inbox</Link>} />
-
-      <div className="border-b border-white/10">
-        <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {TABS.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`relative shrink-0 px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'text-gold' : 'text-slate-400 hover:text-white'}`}>
-              {t.label}
-              {tab === t.id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-t-full bg-gold"/>}
-            </button>
-          ))}
-          <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex">
-            <Link to={p('communications/email')} className={btnSecondary}><Send size={14}/>Email Center</Link>
-            <Link to={p('messages')} className={btnSecondary}><Inbox size={14}/>Inbox</Link>
-            <button className={btnSecondary} onClick={() => { window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } })); void loadOverview() }}><RefreshCw size={14}/>Refresh</button>
-          </div>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 pb-2 sm:hidden">
-          <Link to={p('communications/email')} className={btnSecondary}><Send size={14}/>Email Center</Link>
-          <Link to={p('messages')} className={btnSecondary}><Inbox size={14}/>Inbox</Link>
-          <button className={btnSecondary} onClick={() => { window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } })); void loadOverview() }}><RefreshCw size={14}/>Refresh</button>
-        </div>
-      </div>
-
-      {tab === 'overview' && <OverviewTab overview={overview} loading={loading}/>}
-      {tab === 'threads' && <ConversationsPanel/>}
-      {tab === 'email' && <EmailThreadsPanel/>}
-      {tab === 'reporting' && <ReportingTab/>}
-    </div>
-  )
 }
 
 function StatTile({ label, value, hint, icon: Icon, tone = 'slate' }: { label: string; value: string | number; hint?: string; icon: any; tone?: 'slate' | 'gold' | 'amber' | 'green' }) {
@@ -120,23 +57,17 @@ export function OverviewTab({ overview, loading }: { overview: Overview | null; 
       </div>
 
       <Panel>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-extrabold text-white">Where things stand</p>
-            <p className="mt-1 text-xs text-slate-500">Fast jumps into the specialized workspaces.</p>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-2 md:grid-cols-3">
-          <Link to={p('messages')} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-4 transition hover:border-gold/40 hover:bg-white/[.04]">
-            <div><p className="text-sm font-bold text-white">Client & vendor threads</p><p className="mt-1 text-xs text-slate-400">Two-way conversations with clients, coworkers, and vendors.</p></div>
+        <div className="mt-0 grid gap-2 md:grid-cols-3">
+          <Link to={`${p('messages')}?tab=inbox`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-4 transition hover:border-gold/40 hover:bg-white/[.04]">
+            <div><p className="text-sm font-bold text-white">Client inbox</p><p className="mt-1 text-xs text-slate-400">Secure threads with clients.</p></div>
             <ArrowRight size={16} className="text-gold"/>
           </Link>
-          <Link to={p('communications/email')} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-4 transition hover:border-gold/40 hover:bg-white/[.04]">
-            <div><p className="text-sm font-bold text-white">Email Center</p><p className="mt-1 text-xs text-slate-400">Compose, schedule, template, and audience-target outbound.</p></div>
+          <Link to={`${p('messages')}?tab=campaigns`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-4 transition hover:border-gold/40 hover:bg-white/[.04]">
+            <div><p className="text-sm font-bold text-white">Campaigns</p><p className="mt-1 text-xs text-slate-400">Audience email and scheduled outreach.</p></div>
             <ArrowRight size={16} className="text-gold"/>
           </Link>
           <Link to={p('cases')} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-4 transition hover:border-gold/40 hover:bg-white/[.04]">
-            <div><p className="text-sm font-bold text-white">Cases & SLA</p><p className="mt-1 text-xs text-slate-400">Live case timers when a thread escalates to a tracked request.</p></div>
+            <div><p className="text-sm font-bold text-white">Cases</p><p className="mt-1 text-xs text-slate-400">Tracked requests with SLA timers.</p></div>
             <ArrowRight size={16} className="text-gold"/>
           </Link>
         </div>

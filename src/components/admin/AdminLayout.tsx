@@ -158,7 +158,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
       </AnimatePresence>
 
       <div className={`flex min-w-0 flex-1 flex-col ${hideHqNav ? 'h-full min-h-0 overflow-hidden' : 'min-h-screen'}`}>
-        <div className="hidden h-14 items-center justify-between gap-4 border-b border-white/10 bg-navy-900/70 px-6 backdrop-blur lg:flex print:hidden">
+        <div className="relative z-40 hidden h-14 items-center justify-between gap-4 border-b border-white/10 bg-navy-900/70 px-6 backdrop-blur lg:flex print:hidden">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {hideHqNav ? (
               <NavLink to={p()} className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[.03] px-3 py-1.5 text-sm font-semibold text-white transition hover:border-gold/40 hover:text-gold">

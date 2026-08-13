@@ -9,6 +9,7 @@ import { RichTextComposer } from '../../components/admin/RichTextComposer'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
 import { pickDefaultSignature, rememberSignatureId, signatureLabel, type EmailSignature } from '../../lib/emailSignatures'
 import { SignaturePreview } from './SignatureLetterhead'
+import { SessionWho } from '../../components/kit/WhoSection'
 import { crmRecordLine } from '../../../shared/crmRecord'
 
 interface AudienceData {
@@ -37,7 +38,7 @@ function personKind(person: AudienceData['people'][number]) {
   return 'Employee'
 }
 
-export default function CommunicationsCRMAdmin() {
+export default function CommunicationsCRMAdmin({ embedded = false }: { embedded?: boolean }) {
   const caps = useCapabilities()
   const [searchParams] = useSearchParams()
   const seeded = useRef(false)
@@ -94,7 +95,7 @@ export default function CommunicationsCRMAdmin() {
         if (lead || leadIds.length || list || client) setComposeOpen(true)
         seeded.current = true
       }
-    } catch (err) { if (!silent) setError(err instanceof ApiError ? err.message : 'Could not load the Email Center.') }
+    } catch (err) { if (!silent) setError(err instanceof ApiError ? err.message : 'Could not load campaigns.') }
     finally { if (!silent) setLoading(false) }
   }, [searchParams])
 
@@ -162,7 +163,7 @@ export default function CommunicationsCRMAdmin() {
   async function sendDraft(id: string) { if (!window.confirm('Send this draft now?')) return; try { await api.post(`/admin/comms/messages/${id}/send`); await load(); await loadDetail(id) } catch (err) { window.alert(err instanceof ApiError ? err.message : 'The draft could not be sent.') } }
   async function cancelMessage(id: string) { if (!window.confirm('Cancel this message?')) return; try { await api.del(`/admin/comms/messages/${id}`); await load(); await loadDetail(id) } catch (err) { window.alert(err instanceof ApiError ? err.message : 'The message could not be canceled.') } }
 
-  if (loading) return <div><PageIntro kicker="HQ Communications" title="Email Center" subtitle="A unified mailbox for client, CRM, internal, scheduled, and campaign email." /><SkeletonTable rows={6} cols={5} /></div>
+  if (loading) return <div>{!embedded && <PageIntro kicker="HQ Communications" title="Campaigns" subtitle="Audience email, scheduled outreach, and delivery history." />}<SkeletonTable rows={6} cols={5} /></div>
 
   const selectedCampaignSignature = signatures.find((s) => s.id === signatureId) || null
   const folderItems = [
@@ -173,13 +174,13 @@ export default function CommunicationsCRMAdmin() {
     { key: 'exceptions' as const, label: 'Exceptions', count: folders.exceptions, icon: AlertTriangle },
   ]
 
-  return <div className="mx-auto max-w-[1600px]">
-    <PageIntro kicker="HQ Communications" title="Email Center" subtitle="Manage one-to-one email, internal communication, scheduled outreach, delivery status, and message history from one workspace." action={caps.can_manage_communications ? <button className={btnPrimary} onClick={() => setComposeOpen(true)}>New email</button> : undefined} />
+  return <div className={embedded ? 'flex h-full min-h-0 flex-col' : 'mx-auto max-w-[1600px]'}>
+    {embedded ? <div className="mb-3 shrink-0"><SessionWho /></div> : <PageIntro kicker="HQ Communications" title="Campaigns" subtitle="Audience email, scheduled outreach, and delivery history." action={caps.can_manage_communications ? <button className={btnPrimary} onClick={() => setComposeOpen(true)}>New email</button> : undefined} />}
     {error && <p className="mb-4 text-sm text-rose-300">{error}</p>}
 
-    <Panel className="grid min-h-[690px] overflow-hidden !p-0 xl:grid-cols-[220px_360px_minmax(0,1fr)]">
+    <Panel className={`grid overflow-hidden !p-0 xl:grid-cols-[220px_360px_minmax(0,1fr)] ${embedded ? 'min-h-0 flex-1' : 'min-h-[690px]'}`}>
       <aside className="border-b border-white/10 p-3 xl:border-b-0 xl:border-r">
-        <div className="mb-3 flex items-center justify-between px-2"><p className="text-xs font-semibold uppercase tracking-[.16em] text-slate-500">Folders</p><button className="text-slate-500 hover:text-white" onClick={() => load()} aria-label="Refresh email"><RefreshCw size={14} /></button></div>
+        <div className="mb-3 flex items-center justify-between gap-2 px-2"><p className="text-xs font-semibold uppercase tracking-[.16em] text-slate-500">Folders</p><div className="flex items-center gap-2">{embedded && caps.can_manage_communications && <button type="button" className="text-xs font-semibold text-gold hover:text-white" onClick={() => setComposeOpen(true)}>New email</button>}<button className="text-slate-500 hover:text-white" onClick={() => load()} aria-label="Refresh email"><RefreshCw size={14} /></button></div></div>
         <div className="space-y-1">{folderItems.map((item) => { const Icon = item.icon; return <button key={item.key} onClick={() => setFolder(item.key)} className={`flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm transition ${folder === item.key ? 'bg-gold/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><span className="flex items-center gap-2"><Icon size={15} />{item.label}</span><span className="text-xs text-slate-500">{item.count}</span></button> })}</div>
         <div className="mt-6 border-t border-white/10 pt-4"><p className="px-2 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">Mail types</p><div className="mt-2 space-y-2 px-2 text-xs text-slate-400"><p>Operational / client</p><p>Internal team</p><p>Marketing / outreach</p></div></div>
       </aside>

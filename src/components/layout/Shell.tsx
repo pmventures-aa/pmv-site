@@ -151,7 +151,7 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
       </AnimatePresence>
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <div className="hidden h-14 items-center justify-between gap-4 border-b border-white/[.07] bg-navy-950/45 px-6 backdrop-blur lg:flex">
+        <div className="relative z-40 hidden h-14 items-center justify-between gap-4 border-b border-white/[.07] bg-navy-950/45 px-6 backdrop-blur lg:flex">
           <button onClick={toggleSidebar} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/[.04] hover:text-white" aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>{sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}</button>
           <div className="flex items-center gap-3"><NotificationFeedPanel surface="portal"/><MailBell /><span className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">{badge}</span></div>
         </div>

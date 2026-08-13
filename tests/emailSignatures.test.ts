@@ -121,7 +121,7 @@ describe('HQ notification deep links', () => {
     expect(resolveHqDeepLink('/hq/communications?tab=email&thread=abc', p)).toBe('/hq/messages?tab=email&thread=abc')
     expect(resolveHqDeepLink('/hq/communications?tab=threads&conv=xyz', p)).toBe('/hq/messages?tab=staff&conv=xyz')
     expect(resolveHqDeepLink('/hq/communications', p)).toBe('/hq/messages?tab=email')
-    expect(resolveHqDeepLink('/hq/communications/email', p)).toBe('/hq/communications/email')
+    expect(resolveHqDeepLink('/hq/communications/email', p)).toBe('/hq/messages?tab=campaigns')
   })
 
   it('keeps relative mail workspace links on the current HQ base', () => {

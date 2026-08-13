@@ -39,10 +39,10 @@ describe('engagement deep links', () => {
     expect(leadEmailHref(p, { id: 'l1', email: 'lead@x.com', name: 'Lee' })).toContain('compose=1')
   })
 
-  it('keeps campaign audiences on the Email Center', () => {
-    expect(campaignAudienceHref(p, { lead: 'l1' })).toBe('/hq/communications/email?lead=l1')
-    expect(campaignAudienceHref(p, { leadIds: ['a', 'b'] })).toBe('/hq/communications/email?leadIds=a%2Cb')
-    expect(campaignAudienceHref(p, { list: 'list-1' })).toBe('/hq/communications/email?list=list-1')
+  it('opens campaign audiences on the Messages Campaigns tab', () => {
+    expect(campaignAudienceHref(p, { lead: 'l1' })).toBe('/hq/messages?tab=campaigns&lead=l1')
+    expect(campaignAudienceHref(p, { leadIds: ['a', 'b'] })).toBe('/hq/messages?tab=campaigns&leadIds=a%2Cb')
+    expect(campaignAudienceHref(p, { list: 'list-1' })).toBe('/hq/messages?tab=campaigns&list=list-1')
   })
 
   it('formats a display address and detects campaign query params', () => {

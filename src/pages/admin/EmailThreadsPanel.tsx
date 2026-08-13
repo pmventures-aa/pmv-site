@@ -14,6 +14,7 @@ import { composeAddress } from '../../lib/engagements'
 import { readComposeQuery, stripComposeQuery } from '../../lib/emailComposeQuery'
 import { parseWhoAddresses, uniqueWhoPeople, type WhoPerson, type WhoRow } from '../../lib/who'
 import { useAppPath } from '../../lib/basePath'
+import { useFixedBelowAnchor } from '../../lib/anchoredPopover'
 import { FIRM_NAME } from '../../../shared/letterhead'
 
 type Thread = {
@@ -330,6 +331,8 @@ function EmailThreadDetail({
   const p = useAppPath()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
+  const menuStyle = useFixedBelowAnchor(menuOpen, menuBtnRef)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -363,11 +366,11 @@ function EmailThreadDetail({
         </div>
 
         <div ref={menuRef} className="relative md:hidden">
-          <button type="button" onClick={() => setMenuOpen((v) => !v)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold" aria-label="More actions" aria-haspopup="menu" aria-expanded={menuOpen}>
+          <button ref={menuBtnRef} type="button" onClick={() => setMenuOpen((v) => !v)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold" aria-label="More actions" aria-haspopup="menu" aria-expanded={menuOpen}>
             <MoreVertical size={18}/>
           </button>
           {menuOpen && (
-            <div role="menu" className="absolute right-0 top-11 z-20 w-52 overflow-hidden rounded-xl border border-white/12 bg-navy-900 shadow-2xl">
+            <div role="menu" style={menuStyle} className="z-[80] w-52 overflow-hidden rounded-xl border border-white/12 bg-navy-900 shadow-2xl">
               <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onCompose() }} className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-sm text-slate-200 hover:bg-white/5">
                 <MailPlus size={15}/>New email
               </button>
