@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2, Plus, MapPin } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
@@ -10,6 +10,7 @@ import { toast } from '../../components/kit/toast'
 import { FieldLiveMap, type FieldMapPin } from '../../components/admin/FieldLiveMap'
 import { ScopeIntakePicker } from '../../components/admin/ScopeIntakePicker'
 import { fieldPrefillFromScope } from '../../../shared/scopeIntakePrefill'
+import { composeAddressQuery, isUsefulGeoQuery, type GeoHit } from '../../../shared/geocode'
 
 interface StaffOption { id: string; full_name: string | null; email: string; party_type: string | null; vendor_category: string | null }
 interface ClientOption { id: string; full_name: string | null; email: string; business_name: string | null }
@@ -237,6 +238,8 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
     notes: '',
   })
   const [saving, setSaving] = useState(false)
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'looking' | 'pinned' | 'miss'>('idle')
+  const pinnedQueryRef = useRef('')
 
   useEffect(() => {
     api.get<{ clients: ClientOption[] }>('/admin/clients').then((r) => setClients(r.clients ?? [])).catch(() => {})
@@ -244,6 +247,46 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
   }, [])
 
   const availableVendors = useMemo(() => vendors.filter((v) => v.party_type === 'vendor'), [vendors])
+
+  useEffect(() => {
+    if (form.kind !== 'field') return
+    const query = composeAddressQuery({ line1: form.site_address, city: form.site_city, state: form.site_state, postal: form.site_postal_code })
+    if (!isUsefulGeoQuery(query)) {
+      setGeoStatus(form.site_lat && form.site_lng ? 'pinned' : 'idle')
+      return
+    }
+    if (pinnedQueryRef.current === query && form.site_lat && form.site_lng) {
+      setGeoStatus('pinned')
+      return
+    }
+    let cancelled = false
+    setGeoStatus('looking')
+    const handle = window.setTimeout(async () => {
+      try {
+        const data = await api.get<{ results: GeoHit[] }>(`/geo/search?q=${encodeURIComponent(query)}&limit=1`)
+        if (cancelled) return
+        const hit = data.results?.[0]
+        if (!hit) {
+          setGeoStatus('miss')
+          return
+        }
+        pinnedQueryRef.current = query
+        setForm((current) => {
+          const nextLat = String(hit.lat)
+          const nextLng = String(hit.lng)
+          if (current.site_lat === nextLat && current.site_lng === nextLng) return current
+          return { ...current, site_lat: nextLat, site_lng: nextLng }
+        })
+        setGeoStatus('pinned')
+      } catch {
+        if (!cancelled) setGeoStatus('miss')
+      }
+    }, 450)
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
+    }
+  }, [form.kind, form.site_address, form.site_city, form.site_state, form.site_postal_code])
 
   async function submit() {
     if (!form.vendor_user_id || !form.service_key) {
@@ -318,6 +361,7 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
           label="Prefill from occupancy / photos / reports"
           onPick={(row) => {
             const prefill = fieldPrefillFromScope(row)
+            pinnedQueryRef.current = ''
             setForm((current) => ({
               ...current,
               kind: prefill.kind,
@@ -327,6 +371,8 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
               site_city: prefill.site_city,
               site_state: prefill.site_state,
               site_postal_code: prefill.site_postal_code,
+              site_lat: '',
+              site_lng: '',
               notes: prefill.notes,
               client_user_id: row.reserved_user_id || current.client_user_id,
             }))
@@ -371,7 +417,11 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
         <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Title</span><input className={inputCls} placeholder='e.g. "Loan signing: Boca Raton office"' value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Scheduled for</span><input className={inputCls} type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Site label (optional)</span><input className={inputCls} placeholder="Client home, conference room…" value={form.site_label} onChange={(e) => setForm({ ...form, site_label: e.target.value })}/></label>
-        {form.kind === 'field' && <div className="sm:col-span-2 space-y-3"><div><span className="mb-1 block text-xs text-slate-400">Site address</span><AddressAutocomplete value={form.site_address} inputClassName={inputCls} onChange={(line1) => setForm({ ...form, site_address: line1 })} onSelect={(address) => setForm({ ...form, site_address: address.line1, site_city: address.city || form.site_city, site_state: address.state || form.site_state, site_postal_code: address.postal_code || form.site_postal_code, site_lat: address.lat != null ? String(address.lat) : form.site_lat, site_lng: address.lng != null ? String(address.lng) : form.site_lng })}/></div><div className="grid gap-3 sm:grid-cols-3"><label><span className="mb-1 block text-xs text-slate-400">City</span><input className={inputCls} value={form.site_city} onChange={(e) => setForm({ ...form, site_city: e.target.value })}/></label><label><span className="mb-1 block text-xs text-slate-400">State</span><input className={inputCls} value={form.site_state} onChange={(e) => setForm({ ...form, site_state: e.target.value })}/></label><label><span className="mb-1 block text-xs text-slate-400">Postal code</span><input className={inputCls} value={form.site_postal_code} onChange={(e) => setForm({ ...form, site_postal_code: e.target.value })}/></label></div><div className="grid gap-3 sm:grid-cols-2"><label><span className="mb-1 block text-xs text-slate-400">Site latitude (optional)</span><input className={inputCls} type="number" step="0.00001" value={form.site_lat} onChange={(e) => setForm({ ...form, site_lat: e.target.value })}/></label><label><span className="mb-1 block text-xs text-slate-400">Site longitude (optional)</span><input className={inputCls} type="number" step="0.00001" value={form.site_lng} onChange={(e) => setForm({ ...form, site_lng: e.target.value })}/></label></div><p className="text-xs text-slate-500 flex items-center gap-1"><MapPin size={12}/> With lat/lng set, the vendor's phone will auto-mark them "on site" when they arrive within 150 m.</p></div>}
+        {form.kind === 'field' && <div className="sm:col-span-2 space-y-3"><div><span className="mb-1 block text-xs text-slate-400">Site address</span><AddressAutocomplete value={form.site_address} inputClassName={inputCls} onChange={(line1) => { pinnedQueryRef.current = ''; setForm({ ...form, site_address: line1, site_lat: '', site_lng: '' }) }} onSelect={(address) => { const next = { ...form, site_address: address.line1, site_city: address.city || form.site_city, site_state: address.state || form.site_state, site_postal_code: address.postal_code || form.site_postal_code, site_lat: address.lat != null ? String(address.lat) : '', site_lng: address.lng != null ? String(address.lng) : '' }; pinnedQueryRef.current = composeAddressQuery({ line1: next.site_address, city: next.site_city, state: next.site_state, postal: next.site_postal_code }); setGeoStatus(next.site_lat && next.site_lng ? 'pinned' : 'looking'); setForm(next) }}/></div><div className="grid gap-3 sm:grid-cols-3"><label><span className="mb-1 block text-xs text-slate-400">City</span><input className={inputCls} value={form.site_city} onChange={(e) => { pinnedQueryRef.current = ''; setForm({ ...form, site_city: e.target.value, site_lat: '', site_lng: '' }) }}/></label><label><span className="mb-1 block text-xs text-slate-400">State</span><input className={inputCls} value={form.site_state} onChange={(e) => { pinnedQueryRef.current = ''; setForm({ ...form, site_state: e.target.value, site_lat: '', site_lng: '' }) }}/></label><label><span className="mb-1 block text-xs text-slate-400">Postal code</span><input className={inputCls} value={form.site_postal_code} onChange={(e) => { pinnedQueryRef.current = ''; setForm({ ...form, site_postal_code: e.target.value, site_lat: '', site_lng: '' }) }}/></label></div>
+          {geoStatus === 'looking' && <p className="flex items-center gap-1 text-xs text-slate-500"><Loader2 size={12} className="animate-spin"/> Looking up the map pin from this address…</p>}
+          {geoStatus === 'pinned' && form.site_lat && form.site_lng && <p className="flex items-center gap-1 text-xs text-emerald-300"><MapPin size={12}/> Map pin set from address ({Number(form.site_lat).toFixed(5)}, {Number(form.site_lng).toFixed(5)}). Vendor phones auto-arrive within 150 m.</p>}
+          {geoStatus === 'miss' && <p className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12}/> No pin yet. Pick an address from the suggestions so the live map and auto-arrive can use it.</p>}
+          {geoStatus === 'idle' && <p className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12}/> Start typing a street address. The map pin fills in from the public address database.</p>}</div>}
         <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Notes for the provider (optional)</span><textarea className={`${inputCls} min-h-20`} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}/></label>
       </div>
       <div className="mt-4 flex gap-2"><button type="button" onClick={onCancel} className={btnOutline}>Cancel</button><button type="button" onClick={submit} disabled={saving} className={`${btnPrimary} disabled:opacity-60`}>{saving ? <Loader2 size={14} className="animate-spin"/> : <Plus size={14}/>} Create assignment</button></div>

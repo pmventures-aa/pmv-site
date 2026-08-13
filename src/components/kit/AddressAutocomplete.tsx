@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { MapPin, Loader2 } from 'lucide-react'
+import { api } from '../../lib/api'
+import { normalizeGeoQuery, type GeoHit } from '../../../shared/geocode'
 
-// Structured address the parent form uses to fill in individual fields when
-// the user picks a suggestion. Everything but `line1` is optional so callers
-// with a compact single-line variant can still consume it.
 export interface AddressValue {
   line1: string
   line2?: string
@@ -27,55 +26,28 @@ interface Props {
   placeholder?: string
   inputClassName?: string
   label?: string
-  countryCodes?: string   // comma-separated ISO codes, e.g. "us,ca": defaults to US
+  countryCodes?: string
   autoComplete?: string
   disabled?: boolean
   id?: string
 }
 
-// Lightweight predictive-address input backed by the free Nominatim
-// (OpenStreetMap) endpoint: good enough for form assistance without pulling
-// in a paid Places API or a client SDK. Debounced, silent-fail (so the
-// input keeps working as a plain text field when the network is offline),
-// and only queries after 4+ characters so we don't spam the endpoint for
-// every keystroke on empty inputs.
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
-const DEBOUNCE_MS = 260
+const DEBOUNCE_MS = 280
 const MIN_QUERY_LENGTH = 4
 
-interface NominatimResult {
-  display_name: string
-  lat?: string
-  lon?: string
-  address?: {
-    house_number?: string
-    road?: string
-    city?: string
-    town?: string
-    village?: string
-    hamlet?: string
-    county?: string
-    state?: string
-    postcode?: string
-    country_code?: string
-    country?: string
+function hitToSuggestion(hit: GeoHit): Suggestion {
+  return {
+    display: hit.display || [hit.line1, hit.city, hit.state, hit.postal_code].filter(Boolean).join(', '),
+    address: {
+      line1: hit.line1 || hit.display.split(',')[0]?.trim() || '',
+      city: hit.city,
+      state: hit.state,
+      postal_code: hit.postal_code,
+      country: hit.country,
+      lat: hit.lat,
+      lng: hit.lng,
+    },
   }
-}
-
-function normalizeNominatim(result: NominatimResult): Suggestion {
-  const a = result.address ?? {}
-  const line1Parts = [a.house_number, a.road].filter(Boolean).join(' ').trim()
-  const city = a.city || a.town || a.village || a.hamlet || ''
-  const address: AddressValue = {
-    line1: line1Parts || result.display_name.split(',')[0]?.trim() || '',
-    city,
-    state: a.state || '',
-    postal_code: a.postcode || '',
-    country: a.country_code ? a.country_code.toUpperCase() : a.country || '',
-    lat: result.lat ? Number(result.lat) : undefined,
-    lng: result.lon ? Number(result.lon) : undefined,
-  }
-  return { display: result.display_name, address }
 }
 
 export function AddressAutocomplete({
@@ -95,30 +67,22 @@ export function AddressAutocomplete({
   const [loading, setLoading] = useState(false)
   const [focused, setFocused] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
-  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!focused) return
-    if (value.trim().length < MIN_QUERY_LENGTH) {
+    const query = normalizeGeoQuery(value)
+    if (query.length < MIN_QUERY_LENGTH) {
       setSuggestions([])
       setShowList(false)
       return
     }
     const handle = window.setTimeout(async () => {
-      abortRef.current?.abort()
-      const controller = new AbortController()
-      abortRef.current = controller
       setLoading(true)
       try {
-        const url = `${NOMINATIM_URL}?format=json&addressdetails=1&limit=5&countrycodes=${encodeURIComponent(countryCodes)}&q=${encodeURIComponent(value)}`
-        const res = await fetch(url, {
-          headers: { Accept: 'application/json' },
-          signal: controller.signal,
-        })
-        if (!res.ok) throw new Error(`status ${res.status}`)
-        const data = (await res.json()) as NominatimResult[]
-        setSuggestions(data.slice(0, 5).map(normalizeNominatim))
-        setShowList(true)
+        const data = await api.get<{ results: GeoHit[] }>(`/geo/search?q=${encodeURIComponent(value)}&limit=5&countrycodes=${encodeURIComponent(countryCodes)}`)
+        const next = (data.results || []).map(hitToSuggestion)
+        setSuggestions(next)
+        setShowList(next.length > 0)
       } catch {
         setSuggestions([])
         setShowList(false)
@@ -171,7 +135,7 @@ export function AddressAutocomplete({
       {showList && suggestions.length > 0 && (
         <ul className="absolute z-40 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-white/10 bg-navy-900 shadow-lg">
           {suggestions.map((suggestion) => (
-            <li key={suggestion.display}>
+            <li key={`${suggestion.address.lat},${suggestion.address.lng}:${suggestion.display}`}>
               <button
                 type="button"
                 onClick={() => pick(suggestion)}

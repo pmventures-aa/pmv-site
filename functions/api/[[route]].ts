@@ -68,6 +68,7 @@ import { impersonationRoutes } from '../_lib/routes/impersonation'
 import { denyDuringImpersonation, impersonationGuard } from '../_lib/impersonationGuard'
 import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib/routes/managedTemplates'
 import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
+import { geoRoutes } from '../_lib/routes/geo'
 import { loadWorkspaceContext } from '../_lib/workspaceContext'
 
 const app = new Hono<AppEnv>().basePath('/api')
@@ -170,6 +171,7 @@ app.route('/admin', clientRelationshipRoutes)
 // Public endpoint serves branded font files by id for the mail workspace
 // preview + rendered signer experience; no auth required so <link rel="preload">
 // and @font-face fetches work in an unauthenticated recipient's browser.
+app.route('/', geoRoutes)
 app.route('/', communicationBrandingPublicRoutes)
 
 app.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
