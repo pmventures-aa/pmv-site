@@ -1,14 +1,22 @@
 import { Hono } from 'hono'
-import type { AppEnv, Env } from '../types'
+import type { AppEnv, Env, SessionUser } from '../types'
 import { requireStaff } from '../mid'
+import { canAccessClient, visibleClientIds } from '../access'
 import { uuid } from '../crypto'
 import { sendEmailStrict } from '../email'
 import { sendingFrom, threadReplyAddress, formattedReplyTo } from '../resendInbound'
 import { applySelectedSignature } from '../emailSignatures'
 import { recordOutboundEmailEngagement, mergeParty } from '../engagements'
+import { sanitizeHtml } from '../htmlSanitize'
 
 export const emailThreadRoutes = new Hono<AppEnv>()
 emailThreadRoutes.use('*', requireStaff)
+
+async function assertThreadAccess(env: Env, user: SessionUser, scopeClientUserId: string | null) {
+  // Unscoped threads are shared HQ mailbox traffic; client-scoped threads follow assignment rules.
+  if (!scopeClientUserId) return true
+  return canAccessClient(env, user, scopeClientUserId)
+}
 
 const clean = (v: unknown, n: number) => typeof v === 'string' ? v.trim().slice(0, n) : ''
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
@@ -52,14 +60,28 @@ const UNREAD_SQL = `EXISTS (
 
 emailThreadRoutes.get('/email-threads/unread-count', async (c) => {
   const user = c.get('user')
+  const visible = await visibleClientIds(c.env, user)
+  const scopeSql = visible === null
+    ? ''
+    : visible.length
+      ? `AND (et.scope_client_user_id IS NULL OR et.scope_client_user_id IN (${visible.map(() => '?').join(',')}))`
+      : `AND (et.scope_client_user_id IS NULL OR et.created_by_user_id = ?)`
+  const params = visible === null ? [user.id] : visible.length ? [user.id, ...visible] : [user.id, user.id]
   const row = await c.env.DB.prepare(
-    `SELECT COUNT(*) AS n FROM email_threads et WHERE ${UNREAD_SQL}`,
-  ).bind(user.id).first<{ n: number }>()
+    `SELECT COUNT(*) AS n FROM email_threads et WHERE ${UNREAD_SQL} ${scopeSql}`,
+  ).bind(...params).first<{ n: number }>()
   return c.json({ count: Number(row?.n || 0) })
 })
 
 emailThreadRoutes.get('/email-threads', async (c) => {
   const user = c.get('user')
+  const visible = await visibleClientIds(c.env, user)
+  const scopeSql = visible === null
+    ? ''
+    : visible.length
+      ? `AND (et.scope_client_user_id IS NULL OR et.scope_client_user_id IN (${visible.map(() => '?').join(',')}))`
+      : `AND (et.scope_client_user_id IS NULL OR et.created_by_user_id = ?)`
+  const params = visible === null ? [user.id] : visible.length ? [user.id, ...visible] : [user.id, user.id]
   const rows = await c.env.DB.prepare(
     `SELECT et.id, et.subject, et.scope_client_user_id, et.last_activity_at, et.created_at,
             et.conversation_id,
@@ -71,8 +93,9 @@ emailThreadRoutes.get('/email-threads', async (c) => {
             (SELECT provider_status FROM email_messages WHERE email_thread_id = et.id ORDER BY created_at DESC LIMIT 1) last_status,
             CASE WHEN ${UNREAD_SQL} THEN 1 ELSE 0 END AS unread
      FROM email_threads et
+     WHERE 1=1 ${scopeSql}
      ORDER BY et.last_activity_at DESC LIMIT 200`
-  ).bind(user.id).all()
+  ).bind(...params).all()
   return c.json({ threads: (rows.results as any[]) || [] })
 })
 
@@ -85,6 +108,7 @@ emailThreadRoutes.get('/email-threads/:id', async (c) => {
      WHERE et.id = ?`,
   ).bind(c.req.param('id')).first() as any
   if (!thread) return c.json({ error: 'not found' }, 404)
+  if (!(await assertThreadAccess(c.env, user, thread.scope_client_user_id))) return c.json({ error: 'forbidden' }, 403)
   await c.env.DB.prepare(
     `INSERT INTO email_thread_reads (user_id, email_thread_id, last_read_at)
      VALUES (?, ?, datetime('now'))
@@ -104,7 +128,11 @@ emailThreadRoutes.get('/email-threads/:id', async (c) => {
        WHERE em.email_thread_id = ?`
     ).bind(thread.id).all(),
   ])
-  return c.json({ thread, messages: (messagesRes.results as any[]) || [], attachments: (attachmentsRes.results as any[]) || [] })
+  const messages = ((messagesRes.results as any[]) || []).map((m) => ({
+    ...m,
+    body_html: m.body_html ? sanitizeHtml(m.body_html) : m.body_html,
+  }))
+  return c.json({ thread, messages, attachments: (attachmentsRes.results as any[]) || [] })
 })
 
 // POST /admin/email-threads
@@ -126,11 +154,18 @@ emailThreadRoutes.post('/email-threads', async (c) => {
   const bodyText = clean(body.body_text, 60_000) || signed.text || undefined
 
   const knownInquiryId = clean(body.inquiry_id, 40) || null
+  const requestedClientId = clean(body.scope_client_user_id, 40) || null
+  if (requestedClientId && !(await canAccessClient(c.env, user, requestedClientId))) {
+    return c.json({ error: 'forbidden' }, 403)
+  }
   const party = await mergeParty(c.env, {
-    clientUserId: clean(body.scope_client_user_id, 40) || null,
+    clientUserId: requestedClientId,
     inquiryId: knownInquiryId,
   }, to.map((a) => a.email))
   const scopeClientId = party.clientUserId
+  if (scopeClientId && !(await canAccessClient(c.env, user, scopeClientId))) {
+    return c.json({ error: 'forbidden' }, 403)
+  }
   let conversationId = clean(body.conversation_id, 40) || null
 
   // Create the parent conversation if none was passed. Every email thread
@@ -209,6 +244,7 @@ emailThreadRoutes.post('/email-threads/:id/reply', async (c) => {
   const user = c.get('user')
   const thread = await c.env.DB.prepare(`SELECT * FROM email_threads WHERE id = ?`).bind(c.req.param('id')).first() as any
   if (!thread) return c.json({ error: 'not found' }, 404)
+  if (!(await assertThreadAccess(c.env, user, thread.scope_client_user_id))) return c.json({ error: 'forbidden' }, 403)
   const body = await c.req.json<any>().catch(() => null)
   const rawHtml = clean(body?.body_html, 60_000)
   if (!rawHtml) return c.json({ error: 'body_html required' }, 400)

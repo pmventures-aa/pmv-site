@@ -109,7 +109,8 @@ function ComposerDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
     if (!client || !title.trim() || !body.trim()) return
     setBusy(true)
     try {
-      const html = body.trim().split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('')
+      const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+      const html = body.trim().split(/\n{2,}/).map((p) => `<p>${escape(p).replace(/\n/g, '<br/>')}</p>`).join('')
       await api.post('/admin/client-login-notices', {
         client_user_id: client.id, title: title.trim(), body_html: html, priority,
         force_redirect_path: forceRedirect.trim() || null,

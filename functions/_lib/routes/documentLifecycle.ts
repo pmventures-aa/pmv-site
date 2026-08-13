@@ -57,12 +57,85 @@ documentLifecycleAdminRoutes.get('/envelopes/:id/artifacts/:kind',async c=>{ if(
 
 documentLifecyclePublicRoutes.get('/sign/:token',async c=>{ const raw=c.req.param('token'),h=await sha256Hex(raw),r=await c.env.DB.prepare(`SELECT r.*,e.title,e.message,e.public_id,e.status envelope_status,e.expires_at FROM envelope_recipients r JOIN envelopes e ON e.id=r.envelope_id WHERE r.invitation_token_hash=?`).bind(h).first<any>(); if(!r)return c.json({error:'invalid link'},404); if(r.invitation_expires_at&&r.invitation_expires_at<now())return c.json({error:'link expired'},410); if(r.status==='invited'){await c.env.DB.prepare(`UPDATE envelope_recipients SET status='viewed',first_viewed_at=?,updated_at=? WHERE id=?`).bind(now(),now(),r.id).run();await c.env.DB.prepare(`UPDATE envelopes SET status=CASE WHEN status='sent' THEN 'viewed' ELSE status END,updated_at=? WHERE id=?`).bind(now(),r.envelope_id).run();await appendEvent(c,r.envelope_id,'recipient.viewed','signer',r.id,r.id,{})} const fields=await c.env.DB.prepare('SELECT id,page_number,field_type,x,y,width,height,required,label,value_text,completed_at FROM document_fields WHERE recipient_id=? ORDER BY page_number,created_at').bind(r.id).all(); return c.json({recipient:{id:r.id,name:r.name,email:r.email,status:r.status},envelope:{id:r.envelope_id,title:r.title,message:r.message,public_id:r.public_id,status:r.envelope_status,expires_at:r.expires_at},fields:fields.results}) })
 
-documentLifecyclePublicRoutes.post('/sign/:token/otp',async c=>{ const h=await sha256Hex(c.req.param('token')),r=await c.env.DB.prepare('SELECT * FROM envelope_recipients WHERE invitation_token_hash=?').bind(h).first<any>(); if(!r)return c.json({error:'invalid link'},404); const code=code6(), codeHash=await sha256Hex(`${code}:${c.env.SESSION_SECRET}`),id=uuid(),exp=new Date(Date.now()+10*60000).toISOString(); await c.env.DB.prepare(`INSERT INTO otp_challenges (id,recipient_id,channel,destination_masked,code_hash,expires_at) VALUES (?,?,'email',?,?,?)`).bind(id,r.id,r.email.replace(/^(.{2}).*(@.*)$/,'$1***$2'),codeHash,exp).run(); c.executionCtx.waitUntil(sendEmail(c.env,{to:r.email,subject:'Your Pinnacle verification code',html:`<p>Your verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`}).catch(()=>{})); await appendEvent(c,r.envelope_id,'authentication.otp_sent','signer',r.id,r.id,{channel:'email'}); return c.json({challenge_id:id,expires_at:exp}) })
+async function recipientInviteOrGone(c:any): Promise<{ error?: Response; recipient?: any }> {
+  const h=await sha256Hex(c.req.param('token'))
+  const r=await c.env.DB.prepare(
+    `SELECT r.*, e.status envelope_status, e.expires_at envelope_expires_at
+     FROM envelope_recipients r JOIN envelopes e ON e.id=r.envelope_id
+     WHERE r.invitation_token_hash=?`,
+  ).bind(h).first()
+  if(!r) return { error:c.json({error:'invalid link'},404) }
+  if(r.access_revoked_at) return { error:c.json({error:'access revoked'},410) }
+  if(r.invitation_expires_at && r.invitation_expires_at < now()) return { error:c.json({error:'link expired'},410) }
+  if(r.envelope_expires_at && r.envelope_expires_at < now()) return { error:c.json({error:'envelope expired'},410) }
+  if(['voided','expired','declined'].includes(r.envelope_status)) return { error:c.json({error:`envelope ${r.envelope_status}`},410) }
+  return { recipient:r }
+}
 
-documentLifecyclePublicRoutes.post('/sign/:token/otp/verify',async c=>{ const raw=c.req.param('token'),h=await sha256Hex(raw),b=await c.req.json<any>().catch(()=>null),r=await c.env.DB.prepare('SELECT * FROM envelope_recipients WHERE invitation_token_hash=?').bind(h).first<any>(); if(!r||!b?.challenge_id||!b?.code)return c.json({error:'invalid request'},400); const ch=await c.env.DB.prepare('SELECT * FROM otp_challenges WHERE id=? AND recipient_id=?').bind(b.challenge_id,r.id).first<any>(); if(!ch||ch.consumed_at||ch.expires_at<now())return c.json({error:'code expired'},410); if(Number(ch.attempt_count||0)>=5)return c.json({error:'too many attempts'},429); const actual=await sha256Hex(`${String(b.code)}:${c.env.SESSION_SECRET}`); if(actual!==ch.code_hash){await c.env.DB.prepare('UPDATE otp_challenges SET attempt_count=attempt_count+1 WHERE id=?').bind(ch.id).run();return c.json({error:'incorrect code'},401)} await c.env.DB.batch([c.env.DB.prepare('UPDATE otp_challenges SET consumed_at=? WHERE id=?').bind(now(),ch.id),c.env.DB.prepare(`UPDATE envelope_recipients SET status='authenticated',updated_at=? WHERE id=?`).bind(now(),r.id)]); await appendEvent(c,r.envelope_id,'authentication.passed','signer',r.id,r.id,{method:'email_otp'}); const session=token(); await c.env.SESSIONS.put(`sign:${session}`,JSON.stringify({recipient_id:r.id,envelope_id:r.envelope_id}),{expirationTtl:3600}); return c.json({session_token:session}) })
+documentLifecyclePublicRoutes.post('/sign/:token/otp',async c=>{
+  const check=await recipientInviteOrGone(c); if(check.error) return check.error
+  const r=check.recipient!
+  const code=code6(), codeHash=await sha256Hex(`${code}:${c.env.SESSION_SECRET}`),id=uuid(),exp=new Date(Date.now()+10*60000).toISOString()
+  await c.env.DB.prepare(`INSERT INTO otp_challenges (id,recipient_id,channel,destination_masked,code_hash,expires_at) VALUES (?,?,'email',?,?,?)`).bind(id,r.id,r.email.replace(/^(.{2}).*(@.*)$/,'$1***$2'),codeHash,exp).run()
+  c.executionCtx.waitUntil(sendEmail(c.env,{to:r.email,subject:'Your Pinnacle verification code',html:`<p>Your verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`}).catch(()=>{}))
+  await appendEvent(c,r.envelope_id,'authentication.otp_sent','signer',r.id,r.id,{channel:'email'})
+  return c.json({challenge_id:id,expires_at:exp})
+})
 
-documentLifecyclePublicRoutes.post('/sign/:token/fields/:fieldId',async c=>{ const ses=await signerSession(c); if(!ses)return c.json({error:'authentication required'},401); const b=await c.req.json<any>().catch(()=>null),f=await c.env.DB.prepare('SELECT * FROM document_fields WHERE id=? AND recipient_id=?').bind(c.req.param('fieldId'),ses.recipient_id).first<any>(); if(!f)return c.json({error:'field not found'},404); const value=f.field_type==='checkbox'?(b?.checked?'true':'false'):String(b?.value??'').slice(0,2000); await c.env.DB.batch([c.env.DB.prepare(`UPDATE document_fields SET value_text=?,completed_at=?,updated_at=? WHERE id=?`).bind(value,now(),now(),f.id),c.env.DB.prepare(`UPDATE envelope_recipients SET status='in_progress',updated_at=? WHERE id=?`).bind(now(),ses.recipient_id),c.env.DB.prepare(`UPDATE envelopes SET status='in_progress',updated_at=? WHERE id=?`).bind(now(),ses.envelope_id)]); await appendEvent(c,ses.envelope_id,'field.completed','signer',ses.recipient_id,ses.recipient_id,{field_id:f.id,field_type:f.field_type}); return c.json({ok:true}) })
+documentLifecyclePublicRoutes.post('/sign/:token/otp/verify',async c=>{
+  const check=await recipientInviteOrGone(c); if(check.error) return check.error
+  const r=check.recipient!, b=await c.req.json<any>().catch(()=>null)
+  if(!b?.challenge_id||!b?.code)return c.json({error:'invalid request'},400)
+  const ch=await c.env.DB.prepare('SELECT * FROM otp_challenges WHERE id=? AND recipient_id=?').bind(b.challenge_id,r.id).first<any>()
+  if(!ch||ch.consumed_at||ch.expires_at<now())return c.json({error:'code expired'},410)
+  if(Number(ch.attempt_count||0)>=5)return c.json({error:'too many attempts'},429)
+  const actual=await sha256Hex(`${String(b.code)}:${c.env.SESSION_SECRET}`)
+  if(actual!==ch.code_hash){await c.env.DB.prepare('UPDATE otp_challenges SET attempt_count=attempt_count+1 WHERE id=?').bind(ch.id).run();return c.json({error:'incorrect code'},401)}
+  await c.env.DB.batch([c.env.DB.prepare('UPDATE otp_challenges SET consumed_at=? WHERE id=?').bind(now(),ch.id),c.env.DB.prepare(`UPDATE envelope_recipients SET status='authenticated',updated_at=? WHERE id=?`).bind(now(),r.id)])
+  await appendEvent(c,r.envelope_id,'authentication.passed','signer',r.id,r.id,{method:'email_otp'})
+  const session=token(); await c.env.SESSIONS.put(`sign:${session}`,JSON.stringify({recipient_id:r.id,envelope_id:r.envelope_id}),{expirationTtl:3600})
+  return c.json({session_token:session})
+})
 
-documentLifecyclePublicRoutes.post('/sign/:token/complete',async c=>{ const ses=await signerSession(c); if(!ses)return c.json({error:'authentication required'},401); const missing=await c.env.DB.prepare(`SELECT COUNT(*) n FROM document_fields WHERE recipient_id=? AND required=1 AND completed_at IS NULL`).bind(ses.recipient_id).first<any>(); if(Number(missing?.n||0)>0)return c.json({error:'required fields remain'},400); await c.env.DB.prepare(`UPDATE envelope_recipients SET status='completed',completed_at=?,updated_at=? WHERE id=?`).bind(now(),now(),ses.recipient_id).run(); await appendEvent(c,ses.envelope_id,'recipient.completed','signer',ses.recipient_id,ses.recipient_id,{}); const remaining=await c.env.DB.prepare(`SELECT COUNT(*) n FROM envelope_recipients WHERE envelope_id=? AND role IN ('signer','approver','witness','notary') AND status!='completed'`).bind(ses.envelope_id).first<any>(); if(Number(remaining?.n||0)===0){ const completedAt=now(); await c.env.DB.prepare(`UPDATE envelopes SET status='completed',completed_at=?,updated_at=? WHERE id=?`).bind(completedAt,completedAt,ses.envelope_id).run(); await appendEvent(c,ses.envelope_id,'envelope.completed','system',null,null,{}); try{ const result=await sealEnvelope(c.env,ses.envelope_id); await appendEvent(c,ses.envelope_id,'envelope.sealed','system',null,null,{algorithm:result.algorithm,key_id:result.keyId,final_pdf_sha256:result.signedPdfHash,audit_pdf_sha256:result.auditPdfHash,manifest_sha256:result.manifestHash}); const e=await c.env.DB.prepare('SELECT public_id,title,completed_at FROM envelopes WHERE id=?').bind(ses.envelope_id).first<any>(), signers=await c.env.DB.prepare(`SELECT COUNT(*) n FROM envelope_recipients WHERE envelope_id=? AND role='signer'`).bind(ses.envelope_id).first<any>(); await c.env.DB.prepare(`INSERT OR REPLACE INTO verification_records (id,envelope_id,public_id,verification_status,document_label,issuer_name,completed_date,signer_count,final_pdf_sha256_prefix,sealed_at,updated_at) VALUES (?,?,?,?,?,'Pinnacle Management Ventures',?,?,?,?,?)`).bind(uuid(),ses.envelope_id,e.public_id,'valid',e.title,e.completed_at,Number(signers?.n||0),result.signedPdfHash.slice(0,16),result.sealedAt,now()).run() }catch(err){ console.error('automatic envelope sealing failed',err); await appendEvent(c,ses.envelope_id,'envelope.seal_failed','system',null,null,{error:err instanceof Error?err.message:'unknown sealing error'}) } } return c.json({ok:true}) })
+documentLifecyclePublicRoutes.post('/sign/:token/fields/:fieldId',async c=>{
+  const ses=await signerSession(c); if(!ses)return c.json({error:'authentication required'},401)
+  const recipient=await c.env.DB.prepare('SELECT invitation_expires_at,access_revoked_at,status FROM envelope_recipients WHERE id=?').bind(ses.recipient_id).first<any>()
+  if(!recipient||recipient.access_revoked_at||(recipient.invitation_expires_at&&recipient.invitation_expires_at<now()))return c.json({error:'link expired'},410)
+  const b=await c.req.json<any>().catch(()=>null),f=await c.env.DB.prepare('SELECT * FROM document_fields WHERE id=? AND recipient_id=?').bind(c.req.param('fieldId'),ses.recipient_id).first<any>()
+  if(!f)return c.json({error:'field not found'},404)
+  const value=f.field_type==='checkbox'?(b?.checked?'true':'false'):String(b?.value??'').slice(0,2000)
+  await c.env.DB.batch([c.env.DB.prepare(`UPDATE document_fields SET value_text=?,completed_at=?,updated_at=? WHERE id=?`).bind(value,now(),now(),f.id),c.env.DB.prepare(`UPDATE envelope_recipients SET status='in_progress',updated_at=? WHERE id=?`).bind(now(),ses.recipient_id),c.env.DB.prepare(`UPDATE envelopes SET status='in_progress',updated_at=? WHERE id=?`).bind(now(),ses.envelope_id)])
+  await appendEvent(c,ses.envelope_id,'field.completed','signer',ses.recipient_id,ses.recipient_id,{field_id:f.id,field_type:f.field_type})
+  return c.json({ok:true})
+})
 
-documentLifecyclePublicRoutes.post('/sign/:token/decline',async c=>{ const h=await sha256Hex(c.req.param('token')),r=await c.env.DB.prepare('SELECT * FROM envelope_recipients WHERE invitation_token_hash=?').bind(h).first<any>(); if(!r)return c.json({error:'invalid link'},404); const b=await c.req.json<any>().catch(()=>({})); await c.env.DB.batch([c.env.DB.prepare(`UPDATE envelope_recipients SET status='declined',declined_at=?,updated_at=? WHERE id=?`).bind(now(),now(),r.id),c.env.DB.prepare(`UPDATE envelopes SET status='declined',declined_at=?,updated_at=? WHERE id=?`).bind(now(),now(),r.envelope_id)]); await appendEvent(c,r.envelope_id,'recipient.declined','signer',r.id,r.id,{reason:String(b.reason||'').slice(0,500)}); return c.json({ok:true}) })
+documentLifecyclePublicRoutes.post('/sign/:token/complete',async c=>{
+  const ses=await signerSession(c); if(!ses)return c.json({error:'authentication required'},401)
+  const recipient=await c.env.DB.prepare('SELECT invitation_expires_at,access_revoked_at,status FROM envelope_recipients WHERE id=?').bind(ses.recipient_id).first<any>()
+  if(!recipient||recipient.access_revoked_at||(recipient.invitation_expires_at&&recipient.invitation_expires_at<now()))return c.json({error:'link expired'},410)
+  const missing=await c.env.DB.prepare(`SELECT COUNT(*) n FROM document_fields WHERE recipient_id=? AND required=1 AND completed_at IS NULL`).bind(ses.recipient_id).first<any>()
+  if(Number(missing?.n||0)>0)return c.json({error:'required fields remain'},400)
+  await c.env.DB.prepare(`UPDATE envelope_recipients SET status='completed',completed_at=?,updated_at=? WHERE id=?`).bind(now(),now(),ses.recipient_id).run()
+  await appendEvent(c,ses.envelope_id,'recipient.completed','signer',ses.recipient_id,ses.recipient_id,{})
+  const remaining=await c.env.DB.prepare(`SELECT COUNT(*) n FROM envelope_recipients WHERE envelope_id=? AND role IN ('signer','approver','witness','notary') AND status!='completed'`).bind(ses.envelope_id).first<any>()
+  if(Number(remaining?.n||0)===0){
+    const completedAt=now()
+    await c.env.DB.prepare(`UPDATE envelopes SET status='completed',completed_at=?,updated_at=? WHERE id=?`).bind(completedAt,completedAt,ses.envelope_id).run()
+    await appendEvent(c,ses.envelope_id,'envelope.completed','system',null,null,{})
+    try{
+      const result=await sealEnvelope(c.env,ses.envelope_id)
+      await appendEvent(c,ses.envelope_id,'envelope.sealed','system',null,null,{algorithm:result.algorithm,key_id:result.keyId,final_pdf_sha256:result.signedPdfHash,audit_pdf_sha256:result.auditPdfHash,manifest_sha256:result.manifestHash})
+      const e=await c.env.DB.prepare('SELECT public_id,title,completed_at FROM envelopes WHERE id=?').bind(ses.envelope_id).first<any>(), signers=await c.env.DB.prepare(`SELECT COUNT(*) n FROM envelope_recipients WHERE envelope_id=? AND role='signer'`).bind(ses.envelope_id).first<any>()
+      await c.env.DB.prepare(`INSERT OR REPLACE INTO verification_records (id,envelope_id,public_id,verification_status,document_label,issuer_name,completed_date,signer_count,final_pdf_sha256_prefix,sealed_at,updated_at) VALUES (?,?,?,?,?,'Pinnacle Management Ventures',?,?,?,?,?)`).bind(uuid(),ses.envelope_id,e.public_id,'valid',e.title,e.completed_at,Number(signers?.n||0),result.signedPdfHash.slice(0,16),result.sealedAt,now()).run()
+    }catch(err){ console.error('automatic envelope sealing failed',err); await appendEvent(c,ses.envelope_id,'envelope.seal_failed','system',null,null,{error:err instanceof Error?err.message:'unknown sealing error'}) }
+  }
+  return c.json({ok:true})
+})
+
+documentLifecyclePublicRoutes.post('/sign/:token/decline',async c=>{
+  const check=await recipientInviteOrGone(c); if(check.error) return check.error
+  const r=check.recipient!, b=await c.req.json<any>().catch(()=>({}))
+  await c.env.DB.batch([c.env.DB.prepare(`UPDATE envelope_recipients SET status='declined',declined_at=?,updated_at=? WHERE id=?`).bind(now(),now(),r.id),c.env.DB.prepare(`UPDATE envelopes SET status='declined',declined_at=?,updated_at=? WHERE id=?`).bind(now(),now(),r.envelope_id)])
+  await appendEvent(c,r.envelope_id,'recipient.declined','signer',r.id,r.id,{reason:String(b.reason||'').slice(0,500)})
+  return c.json({ok:true})
+})

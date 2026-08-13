@@ -248,7 +248,7 @@ commsRoutes.get('/comms/folders', requireStaff, async (c) => {
             SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END) drafts,
             SUM(CASE WHEN status='queued' THEN 1 ELSE 0 END) scheduled,
             SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) sent,
-            SUM(CASE WHEN status IN ('failed','canceled') THEN 1 ELSE 0 END) exceptions
+            SUM(CASE WHEN status IN ('failed','canceled','partial') THEN 1 ELSE 0 END) exceptions
      FROM comms_messages`,
   ).first<any>()
   return c.json({
@@ -281,6 +281,12 @@ async function insertRecipients(env: Env, messageId: string, recipients: Recipie
   return rows
 }
 
+function toSqliteDateTime(value: Date | string): string {
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
+  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
+}
+
 async function dispatchNow(
   env: Env,
   actorUserId: string,
@@ -291,6 +297,8 @@ async function dispatchNow(
   messageType: MessageType,
 ) {
   const marketingConfig = messageType === 'marketing' ? await getMarketingComplianceConfig(env) : null
+  let sent = 0
+  let failed = 0
   await Promise.all(recipients.map(async (r) => {
     try {
       const deliveryHtml = marketingConfig
@@ -318,14 +326,17 @@ async function dispatchNow(
         )
       }
       await env.DB.batch(statements)
+      sent += 1
     } catch (err) {
+      failed += 1
       await env.DB.prepare("UPDATE comms_recipients SET status = 'failed', error = ? WHERE id = ?")
         .bind(String(err).slice(0, 500), r.row_id).run()
     }
   }))
+  const status = failed > 0 && sent > 0 ? 'partial' : failed > 0 ? 'failed' : 'sent'
   await env.DB.prepare(
-    "UPDATE comms_messages SET status = 'sent', sent_at = datetime('now'), last_sent_at = datetime('now'), next_run_at = NULL, updated_at = datetime('now') WHERE id = ?",
-  ).bind(messageId).run()
+    "UPDATE comms_messages SET status = ?, sent_at = datetime('now'), last_sent_at = datetime('now'), next_run_at = NULL, updated_at = datetime('now') WHERE id = ?",
+  ).bind(status, messageId).run()
 }
 
 commsRoutes.post('/comms/messages', requireStaff, requireCapability('can_manage_communications'), async (c) => {
@@ -354,7 +365,8 @@ commsRoutes.post('/comms/messages', requireStaff, requireCapability('can_manage_
   if (action === 'schedule') {
     const d = body.scheduled_at ? new Date(body.scheduled_at) : null
     if (!d || Number.isNaN(d.getTime())) return c.json({ error: 'a valid scheduled date/time is required' }, 400)
-    scheduledAt = d.toISOString()
+    // Store SQLite-comparable UTC datetimes so the cron due query works.
+    scheduledAt = toSqliteDateTime(d)
   }
 
   const recipientsPreview = await resolveAudience(c.env, audience, messageType)

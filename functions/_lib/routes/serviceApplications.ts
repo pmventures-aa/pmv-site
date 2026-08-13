@@ -493,6 +493,18 @@ serviceApplicationRoutes.post('/service-applications/:id/submit', requireClient,
     throw err
   }
 
+  const mayRequireAttorney = attorneyFlag(application.service_key, answers)
+  const submittedAt = new Date().toISOString()
+  const submitIp = actorIp(c.req.raw)
+  const submitUa = actorUserAgent(c.req.raw)
+  // Persist the durable draft signature fields atomically with submit so the
+  // portal can sign-and-submit in one request without a separate /sign call.
+  await c.env.DB.prepare(
+    `UPDATE service_applications SET client_signature_name = ?, client_signature_intent = 1, client_signed_at = ?,
+       client_signature_ip = ?, client_signature_user_agent = ?, updated_at = datetime('now')
+     WHERE id = ? AND client_user_id = ? AND status = 'draft'`,
+  ).bind(signedName, submittedAt, submitIp, submitUa, application.id, user.id).run()
+
   const [client, routing, attachments, disclaimer, evictionDisclaimer, contactLine, logoBytes] = await Promise.all([
     clientProfileBundle(c.env, user),
     assignmentRouting(c.env, user.id),
@@ -502,9 +514,6 @@ serviceApplicationRoutes.post('/service-applications/:id/submit', requireClient,
     setting(c.env, 'service_application_contact_line', 'Pinnacle Management Ventures | pinnaclemanagementventures.com'),
     tryLogo(c.req.url),
   ])
-
-  const mayRequireAttorney = attorneyFlag(application.service_key, answers)
-  const submittedAt = new Date().toISOString()
   const pdfAnswers: ApplicationPdfAnswer[] = answerRows.map((row) => ({
     question_key: row.question_key,
     question_label: row.question_label,

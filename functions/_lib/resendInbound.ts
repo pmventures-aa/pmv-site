@@ -3,6 +3,7 @@ import { uuid } from './crypto'
 import { pushNotification } from './notificationFeed'
 import { logActivity } from './activity'
 import { mergeParty } from './engagements'
+import { sanitizeHtml } from './htmlSanitize'
 
 export const DEFAULT_INBOUND_DOMAIN = 'ziloifaluk.resend.app'
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
@@ -132,7 +133,7 @@ export async function ingestReceivedEmail(
   const cc = parseMailboxList(received.cc)
   const receivedFor = parseMailboxList(received.received_for)
   const subject = (received.subject || headerLookup(received.headers, 'subject') || '(no subject)').trim().slice(0, 300)
-  const html = typeof received.html === 'string' ? received.html.slice(0, 200_000) : null
+  const html = typeof received.html === 'string' ? sanitizeHtml(received.html, 200_000) : null
   const text = typeof received.text === 'string' ? received.text.slice(0, 200_000) : null
   const externalMessageId = received.message_id || headerLookup(received.headers, 'message-id') || null
   const inReplyTo = headerLookup(received.headers, 'in-reply-to')

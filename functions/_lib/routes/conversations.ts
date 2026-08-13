@@ -38,8 +38,25 @@ async function loadConversation(env: Env, user: SessionUser, id: string) {
 // full markdown is out of scope for this PR and the frontend will render
 // a WYSIWYG-lite that emits the same subset. Escapes HTML aggressively.
 function renderBody(md: string): string {
-  const esc = md.replace(/[&<>]/g, (c) => c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;')
-  const withLinks = esc.replace(/\bhttps?:\/\/[^\s<]+/g, (m) => `<a href="${m}" target="_blank" rel="noopener">${m}</a>`)
+  const esc = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+  const withLinks = esc.replace(/\bhttps?:\/\/[^\s<]+/g, (m) => {
+    // Strip trailing punctuation commonly stuck to URLs, then validate scheme.
+    const cleaned = m.replace(/[).,;:!?]+$/g, '')
+    try {
+      const parsed = new URL(cleaned)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return m
+      const href = parsed.toString().replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      const label = cleaned
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>${m.slice(cleaned.length)}`
+    } catch {
+      return m
+    }
+  })
   const withMentions = withLinks.replace(/@([a-z0-9._-]+)/gi, (_m, u) => `<span class="pmv-mention">@${u}</span>`)
   const withBold = withMentions.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>')
   return withBold.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('')

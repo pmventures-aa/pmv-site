@@ -75,11 +75,22 @@ documentPlatformV2AdminRoutes.post('/document-platform/templates/from-envelope/:
   const [recipients,fields,docs]=await Promise.all([
     c.env.DB.prepare('SELECT role,routing_order,name,email,phone_e164,id FROM envelope_recipients WHERE envelope_id=? ORDER BY routing_order,created_at').bind(envelopeId).all(),
     c.env.DB.prepare('SELECT recipient_id,envelope_document_id,page_number,field_type,x,y,width,height,required,label,validation_json,condition_json,validation_error_message FROM document_fields WHERE envelope_id=? ORDER BY page_number,created_at').bind(envelopeId).all(),
-    c.env.DB.prepare('SELECT document_file_id,title,sort_order,required FROM envelope_documents WHERE envelope_id=? ORDER BY sort_order').bind(envelopeId).all(),
+    c.env.DB.prepare('SELECT id,document_file_id,title,sort_order,required FROM envelope_documents WHERE envelope_id=? ORDER BY sort_order').bind(envelopeId).all(),
   ])
   const recipientRows=(recipients.results||[]) as any[],recipientIndex=new Map(recipientRows.map((r,i)=>[r.id,i]))
-  const fieldBlueprint=((fields.results||[]) as any[]).map(f=>({...f,recipient_index:recipientIndex.get(f.recipient_id)??0,recipient_id:undefined}))
-  const snapshot={title_template:e.title,message_template:e.message,signing_order_mode:e.signing_order_mode,priority:e.priority||'normal',reminder_frequency:e.reminder_frequency||'none',expiration_days:body.expiration_days??null,approval_status_default:e.approval_status==='pending'?'pending':'not_required',branding_profile_id:e.branding_profile_id||null,tags:safeJson(e.tags_json,[]),recipients:recipientRows.map(({id,...r})=>r),fields:fieldBlueprint,documents:docs.results||[],settings:{source_file_id:e.source_file_id,canonical_file_id:e.canonical_file_id}}
+  const docSortById=new Map(((docs.results||[]) as any[]).map(d=>[d.id, Number(d.sort_order||1)]))
+  // Store document_sort_order (not the source envelope_document_id) so fields
+  // remap onto newly inserted envelope_documents when the template is used.
+  const fieldBlueprint=((fields.results||[]) as any[]).map(f=>{
+    const {recipient_id, envelope_document_id, ...rest}=f
+    return {
+      ...rest,
+      recipient_index:recipientIndex.get(recipient_id)??0,
+      document_sort_order: envelope_document_id ? (docSortById.get(envelope_document_id) ?? 1) : 1,
+    }
+  })
+  const documents=((docs.results||[]) as any[]).map(({id:_id,...d})=>d)
+  const snapshot={title_template:e.title,message_template:e.message,signing_order_mode:e.signing_order_mode,priority:e.priority||'normal',reminder_frequency:e.reminder_frequency||'none',expiration_days:body.expiration_days??null,approval_status_default:e.approval_status==='pending'?'pending':'not_required',branding_profile_id:e.branding_profile_id||null,tags:safeJson(e.tags_json,[]),recipients:recipientRows.map(({id,...r})=>r),fields:fieldBlueprint,documents,settings:{source_file_id:e.source_file_id,canonical_file_id:e.canonical_file_id}}
   const id=uuid(),name=String(body.name||`${e.title} Template`).trim().slice(0,180)
   await c.env.DB.batch([
     c.env.DB.prepare(`INSERT INTO envelope_templates_v2(id,name,description,status,source_envelope_id,title_template,message_template,signing_order_mode,priority,reminder_frequency,expiration_days,approval_status_default,branding_profile_id,tags_json,recipient_blueprint_json,field_blueprint_json,settings_json,created_by_user_id,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id,name,String(body.description||'').trim().slice(0,1000)||null,'active',envelopeId,e.title,e.message,e.signing_order_mode,e.priority||'normal',e.reminder_frequency||'none',body.expiration_days??null,e.approval_status==='pending'?'pending':'not_required',e.branding_profile_id||null,JSON.stringify(snapshot.tags),JSON.stringify(snapshot.recipients),JSON.stringify(snapshot.fields),JSON.stringify({...snapshot.settings,documents:snapshot.documents}),c.get('user').id,c.get('user').id),
@@ -113,7 +124,7 @@ documentPlatformV2AdminRoutes.post('/document-platform/templates/:templateId/use
   const docMap=new Map<number,string>()
   for(const d of docs){const did=uuid();docMap.set(Number(d.sort_order||1),did);await c.env.DB.prepare(`INSERT INTO envelope_documents(id,envelope_id,document_file_id,title,sort_order,required,created_by_user_id) VALUES (?,?,?,?,?,?,?)`).bind(did,envId,d.document_file_id,d.title||'Document',Number(d.sort_order||1),d.required===0?0:1,c.get('user').id).run()}
   if(!docs.length){const did=uuid();docMap.set(1,did);await c.env.DB.prepare(`INSERT INTO envelope_documents(id,envelope_id,document_file_id,title,sort_order,required,created_by_user_id) VALUES (?,?,?,?,1,1,?)`).bind(did,envId,sourceFileId,t.title_template||t.name,c.get('user').id).run()}
-  for(const f of fields){const rid=recipientIds[Number(f.recipient_index||0)];if(!rid)continue;await c.env.DB.prepare(`INSERT INTO document_fields(id,envelope_id,recipient_id,envelope_document_id,page_number,field_type,x,y,width,height,required,label,validation_json,condition_json,validation_error_message) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(uuid(),envId,rid,f.envelope_document_id||docMap.get(Number(f.document_sort_order||1))||docMap.get(1)||null,Number(f.page_number||1),f.field_type||'text',Number(f.x||0.1),Number(f.y||0.1),Number(f.width||0.2),Number(f.height||0.05),f.required===0?0:1,f.label||null,f.validation_json||null,f.condition_json||null,f.validation_error_message||null).run()}
+  for(const f of fields){const rid=recipientIds[Number(f.recipient_index||0)];if(!rid)continue;const mappedDocId=docMap.get(Number(f.document_sort_order||1))||docMap.get(1)||null;await c.env.DB.prepare(`INSERT INTO document_fields(id,envelope_id,recipient_id,envelope_document_id,page_number,field_type,x,y,width,height,required,label,validation_json,condition_json,validation_error_message) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(uuid(),envId,rid,mappedDocId,Number(f.page_number||1),f.field_type||'text',Number(f.x||0.1),Number(f.y||0.1),Number(f.width||0.2),Number(f.height||0.05),f.required===0?0:1,f.label||null,f.validation_json||null,f.condition_json||null,f.validation_error_message||null).run()}
   await appendStaffEvent(c,envId,'envelope.created_from_template',null,{template_id:id,template_version:t.version_number})
   return c.json({id:envId,public_id:publicId},201)
 })

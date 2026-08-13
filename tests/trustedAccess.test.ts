@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { normalizeTrustedPermissions } from '../functions/_lib/trustedAccess'
 
 describe('Trusted Contact permissions', () => {
@@ -27,5 +29,11 @@ describe('Trusted Contact permissions', () => {
     expect(permissions.services).toBe('none')
     expect(permissions.support).toBe('none')
     expect(permissions.calendar).toBe('none')
+  })
+
+  it('guards malformed permissions_json while loading trusted contexts', () => {
+    const source = readFileSync(resolve('functions/_lib/trustedAccess.ts'), 'utf8')
+    expect(source).toContain('JSON.parse(row.permissions_json ||')
+    expect(source).toContain('catch { return {} }')
   })
 })

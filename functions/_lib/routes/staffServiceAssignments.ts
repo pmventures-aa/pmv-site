@@ -292,18 +292,9 @@ clientApplicationSignatureRoutes.post('/service-applications/:id/sign', requireC
   return c.json({ ok: true, signed_at: signedAt })
 })
 
-clientApplicationSignatureRoutes.use('/service-applications/:id/submit', requireClient, async (c, next) => {
-  const user = c.get('user')
-  const app = await c.env.DB.prepare(
-    `SELECT client_user_id, status, client_signature_name, client_signature_intent, client_signed_at
-     FROM service_applications WHERE id = ?`,
-  ).bind(c.req.param('id')!).first<any>()
-  if (!app || app.client_user_id !== user.id || app.status !== 'draft') return c.json({ error: 'draft application not found' }, 404)
-  if (!app.client_signature_name || app.client_signature_intent !== 1 || !app.client_signed_at) {
-    return c.json({ error: 'electronic signature required before submission' }, 400)
-  }
-  await next()
-})
+// Submit validates and persists the electronic signature atomically in
+// serviceApplications.ts (signed_name + signature_ack). A prior /sign call
+// is optional; do not block submit when the draft signature columns are empty.
 
 clientApplicationSignatureRoutes.use('/service-applications/:id', requireClient, async (c, next) => {
   if (c.req.method === 'PATCH') {

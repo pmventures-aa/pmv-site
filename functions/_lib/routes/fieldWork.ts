@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
+import { canAccessClient } from '../access'
 import { uuid } from '../crypto'
 import { activityInsert, logActivity } from '../activity'
 import { actorIp, actorUserAgent, actorGeo, logAudit } from '../auditLog'
@@ -119,6 +120,20 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   if (!serviceKey || !clientUserId || !vendorUserId) {
     return c.json({ error: 'service_key, client_user_id and vendor_user_id are required' }, 400)
   }
+  if (!(await canAccessClient(c.env, user, clientUserId))) {
+    return c.json({ error: 'forbidden' }, 403)
+  }
+  const client = await c.env.DB.prepare(
+    `SELECT id FROM users WHERE id = ? AND role = 'client' AND status = 'active'`,
+  ).bind(clientUserId).first()
+  if (!client) return c.json({ error: 'unknown client' }, 400)
+  const vendor = await c.env.DB.prepare(
+    `SELECT u.id FROM users u
+     LEFT JOIN team_members tm ON tm.user_id = u.id
+     WHERE u.id = ? AND u.status = 'active'
+       AND (tm.party_type = 'vendor' OR u.role IN ('staff', 'admin'))`,
+  ).bind(vendorUserId).first()
+  if (!vendor) return c.json({ error: 'unknown vendor' }, 400)
   const id = uuid()
   await c.env.DB.prepare(
     `INSERT INTO field_assignments (

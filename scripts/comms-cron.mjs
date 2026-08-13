@@ -170,16 +170,29 @@ async function sendViaResend(to, subject, html) {
   return json.id
 }
 
+function toSqliteDateTime(value) {
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
+  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
+}
+
 function nextOccurrence(fromIso, recurrence) {
-  const d = new Date(fromIso)
+  const d = new Date(String(fromIso).includes('T') ? fromIso : `${fromIso}Z`)
   if (recurrence === 'daily') d.setUTCDate(d.getUTCDate() + 1)
   else if (recurrence === 'weekly') d.setUTCDate(d.getUTCDate() + 7)
   else if (recurrence === 'monthly') d.setUTCMonth(d.getUTCMonth() + 1)
-  return d.toISOString()
+  return toSqliteDateTime(d)
 }
 
 async function main() {
-  const due = await d1("SELECT * FROM comms_messages WHERE status = 'queued' AND next_run_at IS NOT NULL AND next_run_at <= datetime('now')")
+  // Normalize ISO and SQLite datetime forms so legacy rows with a "T"/"Z"
+  // timestamp still become due when compared against datetime('now').
+  const due = await d1(
+    `SELECT * FROM comms_messages
+     WHERE status = 'queued'
+       AND next_run_at IS NOT NULL
+       AND datetime(replace(replace(substr(next_run_at, 1, 19), 'T', ' '), 'Z', '')) <= datetime('now')`,
+  )
   if (!due.length) { console.log('no due comms messages'); return }
   console.log(`${due.length} due message(s)`)
 
@@ -198,6 +211,8 @@ async function main() {
     const recipients = await resolveAudience(audience, type)
     console.log(`message ${message.id} (${message.subject}) — ${recipients.length} eligible recipient(s)`)
 
+    let sent = 0
+    let failed = 0
     for (const recipient of recipients) {
       const recipientId = uuid()
       await d1(
@@ -208,6 +223,7 @@ async function main() {
         const deliveryHtml = compliance ? await marketingHtml(message.body_html, recipient.email, compliance) : message.body_html
         const providerMessageId = await sendViaResend(recipient.email, message.subject, deliveryHtml)
         await d1("UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE id = ?", [providerMessageId, recipientId])
+        sent += 1
         if (recipient.recipient_kind === 'lead' && recipient.inquiry_id) {
           await d1('INSERT INTO email_log (id, inquiry_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)', [uuid(), recipient.inquiry_id, message.created_by_user_id, recipient.email, message.subject, deliveryHtml])
           await d1("UPDATE contact_inquiries SET last_contacted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", [recipient.inquiry_id])
@@ -215,6 +231,7 @@ async function main() {
           await d1('INSERT INTO email_log (id, client_user_id, sent_by_user_id, to_address, subject, body) VALUES (?, ?, ?, ?, ?, ?)', [uuid(), recipient.user_id, message.created_by_user_id, recipient.email, message.subject, deliveryHtml])
         }
       } catch (err) {
+        failed += 1
         console.error(`send failed for ${recipient.email}:`, err.message)
         await d1("UPDATE comms_recipients SET status = 'failed', error = ? WHERE id = ?", [String(err.message).slice(0, 500), recipientId])
       }
@@ -225,8 +242,9 @@ async function main() {
       await d1("UPDATE comms_messages SET next_run_at = ?, last_sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", [next, message.id])
       console.log(`  recurring (${message.recurrence}) — next run ${next}`)
     } else {
-      await d1("UPDATE comms_messages SET status = 'sent', sent_at = datetime('now'), last_sent_at = datetime('now'), next_run_at = NULL, updated_at = datetime('now') WHERE id = ?", [message.id])
-      console.log('  one-time — marked sent')
+      const status = failed > 0 && sent > 0 ? 'partial' : failed > 0 || recipients.length === 0 ? 'failed' : 'sent'
+      await d1("UPDATE comms_messages SET status = ?, sent_at = datetime('now'), last_sent_at = datetime('now'), next_run_at = NULL, updated_at = datetime('now') WHERE id = ?", [status, message.id])
+      console.log(`  one-time — marked ${status} (sent=${sent}, failed=${failed})`)
     }
   }
 }

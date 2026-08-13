@@ -1,6 +1,7 @@
 import type { Context, Next } from 'hono'
 import type { AppEnv, Env } from './types'
 import { uuid } from './crypto'
+import { getUser } from './session'
 
 // Server-side deny-list for actions that should NEVER execute while an
 // impersonation session is active - even by an owner. Keeps the audit
@@ -11,12 +12,11 @@ import { uuid } from './crypto'
 // Matched as (method, exact path). Add more entries by editing this
 // list; every hit produces an impersonation_events row with action='blocked'.
 const DENYLIST: Array<{ method: string; path: string; reason: string }> = [
-  { method: 'POST', path: '/api/auth/change-password', reason: 'password change during impersonation' },
+  { method: 'POST', path: '/api/portal/change-password', reason: 'password change during impersonation' },
   { method: 'POST', path: '/api/auth/logout', reason: 'logout during impersonation - use /admin/impersonate/end' },
   { method: 'POST', path: '/api/admin/impersonate', reason: 'nested impersonation' },
   { method: 'DELETE', path: '/api/me', reason: 'account deletion during impersonation' },
-  { method: 'POST', path: '/api/me/two-factor/disable', reason: '2FA disable during impersonation' },
-  { method: 'POST', path: '/api/me/sessions/revoke-all', reason: 'session revoke during impersonation' },
+  { method: 'POST', path: '/api/admin/security/sessions/revoke-others', reason: 'session revoke during impersonation' },
 ]
 
 async function logBlock(env: Env, sessionId: string, method: string, path: string, reason: string) {
@@ -58,8 +58,18 @@ export async function impersonationGuard(c: Context<AppEnv>, next: Next) {
 
 // Route middleware: apply to any route that should NEVER run under
 // impersonation. Blocks the request with 403 and audits.
+// Resolves the session here because this runs before requireUser/requireStaff.
 export async function denyDuringImpersonation(c: Context<AppEnv>, next: Next) {
-  const user = c.get('user')
+  // This middleware is mounted before requireUser/requireStaff, so c.get('user')
+  // is usually empty. Resolve the session (including impersonation swap) here.
+  let user = c.get('user')
+  if (!user) {
+    const resolved = await getUser(c.env, c.req.raw)
+    if (resolved) {
+      c.set('user', resolved)
+      user = resolved
+    }
+  }
   if (!user?.impersonation_session_id) return next()
   const method = c.req.method.toUpperCase()
   const path = new URL(c.req.url).pathname
