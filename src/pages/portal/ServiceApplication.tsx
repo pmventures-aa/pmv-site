@@ -127,10 +127,10 @@ function QuestionField({
                 type="button"
                 aria-pressed={active}
                 onClick={() => onChange(option.value)}
-                className={`rounded-xl border p-4 text-left transition-all focus:outline-none focus:ring-2 focus:ring-gold/70 ${
+                className={`rounded-md border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-gold/70 ${
                   active
-                    ? 'border-gold/70 bg-gold/10 shadow-[0_0_0_1px_rgba(212,175,55,.15)]'
-                    : 'border-white/10 bg-white/[0.025] hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.05]'
+                    ? 'border-gold/70 bg-gold/10'
+                    : 'border-white/10 bg-white/[0.025] hover:border-white/25 hover:bg-white/[0.05]'
                 }`}
               >
                 <span className={`block text-sm font-semibold ${active ? 'text-gold' : 'text-white'}`}>{option.label}</span>
@@ -159,7 +159,7 @@ function QuestionField({
                 type="button"
                 aria-pressed={active}
                 onClick={() => onChange(active ? selected.filter((v) => v !== option.value) : [...selected, option.value])}
-                className={`rounded-full border px-4 py-2.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-gold/70 ${
+                className={`rounded-md border px-3 py-1.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-gold/70 ${
                   active ? 'border-gold/70 bg-gold/15 text-gold' : 'border-white/10 bg-white/[0.03] text-slate-200 hover:border-white/25 hover:bg-white/[0.06]'
                 }`}
               >
@@ -178,7 +178,7 @@ function QuestionField({
       <fieldset>
         <legend className="sr-only">{q.label}</legend>
         {label}
-        <div className="grid max-w-sm grid-cols-2 gap-2 rounded-xl border border-white/10 bg-white/[0.025] p-1.5">
+        <div className="grid max-w-sm grid-cols-2 gap-2 rounded-md border border-white/10 bg-white/[0.025] p-1">
           {([true, false] as const).map((choice) => {
             const active = answered && value === choice
             return (
@@ -206,7 +206,7 @@ function QuestionField({
     return (
       <div>
         {label}
-        <div className="rounded-xl border border-dashed border-white/20 bg-white/[0.025] p-4 sm:p-5">
+        <div className="rounded-md border border-dashed border-white/20 bg-white/[0.025] p-3">
           {files.length > 0 && (
             <ul className="mb-4 space-y-2">
               {files.map((file) => (
@@ -560,9 +560,9 @@ export default function ServiceApplication() {
       <div>
         <PageHeader eyebrow="Application received" title={service.name} />
         <Card className="mx-auto max-w-2xl overflow-hidden !p-0 text-center">
-          <div className="border-b border-white/10 bg-gradient-to-br from-gold/10 via-white/[0.025] to-transparent px-6 py-10 sm:px-10">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 text-2xl text-emerald-300">✓</div>
-            <h2 className="mt-5 text-2xl font-semibold text-white">You're all set.</h2>
+          <div className="border-b border-white/10 bg-gold/[.04] px-5 py-6">
+            <div className="mx-auto grid h-10 w-10 place-items-center rounded-md border border-emerald-400/30 bg-emerald-400/10 text-lg text-emerald-300">✓</div>
+            <h2 className="mt-3 text-lg font-semibold text-white">You're all set.</h2>
             <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-slate-300">
               We received your {service.name} application and your Pinnacle team has been notified. We'll review the details and follow up with the right next step.
             </p>
@@ -584,7 +584,7 @@ export default function ServiceApplication() {
       <PageHeader eyebrow="Start your journey" title={service.name} subtitle={service.description || undefined} />
 
       <div className="mx-auto max-w-3xl">
-        <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3">
+        <div className="mb-3 rounded-md border border-white/10 bg-white/[0.025] px-3 py-2">
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="font-semibold uppercase tracking-wide text-slate-300">Step {pageIdx + 1} of {pages.length}</span>
             <span className={saveState === 'error' ? 'text-rose-300' : saveState === 'saving' ? 'text-slate-400' : 'text-emerald-300'}>
@@ -596,30 +596,30 @@ export default function ServiceApplication() {
           </div>
         </div>
 
-        {error && <div role="alert" className="mb-4 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">{error}</div>}
+        {error && <div role="alert" className="mb-3 rounded-md border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">{error}</div>}
 
         <Card className="relative overflow-hidden !p-0">
-          <div className="px-5 py-6 sm:px-8 sm:py-8">
+          <div className="px-4 py-4 sm:px-5 sm:py-5">
             {page?.type === 'intro' && (
               <div>
                 <p className="eyebrow">Before we get started</p>
-                <h2 ref={headingRef} tabIndex={-1} className="mt-2 text-2xl font-semibold text-white outline-none sm:text-3xl">A few details, then we'll take it from here.</h2>
+                <h2 ref={headingRef} tabIndex={-1} className="mt-1 text-xl font-semibold text-white outline-none">A few details, then we'll take it from here.</h2>
                 <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-300">
                   {service.intake_intro || 'Answer a few questions so we can understand what you need and route your request to the right person.'}
                 </p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/10 px-3 py-1.5 text-xs font-medium text-gold">
+                  <div className="inline-flex items-center gap-2 rounded-sm border border-gold/20 bg-gold/10 px-2 py-1 text-xs font-medium text-gold">
                     About {service.estimated_minutes || 3} minutes
                   </div>
                   {application.submission_source === 'staff_assigned' && (
-                    <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-xs font-medium text-sky-300">
+                    <div className="inline-flex items-center gap-2 rounded-sm border border-sky-400/20 bg-sky-400/10 px-2 py-1 text-xs font-medium text-sky-300">
                       Started for you by your Pinnacle team: review and sign to submit
                     </div>
                   )}
                 </div>
 
                 {client && (
-                  <div className="mt-7 rounded-xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
+                  <div className="mt-4 rounded-md border border-white/10 bg-white/[0.025] p-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">We already have</p>
@@ -660,7 +660,7 @@ export default function ServiceApplication() {
                   ))}
                 </div>
                 {service.key === 'property_management' && page.label.toLowerCase().includes('eviction') && copy?.eviction_scope_disclaimer && (
-                  <div className="mt-8 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-4 text-xs leading-relaxed text-amber-100/80">
+                  <div className="mt-4 rounded-md border border-amber-300/20 bg-amber-300/[0.06] p-3 text-xs leading-relaxed text-amber-100/80">
                     <p className="font-semibold text-amber-100">Scope &amp; legal coordination</p>
                     <p className="mt-1.5">{copy.eviction_scope_disclaimer}</p>
                   </div>
@@ -701,7 +701,7 @@ export default function ServiceApplication() {
                     <input className={inputCls} disabled={skipBanking} inputMode="numeric" value={banking.account_number} onChange={(e) => setBanking((b) => ({ ...b, account_number: e.target.value.replace(/\D/g, '') }))} />
                   </label>
                 </div>
-                <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm text-slate-200">
+                <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-md border border-white/10 bg-white/[0.025] p-3 text-sm text-slate-200">
                   <input type="checkbox" checked={skipBanking} onChange={(e) => setSkipBanking(e.target.checked)} />
                   <span><strong className="font-semibold text-white">Provide later.</strong> My Pinnacle representative can collect this when needed.</span>
                 </label>
@@ -716,7 +716,7 @@ export default function ServiceApplication() {
 
                 <div className="mt-7 space-y-4">
                   {pages.filter((candidate): candidate is Extract<WizardPage, { type: 'questions' }> => candidate.type === 'questions').map((section) => (
-                    <div key={section.stepOrder} className="rounded-xl border border-white/10 bg-white/[0.025] p-4 sm:p-5">
+                    <div key={section.stepOrder} className="rounded-md border border-white/10 bg-white/[0.025] p-3">
                       <div className="flex items-center justify-between gap-3">
                         <h3 className="text-sm font-semibold text-white">{section.label}</h3>
                         <button type="button" onClick={() => setPageIdx(pages.findIndex((candidate) => candidate.type === 'questions' && candidate.stepOrder === section.stepOrder))} className="text-xs font-medium text-gold hover:underline">Edit</button>
@@ -734,12 +734,12 @@ export default function ServiceApplication() {
                 </div>
 
                 {copy?.service_application_disclaimer && (
-                  <div className="mt-6 rounded-xl border border-white/10 bg-navy-950/50 p-4 text-xs leading-relaxed text-slate-500">
+                  <div className="mt-4 rounded-md border border-white/10 bg-navy-950/50 p-3 text-xs leading-relaxed text-slate-500">
                     {copy.service_application_disclaimer}
                   </div>
                 )}
 
-                <div className="mt-6 rounded-xl border border-gold/20 bg-gold/[0.04] p-4 sm:p-5">
+                <div className="mt-4 rounded-md border border-gold/20 bg-gold/[0.04] p-3">
                   <h3 className="text-sm font-semibold text-white">Sign to submit</h3>
                   <label className="mt-3 block">
                     <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Type your full legal name</span>

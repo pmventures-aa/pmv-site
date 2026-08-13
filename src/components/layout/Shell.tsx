@@ -51,7 +51,7 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
   }
 
   const linkCls = ({ isActive }: { isActive: boolean }) =>
-    `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+    `group flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium transition ${
       isActive ? 'bg-white/[.07] text-white ring-1 ring-white/[.08]' : 'text-slate-400 hover:bg-white/[.035] hover:text-white'
     }`
 
@@ -71,16 +71,16 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
 
   const sidebarContent = (
     <>
-      <div className="shrink-0 px-1 pb-5">
+      <div className="shrink-0 px-1 pb-3">
         <Logo compact />
-        <div className="mt-3 flex items-center gap-2 px-2">
-          <span className="rounded-full border border-gold/20 bg-gold/[.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.12em] text-gold/80">Secure</span>
-          <span className="text-[11px] font-medium uppercase tracking-[.12em] text-slate-600">{badge}</span>
+        <div className="mt-2 flex items-center gap-2 px-1">
+          <span className="rounded-sm border border-gold/20 bg-gold/[.06] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[.12em] text-gold/80">Secure</span>
+          <span className="text-[10px] font-medium uppercase tracking-[.12em] text-slate-600">{badge}</span>
         </div>
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
-        <div className="space-y-2 pb-5">
+        <div className="space-y-1.5 pb-3">
           {grouped.map((group, index) => {
             const collapsed = !!group.section && collapsedSections.has(group.section)
             return (
@@ -93,7 +93,7 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
                 )}
                 {!collapsed && group.items.map((item) => (
                   <NavLink key={item.key} to={p(item.to)} end={item.to === ''} className={linkCls} onClick={() => setMobileOpen(false)}>
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[.02] text-slate-500 transition group-hover:text-gold"><item.icon size={17} strokeWidth={1.8} /></span>
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-sm bg-white/[.02] text-slate-500 transition group-hover:text-gold"><item.icon size={15} strokeWidth={1.8} /></span>
                     <span className="truncate">{item.label}</span>
                   </NavLink>
                 ))}
@@ -104,19 +104,19 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
       </nav>
 
       <div className="relative shrink-0 border-t border-white/[.08] pt-3">
-        <button type="button" onClick={() => setProfileOpen((v) => !v)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-white/[.035]">
-          {user && <Avatar userId={user.id} name={user.full_name} size={36} editable uploadPath="/me/avatar" />}
+        <button type="button" onClick={() => setProfileOpen((v) => !v)} className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition hover:bg-white/[.035]">
+          {user && <Avatar userId={user.id} name={user.full_name} size={30} editable uploadPath="/me/avatar" />}
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p><p className="truncate text-xs text-slate-500">{user?.email}</p></div>
           <ChevronDown size={14} className={`shrink-0 text-slate-600 transition ${profileOpen ? 'rotate-180' : ''}`} />
         </button>
         <AnimatePresence initial={false}>{profileOpen && (
-          <motion.div initial={{opacity:0,y:6,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:5,scale:.985}} transition={pmvMotion.ui} className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-white/[.08] bg-navy-900 shadow-2xl">
+          <motion.div initial={{opacity:0,y:6,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:5,scale:.985}} transition={pmvMotion.ui} className="absolute bottom-full left-0 right-0 mb-1.5 overflow-hidden rounded-md border border-white/[.08] bg-navy-900 shadow-xl">
             {profileLinks.map((item) => (
-              <NavLink key={item.to} to={item.to} onClick={() => { setProfileOpen(false); setMobileOpen(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[.04] hover:text-white">
-                <item.icon size={15} /> {item.label}
+              <NavLink key={item.to} to={item.to} onClick={() => { setProfileOpen(false); setMobileOpen(false) }} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/[.04] hover:text-white">
+                <item.icon size={14} /> {item.label}
               </NavLink>
             ))}
-            <button onClick={() => logout()} className="flex w-full items-center gap-2 border-t border-white/[.08] px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/[.04] hover:text-white"><LogOut size={15}/>Sign out</button>
+            <button onClick={() => logout()} className="flex w-full items-center gap-2 border-t border-white/[.08] px-3 py-2 text-sm text-slate-300 transition hover:bg-white/[.04] hover:text-white"><LogOut size={14}/>Sign out</button>
           </motion.div>
         )}</AnimatePresence>
       </div>
@@ -126,11 +126,11 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
   const mobileItems = nav.filter((item) => mobilePrimary.includes(item.key))
 
   return (
-    <div className="min-h-screen bg-navy-radial lg:flex">
+    <div className="portal-app min-h-screen bg-navy-radial lg:flex">
       <ImpersonationBanner />
       <LoginBanner />
-      <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/[.07] bg-navy-950/75 backdrop-blur-xl transition-[width,padding] duration-200 lg:flex ${sidebarOpen ? 'w-64 border-r p-4' : 'w-0 p-0'}`}>
-        <div className="flex h-full w-64 min-h-0 shrink-0 flex-col">{sidebarContent}</div>
+      <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/[.07] bg-navy-950/75 backdrop-blur-xl transition-[width,padding] duration-200 lg:flex ${sidebarOpen ? 'w-56 border-r p-3' : 'w-0 p-0'}`}>
+        <div className="flex h-full w-56 min-h-0 shrink-0 flex-col">{sidebarContent}</div>
       </aside>
 
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[.07] bg-navy-950/90 px-4 py-3 backdrop-blur-xl lg:hidden">
@@ -151,12 +151,12 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
       </AnimatePresence>
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <div className="hidden h-14 items-center justify-between gap-4 border-b border-white/[.07] bg-navy-950/45 px-6 backdrop-blur lg:flex">
+        <div className="hidden h-12 items-center justify-between gap-3 border-b border-white/[.07] bg-navy-950/45 px-4 backdrop-blur lg:flex">
           <button onClick={toggleSidebar} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/[.04] hover:text-white" aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>{sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}</button>
           <div className="flex items-center gap-3"><NotificationFeedPanel surface="portal"/><MailBell /><span className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">{badge}</span></div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-5 pb-24 sm:px-6 lg:px-8 lg:py-7 lg:pb-7"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-4 pb-20 sm:px-5 lg:px-6 lg:py-5 lg:pb-5"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
 

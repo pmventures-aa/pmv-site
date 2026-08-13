@@ -94,24 +94,24 @@ export default function MatterDetail() {
         action={<StatusBadge tone={tone}>{matterStatusLabel(matter.status)}</StatusBadge>}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="space-y-3">
           {matter.summary && (
             <Card>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">What this is</p>
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-200">{matter.summary}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">{matter.summary}</p>
             </Card>
           )}
 
           <Card>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Updates</p>
-            <form onSubmit={postUpdate} className="mt-4 space-y-3">
-              <textarea className={`${inputCls} min-h-[90px]`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note Pinnacle should see on this project." />
+            <form onSubmit={postUpdate} className="mt-3 space-y-2">
+              <textarea className={`${inputCls} min-h-[72px]`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note Pinnacle should see on this project." />
               <button type="submit" disabled={busy || !note.trim()} className="btn-gold disabled:opacity-60">{busy ? 'Posting…' : 'Post update'}</button>
             </form>
-            <ul className="mt-5 divide-y divide-white/10 border-t border-white/10">
-              {updates.length === 0 ? <li className="py-4 text-sm text-slate-500">No updates yet.</li> : updates.map((u) => (
-                <li key={u.id} className="py-4">
+            <ul className="mt-3 divide-y divide-white/10 border-t border-white/10">
+              {updates.length === 0 ? <li className="py-3 text-sm text-slate-500">No updates yet.</li> : updates.map((u) => (
+                <li key={u.id} className="py-2.5">
                   <p className="text-sm leading-6 text-slate-200">{u.body}</p>
                   <p className="mt-1 text-[11px] text-slate-500">{u.author_name || 'Pinnacle'} · {new Date(u.created_at).toLocaleString()}</p>
                 </li>
@@ -134,7 +134,7 @@ export default function MatterDetail() {
           )}
         </div>
 
-        <aside className="space-y-4">
+        <aside className="space-y-3">
           {property && (
             <Card>
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><Building2 size={13} /> Property</p>
@@ -156,25 +156,25 @@ export default function MatterDetail() {
             )}
           </Card>
           <Card className="!p-0">
-            <div className="border-b border-white/10 px-5 py-3">
+            <div className="border-b border-white/10 px-3 py-2">
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><HelpCircle size={13} /> Related requests</p>
             </div>
-            {tickets.length === 0 ? <div className="p-5"><EmptyState label="No related requests." /></div> : (
+            {tickets.length === 0 ? <div className="p-3"><EmptyState label="No related requests." /></div> : (
               <ul className="divide-y divide-white/10">
                 {tickets.map((t) => (
-                  <li key={t.id}><Link to={p('support')} className="block px-5 py-3 text-sm text-slate-200 hover:bg-white/[.03]">{t.subject}</Link></li>
+                  <li key={t.id}><Link to={p('support')} className="block px-3 py-2 text-sm text-slate-200 hover:bg-white/[.03]">{t.subject}</Link></li>
                 ))}
               </ul>
             )}
           </Card>
           <Card className="!p-0">
-            <div className="border-b border-white/10 px-5 py-3">
+            <div className="border-b border-white/10 px-3 py-2">
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><FileText size={13} /> Files</p>
             </div>
-            {documents.length === 0 ? <div className="p-5"><EmptyState label="No files on this project." /></div> : (
+            {documents.length === 0 ? <div className="p-3"><EmptyState label="No files on this project." /></div> : (
               <ul className="divide-y divide-white/10">
                 {documents.map((d) => (
-                  <li key={d.id}><Link to={p('documents')} className="block px-5 py-3 text-sm text-slate-200 hover:bg-white/[.03]">{d.file_name || d.category || 'Document'}</Link></li>
+                  <li key={d.id}><Link to={p('documents')} className="block px-3 py-2 text-sm text-slate-200 hover:bg-white/[.03]">{d.file_name || d.category || 'Document'}</Link></li>
                 ))}
               </ul>
             )}

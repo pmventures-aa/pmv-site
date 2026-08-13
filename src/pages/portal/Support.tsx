@@ -106,9 +106,9 @@ export default function Support() {
   return (
     <div>
       <PageHeader
-        eyebrow="One place for every need"
+        eyebrow="Requests"
         title="Requests & Cases"
-        subtitle="Request a service, send instructions, and follow ownership, messages, and response commitments in one thread."
+        subtitle="One thread per request: status, ownership, and replies."
         action={
           <button className="btn-gold" onClick={() => setShowForm((s) => !s)}>
             {showForm ? 'Cancel' : '+ Start request'}
@@ -117,8 +117,8 @@ export default function Support() {
       />
 
       {showForm && (
-        <Card className="mb-6">
-          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-3">
+        <Card className="mb-4">
+          <form onSubmit={onCreate} className="grid gap-3 sm:grid-cols-3">
             <label>
               <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">What do you need?</span>
               <select className={inputCls} value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
@@ -170,12 +170,12 @@ export default function Support() {
           <EmptyState label="No requests yet. Start one whenever you need Pinnacle's help." />
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {ordered.map((t) => {
             const yours = t.status !== 'closed' && (t.waiting_on === 'you' || t.waiting_on === 'client')
             return (
             <Card key={t.id} className={`!p-0 ${yours ? 'border-gold/30' : ''}`}>
-              <button onClick={() => openThread(t.id)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
+              <button onClick={() => openThread(t.id)} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left">
                 <div>
                   {yours && <p className="mb-1 text-[10px] font-semibold uppercase tracking-[.14em] text-gold">Action needed</p>}
                   <p className="text-sm font-medium text-white">{t.subject}</p>
@@ -185,15 +185,15 @@ export default function Support() {
                 <StatusBadge tone={t.status === 'closed' ? 'green' : yours ? 'gold' : t.status === 'in_progress' ? 'blue' : 'gold'}>{yours ? 'waiting on you' : t.status}</StatusBadge>
               </button>
               {openId === t.id && (
-                <div className="border-t border-white/10 p-5">
+                <div className="border-t border-white/10 p-3">
                   {isStaff && (
-                    <div className="mb-4 flex items-center gap-2">
+                    <div className="mb-3 flex items-center gap-2">
                       <span className="text-xs text-slate-400">Set status:</span>
                       {['open', 'in_progress', 'closed'].map((s) => (
                         <button
                           key={s}
                           onClick={() => setStatus(t.id, s)}
-                          className={`rounded-full border px-3 py-1 text-xs ${t.status === s ? 'border-gold text-gold' : 'border-white/10 text-slate-400'}`}
+                          className={`rounded-sm border px-2 py-0.5 text-xs ${t.status === s ? 'border-gold text-gold' : 'border-white/10 text-slate-400'}`}
                         >
                           {s.replace('_', ' ')}
                         </button>
@@ -205,7 +205,7 @@ export default function Support() {
                       <li className="text-sm text-slate-500">No replies yet.</li>
                     ) : (
                       thread.map((m) => (
-                        <li key={m.id} className="rounded-lg bg-white/[0.04] px-3 py-2 text-sm text-slate-200">
+                        <li key={m.id} className="rounded-md bg-white/[0.04] px-2.5 py-1.5 text-sm text-slate-200">
                           {m.body}
                           <span className="ml-2 text-[10px] text-slate-500">{new Date(m.created_at).toLocaleTimeString()}</span>
                         </li>

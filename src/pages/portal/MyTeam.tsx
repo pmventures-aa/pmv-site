@@ -70,14 +70,14 @@ export default function MyTeam() {
           <EmptyState label="No one's been assigned yet: we'll introduce your team shortly." />
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           {team.map((m) => {
             const entry = presence[m.id]
             return (
             <Card key={m.id}>
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <Avatar userId={m.id} name={m.full_name} size={44} />
+                  <Avatar userId={m.id} name={m.full_name} size={36} />
                   <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-navy-900 p-0.5">
                     <PresenceDot entry={entry} size={10} />
                   </span>

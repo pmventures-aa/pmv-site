@@ -47,8 +47,8 @@ export default function Security() {
         <Card>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gold">Account</h2>
           {user && (
-            <div className="mt-4 flex items-center gap-4">
-              <Avatar userId={user.id} name={user.full_name} size={64} editable uploadPath="/me/avatar" />
+            <div className="mt-3 flex items-center gap-3">
+              <Avatar userId={user.id} name={user.full_name} size={48} editable uploadPath="/me/avatar" />
               <p className="text-xs leading-5 text-slate-500">Click the photo to change it. Pinnacle staff can also update it from HQ.</p>
             </div>
           )}
