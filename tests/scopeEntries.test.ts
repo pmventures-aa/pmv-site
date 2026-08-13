@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GUIDE_ENTRIES, resolveScopeEntry, SERVICE_ENTRIES, visibleQuestions } from '../shared/scopeEntries'
+import { GUIDE_ENTRIES, hasStandardIntake, resolveScopeEntry, SERVICE_ENTRIES, visibleQuestions } from '../shared/scopeEntries'
 import { services } from '../src/data/services'
 
 const PUBLISHED_GUIDES = [
@@ -23,6 +23,10 @@ describe('entry-aware scope requests', () => {
     expect(entry?.job).toBe('pos_payments')
     expect(entry?.remoteDefault).toBe(true)
     expect(entry?.questions.map((q) => q.key)).toEqual([
+      'system_down',
+      'deliverables',
+      'photos_required',
+      'reports_required',
       'source_system',
       'destination_system',
       'record_types',
@@ -60,21 +64,41 @@ describe('entry-aware scope requests', () => {
   })
 
   it('maps service slugs used on public pages', () => {
-    expect(SERVICE_ENTRIES['field-photos-bpo']?.questions.some((q) => q.key === 'photo_set')).toBe(true)
+    expect(SERVICE_ENTRIES['field-photos-bpo']?.questions.some((q) => q.key === 'photos_required')).toBe(true)
     expect(SERVICE_ENTRIES['eviction-support']?.job).toBe('eviction_reo')
     expect(resolveScopeEntry({ offering: 'pos-terminal-swap' })?.job).toBe('pos_payments')
     expect(resolveScopeEntry({ offering: 'field-exterior-light' })?.job).toBe('property_inspection')
   })
 
-  it('shows inspection photo follow-ups only after a photo-related type is chosen', () => {
+  it('uses the same intake pattern on every job, guide, and service entry', () => {
+    const jobs = ['cleaning_turnover', 'property_inspection', 'documents_notary', 'eviction_reo', 'business_operations', 'pos_payments', 'other']
+    for (const job of jobs) {
+      const entry = resolveScopeEntry({ job })
+      expect(entry, `missing job entry for ${job}`).toBeTruthy()
+      expect(hasStandardIntake(entry!.questions), `${job} is missing address-style intake (status, photos, reports, check-in)`).toBe(true)
+    }
+    for (const [slug, entry] of Object.entries(GUIDE_ENTRIES)) {
+      expect(hasStandardIntake(entry.questions), `guide ${slug} is missing the shared intake`).toBe(true)
+    }
+    for (const [slug, entry] of Object.entries(SERVICE_ENTRIES)) {
+      expect(hasStandardIntake(entry.questions), `service ${slug} is missing the shared intake`).toBe(true)
+    }
+  })
+
+  it('shows inspection photo follow-ups only after photos are requested', () => {
     const entry = resolveScopeEntry({ job: 'property_inspection' })
     expect(entry).not.toBeNull()
     const before = visibleQuestions(entry!.questions, {}, 'onsite').map((q) => q.key)
-    expect(before).toContain('inspection_type')
-    expect(before).not.toContain('photo_set')
-    const after = visibleQuestions(entry!.questions, { inspection_type: 'Field photos / BPO' }, 'onsite').map((q) => q.key)
-    expect(after).toContain('photo_set')
-    expect(after).toContain('platform')
+    expect(before).toContain('occupied')
+    expect(before).toContain('deliverables')
+    expect(before).not.toContain('photos_required')
+    expect(before).not.toContain('reports_required')
+    const afterPhotos = visibleQuestions(entry!.questions, { deliverables: ['Photos'] }, 'onsite').map((q) => q.key)
+    expect(afterPhotos).toContain('photos_required')
+    const afterReport = visibleQuestions(entry!.questions, { deliverables: ['Written report'] }, 'onsite').map((q) => q.key)
+    expect(afterReport).toContain('reports_required')
+    const afterBpo = visibleQuestions(entry!.questions, { deliverables: ['Photos'], photos_required: 'BPO photo set - exterior' }, 'onsite').map((q) => q.key)
+    expect(afterBpo).toContain('platform')
     const remote = visibleQuestions(entry!.questions, {}, 'remote').map((q) => q.key)
     expect(remote).not.toContain('access')
   })

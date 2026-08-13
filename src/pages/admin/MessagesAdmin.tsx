@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Search, Mail, MailOpen } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
-import { PageIntro, Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { ThreadView } from '../../components/kit/ThreadView'
 import { PresenceDot } from '../../components/kit/PresenceDot'
 import { usePresence } from '../../lib/presence'
 import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 import { toast } from '../../components/kit/toast'
 import { timeAgo } from '../../lib/activity'
+import { useAppPath } from '../../lib/basePath'
 
 interface ThreadRow {
   id: string
@@ -61,6 +62,7 @@ function NewThreadDialog({ clients, initialClientId, onCreated }: { clients: Cli
 }
 
 export default function MessagesAdmin() {
+  const p = useAppPath()
   const [searchParams, setSearchParams] = useSearchParams()
   const [threads, setThreads] = useState<ThreadRow[]>([])
   const [clients, setClients] = useState<ClientOption[]>([])
@@ -98,7 +100,7 @@ export default function MessagesAdmin() {
   }
 
   return <div className="mx-auto max-w-[1500px]">
-    <PageIntro kicker="Secure communications" title="Inbox" subtitle="Manage client conversations in a focused workspace with delivery and read visibility." action={<NewThreadDialog clients={clients} initialClientId={initialClientId} onCreated={onCreated} />} />
+    <PageIntro kicker="Secure communications" title="Inbox" subtitle="Client conversations in a focused workspace. Email campaigns and staff threads live in Communications." action={<div className="flex flex-wrap gap-2"><Link to={p('communications')} className={btnOutline}>Email & campaigns</Link><NewThreadDialog clients={clients} initialClientId={initialClientId} onCreated={onCreated} /></div>} />
     <Panel className="grid h-[72vh] grid-cols-1 gap-0 overflow-hidden !p-0 md:grid-cols-[340px_1fr]">
       <aside className="flex min-h-0 flex-col border-b border-white/10 md:border-b-0 md:border-r">
         <div className="border-b border-white/10 p-3">

@@ -50,7 +50,7 @@ import CasesAdmin from './CasesAdmin'
 import PublicFunnelAdmin from './PublicFunnelAdmin'
 import QuotesAdmin from './QuotesAdmin'
 
-const STAFF_VISIBLE = ['dashboard','pipelines','clients','inquiries','quotes','messages','cases','activity','service-assignments','invoices','field-work','security-center']
+const STAFF_VISIBLE = ['dashboard','pipelines','clients','inquiries','quotes','messages','cases','activity','invoices','field-work','security-center']
 
 function AdminShell(){
   const{user,workspace}=useAuth();const caps=useCapabilities();const visible=new Set(STAFF_VISIBLE)

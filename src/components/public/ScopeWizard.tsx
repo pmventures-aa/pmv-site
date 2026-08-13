@@ -40,6 +40,8 @@ const jobs:{value:string;label:string;body:string;icon:IconName}[]=[
   {value:'other',label:'Something else',body:'Describe the outcome. We will help scope it.',icon:'support'},
 ]
 const remoteJobs=new Set(['business_operations','pos_payments','documents_notary','other'])
+const propertyJobs=new Set(['cleaning_turnover','property_inspection','eviction_reo'])
+const flexibleLocationJobs=new Set(['documents_notary','other'])
 const serviceJobs:Record<string,string>={
   consulting:'business_operations',
   merchant_services:'pos_payments',
@@ -53,6 +55,34 @@ const serviceJobs:Record<string,string>={
 }
 const timings=['As soon as possible','Within 2-3 business days','This week','I have a specific date','Flexible / planning ahead']
 
+function optionButtonCls(selected:boolean){
+  return `rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${selected?'border-gold/50 bg-gold/[.07] text-white':'border-white/10 text-slate-300 hover:border-white/25'}`
+}
+
+function QuestionField({q,val,onChange}:{q:ScopeQuestion;val:string|string[]|undefined;onChange:(v:string|string[])=>void}){
+  const useButtons = q.type==='yesno' || (q.type==='select' && (q.options?.length||0) <= 10)
+  return <div>
+    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">{q.label}</label>
+    {q.hint && <p className="text-[11px] text-slate-500">{q.hint}</p>}
+    {useButtons && <div className={`mt-2 grid gap-2 ${q.type==='yesno'?'grid-cols-2':(q.options?.length||0)>4?'sm:grid-cols-2':'sm:grid-cols-2'}`}>
+      {q.options?.map(o=>{
+        const selected = val===o
+        return <button key={o} type="button" onClick={()=>onChange(o)} className={optionButtonCls(selected)}>{o}</button>
+      })}
+    </div>}
+    {q.type==='select' && !useButtons && <select className="input mt-1" value={typeof val==='string'?val:''} onChange={e=>onChange(e.target.value)}>
+      <option value="">Choose…</option>
+      {q.options?.map(o=><option key={o} value={o}>{o}</option>)}
+    </select>}
+    {q.type==='multiselect' && <div className="mt-2 grid gap-1.5 sm:grid-cols-2">{q.options?.map(o=>{
+      const arr = Array.isArray(val)?val:[]
+      const selected = arr.includes(o)
+      return <button key={o} type="button" onClick={()=>onChange(selected?arr.filter(x=>x!==o):[...arr,o])} className={optionButtonCls(selected)}>{o}</button>
+    })}</div>}
+    {q.type==='text' && <input className="input mt-1" value={typeof val==='string'?val:''} onChange={e=>onChange(e.target.value)} placeholder={q.hint||''}/>}
+    {q.type==='number' && <input className="input mt-1" inputMode="numeric" value={typeof val==='string'?val:''} onChange={e=>onChange(e.target.value.replace(/[^\d]/g,''))} placeholder={q.hint||'e.g. 1450'}/>}
+  </div>
+}
 
 export function ScopeWizard({source='scope-page',compact=false}:{source?:string;compact?:boolean}){
   const navigate=useNavigate();const [params]=useSearchParams()
@@ -101,13 +131,19 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
   )
   const update=<K extends keyof Form>(key:K,value:Form[K])=>setForm(current=>({...current,[key]:value}))
   const setAnswer=(k:string,v:string|string[])=>setForm(current=>({...current,service_answers:{...current.service_answers,[k]:v}}))
-  const chooseJob=(value:string)=>{setForm(current=>({...current,job_type:value,location_type:remoteJobs.has(value)?'remote':'onsite',service_answers:{}}));setError('')}
+  const chooseJob=(value:string)=>{
+    setForm(current=>({...current,job_type:value,location_type:remoteJobs.has(value)?'remote':'onsite',service_answers:{}}))
+    setError('')
+    setStep(1)
+  }
 
   function next(){
     if(step===0&&!form.job_type)return setError('Choose the kind of work you need.')
-    if(step===1&&form.location_type==='onsite'&&(!form.city.trim()||!form.state.trim()))return setError('Enter the city and state for the on-site work.')
-    if(step===2&&!form.timing)return setError('Choose the timing that is closest to what you need.')
-    setError('');setStep(value=>Math.min(4,value+1))
+    if(step===1){
+      if(form.location_type==='onsite'&&(!form.city.trim()||!form.state.trim()))return setError('Enter the city and state for the on-site work.')
+      if(!form.timing)return setError('Choose the timing that is closest to what you need.')
+    }
+    setError('');setStep(value=>Math.min(2,value+1))
   }
   async function submit(){
     if(!form.contact_name.trim())return setError('Enter your name.')
@@ -133,22 +169,26 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
   }
 
   const selectedLabel=entry && form.job_type===entry.job ? entry.pickerLabel : jobs.find(j=>j.value===form.job_type)?.label
-  const totalSteps = activeQuestions.length ? 5 : 4
+  const totalSteps = 3
   const displayTotal = locked ? totalSteps - 1 : totalSteps
   const displayStep = locked ? step : step + 1
   const progressPct = (displayStep / displayTotal) * 100
-  const showQuestionsStep = step === 3 && activeQuestions.length > 0
-  const showContactStep = (activeQuestions.length ? step === 4 : step === 3)
+  const showDetailsStep = step === 1
+  const showContactStep = step === 2
   const isLastStep = showContactStep
+  const showLocationToggle = flexibleLocationJobs.has(form.job_type)
+  const showAddress = form.location_type==='onsite' || propertyJobs.has(form.job_type)
+  const addressLabel = propertyJobs.has(form.job_type) ? 'What is the property address?' : 'Where does this need to happen?'
   const detailsPlaceholder = entry?.id==='moving-data-between-systems'
     ? 'Anything else about the source, destination, or records that must survive the move.'
     : world==='property'
-    ? 'Address, access, occupancy, condition, and what should be true when the visit is finished.'
+    ? 'Access, condition, or anything else we should know before the visit.'
     : world==='documents'
       ? 'Document type, signer location, deadline, and whether it needs notary, RON, filing, or courier.'
       : world==='business'
         ? 'The capacity, system, or follow-through gap, plus any deadline that matters.'
         : 'What should be true when the work is finished? Add any deadline, access issue, document, property condition, or other detail that matters.'
+  const detailsTitle = entry && form.job_type===entry.job ? entry.title : 'A few details specific to this work'
 
   return <div className={`overflow-hidden rounded-2xl border border-white/10 bg-navy-900/75 shadow-[0_24px_80px_rgba(0,0,0,.24)] ${compact?'':'max-w-5xl'}`}>
     <div className="border-b border-white/10 px-5 py-4 sm:px-7">
@@ -168,7 +208,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
 
         {step===0 && <div>
           <h3 className="text-xl font-bold text-white">{copy.pickerTitle}</h3>
-          <p className="mt-1 text-sm text-slate-400">{world==='general'?'Pick the closest fit. You can add detail in a moment.':'These options stay inside this operating world. You can add detail in a moment.'}</p>
+          <p className="mt-1 text-sm text-slate-400">{world==='general'?'Pick the closest fit. The next screen is the questions for that work.':'These options stay inside this operating world. The next screen is the questions for that work.'}</p>
           <div className="mt-5 grid gap-2 sm:grid-cols-2">{visibleJobs.map(job=>
             <button key={job.value} type="button" onClick={()=>chooseJob(job.value)} className={`flex min-h-[88px] items-start gap-3 rounded-xl border p-4 text-left transition ${form.job_type===job.value?'border-gold/55 bg-gold/[.08]':'border-white/10 bg-white/[.02] hover:border-white/25'}`}>
               <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-navy-950 text-gold"><Icon name={job.icon} size={17}/></span>
@@ -177,13 +217,17 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
           </div>
         </div>}
 
-        {step===1 && <div>
-          <h3 className="text-xl font-bold text-white">{copy.locationTitle}</h3>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <button type="button" onClick={()=>update('location_type','onsite')} className={`rounded-xl border p-4 text-left ${form.location_type==='onsite'?'border-gold/50 bg-gold/[.07]':'border-white/10'}`}><strong className="text-sm text-white">At a location</strong><span className="mt-1 block text-xs text-slate-400">{world==='property'?'The address, unit, or site that needs the visit.':'A property, office, courthouse, care facility, or other site.'}</span></button>
-            <button type="button" onClick={()=>update('location_type','remote')} className={`rounded-xl border p-4 text-left ${form.location_type==='remote'?'border-gold/50 bg-gold/[.07]':'border-white/10'}`}><strong className="text-sm text-white">Remote or nationwide</strong><span className="mt-1 block text-xs text-slate-400">{world==='documents'?'RON, document prep, or coordination that does not require a site visit.':'Business support, documents, coordination, or RON.'}</span></button>
-          </div>
-          {form.location_type==='onsite' && <div className="mt-5 space-y-3">
+        {showDetailsStep && <div>
+          <h3 className="text-xl font-bold text-white">{detailsTitle}</h3>
+          <p className="mt-1 text-sm text-slate-400">Same structure on every request: location, a yes or no, then photos, reports, or a quick check-in.</p>
+
+          {showLocationToggle && <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <button type="button" onClick={()=>update('location_type','onsite')} className={optionButtonCls(form.location_type==='onsite')}><strong className="block text-white">At a location</strong><span className="mt-1 block text-xs font-normal text-slate-400">A property, office, courthouse, care facility, or other site.</span></button>
+            <button type="button" onClick={()=>update('location_type','remote')} className={optionButtonCls(form.location_type==='remote')}><strong className="block text-white">Remote or nationwide</strong><span className="mt-1 block text-xs font-normal text-slate-400">RON, document prep, or coordination that does not require a site visit.</span></button>
+          </div>}
+
+          {showAddress && <div className="mt-5 space-y-3">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">{addressLabel}</label>
             <AddressAutocomplete
               value={form.address}
               onChange={(v)=>update('address',v)}
@@ -202,40 +246,18 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
               <input className="input" placeholder="ZIP code" value={form.postal_code} onChange={e=>update('postal_code',e.target.value)}/>
             </div>
           </div>}
-        </div>}
 
-        {step===2 && <div>
-          <h3 className="text-xl font-bold text-white">How soon do you need it?</h3>
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">{timings.map(item=>
-            <button key={item} type="button" onClick={()=>update('timing',item)} className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold ${form.timing===item?'border-gold/50 bg-gold/[.07] text-white':'border-white/10 text-slate-300 hover:border-white/25'}`}>{item}</button>)}
-          </div>
-          <textarea className="input mt-5 min-h-28 resize-y" placeholder={detailsPlaceholder} value={form.details} onChange={e=>update('details',e.target.value)}/>
-        </div>}
+          <div className="mt-6 space-y-5">{activeQuestions.map((q)=>
+            <QuestionField key={q.key} q={q} val={form.service_answers[q.key]} onChange={(v)=>setAnswer(q.key,v)}/>
+          )}</div>
 
-        {showQuestionsStep && <div>
-          <h3 className="text-xl font-bold text-white">{entry && form.job_type===entry.job ? entry.title : 'A few details specific to this work'}</h3>
-          <p className="mt-1 text-sm text-slate-400">{entry?.id==='moving-data-between-systems'?'These questions are for a data move, not a generic operations request.':'Answers here change the next questions. All optional, but they help us reply with real pricing instead of a generic follow-up.'}</p>
-          <div className="mt-5 space-y-4">{activeQuestions.map((q)=>{
-            const val = form.service_answers[q.key]
-            return <div key={q.key}>
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">{q.label}</label>
-              {q.hint && <p className="text-[11px] text-slate-500">{q.hint}</p>}
-              {q.type==='select' && <select className="input mt-1" value={typeof val==='string'?val:''} onChange={e=>setAnswer(q.key,e.target.value)}>
-                <option value="">Choose…</option>
-                {q.options?.map(o=><option key={o} value={o}>{o}</option>)}
-              </select>}
-              {q.type==='multiselect' && <div className="mt-1 grid gap-1.5 sm:grid-cols-2">{q.options?.map(o=>{
-                const arr = Array.isArray(val)?val:[]
-                const selected = arr.includes(o)
-                return <label key={o} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-xs ${selected?'border-gold/50 bg-gold/[.08] text-white':'border-white/10 text-slate-300'}`}>
-                  <input type="checkbox" className="accent-gold" checked={selected} onChange={()=>setAnswer(q.key, selected?arr.filter(x=>x!==o):[...arr,o])}/>
-                  <span>{o}</span>
-                </label>
-              })}</div>}
-              {q.type==='text' && <input className="input mt-1" value={typeof val==='string'?val:''} onChange={e=>setAnswer(q.key,e.target.value)} placeholder={q.hint||''}/>}
-              {q.type==='number' && <input className="input mt-1" inputMode="numeric" value={typeof val==='string'?val:''} onChange={e=>setAnswer(q.key,e.target.value.replace(/[^\d]/g,''))} placeholder={q.hint||'e.g. 1450'}/>}
+          <div className="mt-6">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">How soon do you need it?</label>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">{timings.map(item=>
+              <button key={item} type="button" onClick={()=>update('timing',item)} className={optionButtonCls(form.timing===item)}>{item}</button>)}
             </div>
-          })}</div>
+          </div>
+          <textarea className="input mt-5 min-h-24 resize-y" placeholder={detailsPlaceholder} value={form.details} onChange={e=>update('details',e.target.value)}/>
         </div>}
 
         {showContactStep && <div>
@@ -261,9 +283,11 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     {error && <p role="alert" className="mt-4 rounded-lg border border-red-400/20 bg-red-400/[.06] px-4 py-3 text-sm text-red-200">{error}</p>}
     <div className="mt-6 flex items-center justify-between gap-3">
       {step>0 ? <button type="button" className="btn-outline" onClick={()=>{setError('');if(locked&&step===1){setLocked(false);setStep(0)}else setStep(v=>v-1)}}>Back</button> : <span/>}
-      {!isLastStep
-        ? <button type="button" className="btn-gold" onClick={next}>Continue</button>
-        : <button type="button" className="btn-gold" disabled={busy} onClick={()=>void submit()}>{busy?'Sending request…':copy.cta}</button>}
+      {step===0
+        ? <span/>
+        : !isLastStep
+          ? <button type="button" className="btn-gold" onClick={next}>Continue</button>
+          : <button type="button" className="btn-gold" disabled={busy} onClick={()=>void submit()}>{busy?'Sending request…':copy.cta}</button>}
     </div>
     </div>
   </div>

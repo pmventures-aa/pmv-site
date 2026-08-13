@@ -3,6 +3,7 @@ import { Archive, Check, CopyPlus, FileDiff, Files, Gavel, Layers3, RefreshCw, R
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
+import { DocumentWorkspaceNav } from '../../components/admin/DocumentWorkspaceNav'
 
 type Envelope={id:string;public_id:string;title:string;status:string;created_at:string;priority?:string}
 type Detail={envelope:any;recipients:any[];fields:any[];events:any[];seal?:any}
@@ -50,6 +51,7 @@ export default function EnvelopeWorkspaceEnterprise(){
   const criticalWarnings = serviceWarnings.filter((w) => w === 'Envelope records')
 
   return <div className="space-y-6">
+    <DocumentWorkspaceNav />
     <PageIntro kicker="Signed Documents" title="Signing & Documents" subtitle="Everything you've sent for signature. Create a new signing packet, track who has signed, remind late signers, or open the completed evidence bundle. Templates and retention are optional enterprise features - the list below is the day-to-day view." />
     {criticalWarnings.length>0&&<div role="alert" className="flex flex-col gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[.04] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-amber-100">The signed-document list could not load</p><p className="mt-1 text-xs text-slate-400">This usually clears on retry. If it persists, check the D1 database is reachable from Pages Functions.</p></div><button className={btnSecondary} onClick={()=>void loadBase()}><RefreshCw size={14}/>Retry</button></div>}
 

@@ -6,6 +6,7 @@ import { useAppPath } from '../../lib/basePath'
 import { PageIntro, Panel, Tag, inputCls, btnPrimary, btnSecondary, btnOutline } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { humanizeLabel } from '../../../shared/displayCase'
+import { DocumentWorkspaceNav } from '../../components/admin/DocumentWorkspaceNav'
 
 type Template={id:string;name:string;description?:string;status:string;version_number:number;version_count:number;updated_at:string}
 type Rule={id:string;name:string;rule_type:string;enabled:number;config_json:string}
@@ -30,6 +31,7 @@ export default function ESignPlatformAdmin(){
  async function releaseHold(id:string){if(!confirm('Release this legal hold? The release will remain in the record.'))return;try{await api.post(`/admin/document-platform/retention/holds/${id}/release`,{});await loadArea('retention')}catch(e){toast.error(e instanceof ApiError?e.message:'Could not release hold.')}}
  const AreaError=({area}:{area:Area})=>errors[area]?<Panel className="!border-rose-400/20"><p className="font-bold text-rose-200">This area could not load.</p><p className="mt-2 text-sm text-slate-400">{errors[area]}</p><button className={`${btnOutline} mt-4`} onClick={()=>void loadArea(area)}><RefreshCw size={14}/> Try Again</button></Panel>:null
  return <div className="mx-auto max-w-[1500px] pb-12">
+  <DocumentWorkspaceNav />
   <PageIntro kicker="Document Operations" title="E-Signature Platform" subtitle="Prepare, send, track, and preserve signature transactions. Use templates for repeatable work, automation for reminders, and retention controls for long-term records." action={<div className="flex flex-wrap gap-2"><Link to={p('envelopes')} className={btnPrimary}>Open Envelope Workspace</Link><button className={btnOutline} onClick={()=>void loadAll()}><RefreshCw size={14}/> Refresh</button></div>}/>
   <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[[FileStack,'Active Templates',stats.templates],[History,'Saved Versions',stats.versions],[ShieldCheck,'Active Holds',stats.holds],[Workflow,'Enabled Rules',stats.rules]].map(([Icon,label,value]:any)=><Panel key={label} className="!p-4"><div className="flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.15em] text-slate-500">{label}</p><p className="mt-2 text-2xl font-extrabold text-white">{value}</p></div><Icon size={20} className="text-gold"/></div></Panel>)}</div>
   <div className="mb-5 flex gap-2 overflow-x-auto pb-1">{[['start','Start Here'],['templates','Envelope Templates'],['automation','Reminders & Expiration'],['retention','Retention & Legal Hold'],['bulk','Bulk Actions']].map(([k,l])=><button key={k} onClick={()=>setTab(k as any)} className={`shrink-0 rounded-lg px-4 py-2 text-sm font-bold ${tab===k?'bg-gold text-navy-950':'border border-white/10 text-slate-300 hover:bg-white/[.04]'}`}>{l}</button>)}</div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail, ShieldCheck, UserPlus } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
@@ -36,6 +36,8 @@ const blank: DraftLead = {
 export default function LeadCreate() {
   const p = useAppPath()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const fromPipeline = params.get('from') === 'pipelines'
   const [draft, setDraft] = useState<DraftLead>(blank)
   const [sendInvite, setSendInvite] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -74,7 +76,7 @@ export default function LeadCreate() {
       }
 
       toast.success(inviteSent ? 'Lead created and branded account invitation sent.' : 'Lead created.')
-      navigate(p(`leads/${result.id}/overview`))
+      navigate(fromPipeline ? p('pipelines') : p(`leads/${result.id}/overview`))
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not create lead.')
     } finally {
@@ -86,7 +88,7 @@ export default function LeadCreate() {
     <PageIntro
       kicker="Relationship onboarding"
       title="Create a Lead"
-      subtitle="Build the CRM relationship once, then optionally invite the person into their secure Pinnacle account immediately."
+      subtitle="Build the CRM relationship once, then optionally invite the person into their secure Pinnacle account immediately. New leads appear on the Pipeline board."
     />
 
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">

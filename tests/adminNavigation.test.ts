@@ -18,4 +18,17 @@ describe('HQ navigation contract', () => {
     const destinations = adminNav.map((item) => item.to || '/')
     expect(new Set(destinations).size).toBe(destinations.length)
   })
+
+  it('keeps revenue, documents, and people tools on a shorter HQ sidebar', () => {
+    const keys = adminNav.map((item) => item.key)
+    expect(keys).toContain('invoices')
+    expect(keys).toContain('inquiries')
+    expect(keys).toContain('document-center')
+    expect(keys).not.toContain('esign-platform')
+    expect(keys).not.toContain('community-documents')
+    expect(keys).not.toContain('envelopes')
+    expect(keys).not.toContain('assignments')
+    expect(adminNav.find((item) => item.key === 'inquiries')?.section).toBe('Revenue')
+    expect(adminNav.find((item) => item.key === 'audit-log')?.section).toBe('Administration')
+  })
 })
