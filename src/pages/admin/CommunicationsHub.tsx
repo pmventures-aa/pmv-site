@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, BellRing, Inbox, Mail, MessageSquare, RefreshCw, Send, Timer, TrendingUp, Users } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Inbox, Mail, MessageSquare, RefreshCw, Send, Timer, TrendingUp, Users } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, Tag, btnSecondary, btnPrimary, inputCls } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag, btnSecondary, inputCls } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
-import { SessionWho } from '../../components/kit/WhoSection'
 import { useAppPath } from '../../lib/basePath'
 import { ConversationsPanel } from './ConversationsPanel'
 import { EmailThreadsPanel } from './EmailThreadsPanel'
@@ -19,18 +18,6 @@ type Overview = {
   generated_at: string
 }
 
-type NotificationEvent = {
-  event_key: string
-  label: string
-  category: string
-  audience: string
-  description: string | null
-  in_app_enabled: 0 | 1
-  email_enabled: 0 | 1
-  desktop_enabled: 0 | 1
-  sound_enabled: 0 | 1
-}
-
 type ReportingResponse = {
   range_days: number
   daily_thread_volume: Array<{ day: string; n: number }>
@@ -39,13 +26,12 @@ type ReportingResponse = {
   aging_threads: Array<{ id: string; subject: string; client_name: string; client_email: string; last_message_at: string }>
 }
 
-type Tab = 'overview' | 'threads' | 'email' | 'notifications' | 'reporting'
+type Tab = 'overview' | 'threads' | 'email' | 'reporting'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'threads', label: 'DM Threads' },
   { id: 'email', label: 'Email' },
-  { id: 'notifications', label: 'Notifications' },
   { id: 'reporting', label: 'Reporting' },
 ]
 
@@ -70,7 +56,7 @@ export default function CommunicationsHub() {
 
   return (
     <div className="space-y-6">
-      <PageIntro kicker="Communications Hub" title="One view. Every channel." subtitle="Client threads, staff DMs, outbound email, and per-user notification settings in one place. Day-to-day client messages stay in Inbox." action={<Link to={p('messages')} className={btnSecondary}>Open Inbox</Link>} />
+      <PageIntro kicker="Communications Hub" title="One view. Every channel." subtitle="Client threads, staff DMs, and outbound email in one place. Day-to-day client messages stay in Inbox. Notification channels live in Settings." action={<Link to={p('messages')} className={btnSecondary}>Open Inbox</Link>} />
 
       <div className="border-b border-white/10">
         <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -96,7 +82,6 @@ export default function CommunicationsHub() {
       {tab === 'overview' && <OverviewTab overview={overview} loading={loading}/>}
       {tab === 'threads' && <ConversationsPanel/>}
       {tab === 'email' && <EmailThreadsPanel/>}
-      {tab === 'notifications' && <NotificationsTab/>}
       {tab === 'reporting' && <ReportingTab/>}
     </div>
   )
@@ -160,109 +145,6 @@ export function OverviewTab({ overview, loading }: { overview: Overview | null; 
       <p className="text-[11px] text-slate-600">Data as of {new Date(overview.generated_at).toLocaleString()}</p>
     </div>
   )
-}
-
-export function NotificationsTab() {
-  const [events, setEvents] = useState<NotificationEvent[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [dirty, setDirty] = useState<Record<string, Partial<NotificationEvent>>>({})
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const r = await api.get<{ events: NotificationEvent[] }>('/admin/notification-center')
-      setEvents(r.events)
-      setDirty({})
-    } catch (err) {
-      if (err instanceof ApiError) toast.error(err.message)
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { void load() }, [load])
-
-  const byCategory = useMemo(() => {
-    const groups: Record<string, NotificationEvent[]> = {}
-    for (const e of events) (groups[e.category] = groups[e.category] || []).push(e)
-    return groups
-  }, [events])
-
-  function toggle(eventKey: string, field: 'in_app_enabled' | 'email_enabled' | 'desktop_enabled' | 'sound_enabled', next: boolean) {
-    setEvents((current) => current.map((e) => e.event_key === eventKey ? { ...e, [field]: next ? 1 : 0 } : e))
-    setDirty((d) => ({ ...d, [eventKey]: { ...(d[eventKey] || {}), [field]: next } }))
-  }
-
-  async function save() {
-    const preferences = Object.entries(dirty).map(([event_key, changes]) => {
-      const source = events.find((e) => e.event_key === event_key)
-      return {
-        event_key,
-        in_app_enabled: (changes.in_app_enabled ?? source?.in_app_enabled === 1) as boolean,
-        email_enabled: (changes.email_enabled ?? source?.email_enabled === 1) as boolean,
-        desktop_enabled: (changes.desktop_enabled ?? source?.desktop_enabled === 1) as boolean,
-        sound_enabled: (changes.sound_enabled ?? source?.sound_enabled === 1) as boolean,
-      }
-    })
-    if (!preferences.length) return
-    setSaving(true)
-    try {
-      await api.patch('/admin/notification-center/preferences', { preferences })
-      toast.success('Notification preferences saved')
-      setDirty({})
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Could not save preferences')
-    } finally { setSaving(false) }
-  }
-
-  if (loading) return <Panel><p className="text-sm text-slate-400">Loading your notification preferences…</p></Panel>
-
-  return (
-    <div className="space-y-5">
-      <SessionWho hint="These alerts go to your HQ session and the mailbox on this account." />
-      <Panel>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2"><BellRing size={16} className="text-gold"/><p className="text-sm font-extrabold text-white">Your notification preferences</p></div>
-            <p className="mt-1 text-xs text-slate-500">These settings apply only to you. Owners can change the org-wide defaults from Settings.</p>
-          </div>
-          {Object.keys(dirty).length > 0 && <button className={btnPrimary} disabled={saving} onClick={() => void save()}>{saving ? 'Saving…' : `Save ${Object.keys(dirty).length} change${Object.keys(dirty).length === 1 ? '' : 's'}`}</button>}
-        </div>
-      </Panel>
-
-      {Object.entries(byCategory).map(([category, list]) => (
-        <Panel key={category}>
-          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/80">{category}</p>
-          <div className="mt-4 divide-y divide-white/10 border-y border-white/10">
-            {list.map((event) => (
-              <div key={event.event_key} className="grid gap-3 py-4 lg:grid-cols-[1.6fr_repeat(4,minmax(90px,1fr))] lg:items-center">
-                <div>
-                  <p className="text-sm font-bold text-white">{event.label}</p>
-                  {event.description && <p className="mt-1 text-xs leading-5 text-slate-500">{event.description}</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:contents">
-                  {(['in_app_enabled', 'email_enabled', 'desktop_enabled', 'sound_enabled'] as const).map((field) => (
-                    <label key={field} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[.02] px-3 py-2 text-xs font-semibold text-slate-300 lg:justify-center">
-                      <span className="lg:hidden">{fieldLabel(field)}</span>
-                      <input type="checkbox" className="accent-gold" checked={event[field] === 1} onChange={(e) => toggle(event.event_key, field, e.target.checked)}/>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 hidden text-[10px] font-bold uppercase tracking-[.14em] text-slate-500 lg:grid lg:grid-cols-[1.6fr_repeat(4,minmax(90px,1fr))]">
-            <span/><span className="text-center">In-app</span><span className="text-center">Email</span><span className="text-center">Desktop push</span><span className="text-center">Sound</span>
-          </div>
-        </Panel>
-      ))}
-    </div>
-  )
-}
-
-function fieldLabel(field: string) {
-  if (field === 'in_app_enabled') return 'In-app'
-  if (field === 'email_enabled') return 'Email'
-  if (field === 'desktop_enabled') return 'Desktop push'
-  return 'Sound'
 }
 
 export function ReportingTab() {

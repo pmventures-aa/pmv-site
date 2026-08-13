@@ -10,9 +10,7 @@ import { NotificationFeedPanel } from '../kit/NotificationFeedPanel'
 import { ImpersonationBanner } from '../kit/ImpersonationBanner'
 import { GlobalSearch } from './GlobalSearch'
 import { MailBell } from '../kit/MailBell'
-import { EmailCenterBell } from '../kit/EmailCenterBell'
 import { SlaAlertChip } from './SlaAlertChip'
-import { MailWorkspaceLauncher } from './MailWorkspaceLauncher'
 import { AdminPageBoundary } from './AdminPageBoundary'
 import { WhoMenu } from './WhoMenu'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
@@ -137,8 +135,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <span className="hidden sm:inline-flex"><SlaAlertChip /></span>
             <button onClick={() => setMobileSearchOpen((v) => !v)} className="hidden h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 sm:grid" aria-label="Search"><Search size={17} /></button>
             <button onClick={refreshPage} className="hidden h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 hover:text-gold sm:grid" aria-label="Refresh page"><RotateCw size={15} /></button>
-            <span className="hidden sm:inline-flex"><EmailCenterBell /></span>
-            <MailBell />
+            {!hideHqNav && <MailBell />}
             <NotificationBell />
             <NotificationFeedPanel surface="admin" />
             {hideHqNav && <WhoMenu placement="down" compact canOpenSettings={canOpenSettings} />}
@@ -174,10 +171,8 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <SlaAlertChip />
-            <span className="hidden lg:inline-flex"><MailWorkspaceLauncher /></span>
             <button onClick={refreshPage} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-gold" title="Refresh this page" aria-label="Refresh this HQ page"><RotateCw size={14} /></button>
-            <EmailCenterBell />
-            <MailBell />
+            {!hideHqNav && <MailBell />}
             <NotificationBell />
             <NotificationFeedPanel surface="admin" />
             {hideHqNav && <WhoMenu placement="down" compact canOpenSettings={canOpenSettings} />}

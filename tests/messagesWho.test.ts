@@ -43,7 +43,6 @@ describe('Messages hub who coverage', () => {
     email: readFileSync(new URL('../src/pages/admin/EmailThreadsPanel.tsx', import.meta.url), 'utf8'),
     inbox: readFileSync(new URL('../src/components/kit/ThreadView.tsx', import.meta.url), 'utf8'),
     staff: readFileSync(new URL('../src/pages/admin/ConversationsPanel.tsx', import.meta.url), 'utf8'),
-    hub: readFileSync(new URL('../src/pages/admin/CommunicationsHub.tsx', import.meta.url), 'utf8'),
     templates: readFileSync(new URL('../src/pages/admin/EmailTemplatesPanel.tsx', import.meta.url), 'utf8'),
   }
 
@@ -57,7 +56,6 @@ describe('Messages hub who coverage', () => {
     expect(files.email).toContain('WhoSection')
     expect(files.inbox).toContain('WhoSection')
     expect(files.staff).toContain('WhoSection')
-    expect(files.hub).toContain('SessionWho')
     expect(files.templates).toContain('SessionWho')
   })
 })
