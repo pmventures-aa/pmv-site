@@ -25,7 +25,8 @@ export function clientPortalNav(serviceKeys: string[]): NavItem[] {
   const extras: NavItem[] = []
   if (keys.has('property_management') || keys.has('property_inspections')) extras.push({key:'properties',label:'Properties',to:'property-management',icon:Building2,section:'Your work'})
   if (keys.has('funding')) extras.push({key:'funding',label:'Funding',to:'funding',icon:Gauge,section:'Your work'})
-  if ([...keys].some((key) => ['admin_support','document_courier','mobile_notary'].includes(key)) && world !== 'documents') {
+  const showProjects = keys.has('property_management') || keys.has('property_inspections') || [...keys].some((key) => ['admin_support','document_courier','mobile_notary'].includes(key))
+  if (showProjects && world !== 'documents') {
     extras.push({key:'work',label:'Projects',to:'matters',icon:Wrench,section:'Your work'})
   }
   const home = portalNav[0]

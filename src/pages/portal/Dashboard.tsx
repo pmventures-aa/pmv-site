@@ -218,7 +218,7 @@ export default function Dashboard() {
               <ul className="divide-y divide-white/[.08] border-y border-white/[.08]">
                 {data.properties.slice(0, 4).map((property) => (
                   <li key={property.id}>
-                    <Link to={p('property-management')} className="flex items-center justify-between gap-3 py-3.5">
+                    <Link to={p(`property-management/${property.id}`)} className="flex items-center justify-between gap-3 py-3.5">
                       <span className="min-w-0">
                         <span className="flex items-center gap-2 text-sm font-medium text-white">
                           <Building2 size={14} className="shrink-0 text-gold/80" />

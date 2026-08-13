@@ -673,7 +673,7 @@ export default function ServiceApplication() {
                 <p className="eyebrow">Optional setup detail</p>
                 <h2 ref={headingRef} tabIndex={-1} className="mt-2 text-2xl font-semibold text-white outline-none">Banking information</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                  If deposit/setup banking is relevant to this service, you can provide it now. This sensitive information is encrypted and is never included in the application PDF. You can also provide it later to your assigned specialist.
+                  If deposit/setup banking is relevant to this service, you can provide it now. This is ACH only. Card numbers and CVV codes are never collected here. Bank details are encrypted and are never included in the application PDF.
                 </p>
 
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">

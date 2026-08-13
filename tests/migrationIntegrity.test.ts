@@ -11,6 +11,13 @@ describe('migration chain regression checks', () => {
     expect(presence).toMatch(/CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users\(last_seen_at\)/i)
   })
 
+  it('adds client property and matter profile columns once', () => {
+    const sql = readFileSync(new URL('../migrations/0068_client_workspace_profiles.sql', import.meta.url), 'utf8')
+    expect(sql).toMatch(/ALTER TABLE properties ADD COLUMN occupancy/i)
+    expect(sql).toMatch(/CREATE TABLE matter_updates/i)
+    expect(sql).toMatch(/ALTER TABLE matters ADD COLUMN property_id/i)
+  })
+
   it('adds HQ letterhead email templates once', () => {
     const sql = readFileSync(new URL('../migrations/0066_hq_email_templates.sql', import.meta.url), 'utf8')
     expect(sql).toMatch(/CREATE TABLE hq_email_templates/i)
