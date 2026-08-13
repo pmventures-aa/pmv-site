@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Loader2, Plus, MapPin } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
@@ -74,11 +74,13 @@ const KIND_LABEL = { field: 'Field visit', ron: 'RON session' } as const
 
 export default function FieldWorkAdmin() {
   const p = useAppPath()
+  const [searchParams] = useSearchParams()
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [mapPins, setMapPins] = useState<FieldMapPin[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
+  const [showCreate, setShowCreate] = useState(() => searchParams.get('dispatch') === '1')
   const [kindFilter, setKindFilter] = useState<'all' | 'field' | 'ron'>('all')
+  const dispatchVendorId = searchParams.get('vendor') || ''
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -133,6 +135,9 @@ export default function FieldWorkAdmin() {
   }, [])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    if (searchParams.get('dispatch') === '1') setShowCreate(true)
+  }, [searchParams])
   const backgroundLoad = useCallback(() => load(true), [load])
   useLiveRefresh(backgroundLoad)
 
@@ -158,6 +163,7 @@ export default function FieldWorkAdmin() {
 
       {showCreate && (
         <CreateAssignment
+          initialVendorId={dispatchVendorId}
           onCreated={() => { setShowCreate(false); void load() }}
           onCancel={() => setShowCreate(false)}
         />
@@ -216,7 +222,7 @@ export default function FieldWorkAdmin() {
   )
 }
 
-function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
+function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated: () => void; onCancel: () => void; initialVendorId?: string }) {
   const [clients, setClients] = useState<ClientOption[]>([])
   const [vendors, setVendors] = useState<StaffOption[]>([])
   const [clientMode, setClientMode] = useState<'existing' | 'new'>('existing')
@@ -225,7 +231,7 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
     kind: 'field' as 'field' | 'ron',
     service_key: 'mobile_notary',
     client_user_id: '',
-    vendor_user_id: '',
+    vendor_user_id: initialVendorId || '',
     title: '',
     site_label: '',
     site_address: '',
@@ -246,7 +252,19 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
     api.get<{ employees: StaffOption[] }>('/admin/employees').then((r) => setVendors(r.employees ?? [])).catch(() => {})
   }, [])
 
-  const availableVendors = useMemo(() => vendors.filter((v) => v.party_type === 'vendor'), [vendors])
+  useEffect(() => {
+    if (!initialVendorId) return
+    setForm((current) => current.vendor_user_id === initialVendorId ? current : { ...current, vendor_user_id: initialVendorId })
+  }, [initialVendorId])
+
+  const availableVendors = useMemo(() => {
+    const list = vendors.filter((v) => v.party_type === 'vendor')
+    if (initialVendorId && !list.some((v) => v.id === initialVendorId)) {
+      const extra = vendors.find((v) => v.id === initialVendorId)
+      if (extra) return [extra, ...list]
+    }
+    return list
+  }, [vendors, initialVendorId])
 
   useEffect(() => {
     if (form.kind !== 'field') return
