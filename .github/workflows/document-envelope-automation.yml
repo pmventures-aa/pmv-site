@@ -30,3 +30,4 @@ jobs:
             'https://pmv-site.pages.dev/api/automation/document-envelopes/run')"
           cat "$body" | jq . || cat "$body"
           test "$status" -ge 200 -a "$status" -lt 300
+          jq -e '.ok == true and .status != "error"' "$body" >/dev/null

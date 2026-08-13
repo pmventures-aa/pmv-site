@@ -6,6 +6,7 @@ import { runClientNotificationOutbox } from '../clientNotificationOutbox'
 import { runDueScheduledReports } from '../scheduledReports'
 import { uuid } from '../crypto'
 import { runDueScopeFollowups } from '../scopeFunnel'
+import { runDocumentAutomation } from './documentPlatformV2'
 
 export const relationshipAutomationRoutes = new Hono<AppEnv>()
 export const relationshipAutomationAdminRoutes = new Hono<AppEnv>()
@@ -15,6 +16,7 @@ const AUTOMATIONS = {
   client_nurture: { label: 'Client nurture campaign', cadence: 'Daily at 10:20 AM ET', intervalMinutes: 1440, description: 'Processes due client nurture steps and records successful, skipped, or failed delivery work.' },
   scheduled_reports: { label: 'Scheduled management reports', cadence: 'Hourly', intervalMinutes: 60, description: 'Generates due saved reports, emails authorized recipients, and records report-delivery outcomes.' },
   scope_followup: { label: 'Public request follow-up', cadence: 'Daily at 10:40 AM ET', intervalMinutes: 1440, description: 'Sends the three-step, opt-in follow-up sequence for unbooked public scope requests and stops after booking or account creation.' },
+  document_envelopes: { label: 'Document envelope lifecycle', cadence: 'Every 10 minutes', intervalMinutes: 10, description: 'Sends e-sign reminders, expires overdue envelopes, and applies retention disposition while respecting legal holds.' },
 } as const
 
 type AutomationKey = keyof typeof AUTOMATIONS
@@ -50,7 +52,39 @@ function nextHourly() {
   const next=new Date();next.setUTCMinutes(0,0,0);next.setUTCHours(next.getUTCHours()+1);return next.toISOString()
 }
 
+async function sweepStaleRuns(env: any, key: string, maxAgeMs = 15 * 60 * 1000) {
+  try {
+    const rows = await env.DB.prepare("SELECT id, started_at FROM automation_runs WHERE automation_key=? AND status='running'").bind(key).all()
+    for (const row of rows.results || []) {
+      const raw = String(row.started_at || '')
+      const started = new Date(raw.includes('T') ? raw : `${raw.replace(' ', 'T')}Z`).getTime()
+      const age = Number.isFinite(started) ? Date.now() - started : maxAgeMs + 1
+      if (age <= maxAgeMs) continue
+      await env.DB.prepare(`UPDATE automation_runs SET status='failed', detail_json=?, finished_at=datetime('now') WHERE id=?`).bind(JSON.stringify({ error: 'Run did not finish. Marked stale after 15 minutes.' }), row.id).run()
+    }
+  } catch { /* table may not exist yet */ }
+}
+
+async function controlFor(env: any, key: string) {
+  try {
+    return await env.DB.prepare('SELECT automation_key, enabled, notes, config_json FROM automation_controls WHERE automation_key=?').bind(key).first() as any
+  } catch {
+    return null
+  }
+}
+
 async function executeAutomation(c: any, key: AutomationKey, triggerType: 'scheduled'|'manual', actorUserId?: string) {
+  await sweepStaleRuns(c.env, key)
+  const control = await controlFor(c.env, key)
+  if (control && Number(control.enabled) === 0) {
+    return { run_id: null, status: 'success', processed: 0, paused: true }
+  }
+  if (key === 'document_envelopes') {
+    return runDocumentAutomation(c.env, triggerType === 'manual' ? 100 : 150, actorUserId, triggerType)
+  }
+  const running = await c.env.DB.prepare("SELECT id FROM automation_runs WHERE automation_key=? AND status='running' ORDER BY started_at DESC LIMIT 1").bind(key).first()
+  if (running) return { error: 'this automation is already running', status: 409 }
+
   const runId = uuid()
   await c.env.DB.prepare(
     `INSERT INTO automation_runs(id,automation_key,trigger_type,status,triggered_by_user_id)
@@ -122,30 +156,75 @@ relationshipAutomationRoutes.patch('/portal/notification-preferences', requireUs
 })
 
 relationshipAutomationAdminRoutes.get('/automation-center', requireOwner, async (c) => {
-  const runs = await c.env.DB.prepare(`SELECT * FROM automation_runs ORDER BY started_at DESC LIMIT 100`).all<any>()
+  let runs: any[] = []
+  try {
+    const rows = await c.env.DB.prepare(`SELECT * FROM automation_runs ORDER BY started_at DESC LIMIT 200`).all<any>()
+    runs = rows.results || []
+  } catch { runs = [] }
   const latestByKey = new Map<string, any>()
-  for (const run of runs.results || []) if (!latestByKey.has(run.automation_key)) latestByKey.set(run.automation_key, run)
+  for (const run of runs) if (!latestByKey.has(run.automation_key)) latestByKey.set(run.automation_key, run)
+  let controls: any[] = []
+  try {
+    const rows = await c.env.DB.prepare('SELECT * FROM automation_controls').all<any>()
+    controls = rows.results || []
+  } catch { controls = [] }
+  const controlByKey = new Map(controls.map((row) => [row.automation_key, row]))
+  let rules: any[] = []
+  try {
+    const rows = await c.env.DB.prepare('SELECT * FROM envelope_automation_rules ORDER BY rule_type,name').all()
+    rules = rows.results || []
+  } catch { rules = [] }
+
   const automations = Object.entries(AUTOMATIONS).map(([key, meta]) => {
     const last = latestByKey.get(key) || null
+    const control = controlByKey.get(key)
     let nextRunAt: string | null = null
-    if (key === 'client_notifications') {
+    if (key === 'client_notifications' || key === 'document_envelopes') {
       const now = new Date(); const minute = now.getUTCMinutes(); const next = new Date(now)
       next.setUTCSeconds(0,0); next.setUTCMinutes(minute - (minute % 10) + 10)
       nextRunAt = next.toISOString()
     } else if (key === 'client_nurture') nextRunAt = nextDailyEastern(10,20)
     else if(key==='scheduled_reports') nextRunAt=nextHourly()
     else if(key==='scope_followup') nextRunAt=nextDailyEastern(10,40)
-    return { key, ...meta, last_run: last, next_run_at: nextRunAt }
+    return {
+      key,
+      ...meta,
+      enabled: control ? Number(control.enabled) === 1 : true,
+      notes: control?.notes || '',
+      config: (() => { try { return JSON.parse(control?.config_json || '{}') } catch { return {} } })(),
+      last_run: last,
+      next_run_at: nextRunAt,
+    }
   })
-  return c.json({ automations, runs: runs.results || [] })
+  return c.json({ automations, runs, rules })
+})
+
+relationshipAutomationAdminRoutes.patch('/automation-center/:key', requireOwner, async (c) => {
+  const key = c.req.param('key') as AutomationKey
+  if (!(key in AUTOMATIONS)) return c.json({ error:'unknown automation' },404)
+  const body = await c.req.json<any>().catch(()=>({}))
+  const enabled = body.enabled === false ? 0 : body.enabled === true ? 1 : null
+  const notes = typeof body.notes === 'string' ? body.notes.slice(0, 500) : null
+  const config = body.config && typeof body.config === 'object' ? JSON.stringify(body.config) : null
+  const current = await c.env.DB.prepare('SELECT enabled, notes, config_json FROM automation_controls WHERE automation_key=?').bind(key).first() as any
+  await c.env.DB.prepare(
+    `INSERT INTO automation_controls(automation_key,enabled,notes,config_json,updated_by_user_id,updated_at)
+     VALUES(?,?,?,?,?,datetime('now'))
+     ON CONFLICT(automation_key) DO UPDATE SET
+       enabled=COALESCE(excluded.enabled, automation_controls.enabled),
+       notes=COALESCE(excluded.notes, automation_controls.notes),
+       config_json=COALESCE(excluded.config_json, automation_controls.config_json),
+       updated_by_user_id=excluded.updated_by_user_id,
+       updated_at=datetime('now')`,
+  ).bind(key, enabled ?? (current ? Number(current.enabled) : 1), notes, config || current?.config_json || '{}', c.get('user').id).run()
+  return c.json({ ok:true })
 })
 
 relationshipAutomationAdminRoutes.post('/automation-center/:key/run', requireOwner, async (c) => {
   const key = c.req.param('key') as AutomationKey
   if (!(key in AUTOMATIONS)) return c.json({ error:'unknown automation' },404)
-  const running = await c.env.DB.prepare("SELECT id FROM automation_runs WHERE automation_key=? AND status='running' ORDER BY started_at DESC LIMIT 1").bind(key).first()
-  if (running) return c.json({ error:'this automation is already running' },409)
   const result = await executeAutomation(c, key, 'manual', c.get('user').id)
+  if ((result as any).status === 409) return c.json({ error:(result as any).error },409)
   return c.json({ ok:true, ...result })
 })
 

@@ -5,7 +5,7 @@ import { api, ApiError } from '../../lib/api'
 import { Icon, type IconName } from '../kit/Icon'
 import { AddressAutocomplete } from '../kit/AddressAutocomplete'
 import { jobsForWorld, publicIntakeCopy, worldFromPublicParams } from '../../lib/workspace'
-import { resolveScopeEntry, type ScopeQuestion } from '../../../shared/scopeEntries'
+import { resolveScopeEntry, visibleQuestions, type ScopeQuestion } from '../../../shared/scopeEntries'
 
 type ScopeResponse = { confirmation_url:string; request_token?:string; setup_url?:string|null; account_status?:string }
 type Form = {
@@ -91,10 +91,14 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     service_answers:{},
   })
 
-  const activeQuestions:ScopeQuestion[] = useMemo(() => {
+  const catalogQuestions: ScopeQuestion[] = useMemo(() => {
     if(entry && form.job_type===entry.job) return entry.questions
     return resolveScopeEntry({job:form.job_type})?.questions || []
   }, [entry, form.job_type])
+  const activeQuestions = useMemo(
+    () => visibleQuestions(catalogQuestions, form.service_answers, form.location_type),
+    [catalogQuestions, form.service_answers, form.location_type],
+  )
   const update=<K extends keyof Form>(key:K,value:Form[K])=>setForm(current=>({...current,[key]:value}))
   const setAnswer=(k:string,v:string|string[])=>setForm(current=>({...current,service_answers:{...current.service_answers,[k]:v}}))
   const chooseJob=(value:string)=>{setForm(current=>({...current,job_type:value,location_type:remoteJobs.has(value)?'remote':'onsite',service_answers:{}}));setError('')}
@@ -209,8 +213,8 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
         </div>}
 
         {showQuestionsStep && <div>
-          <h3 className="text-xl font-bold text-white">{entry && form.job_type===entry.job ? 'A few details specific to this work' : 'A few details specific to this work'}</h3>
-          <p className="mt-1 text-sm text-slate-400">{entry?.id==='moving-data-between-systems'?'These questions are for a data move, not a generic operations request.':'All optional, but they help us reply with real pricing instead of a generic follow-up.'}</p>
+          <h3 className="text-xl font-bold text-white">{entry && form.job_type===entry.job ? entry.title : 'A few details specific to this work'}</h3>
+          <p className="mt-1 text-sm text-slate-400">{entry?.id==='moving-data-between-systems'?'These questions are for a data move, not a generic operations request.':'Answers here change the next questions. All optional, but they help us reply with real pricing instead of a generic follow-up.'}</p>
           <div className="mt-5 space-y-4">{activeQuestions.map((q)=>{
             const val = form.service_answers[q.key]
             return <div key={q.key}>
