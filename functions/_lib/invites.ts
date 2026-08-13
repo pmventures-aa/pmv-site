@@ -3,6 +3,7 @@ import { sendEmailStrict } from './email'
 import { uuid } from './crypto'
 import { hqUrl, wwwPortalUrl } from './appUrls'
 import { renderRelationshipEvent } from './emailTemplates/relationship'
+import { renderHqEmailOrFallback } from './hqEmailTemplates'
 
 export type InviteType = 'vendor' | 'client' | 'staff' | 'trusted_contact'
 
@@ -186,17 +187,23 @@ export async function sendInviteEmail(
   const url = inviteUrl(row.invite_type, token)
   const copy = inviteCopy(row.invite_type, row.client_name, parseInviteMetadata(row.metadata_json))
   const firstName = (row.full_name || '').trim().split(/\s+/)[0] || 'there'
-  const rendered = renderRelationshipEvent({
+  const fallback = renderRelationshipEvent({
     eventKey: `invite_${row.invite_type}`,
     firstName,
     subject: copy.subject,
-    preheader: row.invite_type === 'vendor' ? 'A personal invitation to apply to Pinnacle’s professional provider network.' : 'Your private Pinnacle invitation expires in 24 hours.',
+    preheader: row.invite_type === 'vendor' ? 'A personal invitation to apply to Pinnacle\'s professional provider network.' : 'Your private Pinnacle invitation expires in 24 hours.',
     eyebrow: copy.eyebrow,
     title: copy.title,
     body: `${copy.body}\n\nThis private invitation expires in 24 hours. If you were not expecting it, you can ignore this message or contact Pinnacle before creating an account.`,
     ctaLabel: copy.cta,
     ctaUrl: url,
   })
+  const rendered = await renderHqEmailOrFallback(env, `invite_${row.invite_type}`, {
+    first_name: firstName,
+    client_name: row.client_name || '',
+    action_url: url,
+    action_label: copy.cta,
+  }, fallback)
   return sendEmailStrict(env, {
     to: row.email,
     subject: rendered.subject,

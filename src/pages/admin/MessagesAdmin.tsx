@@ -13,6 +13,7 @@ import { timeAgo } from '../../lib/activity'
 import { useAppPath } from '../../lib/basePath'
 import { ConversationsPanel } from './ConversationsPanel'
 import { EmailThreadsPanel } from './EmailThreadsPanel'
+import { EmailTemplatesPanel } from './EmailTemplatesPanel'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 import { NotificationsTab, OverviewTab, ReportingTab } from './CommunicationsHub'
 import { SessionWho } from '../../components/kit/WhoSection'
@@ -32,11 +33,12 @@ interface ClientOption {
   email: string
 }
 
-type MessageTab = 'inbox' | 'email' | 'staff' | 'notifications' | 'pulse'
+type MessageTab = 'inbox' | 'email' | 'staff' | 'notifications' | 'pulse' | 'templates'
 const TABS: { id: MessageTab; label: string }[] = [
   { id: 'inbox', label: 'Client inbox' },
   { id: 'email', label: 'Email' },
   { id: 'staff', label: 'Staff DMs' },
+  { id: 'templates', label: 'Templates' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'pulse', label: 'Pulse' },
 ]
@@ -174,6 +176,7 @@ export default function MessagesAdmin() {
       if (next !== 'email') params.delete('thread')
       if (next !== 'staff') params.delete('conv')
       if (next !== 'inbox') params.delete('inbox')
+      if (next !== 'templates') { params.delete('template'); params.delete('slug') }
       return params
     }, { replace: true })
   }
@@ -194,6 +197,7 @@ export default function MessagesAdmin() {
       <div className="flex min-h-0 flex-1 flex-col pb-3">
         {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} initialThreadId={searchParams.get('inbox')} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
         {tab === 'email' && <EmailThreadsPanel />}
+        {tab === 'templates' && <EmailTemplatesPanel />}
         {tab === 'staff' && <ConversationsPanel />}
         {tab === 'notifications' && <NotificationsTab />}
         {tab === 'pulse' && <PulseTab />}

@@ -5,6 +5,7 @@ import { canAccessClient, scopeFilter } from '../scope'
 import { uuid } from '../crypto'
 import { activityInsert, logActivity } from '../activity'
 import { sendEmailStrict, escapeHtml } from '../email'
+import { renderHqEmailOrFallback } from '../hqEmailTemplates'
 import { calculateInvoiceTotals, type InvoiceLineInput } from '../invoiceMath'
 import { portalUrl } from '../appUrls'
 
@@ -393,14 +394,28 @@ invoiceAdminRoutes.post('/invoices/:id/send', requireStaff, async (c) => {
     : 'upon receipt'
   const invoiceLabel = invoice.invoice_number || invoice.id
   const portalUrlValue = portalUrl('/billing')
-  const subject = `${invoiceLabel} — ${amount}`
-  const html = [
+  const fallbackSubject = `${invoiceLabel} - ${amount}`
+  const fallbackHtml = [
     `<p>Hi ${escapeHtml(invoice.client_name || 'there')},</p>`,
     `<p>Pinnacle Management Ventures has prepared invoice <strong>${escapeHtml(invoiceLabel)}</strong> for <strong>${escapeHtml(amount)}</strong>, due ${escapeHtml(due)}.</p>`,
     invoice.message ? `<p>${escapeHtml(invoice.message)}</p>` : '',
     `<p><a href="${portalUrlValue}">View invoice in your Client Portal</a></p>`,
     '<p>This invoice records the amount and available payment methods. Online card/ACH charging is not enabled in Pinnacle at this time.</p>',
   ].join('')
+  const rendered = await renderHqEmailOrFallback(c.env, 'invoice_send', {
+    first_name: String(invoice.client_name || 'there').trim().split(/\s+/)[0] || 'there',
+    invoice_label: String(invoiceLabel),
+    amount,
+    due,
+    invoice_message: invoice.message ? String(invoice.message) : '',
+    action_url: portalUrlValue,
+  }, {
+    subject: fallbackSubject,
+    html: fallbackHtml,
+    text: `Pinnacle invoice ${invoiceLabel}: ${amount}, due ${due}. View it at ${portalUrlValue}`,
+  })
+  const subject = rendered.subject
+  const html = rendered.html
 
   try {
     const sendStamp = new Date().toISOString().slice(0, 16)
@@ -408,7 +423,7 @@ invoiceAdminRoutes.post('/invoices/:id/send', requireStaff, async (c) => {
       to,
       subject,
       html,
-      text: `Pinnacle invoice ${invoiceLabel}: ${amount}, due ${due}. View it at ${portalUrlValue}`,
+      text: rendered.text || `Pinnacle invoice ${invoiceLabel}: ${amount}, due ${due}. View it at ${portalUrlValue}`,
       replyTo: 'orders@pinnaclemanagementventures.com',
       idempotencyKey: `invoice/${invoice.id}/${to}/${sendStamp}`,
       tags: [
