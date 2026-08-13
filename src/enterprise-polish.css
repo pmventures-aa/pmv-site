@@ -35,34 +35,40 @@ textarea {
   justify-content: center;
   padding: 0 4rem;
   border-right: 1px solid rgba(255,255,255,.08);
-  background:
-    linear-gradient(145deg, rgba(11,31,58,.96), rgba(5,14,25,.985)),
-    radial-gradient(circle at 30% 30%, rgba(201,162,39,.12), transparent 32rem);
+  background: #07111d;
   isolation: isolate;
 }
 
 .auth-brand-panel::after {
-  content: '';
+  display: none;
+}
+
+.auth-atmosphere {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+  z-index: 0;
+}
+
+.auth-atmosphere-scene {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.auth-atmosphere-staff {
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(201,162,39,.08), transparent 36rem),
+    linear-gradient(180deg, #0b1a2e 0%, #07111d 58%, #050c16 100%);
+}
+
+.auth-atmosphere-client,
+.auth-atmosphere-general {
+  background: #0d1828;
 }
 
 .auth-brand-glow {
-  position: absolute;
-  width: 34rem;
-  height: 34rem;
-  right: -13rem;
-  top: 12%;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(201,162,39,.16), rgba(201,162,39,.035) 44%, transparent 70%);
-  filter: blur(18px);
-  animation: pmv-auth-glow 9s ease-in-out infinite;
+  display: none;
 }
 
 .auth-brand-orbit {
@@ -225,10 +231,70 @@ select.input {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+.pmv-sky-mark {
+  display: block;
+  width: 168px;
+  height: 112px;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.pmv-sky-sun {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pmv-sky-breathe 16s ease-in-out infinite;
+}
+
+.pmv-sky-haze {
+  animation: pmv-sky-drift 22s ease-in-out infinite;
+}
+
+.pmv-sky-star {
+  animation: pmv-sky-twinkle 7s ease-in-out infinite;
+}
+
+.pmv-sky-star-late {
+  animation-delay: 2.4s;
+}
+
+.pmv-welcome-wash-sunrise {
+  background: radial-gradient(ellipse at 12% 20%, rgba(243,201,138,.14), transparent 28rem);
+}
+
+.pmv-welcome-wash-day {
+  background: radial-gradient(ellipse at 18% 0%, rgba(126,160,184,.12), transparent 26rem);
+}
+
+.pmv-welcome-wash-sunset {
+  background: radial-gradient(ellipse at 8% 30%, rgba(180,90,72,.16), transparent 28rem);
+}
+
+.pmv-welcome-wash-night {
+  background: radial-gradient(ellipse at 20% 0%, rgba(125,155,210,.1), transparent 26rem);
+}
+
+@keyframes pmv-sky-breathe {
+  0%, 100% { transform: translate3d(0,0,0) scale(1); opacity: 1; }
+  50% { transform: translate3d(0,-2px,0) scale(1.04); opacity: .92; }
+}
+
+@keyframes pmv-sky-drift {
+  0%, 100% { transform: translate3d(0,0,0); opacity: .85; }
+  50% { transform: translate3d(6px,-3px,0); opacity: 1; }
+}
+
+@keyframes pmv-sky-twinkle {
+  0%, 100% { opacity: .35; }
+  50% { opacity: .9; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auth-brand-glow,
   .auth-brand-orbit,
-  .auth-card { animation: none !important; }
+  .auth-card,
+  .pmv-sky-sun,
+  .pmv-sky-haze,
+  .pmv-sky-star { animation: none !important; }
 }
 
 @media (min-width: 1024px) {

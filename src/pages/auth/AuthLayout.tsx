@@ -1,18 +1,22 @@
-import { CheckCircle2, LockKeyhole } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { LockKeyhole } from 'lucide-react'
 import { Crest } from '../../components/ui'
 import { ThemeToggle } from '../../components/ThemeToggle'
+import { AuthAtmosphere, AuthRotatingCopy, AuthRotatingLine } from '../../components/auth/AuthAtmosphere'
+import { authMomentsFor } from '../../data/authMoments'
 
 interface AuthLayoutProps {
   eyebrow: string
   title: string
   subtitle?: string
-  children: React.ReactNode
-  footer?: React.ReactNode
+  children: ReactNode
+  footer?: ReactNode
   surface?: 'client' | 'staff' | 'general'
   sideTitle?: string
   sideBody?: string
   sideLabel?: string
   sidePoints?: string[]
+  liveCopy?: boolean
 }
 
 const surfaceCopy = {
@@ -25,7 +29,7 @@ const surfaceCopy = {
   staff: {
     label: 'Pinnacle HQ',
     title: 'Sign in to continue.',
-    body: 'Every sign-in is encrypted in transit, logged with IP + device, and expires automatically. Forgot your password? The reset link on the sign-in form notifies the owner so unusual attempts get an extra set of eyes.',
+    body: 'Every sign-in is encrypted in transit, logged with IP and device, and expires automatically.',
     points: [] as string[],
   },
   general: {
@@ -47,15 +51,19 @@ export function AuthLayout({
   sideBody,
   sideLabel,
   sidePoints,
+  liveCopy = false,
 }: AuthLayoutProps) {
   const copy = surfaceCopy[surface]
-  const points = sidePoints ?? copy.points
+  const moments = authMomentsFor(surface)
+  const points = liveCopy ? [] : (sidePoints ?? copy.points)
+  const live = liveCopy && moments.length > 0
+
   return (
-    <div className="auth-shell min-h-screen bg-navy-950 text-slate-100">
+    <div className={`auth-shell auth-shell-${surface} min-h-screen bg-navy-950 text-slate-100`}>
       <div className="absolute right-4 top-4 z-30 sm:right-6 sm:top-6"><ThemeToggle compact /></div>
 
-      <aside className="auth-brand-panel hidden lg:flex">
-        <div className="auth-brand-glow" aria-hidden="true" />
+      <aside className={`auth-brand-panel auth-brand-panel-${surface} hidden lg:flex`}>
+        <AuthAtmosphere surface={surface} />
         <div className="relative z-10 flex h-full w-full max-w-xl flex-col justify-between py-10">
           <a href="https://pinnaclemanagementventures.com" className="inline-flex w-fit items-center gap-4" aria-label="Pinnacle Management Ventures home">
             <Crest size={72} tone="light" className="pmv-auth-crest shrink-0" />
@@ -65,22 +73,26 @@ export function AuthLayout({
             </span>
           </a>
 
-          <div className="py-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/[.06] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[.14em] text-gold">
-              {sideLabel || copy.label}
+          {live ? (
+            <AuthRotatingCopy moments={moments} />
+          ) : (
+            <div className="py-10">
+              <div className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/[.06] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[.14em] text-gold">
+                {sideLabel || copy.label}
+              </div>
+              <h2 className="mt-6 max-w-lg font-display text-4xl font-semibold leading-[1.08] tracking-[-.025em] text-white xl:text-5xl">
+                {sideTitle || copy.title}
+              </h2>
+              <p className="mt-5 max-w-lg text-[15px] leading-7 text-slate-300">{sideBody || copy.body}</p>
+              <div className="mt-8 space-y-3">
+                {points.map((point) => (
+                  <div key={point} className="flex items-center gap-3 text-sm font-medium text-slate-200">
+                    <span className="h-1 w-1 rounded-full bg-gold" /> {point}
+                  </div>
+                ))}
+              </div>
             </div>
-            <h2 className="mt-6 max-w-lg font-display text-4xl font-semibold leading-[1.08] tracking-[-.025em] text-white xl:text-5xl">
-              {sideTitle || copy.title}
-            </h2>
-            <p className="mt-5 max-w-lg text-[15px] leading-7 text-slate-300">{sideBody || copy.body}</p>
-            <div className="mt-8 space-y-3">
-              {points.map((point) => (
-                <div key={point} className="flex items-center gap-3 text-sm font-medium text-slate-200">
-                  <CheckCircle2 size={17} className="text-gold" /> {point}
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
 
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <LockKeyhole size={14} className="text-gold/70" />
@@ -104,7 +116,11 @@ export function AuthLayout({
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[.18em] text-gold">{eyebrow}</p>
             <h1 className="mt-3 font-display text-4xl font-semibold leading-tight tracking-[-.025em] text-white sm:text-[2.7rem]">{title}</h1>
-            {subtitle && <p className="mt-3 max-w-md text-[15px] leading-7 text-slate-400">{subtitle}</p>}
+            {live ? (
+              <AuthRotatingLine lines={moments.map((moment) => moment.line)} />
+            ) : (
+              subtitle && <p className="mt-3 max-w-md text-[15px] leading-7 text-slate-400">{subtitle}</p>
+            )}
           </div>
 
           <div className="auth-card mt-8">{children}</div>

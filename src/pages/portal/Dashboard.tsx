@@ -12,6 +12,7 @@ import { GetStartedPrompt } from '../../components/portal/GetStartedPrompt'
 import { pmvFadeUp, pmvStagger } from '../../lib/motionTheme'
 import { clientWorkspace } from '../../lib/workspace'
 import { AddToCalendarButton } from '../../components/kit/AddToCalendar'
+import { DashboardWelcome } from '../../components/DashboardWelcome'
 
 interface DashboardData {
   stats: {
@@ -30,13 +31,6 @@ interface DashboardData {
 }
 
 interface CatalogItem { key: string; name: string; category: string }
-
-function greeting(hour: number): string {
-  if (hour < 5) return 'Good evening'
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
-}
 
 function waitingOnYou(waitingOn: string) {
   return waitingOn === 'you' || waitingOn === 'client'
@@ -63,8 +57,6 @@ export default function Dashboard() {
     return catalog.filter((item) => !enabledKeys.has(item.key)).slice(0, 4)
   }, [catalog, enabledKeys])
 
-  const firstName = (user?.first_name || user?.full_name || '').split(' ')[0] || 'there'
-  const hour = new Date().getHours()
   const stats = data?.stats
   const cases = data?.active_cases ?? []
   const needsYou = cases.filter((item) => waitingOnYou(item.waiting_on))
@@ -143,17 +135,9 @@ export default function Dashboard() {
     <motion.div className="pb-8 lg:pb-4" initial="hidden" animate="show" variants={pmvStagger}>
       <GetStartedPrompt className="mb-6" />
 
-      <motion.header variants={pmvFadeUp} className="border-b border-white/10 pb-7">
-        <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-gold/75">
-          {copy.homeEyebrow} · {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-        </p>
-        <h1 className="mt-2 font-display text-3xl font-medium tracking-[-.02em] text-white sm:text-4xl">
-          {greeting(hour)}, {firstName}.
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-          {copy.homeSubtitle}
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
+      <motion.header variants={pmvFadeUp} className="pb-2">
+        <DashboardWelcome name={user?.first_name || user?.full_name} userId={user?.id} variant="portal" subtitle={copy.homeSubtitle} />
+        <div className="mt-5 flex flex-wrap gap-3">
           <Link to={p(copy.primaryCta.to)} className="btn-gold">{copy.primaryCta.label}</Link>
           <Link to={p(copy.secondaryCta.to)} className="btn-outline">{copy.secondaryCta.label}</Link>
         </div>
