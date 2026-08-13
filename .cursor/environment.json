@@ -11,5 +11,8 @@
       "command": "npm run db:migrate:local && npm run build && npx wrangler pages dev dist --port 8788 --ip 0.0.0.0"
     }
   ],
-  "ports": [5173, 8788]
+  "ports": [
+    { "name": "vite", "port": 5173 },
+    { "name": "wrangler", "port": 8788 }
+  ]
 }
