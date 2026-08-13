@@ -11,7 +11,7 @@ export type ScopeQuestion = {
   key: string
   label: string
   hint?: string
-  type: 'select' | 'multiselect' | 'text' | 'number'
+  type: 'select' | 'multiselect' | 'text' | 'number' | 'yesno'
   options?: string[]
   when?: ScopeQuestionWhen
 }
@@ -36,96 +36,170 @@ const q = (
   extras: Partial<ScopeQuestion> = {},
 ): ScopeQuestion => ({ key, label, type, ...extras })
 
-const CLEAN_QUESTIONS: ScopeQuestion[] = [
+export const STATUS_QUESTION_KEYS = ['occupied', 'has_document', 'is_urgent', 'system_down', 'has_deadline'] as const
+
+const PROPERTY_PHOTOS = [
+  'Quick exterior (3-6 photos)',
+  'Exterior + street scenes',
+  'Interior photo package',
+  'BPO photo set - exterior',
+  'BPO photo set - interior / full',
+  'Licensed exterior BPO',
+  'Licensed interior BPO',
+  'Commercial / signage audit',
+]
+const PROPERTY_REPORTS = [
+  'Occupancy confirmation',
+  'Condition / walkthrough report',
+  'Move-in / move-out condition report',
+  'Insurance / underwriting package',
+  'Rehab / construction progress',
+  'Damage assessment',
+  'Rent-ready / punch list',
+]
+const DOCUMENT_PHOTOS = ['ID / credential photos', 'Document scans or copies', 'Signing-room photos', 'Delivery / drop-off photos']
+const DOCUMENT_REPORTS = ['Delivery confirmation', 'Completion certificate', 'Filing receipt', 'Notary journal confirmation']
+const OPS_PHOTOS = ['Screenshots of current tools', 'Process / workflow photos', 'Location or office photos']
+const OPS_REPORTS = ['Process map', 'Operational audit', 'Handoff checklist', 'Weekly status note']
+const SYSTEMS_PHOTOS = ['Screenshots of the current system', 'Error or downtime photos', 'Terminal / hardware photos']
+const SYSTEMS_REPORTS = ['Cutover checklist', 'Data-mapping summary', 'Go-live status note']
+
+function statusQuestion(key: string, label: string, hint?: string): ScopeQuestion {
+  return q(key, label, 'yesno', { options: ['Yes', 'No'], hint })
+}
+
+function deliverableQuestions(photos: string[], reports: string[], checkIn = 'Quick check-in'): ScopeQuestion[] {
+  return [
+    q('deliverables', 'What do you need back?', 'multiselect', {
+      options: [checkIn, 'Photos', 'Written report'],
+      hint: 'Pick one or more. Quick check-in is a short confirmation without a full photo or report package.',
+    }),
+    q('photos_required', 'Photos required', 'select', {
+      options: photos,
+      when: { key: 'deliverables', in: ['Photos'] },
+    }),
+    q('reports_required', 'Reports required', 'select', {
+      options: reports,
+      when: { key: 'deliverables', in: ['Written report'] },
+    }),
+  ]
+}
+
+function propertyCore(extra: ScopeQuestion[] = []): ScopeQuestion[] {
+  return [
+    statusQuestion('occupied', 'Is the property occupied?'),
+    ...deliverableQuestions(PROPERTY_PHOTOS, PROPERTY_REPORTS),
+    q('platform', 'BPO or inspection platform, if any', 'text', {
+      hint: 'Clear Capital, ServiceLink, interior checklist, etc.',
+      when: { key: 'photos_required', includes: 'BPO' },
+    }),
+    ...extra,
+  ]
+}
+
+function documentCore(extra: ScopeQuestion[] = []): ScopeQuestion[] {
+  return [
+    statusQuestion('has_document', 'Do you already have the document?'),
+    ...deliverableQuestions(DOCUMENT_PHOTOS, DOCUMENT_REPORTS),
+    ...extra,
+  ]
+}
+
+function opsCore(statusKey: 'is_urgent' | 'system_down' | 'has_deadline', statusLabel: string, extra: ScopeQuestion[] = []): ScopeQuestion[] {
+  const photos = statusKey === 'system_down' ? SYSTEMS_PHOTOS : OPS_PHOTOS
+  const reports = statusKey === 'system_down' ? SYSTEMS_REPORTS : OPS_REPORTS
+  return [statusQuestion(statusKey, statusLabel), ...deliverableQuestions(photos, reports), ...extra]
+}
+
+const CLEAN_QUESTIONS: ScopeQuestion[] = propertyCore([
   q('clean_type', 'What kind of clean?', 'select', { options: ['Standard turnover', 'Deep / detail clean', 'Move-out with punch list', 'Rent-ready', 'REO / vacant', 'Post-eviction / heavy condition', 'Vacancy maintenance (recurring)'] }),
   q('property_type', 'Property type', 'select', { options: ['Single-family', 'Condo', 'Townhome', 'Multi-unit 2-4', 'Small multi-family 5-20', 'Vacation / STR', 'Commercial'] }),
   q('square_feet', 'Approx square footage', 'number', { hint: 'Best guess is fine' }),
-  q('occupancy', 'Current occupancy', 'select', { options: ['Occupied', 'Vacant / on market', 'Vacant / off market', 'Transitioning', 'Owner-occupied'] }),
   q('access', 'Access instructions', 'text', { hint: 'Lockbox, key hidden, tenant present, etc.', when: { location: 'onsite' } }),
-]
+])
 
-const INSPECTION_QUESTIONS: ScopeQuestion[] = [
-  q('inspection_type', 'What kind of inspection?', 'select', { options: ['Occupancy check (drive-by / knock)', 'Interior + photo package', 'Move-in / move-out condition report', 'Insurance / underwriting package', 'Rehab / construction progress', '30/60/90-day rental', 'Vacant property check', 'Damage assessment', 'Field photos / BPO'] }),
+const INSPECTION_QUESTIONS: ScopeQuestion[] = propertyCore([
   q('property_type', 'Property type', 'select', { options: ['Single-family', 'Condo', 'Townhome', 'Multi-unit', 'Commercial', 'Land / lot'] }),
-  q('photo_set', 'What photo set do you need?', 'select', { options: ['Exterior / drive-by (3-6 photos)', 'Exterior + street scenes', 'BPO photo set - exterior', 'BPO photo set - interior / full', 'Licensed exterior BPO', 'Licensed interior BPO', 'Commercial / signage audit'], when: { key: 'inspection_type', in: ['Interior + photo package', 'Insurance / underwriting package', 'Field photos / BPO'] } }),
-  q('platform', 'BPO or inspection platform, if any', 'text', { hint: 'Clear Capital, ServiceLink, interior checklist, etc.', when: { key: 'inspection_type', in: ['Interior + photo package', 'Insurance / underwriting package', 'Field photos / BPO'] } }),
   q('recurring', 'One-time or recurring?', 'select', { options: ['One-time', 'Weekly', 'Bi-weekly', 'Monthly', 'Quarterly'] }),
   q('access', 'Access instructions', 'text', { when: { location: 'onsite' } }),
-]
+])
 
-const PHOTO_QUESTIONS: ScopeQuestion[] = [
-  q('photo_set', 'What photo set do you need?', 'select', { options: ['Exterior / drive-by (3-6 photos)', 'Exterior + street scenes', 'BPO photo set - exterior', 'BPO photo set - interior / full', 'Licensed exterior BPO', 'Licensed interior BPO', 'Commercial / signage audit', 'Volume program (10+ / month)'] }),
-  q('platform', 'BPO or inspection platform, if any', 'text', { hint: 'Clear Capital, ServiceLink, interior checklist, etc.' }),
+const PHOTO_QUESTIONS: ScopeQuestion[] = propertyCore([
   q('turnaround', 'Turnaround needed', 'select', { options: ['Standard 24-48 hours', 'Same day', 'Next business day', 'Flexible'] }),
   q('access', 'Access for interior work', 'text', { hint: 'Lockbox, occupied appointment, vacant, or exterior only' }),
-]
+])
 
-const EVICTION_QUESTIONS: ScopeQuestion[] = [
+const EVICTION_QUESTIONS: ScopeQuestion[] = propertyCore([
   q('stage', 'Current stage', 'select', { options: ['Pre-notice', 'Notice served', 'Filed / awaiting hearing', 'Judgment entered', 'Writ / lockout scheduled', 'Post-possession'] }),
   q('county', 'Florida county', 'select', { options: ['Broward', 'Palm Beach', 'Miami-Dade', 'Other Florida county'] }),
   q('attorney', 'Is an attorney already involved?', 'select', { options: ['Yes', 'No', 'Not yet, looking to coordinate one'] }),
   q('property_condition', 'Expected property condition', 'select', { options: ['Normal turnover', 'Heavy trash / damage expected', 'Bio-aware condition', 'Unknown'] }),
   q('needs_after_lockout', 'What is needed after lawful possession?', 'multiselect', { options: ['Locksmith / rekey', 'Debris haul', 'Deep clean', 'Inspection + photos', 'Board-up / secure', 'Ready-to-list'] }),
-]
+])
 
-const DOCUMENT_QUESTIONS: ScopeQuestion[] = [
+const DOCUMENT_QUESTIONS: ScopeQuestion[] = documentCore([
   q('document_kind', 'What kind of document work?', 'multiselect', { options: ['Mobile notary', 'Remote Online Notary (RON)', 'Document prep / packet', 'Courier / delivery', 'Courthouse filing', 'Signing coordination', 'Attorney handoff'] }),
   q('notary_kind', 'In person or remote?', 'select', { options: ['Mobile notary at a location', 'Remote Online Notarization (RON)', 'Loan signing package', 'Not sure yet'], when: { key: 'document_kind', includes: 'notary' } }),
   q('document_type', 'What is being signed or prepared?', 'text', { hint: 'POA, affidavit, closing package, lease, etc.', when: { key: 'document_kind', includes: 'notary' } }),
   q('signer_count', 'How many signers?', 'select', { options: ['1', '2', '3', '4+'], when: { key: 'document_kind', includes: 'notary' } }),
   q('pickup', 'Pickup location', 'text', { when: { key: 'document_kind', includes: 'Courier' } }),
   q('dropoff', 'Drop-off or filing location', 'text', { when: { key: 'document_kind', includes: 'Courier' } }),
-  q('has_document', 'Do you already have the document?', 'select', { options: ['Yes, ready to go', 'Yes, needs review', 'No, need help preparing it'] }),
   q('meeting_location', 'Where does it need to happen?', 'text', { hint: 'Address, office, care facility, courthouse, remote', when: { location: 'onsite' } }),
-]
+])
 
-const NOTARY_QUESTIONS: ScopeQuestion[] = [
+const NOTARY_QUESTIONS: ScopeQuestion[] = documentCore([
   q('notary_kind', 'In person or remote?', 'select', { options: ['Mobile notary at a location', 'Remote Online Notarization (RON)', 'Loan signing package', 'Not sure yet'] }),
   q('document_type', 'What is being signed?', 'text', { hint: 'POA, affidavit, closing package, lease, etc.' }),
   q('signer_count', 'How many signers?', 'select', { options: ['1', '2', '3', '4+'] }),
   q('special_location', 'Any special location needs?', 'select', { options: ['Home or office', 'Hospital / care facility', 'After hours / weekend', 'RON from anywhere'] }),
-]
+])
 
-const OPS_QUESTIONS: ScopeQuestion[] = [
+const OPS_QUESTIONS: ScopeQuestion[] = opsCore('is_urgent', 'Is there a hard deadline?', [
   q('industry', 'Industry / vertical', 'select', { options: ['Real estate', 'Legal / professional', 'Retail', 'Restaurant / hospitality', 'Health / wellness', 'Home services / contractor', 'Property services', 'Non-profit', 'Other'] }),
   q('team_size', 'Team size', 'select', { options: ['Solo / owner-only', '2-5', '6-15', '16-50', '50+'] }),
   q('need_type', 'What kind of help?', 'multiselect', { options: ['Administrative capacity', 'Bookkeeping coordination', 'Vendor management', 'Client follow-up', 'Project management', 'Process documentation', 'Operational audit', 'Systems / software'] }),
-  q('urgency', 'Is there a launch date or deadline?', 'text'),
-]
+  q('urgency', 'What is the date or deadline?', 'text', { when: { key: 'is_urgent', in: ['Yes'] } }),
+])
 
-const DATA_QUESTIONS: ScopeQuestion[] = [
+const DATA_QUESTIONS: ScopeQuestion[] = opsCore('system_down', 'Is the current system down or blocking work?', [
   q('source_system', 'What system are you moving data out of?', 'text', { hint: 'POS, CRM, membership, accounting, or spreadsheets' }),
   q('destination_system', 'Where does it need to land?', 'text', { hint: 'Optional if you are still choosing' }),
   q('record_types', 'What records matter most?', 'multiselect', { options: ['Customers / members', 'Transactions / invoices', 'Inventory', 'Appointments', 'Employees', 'Documents / files', 'Other operational data'] }),
   q('exports_ready', 'Do you already have exports?', 'select', { options: ['Yes, files are ready', 'Partial / messy exports', 'No, we need help pulling them', 'Not sure what can be exported'] }),
   q('must_not_break', 'What cannot break during the move?', 'text'),
-]
+])
 
-const POS_QUESTIONS: ScopeQuestion[] = [
+const POS_QUESTIONS: ScopeQuestion[] = opsCore('system_down', 'Is the current system down or blocking work?', [
   q('current_system', 'Current POS / payment provider', 'text'),
   q('target_system', 'Target system, if known', 'text', { hint: 'Optional - we can help you compare' }),
   q('business_type', 'Business type', 'select', { options: ['Retail', 'Restaurant / hospitality', 'Services', 'E-commerce', 'Multi-location', 'Other'] }),
   q('volume', 'Approx monthly card volume', 'select', { options: ['Under $10k', '$10k-$50k', '$50k-$250k', '$250k-$1M', 'Over $1M', 'Not sure'] }),
   q('timeline', 'Timeline pressure', 'select', { options: ['ASAP - system down or provider issues', 'Within 30 days', '1-3 months', 'No fixed date'] }),
-]
+])
 
-const TRANSITION_QUESTIONS: ScopeQuestion[] = [
+const TRANSITION_QUESTIONS: ScopeQuestion[] = opsCore('has_deadline', 'Is there a hard date?', [
   q('change_type', 'What is changing?', 'multiselect', { options: ['A system or vendor', 'A location or operating model', 'Ownership / leadership', 'A process the whole team uses', 'Several of the above'] }),
   q('stakeholders', 'Who else is involved?', 'text', { hint: 'Vendors, staff, advisors, landlords, etc.' }),
-  q('deadline', 'Is there a hard date?', 'text'),
+  q('deadline', 'What is the date?', 'text', { when: { key: 'has_deadline', in: ['Yes'] } }),
   q('stuck_on', 'What is stuck right now?', 'text'),
-]
+])
 
-const FUNDING_QUESTIONS: ScopeQuestion[] = [
+const FUNDING_QUESTIONS: ScopeQuestion[] = opsCore('has_deadline', 'Is there a deadline to apply or close?', [
   q('use_of_funds', 'What would the funds be used for?', 'text'),
   q('amount_range', 'Amount you are exploring', 'select', { options: ['Under $25k', '$25k-$75k', '$75k-$250k', '$250k-$1M', 'Over $1M', 'Not sure yet'] }),
   q('stage', 'Where are you in the process?', 'select', { options: ['Just exploring', 'Comparing options', 'Ready to apply', 'Already in underwriting'] }),
   q('docs_ready', 'How organized is the paperwork?', 'select', { options: ['Ready to send', 'Partial', 'Need help assembling it'] }),
-]
+])
 
-const OTHER_QUESTIONS: ScopeQuestion[] = [
+const OTHER_QUESTIONS: ScopeQuestion[] = opsCore('has_deadline', 'Is there a deadline?', [
   q('outcome', 'What outcome are you after?', 'text', { hint: 'Describe the handled state so we can scope backwards from it' }),
-]
+])
+
+export function hasStandardIntake(questions: ScopeQuestion[]): boolean {
+  const keys = new Set(questions.map((item) => item.key))
+  const hasStatus = STATUS_QUESTION_KEYS.some((key) => keys.has(key))
+  return hasStatus && keys.has('deliverables') && keys.has('photos_required') && keys.has('reports_required')
+}
 
 const JOB_QUESTIONS: Record<string, ScopeQuestion[]> = {
   cleaning_turnover: CLEAN_QUESTIONS,
@@ -270,12 +344,11 @@ export const SERVICE_ENTRIES: Record<string, ScopeEntry> = {
     title: 'Tell us about the property that needs an owner on it.',
     body: 'One visit, a turnover, or ongoing management through our licensed partner. Start with the property and the outcome.',
     pickerLabel: 'Property management & owner support',
-  }, [
+  }, propertyCore([
     q('need', 'What do you need on this property?', 'select', { options: ['Vendor / maintenance coordination', 'Tenant placement', 'Full management', 'Turnover / make-ready', 'Ongoing owner support', 'Not sure yet'] }),
     q('unit_count', 'How many units?', 'select', { options: ['1', '2-4', '5-20', '21-50', '50+'] }),
-    q('occupancy', 'Current occupancy', 'select', { options: ['Occupied', 'Vacant', 'Mixed', 'Owner-occupied'] }),
     q('access', 'Access instructions', 'text'),
-  ]),
+  ])),
   'property-cleaning': GUIDE_ENTRIES['property-cleaning-turnover'],
   'eviction-support': GUIDE_ENTRIES['eviction-turnover-support'],
   'property-inspections': entry('property-inspections', 'property_inspection', 'property_inspections', {
@@ -301,12 +374,12 @@ export const SERVICE_ENTRIES: Record<string, ScopeEntry> = {
     title: 'Tell us what needs to be delivered or filed.',
     body: 'Pickup, destination, and the deadline. Photo and signature confirmation on every handoff.',
     pickerLabel: 'Prepare, sign, or move a document',
-  }, [
+  }, documentCore([
     q('run_type', 'What kind of run?', 'select', { options: ['Local delivery', 'Priority / direct', 'Same-day tri-county', 'Round-trip', 'Courthouse / agency filing'] }),
     q('pickup', 'Pickup location', 'text'),
     q('dropoff', 'Drop-off or filing location', 'text'),
     q('deadline', 'Deadline', 'text'),
-  ]),
+  ])),
   'mobile-notary': entry('mobile-notary', 'documents_notary', 'mobile_notary', {
     eyebrow: 'Mobile notary',
     title: 'Tell us about the signing appointment.',
@@ -318,12 +391,12 @@ export const SERVICE_ENTRIES: Record<string, ScopeEntry> = {
     title: 'Tell us about the RON session.',
     body: 'If the document qualifies, nobody has to drive. We confirm eligibility, run identity verification, and return the completed document electronically.',
     pickerLabel: 'Prepare, sign, or move a document',
-  }, [
+  }, documentCore([
     q('document_type', 'What is being notarized?', 'text'),
     q('signer_count', 'How many signers?', 'select', { options: ['1', '2', '3', '4+'] }),
     q('signer_location', 'Where will the signer be?', 'text', { hint: 'City and state, or "out of country"' }),
     q('deadline', 'When does it need to be done?', 'text'),
-  ], true),
+  ]), true),
 }
 
 const JOB_ENTRIES: Record<string, ScopeEntry> = {

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, Tag, EmptyState, NoAccess, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { services } from '../../data/services'
 import { toast } from '../../components/kit/toast'
 import { ImpersonateButton } from '../../components/kit/ImpersonateButton'
+import { useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
 
 const ROLE_OPTIONS = ['all', 'client', 'staff', 'admin']
@@ -71,6 +72,7 @@ function emailTone(status: string | null): 'green' | 'red' | 'gold' | 'slate' {
 
 export default function UsersAdmin() {
   const { user: me } = useAuth()
+  const p = useAppPath()
   const [searchParams] = useSearchParams()
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -191,8 +193,8 @@ export default function UsersAdmin() {
       <PageIntro
         kicker="Access"
         title="Users"
-        subtitle="Provision client and HQ accounts, track invitation delivery, and resend access when needed."
-        action={<button className={btnPrimary} onClick={() => { setSetupLink(null); setShowForm((s) => !s) }}>{showForm ? 'Cancel' : '+ New user'}</button>}
+        subtitle="Provision client and HQ accounts, track invitation delivery, and resend access when needed. Coverage and invitations live next to this list."
+        action={<div className="flex flex-wrap gap-2"><Link to={p('assignments')} className={btnOutline}>Staff coverage</Link><Link to={p('invitations')} className={btnOutline}>Invitations</Link><button className={btnPrimary} onClick={() => { setSetupLink(null); setShowForm((s) => !s) }}>{showForm ? 'Cancel' : '+ New user'}</button></div>}
       />
 
       {setupLink && (

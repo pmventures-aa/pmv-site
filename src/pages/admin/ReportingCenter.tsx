@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, NoAccess, inputCls, btnPrimary, btnOutline, SkeletonStatCard, SkeletonTable } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { useCapabilities } from '../../lib/capabilities'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
+import { useAppPath } from '../../lib/basePath'
 
 interface CatalogEntry {
   key: string
@@ -53,6 +55,7 @@ function todayISO(offsetDays = 0): string {
 
 export default function ReportingCenter() {
   const caps = useCapabilities()
+  const p = useAppPath()
   const [catalog, setCatalog] = useState<CatalogEntry[]>([])
   const [category, setCategory] = useState<CatalogEntry['category']>('business')
   const [from, setFrom] = useState(todayISO(-30))
@@ -143,7 +146,7 @@ export default function ReportingCenter() {
 
   return (
     <div>
-      <PageIntro kicker="Insights" title="Reporting Center" subtitle="Real-time metrics across the firm. Export any report to CSV, print/save as PDF, or save it as a reusable template." action={<button onClick={() => window.print()} className={`${btnOutline} print:hidden`}>Print / Save as PDF</button>} />
+      <PageIntro kicker="Insights" title="Reporting Center" subtitle="Real-time metrics across the firm. Operational health and scheduled delivery live in Management." action={<div className="flex flex-wrap gap-2"><Link to={p('management')} className={btnOutline}>Management scorecard</Link><button onClick={() => window.print()} className={`${btnOutline} print:hidden`}>Print / Save as PDF</button></div>} />
 
       <Panel className="mb-6 print:hidden"><div className="flex flex-wrap items-end gap-4"><label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">From</span><input className={inputCls} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label><label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">To</span><input className={inputCls} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label><p className="pb-2.5 text-xs text-slate-500">Reports with "(period)" or "(range)" in their description use this window; others are a live snapshot.</p></div></Panel>
 

@@ -68,9 +68,12 @@ export default function FieldWorkAdmin() {
         title="Field assignments"
         subtitle="Property visits, mobile notary jobs, and Remote Online Notarizations across your professional network."
         action={
-          <button type="button" onClick={() => setShowCreate((v) => !v)} className={btnPrimary}>
-            <Plus size={14} /> New assignment
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <Link to={p('service-assignments')} className={btnOutline}>Client services</Link>
+            <button type="button" onClick={() => setShowCreate((v) => !v)} className={btnPrimary}>
+              <Plus size={14} /> New assignment
+            </button>
+          </div>
         }
       />
 

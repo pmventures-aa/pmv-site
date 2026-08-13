@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { PageIntro, Panel, Tag, EmptyState, inputCls } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag, EmptyState, inputCls, btnOutline } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../components/admin/RecentWindow'
@@ -59,7 +59,7 @@ export default function ClientsList() {
 
   return (
     <div>
-      <PageIntro kicker="Client accounts" title="Clients" subtitle={loading ? 'Everyone you have access to.' : `${filtered.length} of ${clients.length} client${clients.length === 1 ? '' : 's'}, most recent first.`} />
+      <PageIntro kicker="Client accounts" title="Clients" subtitle={loading ? 'Everyone you have access to.' : `${filtered.length} of ${clients.length} client${clients.length === 1 ? '' : 's'}, most recent first.`} action={<Link to={p('service-assignments')} className={btnOutline}>Assign a service</Link>} />
       <div className="mb-4 flex flex-wrap gap-3">
         <input
           className={`${inputCls} max-w-xs`}

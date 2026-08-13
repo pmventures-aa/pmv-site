@@ -278,8 +278,8 @@ export default function CRMRecordsAdmin() {
       <PageIntro
         kicker="CRM"
         title="Leads & Prospects"
-        subtitle="People and businesses stay as durable records from first contact through conversion. Pipeline stage, lists, notes, and communication history travel with the relationship."
-        action={<div className="flex gap-2"><button className={btnOutline} onClick={() => setShowImport((v) => !v)}>Import CSV</button><button className={btnPrimary} onClick={() => setShowCreate((v) => !v)}>+ Add record</button></div>}
+        subtitle="People and businesses stay as durable records from first contact through conversion. Start a lead from Pipeline when you want it on the board immediately."
+        action={<div className="flex gap-2"><Link to={p('pipelines')} className={btnOutline}>Open pipeline</Link><Link to={p('leads/new')} className={btnPrimary}>Start lead profile</Link><button className={btnOutline} onClick={() => setShowImport((v) => !v)}>Import CSV</button><button className={btnOutline} onClick={() => setShowCreate((v) => !v)}>+ Quick add</button></div>}
       />
 
       <div className="mb-6 flex gap-6 border-b border-white/10">

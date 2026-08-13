@@ -69,7 +69,7 @@ export default function CommunicationsHub() {
 
   return (
     <div className="space-y-6">
-      <PageIntro kicker="Communications Hub" title="One view. Every channel." subtitle="Client threads, staff DMs, outbound email, and per-user notification settings in one place. Deep-link into the Email Center or Inbox for their full toolset." />
+      <PageIntro kicker="Communications Hub" title="One view. Every channel." subtitle="Client threads, staff DMs, outbound email, and per-user notification settings in one place. Day-to-day client messages stay in Inbox." action={<Link to={p('messages')} className={btnSecondary}>Open Inbox</Link>} />
 
       <div className="border-b border-white/10">
         <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">

@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Panel, Tag, btnSecondary } from '../../components/admin/ui'
+import { DocumentWorkspaceNav } from '../../components/admin/DocumentWorkspaceNav'
 import DocumentCenter from './DocumentCenter'
 import DocumentGovernanceWorkbench from './DocumentGovernanceWorkbench'
 
@@ -18,6 +19,7 @@ export default function DocumentOperationsDashboard(){
   const metrics=useMemo(()=>({active:docs.length,versioned:docs.filter(d=>d.version_count>1).length,shared:docs.filter(d=>d.share_count>0).length,archived:archived.length,inFlight:envelopes.filter(e=>['sent','viewed','in_progress'].includes(e.status)).length,completed:envelopes.filter(e=>e.status==='completed').length}),[docs,archived,envelopes])
   const recent=useMemo(()=>docs.slice().sort((a,b)=>new Date(b.updated_at).getTime()-new Date(a.updated_at).getTime()).slice(0,5),[docs])
   return <div>
+    <DocumentWorkspaceNav />
     <Panel className="mb-5 !p-0 overflow-hidden border-gold/15 bg-gradient-to-br from-gold/[.055] via-white/[.018] to-transparent">
       <div className="border-b border-white/10 px-4 py-5 sm:px-6"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-gold/80">Document Control</p><h2 className="mt-2 text-xl font-extrabold tracking-tight text-white">Enterprise document operations</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Manage working documents, controlled sharing, version history, signature transactions, evidence, and governance from one operational system.</p></div><div className="flex flex-wrap gap-2"><Link to={p('envelopes')} className={btnSecondary}><Send size={14}/>Envelope Workspace</Link><Link to={p('esign-platform')} className={btnSecondary}><ShieldCheck size={14}/>E-Sign Platform</Link><Link to={p('community-documents')} className={btnSecondary}><BookOpen size={14}/>Template Library</Link></div></div></div>
       <div className="grid grid-cols-2 gap-px bg-white/[.06] sm:grid-cols-3 xl:grid-cols-6">{[
