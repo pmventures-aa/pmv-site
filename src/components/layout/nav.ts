@@ -67,7 +67,7 @@ export const adminNav: NavItem[] = [
   {key:'assignments',label:'Staff Coverage',to:'assignments',icon:ArrowLeftRight,section:'Administration'},
   {key:'invitations',label:'Invitations',to:'invitations',icon:MailPlus,section:'Administration'},
   {key:'roles',label:'Roles & Permissions',to:'roles',icon:KeyRound,section:'Administration'},
-  {key:'public-funnel',label:'Website Studio',to:'public-funnel',icon:Globe,section:'Administration'},
+  {key:'public-funnel',label:'Public Website',to:'public-funnel',icon:Globe,section:'Administration'},
   {key:'settings',label:'Settings',to:'settings',icon:Settings,section:'Administration'},
 ]
 

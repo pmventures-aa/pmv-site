@@ -225,10 +225,10 @@ export function RoleTemplatesPanel({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold text-white">Coding roles</h3>
-          <p className="mt-1 text-sm text-slate-400">Create, rename, and set default permissions. Assigned users inherit these defaults until you override a specific grant.</p>
+          <h3 className="text-sm font-semibold text-white">Coding roles</h3>
+          <p className="mt-0.5 text-xs text-slate-500">Create, rename, and set default grants.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={btnOutline} onClick={() => setShowArchived((value) => !value)}>{showArchived ? 'Hide archived' : 'Show archived'}</button>
@@ -240,21 +240,20 @@ export function RoleTemplatesPanel({
         <RoleEditor form={form} setForm={setForm} permissions={permissions} editing={editing} busy={busy} onSubmit={saveRole} onCancel={() => setShowForm(false)} />
       )}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="space-y-2">
         {visible.length === 0 ? (
-          <Panel><EmptyState label="No roles match this filter." /></Panel>
+          <Panel className="!p-3"><EmptyState label="No roles match this filter." /></Panel>
         ) : visible.map((role) => (
-          <Panel key={role.id}>
+          <Panel key={role.id} className="!p-3">
             <div className="flex items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-base font-semibold text-white">{role.name}</h2>
+                  <h2 className="text-sm font-semibold text-white">{role.name}</h2>
                   {role.is_system ? <Tag tone="gold">Starter</Tag> : <Tag tone="slate">Custom</Tag>}
                   {role.is_archived ? <Tag tone="red">Archived</Tag> : null}
+                  <span className="font-mono text-[10px] text-slate-600">{role.role_key}</span>
                 </div>
-                <p className="mt-1 font-mono text-[11px] text-slate-500">{role.role_key}</p>
-                <p className="mt-1 text-sm text-slate-400">{role.description || 'No description yet.'}</p>
-                <p className="mt-2 text-xs text-slate-500">Applies to: {role.party_type} · {role.assigned_users} assigned</p>
+                <p className="mt-1 text-xs text-slate-400">{role.description || 'No description yet.'} · {role.party_type} · {role.assigned_users} assigned</p>
               </div>
               {canMutate && (
                 <div className="flex shrink-0 flex-col items-end gap-2">
@@ -266,7 +265,7 @@ export function RoleTemplatesPanel({
                 </div>
               )}
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {role.permissions.length === 0
                 ? <span className="text-xs text-slate-500">No elevated permissions.</span>
                 : role.permissions.map((key) => {

@@ -8,11 +8,11 @@ import { RoleTemplatesPanel, type Permission, type RoleDef } from './settings/Ro
 interface Employee { id: string; email: string; full_name: string | null; status: string; party_type: string | null; title: string | null; staff_role: string | null }
 
 const starterDescriptions = [
-  ['Operations Coordinator', 'Cases, assignments, documents, communications, network coordination, and reporting.'],
-  ['Client Relationship Manager', 'Intake, follow-up, communications, documents, and relationship continuity.'],
-  ['Document & E-Sign Specialist', 'Document preparation, signature transactions, invitations, and related communications.'],
-  ['Field Dispatch Coordinator', 'Provider coordination, field assignments, case updates, and completion records.'],
-  ['Professional Provider', 'Restricted access for assigned work and supporting documents.'],
+  ['Operations Coordinator', 'Cases, assignments, documents, communications, network, reporting.'],
+  ['Client Relationship Manager', 'Intake, follow-up, communications, documents.'],
+  ['Document & E-Sign Specialist', 'Documents, signatures, invitations, communications.'],
+  ['Field Dispatch Coordinator', 'Providers, field assignments, completion records.'],
+  ['Professional Provider', 'Assigned work and supporting documents only.'],
   ['Reporting & Audit Reviewer', 'Read-oriented reporting and audit access.'],
 ] as const
 
@@ -24,6 +24,7 @@ export default function RolesPermissionsAdmin() {
   const [assignUser, setAssignUser] = useState('')
   const [assignRole, setAssignRole] = useState('')
   const [busy, setBusy] = useState(false)
+  const [showStarters, setShowStarters] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -50,24 +51,20 @@ export default function RolesPermissionsAdmin() {
   const activeRoles = roles.filter((role) => !role.is_archived)
 
   return <div>
-    <PageIntro kicker="Security & access" title="Roles & Permissions" subtitle="Create reusable coding roles, rename them, set default grants, and assign them without hard-coding new account types. Fine-grained per-user overrides live in Settings." />
+    <PageIntro kicker="Security & access" title="Roles & Permissions" subtitle="Assign a starter or custom role, then edit grants. Per-user overrides live in Settings." />
 
-    <Panel className="mb-6">
-      <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold/80">Pinnacle Starter Roles</p>
-      <h2 className="mt-2 text-lg font-extrabold text-white">Start With the Job Someone Actually Performs</h2>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">These editable role templates cover Pinnacle's common operating functions. Assign the closest fit, then adjust only the permissions that role truly needs. Owner authority is never part of a template.</p>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{starterDescriptions.map(([name, description])=><div key={name} className="rounded-xl border border-white/[.08] bg-white/[.02] p-3"><p className="text-sm font-bold text-white">{name}</p><p className="mt-1 text-xs leading-5 text-slate-500">{description}</p></div>)}</div>
-    </Panel>
-
-    <Panel className="mb-6">
-      <h2 className="text-base font-semibold text-white">Assign a role</h2>
-      <p className="mt-1 text-sm text-slate-400">Role templates grant operational permissions. Owner authority remains separate and cannot be delegated from this screen.</p>
-      <form onSubmit={assign} className="mt-4 flex flex-col gap-3 md:flex-row md:items-end">
-        <label className="flex-1"><span className="mb-1 block text-xs text-slate-400">Network professional</span><select className={inputCls} required value={assignUser} onChange={(e)=>setAssignUser(e.target.value)}><option value="">Choose an internal user or provider…</option>{networkProfessionals.filter((person)=>person.status!=='suspended').map((person)=><option key={person.id} value={person.id}>{person.full_name||person.email} · {person.party_type==='vendor'?'Provider':'Internal'}</option>)}</select></label>
-        <label className="flex-1"><span className="mb-1 block text-xs text-slate-400">Role</span><select className={inputCls} value={assignRole} onChange={(e)=>setAssignRole(e.target.value)}><option value="">No custom role</option>{activeRoles.map((role)=><option key={role.id} value={role.id}>{role.name} ({role.role_key})</option>)}</select></label>
-        <button className={btnPrimary} disabled={busy || !assignUser}>{busy?'Saving…':'Assign role'}</button>
+    <Panel className="mb-4 !p-3">
+      <form onSubmit={assign} className="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <label className="flex-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-500">Person</span><select className={inputCls} required value={assignUser} onChange={(e)=>setAssignUser(e.target.value)}><option value="">Choose…</option>{networkProfessionals.filter((person)=>person.status!=='suspended').map((person)=><option key={person.id} value={person.id}>{person.full_name||person.email} · {person.party_type==='vendor'?'Provider':'Internal'}</option>)}</select></label>
+        <label className="flex-1"><span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-500">Role</span><select className={inputCls} value={assignRole} onChange={(e)=>setAssignRole(e.target.value)}><option value="">No custom role</option>{activeRoles.map((role)=><option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
+        <button className={btnPrimary} disabled={busy || !assignUser}>{busy?'Saving…':'Assign'}</button>
       </form>
     </Panel>
+
+    <details className="mb-4 rounded-lg border border-white/[.08] bg-white/[.015] px-4 py-3" open={showStarters} onToggle={(e)=>setShowStarters((e.target as HTMLDetailsElement).open)}>
+      <summary className="cursor-pointer text-sm font-semibold text-white">Starter roles <span className="ml-2 text-xs font-normal text-slate-500">6 templates · Owner is never included</span></summary>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{starterDescriptions.map(([name, description])=><div key={name} className="rounded-md border border-white/[.06] px-3 py-2"><p className="text-xs font-semibold text-white">{name}</p><p className="mt-0.5 text-[11px] leading-4 text-slate-500">{description}</p></div>)}</div>
+    </details>
 
     <RoleTemplatesPanel permissions={permissions} roles={roles} canMutate={caps.is_owner} onChanged={load} />
   </div>

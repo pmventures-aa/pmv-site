@@ -17,6 +17,7 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
+import { Avatar } from '../../components/kit/Avatar'
 import { toast } from '../../components/kit/toast'
 import { hqWorkspaceCopy } from '../../lib/workspace'
 
@@ -134,6 +135,7 @@ export function FieldWorkList() {
         kicker={copy.homeKicker}
         title="My assignments"
         subtitle={copy.homeSubtitle}
+        leading={user ? <Avatar userId={user.id} name={user.full_name} size={56} editable uploadPath="/me/avatar" /> : undefined}
       />
       <div className="mb-4 flex gap-2">
         <button

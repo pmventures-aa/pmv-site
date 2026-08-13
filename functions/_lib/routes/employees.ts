@@ -42,7 +42,7 @@ employeeRoutes.get('/employees', requireStaff, requireNamedPermission('manage_te
 employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manage_team'), async (c) => {
   const id = c.req.param('id') || ''
   const employee = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status, u.created_at,
+    `SELECT u.id, u.email, u.full_name, u.phone, u.last_seen_at, u.last_login_at, u.status, u.created_at,
             tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
             tm.can_view_reports, tm.can_view_audit_log, tm.can_manage_communications, tm.is_owner,
             tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name,

@@ -3,6 +3,7 @@ import { api, ApiError } from '../../../lib/api'
 import { Panel, NoAccess, inputCls, btnPrimary } from '../../../components/admin/ui'
 import { toast } from '../../../components/kit/toast'
 import { ResendWebhookPanel } from './ResendWebhookPanel'
+import { INVITE_TTL_PRESETS, INVITE_TTL_SETTING_KEY, parseInviteTtlHours } from '../../../../shared/inviteTtl'
 
 const FIRM_FIELDS: { key: string; label: string; type?: string; help?: string }[] = [
   { key: 'firm_notify_email', label: 'Notification email', type: 'email', help: 'Fallback recipient when a client has no assigned representative.' },
@@ -84,6 +85,38 @@ export default function GeneralSettings() {
       </Panel>
 
       <ResendWebhookPanel />
+
+      <Panel>
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-white">Invitation links</h3>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500">Company-wide lifetime for private invite tokens (clients, staff, providers, and trusted contacts). New invites and resent links use this setting. Existing unused links keep their original expiry until they are resent.</p>
+        </div>
+        <label className="block max-w-sm">
+          <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Link expires after</span>
+          <select
+            className={inputCls}
+            value={INVITE_TTL_PRESETS.some((item) => item.hours === parseInviteTtlHours(settings[INVITE_TTL_SETTING_KEY])) ? String(parseInviteTtlHours(settings[INVITE_TTL_SETTING_KEY])) : 'custom'}
+            onChange={(e) => {
+              if (e.target.value === 'custom') return
+              setSettings((s) => ({ ...s, [INVITE_TTL_SETTING_KEY]: e.target.value }))
+            }}
+          >
+            {INVITE_TTL_PRESETS.map((item) => <option key={item.hours} value={item.hours}>{item.label}</option>)}
+            <option value="custom">Custom hours</option>
+          </select>
+        </label>
+        <label className="mt-3 block max-w-sm">
+          <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Hours</span>
+          <input
+            className={inputCls}
+            type="number"
+            min={1}
+            max={8760}
+            value={settings[INVITE_TTL_SETTING_KEY] ?? '24'}
+            onChange={(e) => setSettings((s) => ({ ...s, [INVITE_TTL_SETTING_KEY]: e.target.value }))}
+          />
+        </label>
+      </Panel>
 
       <Panel>
         <div className="mb-4">

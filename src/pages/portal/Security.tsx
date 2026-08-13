@@ -4,6 +4,7 @@ import { Card, PageHeader } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { inputCls } from '../auth/AuthLayout'
 import { toast } from '../../components/kit/toast'
+import { Avatar } from '../../components/kit/Avatar'
 
 export default function Security() {
   const { user } = useAuth()
@@ -45,6 +46,12 @@ export default function Security() {
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gold">Account</h2>
+          {user && (
+            <div className="mt-4 flex items-center gap-4">
+              <Avatar userId={user.id} name={user.full_name} size={64} editable uploadPath="/me/avatar" />
+              <p className="text-xs leading-5 text-slate-500">Click the photo to change it. Pinnacle staff can also update it from HQ.</p>
+            </div>
+          )}
           <dl className="mt-4 space-y-3 text-sm">
             <div>
               <dt className="text-xs uppercase tracking-wide text-slate-500">Email</dt>
