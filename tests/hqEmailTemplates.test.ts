@@ -62,5 +62,7 @@ describe('HQ email templates workspace', () => {
     expect(panel).toContain('Insert')
     expect(compose).toContain('Insert')
     expect(compose).toContain('openTemplates')
+    expect(compose).toContain('footer=')
+    expect(compose).not.toContain('z-10')
   })
 })
