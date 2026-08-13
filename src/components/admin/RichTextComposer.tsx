@@ -68,6 +68,7 @@ export function RichTextComposer({
   function exec(command: string, arg?: string) {
     restoreSelection()
     document.execCommand('styleWithCSS', false, 'true')
+    document.execCommand('defaultParagraphSeparator', false, 'div')
     document.execCommand(command, false, arg)
     saveSelection()
     emit()
@@ -99,9 +100,6 @@ export function RichTextComposer({
   const tool = letter
     ? 'grid h-8 min-w-8 place-items-center rounded px-1.5 text-[13px] text-[#3d4a5c] hover:bg-black/[.06]'
     : 'inline-flex items-center justify-center rounded-md border border-white/12 bg-white/[.025] px-2.5 py-1 text-xs font-semibold text-slate-200 hover:border-gold/45 hover:text-gold'
-  const selectCls = letter
-    ? 'h-8 rounded border border-[#ddd6c8] bg-white px-2 text-[12px] text-[#0a1728] outline-none'
-    : 'h-8 rounded border border-white/12 bg-white/[.04] px-2 text-[12px] text-slate-200 outline-none'
 
   return (
     <div className={`flex min-h-0 flex-col ${fill ? 'h-full' : ''} ${letter ? 'bg-transparent' : 'rounded-md border border-white/10 bg-navy-900'}`}>
@@ -110,29 +108,28 @@ export function RichTextComposer({
         <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('italic')} title="Italic"><em>I</em></button>
         <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('underline')} title="Underline"><span className="underline">U</span></button>
         <span className={`mx-1 h-4 w-px ${letter ? 'bg-[#ddd6c8]' : 'bg-white/10'}`} />
+        <span className={`px-0.5 text-[10px] font-semibold uppercase tracking-[.12em] ${letter ? 'text-[#7b8492]' : 'text-slate-500'}`}>Align</span>
         <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('justifyLeft')} title="Align left"><AlignLeft size={15} /></button>
         <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('justifyCenter')} title="Align center"><AlignCenter size={15} /></button>
         <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('justifyRight')} title="Align right"><AlignRight size={15} /></button>
         <span className={`mx-1 h-4 w-px ${letter ? 'bg-[#ddd6c8]' : 'bg-white/10'}`} />
-        <label className={`flex items-center gap-1.5 ${letter ? 'text-[11px] font-semibold uppercase tracking-[.12em] text-[#5b6573]' : 'text-[11px] font-semibold uppercase tracking-[.12em] text-slate-400'}`}>
-          Color
-          <select
-            className={selectCls}
-            value={ink}
-            title="Font color"
-            onMouseDown={saveSelection}
-            onChange={(e) => applyColor(e.target.value)}
-          >
-            {LETTER_COLORS.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-        </label>
+        <span className={`px-0.5 text-[10px] font-semibold uppercase tracking-[.12em] ${letter ? 'text-[#7b8492]' : 'text-slate-500'}`}>Color</span>
+        {LETTER_COLORS.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            title={c.label}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyColor(c.value)}
+            className={`h-6 w-6 rounded-sm border ${ink === c.value ? (letter ? 'border-[#0a1728] ring-1 ring-[#0a1728]/30' : 'border-gold ring-1 ring-gold/40') : 'border-black/15'}`}
+            style={{ background: c.value }}
+          />
+        ))}
         <input
           type="color"
           title="Custom color"
           value={ink}
-          className="h-8 w-8 cursor-pointer border-0 bg-transparent p-0"
+          className="h-7 w-8 cursor-pointer border-0 bg-transparent p-0"
           onMouseDown={saveSelection}
           onChange={(e) => applyColor(e.target.value)}
         />
@@ -161,6 +158,7 @@ export function RichTextComposer({
           onBlur={emit}
           onMouseUp={saveSelection}
           onKeyUp={saveSelection}
+          onFocus={() => document.execCommand('defaultParagraphSeparator', false, 'div')}
           className={letter
             ? `${fill ? 'h-full min-h-[240px]' : 'min-h-48'} overflow-y-auto px-8 py-5 font-serif text-[15px] leading-[1.75] text-[#1b2430] outline-none [&_a]:text-[#0a1728] [&_a]:underline [&_img]:my-2 [&_img]:max-w-full [&_[align=center]]:text-center [&_[align=right]]:text-right [&_[align=left]]:text-left`
             : `${fill ? 'h-full min-h-[280px]' : 'min-h-48'} max-w-none overflow-y-auto bg-white px-4 py-3 text-sm text-navy-950 outline-none [&_a]:text-sky-700 [&_a]:underline [&_img]:my-2 [&_img]:max-w-full [&_[align=center]]:text-center [&_[align=right]]:text-right [&_[align=left]]:text-left`}
