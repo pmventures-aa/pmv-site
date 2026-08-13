@@ -1,3 +1,32 @@
-.doc-tool{display:inline-grid;height:2rem;width:2rem;place-items:center;border:1px solid rgba(255,255,255,.10);border-radius:.375rem;color:rgb(148 163 184);background:rgba(255,255,255,.02);transition:background .15s ease,border-color .15s ease,color .15s ease}.doc-tool:hover{border-color:rgba(201,162,39,.38);background:rgba(201,162,39,.06);color:rgb(201 162 39)}
-.doc-format{display:inline-grid;height:1.75rem;min-width:1.75rem;place-items:center;border:1px solid #e2e8f0;border-radius:.25rem;color:#334155;background:#fff;padding:0 .4rem;font-size:11px;font-weight:700}.doc-format:hover{border-color:#c99a36;color:#9c7629}
-.doc-page h1{font-size:1.6rem;font-weight:700;margin:0 0 .75rem}.doc-page h2{font-size:1.25rem;font-weight:700;margin:.5rem 0 .5rem}.doc-page ul,.doc-page ol{margin:.5rem 0 .75rem 1.25rem}.doc-page p{margin:0 0 .75rem}
+.doc-tool{display:inline-grid;height:2rem;width:2rem;place-items:center;border:1px solid rgba(255,255,255,.10);border-radius:.375rem;color:rgb(148 163 184);background:rgba(255,255,255,.02);transition:background .15s ease,border-color .15s ease,color .15s ease}
+.doc-tool:hover{border-color:rgba(201,162,39,.38);background:rgba(201,162,39,.06);color:rgb(201 162 39)}
+
+.doc-ribbon{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(8,16,28,.96);padding:.55rem .85rem;backdrop-filter:blur(10px)}
+.doc-ribbon-group{display:flex;align-items:center;gap:.2rem;padding-right:.7rem;border-right:1px solid rgba(255,255,255,.08)}
+.doc-ribbon-group:last-child{border-right:0;padding-right:0}
+.doc-ribbon-btn{display:inline-grid;height:1.85rem;min-width:1.85rem;place-items:center;border:0;border-radius:.35rem;background:transparent;color:#cbd5e1;padding:0 .35rem}
+.doc-ribbon-btn:hover,.doc-ribbon-btn.is-open{background:rgba(255,255,255,.07);color:#fff}
+.doc-ribbon-select{height:1.85rem;border:0;border-radius:.35rem;background:rgba(255,255,255,.05);color:#e2e8f0;font-size:11px;padding:0 .45rem;max-width:9.5rem}
+.doc-ribbon-select:hover,.doc-ribbon-select:focus{background:rgba(255,255,255,.09);outline:none}
+.doc-ribbon-hint{width:100%;color:#64748b;font-size:10px;letter-spacing:.02em}
+.doc-swatch{height:1.05rem;width:1.05rem;border:1px solid rgba(255,255,255,.2);border-radius:999px}
+.doc-swatch-wrap{display:flex;align-items:center;gap:.25rem;padding:.2rem}
+
+.doc-paper{width:816px;min-height:1056px;background:#fff;color:#1b2430;box-shadow:0 24px 60px rgba(0,0,0,.32)}
+.doc-letterhead{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1.15rem;padding:64px 72px 22px}
+.doc-letterhead-rule{height:1px;margin:0 72px;background:linear-gradient(90deg,transparent,#c9c3b4 8%,#c9c3b4 92%,transparent)}
+.doc-letterhead-name{font-family:Georgia,"Times New Roman",serif;font-size:20px;font-weight:600;letter-spacing:.04em;color:#0a1728;line-height:1.15}
+.doc-letterhead-meta{margin-top:.35rem;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5b6573}
+.doc-letterhead-aside{text-align:right;font-size:11px;line-height:1.55;color:#64748b}
+.doc-body{padding:28px 72px 48px;min-height:760px}
+.doc-colophon{display:flex;justify-content:space-between;gap:1rem;margin:8px 72px 48px;padding-top:16px;border-top:1px solid #e7e4dc;color:#8b919c;font-size:9px;letter-spacing:.12em;text-transform:uppercase}
+.doc-page{min-height:720px;width:100%;background:transparent;outline:none;font-family:Georgia,"Times New Roman",serif;font-size:15px;line-height:1.75;color:#1b2430}
+.doc-page h1{font-size:1.7rem;font-weight:650;letter-spacing:.01em;margin:0 0 1rem;color:#0a1728}
+.doc-page h2{font-size:1.2rem;font-weight:650;margin:1.1rem 0 .55rem;color:#0a1728}
+.doc-page h3{font-size:1.02rem;font-weight:650;margin:.9rem 0 .4rem;color:#0a1728}
+.doc-page p{margin:0 0 .85rem}
+.doc-page ul,.doc-page ol{margin:.4rem 0 .9rem 1.4rem}
+.doc-page blockquote{margin:1rem 0;padding:.15rem 0 .15rem 1rem;border-left:2px solid #c9c3b4;color:#475569}
+.doc-page a{color:#0a1728;text-decoration:underline;text-underline-offset:3px}
+.doc-link-row{display:flex;align-items:center;gap:.4rem}
+.doc-link-row input{height:1.85rem;min-width:12rem;border:1px solid rgba(255,255,255,.12);border-radius:.35rem;background:rgba(255,255,255,.05);color:#e2e8f0;font-size:11px;padding:0 .5rem}

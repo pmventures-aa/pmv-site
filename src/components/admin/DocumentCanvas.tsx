@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlignCenter, AlignLeft, AlignRight, Bold, Download, FileText, Heading1, Heading2, Italic, List, ListOrdered, Maximize2, Minus, Plus, RotateCw, Underline } from 'lucide-react'
+import {
+  AlignCenter, AlignLeft, AlignRight, Bold, Download, FileText, Indent, Italic,
+  Link2, List, ListOrdered, Maximize2, Minus, Outdent, Plus, Redo2, RemoveFormatting, RotateCw,
+  Strikethrough, Underline, Undo2,
+} from 'lucide-react'
+import { Crest } from '../ui'
+import { DOC_FONTS, DOC_HIGHLIGHT, DOC_INK, DOC_SIZES, toEditorHtml } from '../../../shared/docHtml'
 import './documentCanvas.css'
 
 type CanvasDocument = {
@@ -76,6 +82,7 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false}:{docu
   const url=`/api/admin/documents-workspace/${document.id}/file?v=${reloadKey}`
   const isPdf=mime==='application/pdf'||ext==='pdf', isImage=mime.startsWith('image/'), isDocx=ext==='docx'||mime.includes('wordprocessingml')
   const branded=document.is_branded!==0
+  const editableText=document.document_type==='text' && !readOnly
   useEffect(()=>{
     setDocx(null);setDocxError('')
     if(!isDocx)return
@@ -86,35 +93,143 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false}:{docu
   const typeLabel=useMemo(()=>document.document_type==='text'?'Editable document':isPdf?'PDF':isDocx?'DOCX':isImage?'Image':ext.toUpperCase()||'File',[document.document_type,isPdf,isDocx,isImage,ext])
   return <section className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#111820] shadow-[0_20px_60px_rgba(0,0,0,.28)]">
     <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-navy-950/90 px-3 py-2 sm:px-4">
-      <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{document.title}</p><p className="text-[11px] text-slate-500">{typeLabel} · {readOnly?'read-only reference':'secure internal workspace'}</p></div>
+      <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{document.title}</p><p className="text-[11px] text-slate-500">{typeLabel} · {readOnly?'read-only reference':'formatting lives in the bar below, not on the page'}</p></div>
       <div className="flex items-center gap-1.5">
         <button className="doc-tool" onClick={()=>setZoom(v=>Math.max(60,v-10))} title="Zoom out"><Minus size={15}/></button><span className="w-12 text-center text-[11px] tabular-nums text-slate-400">{zoom}%</span><button className="doc-tool" onClick={()=>setZoom(v=>Math.min(180,v+10))} title="Zoom in"><Plus size={15}/></button>
         <button className="doc-tool" onClick={()=>{setZoom(100);setReloadKey(v=>v+1)}} title="Refresh document"><RotateCw size={14}/></button>
         <a className="doc-tool" href={url} target="_blank" rel="noreferrer" title="Open full screen"><Maximize2 size={14}/></a><a className="doc-tool" href={url} download title="Download"><Download size={14}/></a>
       </div>
     </div>
+    {editableText && <FormatRibbon onChange={onTextChange}/>}
     <div className="relative h-[calc(100vh-255px)] min-h-[600px] overflow-auto bg-[#2a3037] p-4 sm:p-7">
       {isPdf&&<div className="mx-auto h-full min-h-[560px] w-full overflow-hidden bg-white shadow-2xl" style={{maxWidth:`${Math.round(900*zoom/100)}px`}}><iframe key={reloadKey} title={document.title} src={`${url}#toolbar=0&navpanes=1&view=FitH`} className="h-full w-full bg-white"/></div>}
-      {document.document_type==='text'&&<div className="mx-auto min-h-[1056px] origin-top bg-white text-[#20252b] shadow-2xl" style={{width:'816px',transform:`scale(${zoom/100})`,marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}>{branded&&<PaperBrand/>}<div className={branded?'px-[9%] pb-[8%] pt-8':'px-[9%] py-[8%]'}><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</div>}
+      {document.document_type==='text'&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center',marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}><article className="doc-paper">{branded&&<PaperBrand/>}<div className="doc-body"><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</article></div>}
       {isImage&&<div className="mx-auto flex min-h-[500px] items-start justify-center"><img src={url} alt={document.title} style={{width:`${zoom}%`,maxWidth:'none'}} className="bg-white shadow-2xl"/></div>}
-      {isDocx&&<div className="mx-auto origin-top bg-white text-[#20252b] shadow-2xl" style={{width:'816px',minHeight:'1056px',transform:`scale(${zoom/100})`,transformOrigin:'top center'}}>{branded&&<PaperBrand/>}<div className={branded?'px-[9%] pb-[8%] pt-8':'px-[9%] py-[8%]'}>{loading?<PreviewMessage text="Rendering DOCX…"/>:docxError?<PreviewMessage text={docxError}/>:docx?.map((b,i)=>b.type==='table'?<table key={i} className="my-5 w-full border-collapse text-sm"><tbody>{b.rows.map((row,r)=><tr key={r}>{row.map((cell,c)=><td key={c} className="border border-slate-300 p-2 align-top">{cell}</td>)}</tr>)}</tbody></table>:b.style?.toLowerCase().includes('heading')?<h2 key={i} className="mb-3 mt-6 font-serif text-xl font-semibold">{b.text}</h2>:<p key={i} className="mb-3 whitespace-pre-wrap font-serif text-[15px] leading-7">{b.text||' '}</p>)}</div>{branded&&<PaperFooter/>}</div>}
+      {isDocx&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center'}}><article className="doc-paper">{branded&&<PaperBrand/>}<div className="doc-body">{loading?<PreviewMessage text="Rendering DOCX…"/>:docxError?<PreviewMessage text={docxError}/>:docx?.map((b,i)=>b.type==='table'?<table key={i} className="my-5 w-full border-collapse text-sm"><tbody>{b.rows.map((row,r)=><tr key={r}>{row.map((cell,c)=><td key={c} className="border border-slate-300 p-2 align-top">{cell}</td>)}</tr>)}</tbody></table>:b.style?.toLowerCase().includes('heading')?<h2 key={i} className="mb-3 mt-6 font-serif text-xl font-semibold">{b.text}</h2>:<p key={i} className="mb-3 whitespace-pre-wrap font-serif text-[15px] leading-7">{b.text||' '}</p>)}</div>{branded&&<PaperFooter/>}</article></div>}
       {!isPdf&&!isImage&&!isDocx&&document.document_type!=='text'&&<div className="mx-auto grid min-h-[520px] max-w-2xl place-items-center bg-white p-10 text-center shadow-2xl"><div><FileText size={52} className="mx-auto text-slate-300"/><h3 className="mt-5 text-lg font-semibold text-slate-800">Preview unavailable for this file type</h3><p className="mt-2 text-sm leading-6 text-slate-500">The file remains stored securely in Document Hub. Open or download it to work with the original format.</p><a href={url} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Open document</a></div></div>}
     </div>
   </section>
 }
 
-function looksLikeHtml(value:string){
-  return /<[a-z][\s\S]*>/i.test(value)
+function runCommand(command:string, arg?:string){
+  document.execCommand('styleWithCSS', false, 'true')
+  document.execCommand(command, false, arg)
 }
 
-function toEditorHtml(value:string){
-  if(!value) return ''
-  if(looksLikeHtml(value)) return value
-  return value
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/\n/g,'<br>')
+function applyFontSize(root: HTMLElement | null, px: string){
+  runCommand('fontSize', '7')
+  if (!root) return
+  root.querySelectorAll('font[size="7"]').forEach((el) => {
+    const span = document.createElement('span')
+    span.style.fontSize = px
+    span.innerHTML = (el as HTMLElement).innerHTML
+    el.replaceWith(span)
+  })
+  root.querySelectorAll<HTMLElement>('span').forEach((span) => {
+    if (span.style.fontSize === 'xxx-large' || span.style.fontSize === 'x-large') span.style.fontSize = px
+  })
+}
+
+function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
+  const [link, setLink] = useState('')
+  const [linkOpen, setLinkOpen] = useState(false)
+  const saved = useRef<Range | null>(null)
+
+  function saveSelection() {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount) saved.current = sel.getRangeAt(0)
+  }
+  function restoreSelection() {
+    if (!saved.current) return
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(saved.current)
+  }
+  function capture() {
+    const root = document.getElementById('pmv-doc-editor')
+    onChange(root?.innerHTML || '')
+  }
+  function run(command: string, arg?: string) {
+    restoreSelection()
+    runCommand(command, arg)
+    capture()
+  }
+  function size(px: string) {
+    restoreSelection()
+    applyFontSize(document.getElementById('pmv-doc-editor'), px)
+    capture()
+  }
+  function applyLink() {
+    const href = link.trim()
+    if (!href) return
+    run('createLink', href.startsWith('http') ? href : `https://${href}`)
+    setLink('')
+    setLinkOpen(false)
+  }
+  return (
+    <div className="doc-ribbon" onMouseDown={(e) => {
+      const target = e.target as HTMLElement
+      if (target.closest('input')) return
+      saveSelection()
+      if (target.closest('button')) e.preventDefault()
+    }}>
+      <div className="doc-ribbon-group">
+        <button type="button" className="doc-ribbon-btn" title="Undo" onClick={() => run('undo')}><Undo2 size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Redo" onClick={() => run('redo')}><Redo2 size={14}/></button>
+      </div>
+      <div className="doc-ribbon-group">
+        <select className="doc-ribbon-select" defaultValue="P" onChange={(e) => run('formatBlock', e.target.value)} title="Paragraph style">
+          <option value="P">Body</option>
+          <option value="H1">Title</option>
+          <option value="H2">Heading</option>
+          <option value="H3">Subheading</option>
+          <option value="BLOCKQUOTE">Quote</option>
+        </select>
+        <select className="doc-ribbon-select" defaultValue={DOC_FONTS[0].value} onChange={(e) => run('fontName', e.target.value)} title="Font">
+          {DOC_FONTS.map((font) => <option key={font.label} value={font.value}>{font.label}</option>)}
+        </select>
+        <select className="doc-ribbon-select" defaultValue="15px" onChange={(e) => size(e.target.value)} title="Font size" style={{ maxWidth: '4.4rem' }}>
+          {DOC_SIZES.map((value) => <option key={value} value={value}>{value.replace('px', '')}</option>)}
+        </select>
+      </div>
+      <div className="doc-ribbon-group">
+        <button type="button" className="doc-ribbon-btn" title="Bold" onClick={() => run('bold')}><Bold size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Italic" onClick={() => run('italic')}><Italic size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Underline" onClick={() => run('underline')}><Underline size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Strikethrough" onClick={() => run('strikeThrough')}><Strikethrough size={14}/></button>
+      </div>
+      <div className="doc-ribbon-group">
+        <select className="doc-ribbon-select" defaultValue={DOC_INK[0].value} onChange={(e) => run('foreColor', e.target.value)} title="Text color" style={{ maxWidth: '5.6rem' }}>
+          {DOC_INK.map((ink) => <option key={ink.label} value={ink.value}>{ink.label}</option>)}
+        </select>
+        <select className="doc-ribbon-select" defaultValue={DOC_HIGHLIGHT[0].value} onChange={(e) => run('hiliteColor', e.target.value)} title="Highlight" style={{ maxWidth: '6.2rem' }}>
+          {DOC_HIGHLIGHT.map((tone) => <option key={tone.label} value={tone.value}>{tone.label}</option>)}
+        </select>
+      </div>
+      <div className="doc-ribbon-group">
+        <button type="button" className="doc-ribbon-btn" title="Align left" onClick={() => run('justifyLeft')}><AlignLeft size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Align center" onClick={() => run('justifyCenter')}><AlignCenter size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Align right" onClick={() => run('justifyRight')}><AlignRight size={14}/></button>
+      </div>
+      <div className="doc-ribbon-group">
+        <button type="button" className="doc-ribbon-btn" title="Bulleted list" onClick={() => run('insertUnorderedList')}><List size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Numbered list" onClick={() => run('insertOrderedList')}><ListOrdered size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Increase indent" onClick={() => run('indent')}><Indent size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Decrease indent" onClick={() => run('outdent')}><Outdent size={14}/></button>
+      </div>
+      <div className="doc-ribbon-group">
+        <button type="button" className={`doc-ribbon-btn ${linkOpen ? 'is-open' : ''}`} title="Insert link" onClick={() => setLinkOpen((open) => !open)}><Link2 size={14}/></button>
+        {linkOpen && (
+          <div className="doc-link-row">
+            <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://" onKeyDown={(e) => { if (e.key === 'Enter') applyLink() }}/>
+            <button type="button" className="doc-ribbon-btn" onClick={applyLink}>Add</button>
+          </div>
+        )}
+        <button type="button" className="doc-ribbon-btn" title="Clear formatting" onClick={() => run('removeFormat')}><RemoveFormatting size={14}/></button>
+      </div>
+      <p className="doc-ribbon-hint">Select text first, then use this bar. Zoom and download stay in the title row so they never sit on the letterhead.</p>
+    </div>
+  )
 }
 
 function RichDocEditor({value,onChange,readOnly}:{value:string;onChange:(v:string)=>void;readOnly?:boolean}){
@@ -125,36 +240,47 @@ function RichDocEditor({value,onChange,readOnly}:{value:string;onChange:(v:strin
     const html=toEditorHtml(value)
     if(document.activeElement!==el && el.innerHTML!==html) el.innerHTML=html
   },[value])
-  function run(command:string, arg?:string){
-    if(readOnly) return
-    document.execCommand(command,false,arg)
-    onChange(ref.current?.innerHTML||'')
-  }
-  return <div>
-    {!readOnly && <div className="doc-toolbar mb-3 flex flex-wrap gap-1 border-b border-slate-200 pb-2">
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('bold')} title="Bold"><Bold size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('italic')} title="Italic"><Italic size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('underline')} title="Underline"><Underline size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('formatBlock','H1')} title="Heading"><Heading1 size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('formatBlock','H2')} title="Subheading"><Heading2 size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('insertUnorderedList')} title="Bulleted list"><List size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('insertOrderedList')} title="Numbered list"><ListOrdered size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('justifyLeft')} title="Align left"><AlignLeft size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('justifyCenter')} title="Align center"><AlignCenter size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('justifyRight')} title="Align right"><AlignRight size={14}/></button>
-      <button type="button" className="doc-format" onMouseDown={e=>e.preventDefault()} onClick={()=>run('undo')} title="Undo">Undo</button>
-    </div>}
+  return (
     <div
+      id="pmv-doc-editor"
       ref={ref}
       contentEditable={!readOnly}
       suppressContentEditableWarning
-      className={`doc-page min-h-[820px] w-full bg-transparent font-serif text-[15px] leading-7 text-[#20252b] outline-none ${readOnly?'cursor-default':''}`}
+      className={`doc-page ${readOnly?'cursor-default':''}`}
       onInput={()=>onChange(ref.current?.innerHTML||'')}
       spellCheck={!readOnly}
     />
-  </div>
+  )
 }
 
-function PaperBrand(){return <header className="flex items-center justify-between border-b-2 border-[#c99a36] px-[9%] pb-4 pt-8"><div className="flex items-center gap-3"><img src="/logo-crest-transparent.png" alt="" className="h-12 w-12 object-contain"/><div><p className="font-serif text-[17px] font-bold tracking-wide text-[#0a1728]">Pinnacle Management Ventures</p><p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[.22em] text-[#9c7629]">Professional Services · South Florida</p></div></div><div className="text-right text-[9px] leading-4 text-slate-500"><p>pinnaclemanagementventures.com</p><p>Secure Document Hub</p></div></header>}
-function PaperFooter(){return <footer className="mx-[9%] mb-6 mt-8 flex items-center justify-between border-t border-slate-200 pt-3 text-[8px] uppercase tracking-[.14em] text-slate-400"><span>Pinnacle Management Ventures</span><span>Confidential business document</span></footer>}
+function PaperBrand(){
+  return (
+    <header>
+      <div className="doc-letterhead">
+        <Crest size={76} tone="dark" decorative />
+        <div>
+          <p className="doc-letterhead-name">Pinnacle Management Ventures</p>
+          <p className="doc-letterhead-meta">Property · Documents · Operations</p>
+        </div>
+        <div className="doc-letterhead-aside">
+          <p>South Florida</p>
+          <p>(561) 388-7879</p>
+          <p>pinnaclemanagementventures.com</p>
+        </div>
+      </div>
+      <div className="doc-letterhead-rule" />
+    </header>
+  )
+}
+
+function PaperFooter(){
+  return (
+    <footer className="doc-colophon">
+      <span>Pinnacle Management Ventures</span>
+      <span>Confidential</span>
+      <span>support@pinnaclemanagementventures.com</span>
+    </footer>
+  )
+}
+
 function PreviewMessage({text}:{text:string}){return <div className="grid min-h-[700px] place-items-center"><p className="text-sm text-slate-500">{text}</p></div>}
