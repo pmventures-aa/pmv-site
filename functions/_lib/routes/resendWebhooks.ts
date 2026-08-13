@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import type { AppEnv } from '../types'
 import { verifyResendWebhookSignature } from '../resendWebhookVerify'
+import { listResendWebhookSecrets } from '../resendWebhookSetup'
 import { uuid } from '../crypto'
-import { pushNotification } from '../notificationFeed'
+import { fetchReceivedEmail, ingestReceivedEmail, parseMailbox, parseMailboxList, type ReceivedEmail } from '../resendInbound'
 
 export const resendWebhookRoutes = new Hono<AppEnv>()
 
@@ -35,6 +37,20 @@ function deliveryStatus(eventType: string): { status: string; failure: boolean }
   }
 }
 
+async function verifiedResendPayload(c: Context<AppEnv>) {
+  const secrets = await listResendWebhookSecrets(c.env)
+  if (!secrets.length) return { error: 'webhook not configured' as const, status: 503 as const }
+  const payload = await c.req.raw.text()
+  const id = c.req.header('svix-id') || null
+  const timestamp = c.req.header('svix-timestamp') || null
+  const signature = c.req.header('svix-signature') || null
+  for (const secret of secrets) {
+    const ok = await verifyResendWebhookSignature({ secret, payload, id, timestamp, signature })
+    if (ok) return { payload }
+  }
+  return { error: 'invalid webhook signature' as const, status: 400 as const }
+}
+
 function eventError(event: ResendEvent): string | null {
   const failedReason = event.data?.failed?.reason
   if (typeof failedReason === 'string') return failedReason.slice(0, 1000)
@@ -44,20 +60,10 @@ function eventError(event: ResendEvent): string | null {
 }
 
 resendWebhookRoutes.post('/webhooks/resend', async (c) => {
-  if (!c.env.RESEND_WEBHOOK_SECRET) return c.json({ error: 'webhook not configured' }, 503)
-
-  const payload = await c.req.raw.text()
+  const verified = await verifiedResendPayload(c)
+  if ('error' in verified) return c.json({ error: verified.error }, verified.status)
+  const { payload } = verified
   const svixId = c.req.header('svix-id') || null
-  const svixTimestamp = c.req.header('svix-timestamp') || null
-  const svixSignature = c.req.header('svix-signature') || null
-  const verified = await verifyResendWebhookSignature({
-    secret: c.env.RESEND_WEBHOOK_SECRET,
-    payload,
-    id: svixId,
-    timestamp: svixTimestamp,
-    signature: svixSignature,
-  })
-  if (!verified) return c.json({ error: 'invalid webhook signature' }, 400)
 
   let event: ResendEvent
   try {
@@ -73,6 +79,19 @@ resendWebhookRoutes.post('/webhooks/resend', async (c) => {
     `INSERT OR IGNORE INTO email_webhook_events (svix_id, event_type, provider_id) VALUES (?, ?, ?)`,
   ).bind(svixId, eventType, providerId).run()
   if ((dedupe.meta?.changes ?? 0) === 0) return c.json({ ok: true, duplicate: true })
+
+  if (eventType === 'email.received') {
+    if (!providerId) return c.json({ ok: true, ignored: true })
+    try {
+      const received = await fetchReceivedEmail(c.env, providerId)
+      const result = await ingestReceivedEmail(c.env, received, c.executionCtx)
+      return c.json(result)
+    } catch (err) {
+      // Drop the svix row so Resend's retry can fetch the body again.
+      await c.env.DB.prepare('DELETE FROM email_webhook_events WHERE svix_id = ?').bind(svixId).run()
+      return c.json({ error: err instanceof Error ? err.message : 'could not ingest received email' }, 503)
+    }
+  }
 
   const mapped = deliveryStatus(eventType)
   if (!providerId || !mapped) return c.json({ ok: true, ignored: true })
@@ -125,152 +144,40 @@ resendWebhookRoutes.post('/webhooks/resend', async (c) => {
   return c.json({ ok: true })
 })
 
-// Resend Inbound Webhooks: parsed inbound email delivered as JSON.
-// Threads by walking In-Reply-To → References → subject match. When no
-// match is found, a NEW conversation + email_thread pair is created so
-// truly-new inbound never gets lost.
-type InboundHeaders = { name: string; value: string }[]
-type InboundPayload = {
-  from?: { email?: string; name?: string } | string
-  to?: Array<{ email?: string; name?: string } | string>
-  cc?: Array<{ email?: string; name?: string } | string>
-  subject?: string
-  html?: string
-  text?: string
-  headers?: InboundHeaders | Record<string, string>
-  message_id?: string
-  in_reply_to?: string
-  references?: string
-}
-
-function headerValue(headers: InboundPayload['headers'] | undefined, name: string): string | null {
-  if (!headers) return null
-  if (Array.isArray(headers)) {
-    const row = headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())
-    return row?.value ?? null
-  }
-  const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase())
-  return key ? String(headers[key]) : null
-}
-
-function parseAddress(input: InboundPayload['from']): { email: string; name?: string } | null {
-  if (!input) return null
-  if (typeof input === 'string') {
-    const m = input.match(/^(.*)\s*<\s*([^>]+)\s*>\s*$/)
-    if (m) return { email: m[2].trim().toLowerCase(), name: m[1].trim().replace(/^"|"$/g, '') || undefined }
-    return { email: input.trim().toLowerCase() }
-  }
-  if (!input.email) return null
-  return { email: String(input.email).trim().toLowerCase(), name: input.name || undefined }
-}
-
-function parseAddressList(input: InboundPayload['to']): Array<{ email: string; name?: string }> {
-  if (!input) return []
-  return input.map((v) => parseAddress(v as any)).filter((v): v is { email: string; name?: string } => !!v)
-}
-
 resendWebhookRoutes.post('/webhooks/resend/inbound', async (c) => {
-  // Resend signs inbound with the same Svix header set as outbound events.
-  if (!c.env.RESEND_WEBHOOK_SECRET) return c.json({ error: 'webhook not configured' }, 503)
-  const payload = await c.req.raw.text()
-  const verified = await verifyResendWebhookSignature({
-    secret: c.env.RESEND_WEBHOOK_SECRET, payload,
-    id: c.req.header('svix-id') || null,
-    timestamp: c.req.header('svix-timestamp') || null,
-    signature: c.req.header('svix-signature') || null,
-  })
-  if (!verified) return c.json({ error: 'invalid webhook signature' }, 400)
+  const verified = await verifiedResendPayload(c)
+  if ('error' in verified) return c.json({ error: verified.error }, verified.status)
+  const { payload } = verified
 
   let event: any
   try { event = JSON.parse(payload) } catch { return c.json({ error: 'invalid payload' }, 400) }
-  const inbound: InboundPayload = event?.data || event
-  const from = parseAddress(inbound.from)
-  if (!from) return c.json({ error: 'from required' }, 400)
-  const to = parseAddressList(inbound.to)
-  const cc = parseAddressList(inbound.cc)
-  const subject = (inbound.subject || '').trim().slice(0, 300) || '(no subject)'
-  const html = typeof inbound.html === 'string' ? inbound.html.slice(0, 200_000) : null
-  const text = typeof inbound.text === 'string' ? inbound.text.slice(0, 200_000) : null
-  const externalMessageId = (inbound.message_id || headerValue(inbound.headers, 'Message-ID') || '').trim() || null
-  const inReplyTo = (inbound.in_reply_to || headerValue(inbound.headers, 'In-Reply-To') || '').trim() || null
-  const references = (inbound.references || headerValue(inbound.headers, 'References') || '').trim() || null
 
-  // Dedupe by external Message-ID.
-  if (externalMessageId) {
-    const exists = await c.env.DB.prepare(`SELECT 1 FROM email_messages WHERE external_message_id = ? LIMIT 1`).bind(externalMessageId).first()
-    if (exists) return c.json({ ok: true, duplicate: true })
-  }
-
-  // Threading: try In-Reply-To -> References tokens -> subject match.
-  let threadId: string | null = null
-  if (inReplyTo) {
-    const row = await c.env.DB.prepare(`SELECT email_thread_id FROM email_messages WHERE external_message_id = ? LIMIT 1`).bind(inReplyTo).first() as any
-    if (row?.email_thread_id) threadId = row.email_thread_id
-  }
-  if (!threadId && references) {
-    const tokens = references.split(/\s+/).filter(Boolean).slice(-10)
-    if (tokens.length) {
-      const placeholders = tokens.map(() => '?').join(',')
-      const row = await c.env.DB.prepare(`SELECT email_thread_id FROM email_messages WHERE external_message_id IN (${placeholders}) ORDER BY created_at DESC LIMIT 1`).bind(...tokens).first() as any
-      if (row?.email_thread_id) threadId = row.email_thread_id
+  if (event?.type === 'email.received' && typeof event?.data?.email_id === 'string') {
+    try {
+      const received = await fetchReceivedEmail(c.env, event.data.email_id)
+      return c.json(await ingestReceivedEmail(c.env, received, c.executionCtx))
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : 'could not ingest received email' }, 503)
     }
   }
-  if (!threadId) {
-    // No thread match - open a fresh one attached to a new conversation.
-    // Try to match the sender to a known client user so scope is right.
-    const known = await c.env.DB.prepare(`SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1`).bind(from.email).first() as any
-    const scopeClientId = known?.id || null
-    const conversationId = uuid()
-    threadId = uuid()
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        `INSERT INTO conversations (id, kind, subject, scope_client_user_id, created_by_user_id, last_message_at)
-         VALUES (?, 'email_thread', ?, ?, ?, datetime('now'))`
-      ).bind(conversationId, subject, scopeClientId, scopeClientId || null),
-      c.env.DB.prepare(
-        `INSERT INTO email_threads (id, conversation_id, subject, root_external_message_id, scope_client_user_id, created_by_user_id, last_activity_at)
-         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
-      ).bind(threadId, conversationId, subject, externalMessageId, scopeClientId, scopeClientId || null),
-    ])
+
+  const inbound: ReceivedEmail = event?.data || event
+  const from = parseMailbox(inbound.from)
+  if (!from.email && !inbound.html && !inbound.text) return c.json({ error: 'from required' }, 400)
+  try {
+    return c.json(await ingestReceivedEmail(c.env, {
+      id: inbound.id || (typeof event?.data?.email_id === 'string' ? event.data.email_id : uuid()),
+      from: from.name ? `${from.name} <${from.email}>` : from.email,
+      to: parseMailboxList(inbound.to).map((row) => row.email),
+      cc: parseMailboxList(inbound.cc).map((row) => row.email),
+      subject: inbound.subject,
+      html: inbound.html,
+      text: inbound.text,
+      headers: inbound.headers,
+      message_id: inbound.message_id,
+      received_for: inbound.received_for,
+    }, c.executionCtx))
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : 'could not ingest received email' }, 400)
   }
-
-  const messageId = uuid()
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO email_messages (id, email_thread_id, direction, from_email, from_name, to_json, cc_json,
-         subject, body_html, body_text, external_message_id, in_reply_to_external, references_external, provider_status)
-       VALUES (?, ?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'received')`
-    ).bind(messageId, threadId, from.email, from.name || null,
-      JSON.stringify(to), JSON.stringify(cc), subject, html, text,
-      externalMessageId, inReplyTo, references),
-    c.env.DB.prepare(`UPDATE email_threads SET last_activity_at = datetime('now') WHERE id = ?`).bind(threadId),
-    c.env.DB.prepare(`UPDATE conversations SET last_message_at = datetime('now') WHERE id = (SELECT conversation_id FROM email_threads WHERE id = ?)`).bind(threadId),
-  ])
-
-  // Notify assigned staff of the inbound reply so it never gets buried.
-  c.executionCtx.waitUntil((async () => {
-    const thread = await c.env.DB.prepare(
-      `SELECT et.id, et.conversation_id, et.subject, et.scope_client_user_id FROM email_threads et WHERE et.id = ?`
-    ).bind(threadId).first() as any
-    if (!thread) return
-    const staff = await c.env.DB.prepare(
-      `SELECT DISTINCT u.id FROM users u
-       WHERE u.status = 'active' AND u.role IN ('staff','admin')
-         AND (u.id IN (SELECT user_id FROM conversation_participants WHERE conversation_id = ? AND removed_at IS NULL)
-              OR ? IS NOT NULL AND u.id IN (SELECT staff_user_id FROM staff_assignments WHERE client_user_id = ?)
-              OR u.role = 'admin')`
-    ).bind(thread.conversation_id, thread.scope_client_user_id, thread.scope_client_user_id).all()
-    const link = `/hq/communications?tab=email&thread=${thread.id}`
-    for (const row of ((staff.results as any[]) || [])) {
-      await pushNotification(c.env, {
-        userId: row.id, kind: 'email.inbound',
-        subjectType: 'email_thread', subjectId: thread.id,
-        title: `New reply from ${from.name || from.email}`,
-        body: `${thread.subject}: ${(text || html || '').replace(/<[^>]+>/g, '').slice(0, 180)}`,
-        deepLinkPath: link, dedupeWindowSeconds: 90,
-      })
-    }
-  })())
-
-  return c.json({ ok: true, id: messageId, thread_id: threadId })
 })

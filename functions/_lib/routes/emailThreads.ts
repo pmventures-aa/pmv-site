@@ -4,6 +4,7 @@ import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { sendEmailStrict } from '../email'
 import { logActivity } from '../activity'
+import { sendingFrom, threadReplyAddress, formattedReplyTo } from '../resendInbound'
 
 export const emailThreadRoutes = new Hono<AppEnv>()
 emailThreadRoutes.use('*', requireStaff)
@@ -35,7 +36,7 @@ function formatAddresses(list: { email: string; name?: string }[]): string[] {
 }
 
 function generateMessageId(env: Env): string {
-  const host = (env.RESEND_FROM_EMAIL || 'orders@pinnaclemanagementventures.com').split('@')[1]?.replace(/>$/, '').trim() || 'pinnaclemanagementventures.com'
+  const host = sendingFrom(env).email.split('@')[1] || 'pinnaclemanagementventures.com'
   return `<${uuid()}@${host}>`
 }
 
@@ -108,6 +109,8 @@ emailThreadRoutes.post('/email-threads', async (c) => {
   const threadId = uuid()
   const messageId = uuid()
   const externalMessageId = generateMessageId(c.env)
+  const from = sendingFrom(c.env)
+  const inboundReplyTo = threadReplyAddress(c.env, threadId)
 
   await c.env.DB.prepare(
     `INSERT INTO email_threads (id, conversation_id, subject, root_external_message_id, scope_client_user_id, created_by_user_id, last_activity_at)
@@ -119,8 +122,8 @@ emailThreadRoutes.post('/email-threads', async (c) => {
     `INSERT INTO email_messages (id, email_thread_id, direction, from_email, from_name, to_json, cc_json, bcc_json, reply_to,
        subject, body_html, body_text, external_message_id, sender_user_id)
      VALUES (?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(messageId, threadId, user.email, user.full_name || null,
-    JSON.stringify(to), JSON.stringify(cc), JSON.stringify(bcc), user.email,
+  ).bind(messageId, threadId, from.email, user.full_name || from.name,
+    JSON.stringify(to), JSON.stringify(cc), JSON.stringify(bcc), inboundReplyTo,
     subject, bodyHtml, bodyText || null, externalMessageId, user.id).run()
 
   try {
@@ -129,7 +132,7 @@ emailThreadRoutes.post('/email-threads', async (c) => {
       cc: cc.length ? formatAddresses(cc) : undefined,
       bcc: bcc.length ? formatAddresses(bcc) : undefined,
       subject, html: bodyHtml, text: bodyText,
-      replyTo: user.email,
+      replyTo: formattedReplyTo(inboundReplyTo),
       headers: { 'Message-ID': externalMessageId },
       tags: [{ name: 'email_thread_id', value: threadId }, { name: 'email_message_id', value: messageId }],
       idempotencyKey: messageId,
@@ -194,13 +197,15 @@ emailThreadRoutes.post('/email-threads/:id/reply', async (c) => {
   const messageId = uuid()
   const externalMessageId = generateMessageId(c.env)
   const replySubject = /^re:/i.test(thread.subject) ? thread.subject : `Re: ${thread.subject}`
+  const from = sendingFrom(c.env)
+  const inboundReplyTo = threadReplyAddress(c.env, thread.id)
 
   await c.env.DB.prepare(
     `INSERT INTO email_messages (id, email_thread_id, direction, from_email, from_name, to_json, cc_json, bcc_json, reply_to,
        subject, body_html, body_text, external_message_id, in_reply_to_external, references_external, sender_user_id)
      VALUES (?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(messageId, thread.id, user.email, user.full_name || null,
-    JSON.stringify(replyTo), JSON.stringify(cc), JSON.stringify(bcc), user.email,
+  ).bind(messageId, thread.id, from.email, user.full_name || from.name,
+    JSON.stringify(replyTo), JSON.stringify(cc), JSON.stringify(bcc), inboundReplyTo,
     replySubject, bodyHtml, bodyText || null, externalMessageId, inReplyTo, referencesChain || null, user.id).run()
 
   try {
@@ -209,7 +214,7 @@ emailThreadRoutes.post('/email-threads/:id/reply', async (c) => {
       cc: cc.length ? formatAddresses(cc) : undefined,
       bcc: bcc.length ? formatAddresses(bcc) : undefined,
       subject: replySubject, html: bodyHtml, text: bodyText,
-      replyTo: user.email,
+      replyTo: formattedReplyTo(inboundReplyTo),
       headers: {
         'Message-ID': externalMessageId,
         ...(inReplyTo ? { 'In-Reply-To': inReplyTo } : {}),

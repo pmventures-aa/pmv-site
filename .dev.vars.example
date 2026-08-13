@@ -26,6 +26,10 @@ PAYMENT_ENCRYPTION_KEY=local-dev-payment-key-not-real-either
 # "skipped" so HQ can distinguish provider configuration from delivery.
 # RESEND_API_KEY=
 
-# Optional — only needed to verify real Resend/Svix webhook callbacks locally.
-# Use the signing secret shown for the configured webhook in Resend.
+# Optional — only needed to verify real Resend/Svix webhook callbacks locally
+# if HQ has not already stored the signing secret from Create webhook.
 # RESEND_WEBHOOK_SECRET=
+
+# Optional — Resend receiving domain for Reply-To (not From). Leave unset to
+# use ziloifaluk.resend.app from wrangler.toml.
+# RESEND_INBOUND_DOMAIN=ziloifaluk.resend.app

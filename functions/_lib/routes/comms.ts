@@ -6,6 +6,7 @@ import { uuid } from '../crypto'
 import { sendEmailStrict } from '../email'
 import { logActivity } from '../activity'
 import { getMarketingComplianceConfig, createUnsubscribeToken, appendMarketingFooter } from '../marketingCompliance'
+import { hqInboundAddress, formattedReplyTo } from '../resendInbound'
 
 export const commsRoutes = new Hono<AppEnv>()
 
@@ -294,7 +295,7 @@ async function dispatchNow(
       const deliveryHtml = marketingConfig
         ? appendMarketingFooter(bodyHtml, marketingConfig, await createUnsubscribeToken(env, r.email))
         : bodyHtml
-      const providerMessageId = await sendEmailStrict(env, { to: r.email, subject, html: deliveryHtml })
+      const providerMessageId = await sendEmailStrict(env, { to: r.email, subject, html: deliveryHtml, replyTo: formattedReplyTo(hqInboundAddress(env)) })
       const statements = [
         env.DB.prepare("UPDATE comms_recipients SET status = 'sent', provider_message_id = ?, sent_at = datetime('now') WHERE id = ?").bind(providerMessageId, r.row_id),
       ]

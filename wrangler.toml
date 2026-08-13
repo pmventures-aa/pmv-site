@@ -28,9 +28,12 @@ bucket_name = "pmv-uploads"
 # then email sending no-ops.
 [vars]
 RESEND_FROM_EMAIL = "Pinnacle Management Ventures <notifications@pinnaclemanagementventures.com>"
+# Receiving stays on Resend's managed domain so pinnaclemanagementventures.com
+# MX records (Apple/iCloud for orders@) are never replaced. From/send is unchanged.
+RESEND_INBOUND_DOMAIN = "ziloifaluk.resend.app"
 
 # --- Secrets (NOT set here — see DEPLOY.md "Environment variables" table) ---
 # Required: SESSION_SECRET, PAYMENT_ENCRYPTION_KEY
-# Optional: RESEND_API_KEY
+# Optional: RESEND_API_KEY, RESEND_WEBHOOK_SECRET (HQ can also store the webhook signing secret)
 # Local dev: copy .dev.vars.example to .dev.vars and fill in test values.
 # Deployed: `wrangler pages secret put <NAME>`, or the Cloudflare dashboard.

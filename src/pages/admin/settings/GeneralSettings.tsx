@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../../lib/api'
 import { Panel, NoAccess, inputCls, btnPrimary } from '../../../components/admin/ui'
 import { toast } from '../../../components/kit/toast'
+import { ResendWebhookPanel } from './ResendWebhookPanel'
 
 const FIRM_FIELDS: { key: string; label: string; type?: string; help?: string }[] = [
   { key: 'firm_notify_email', label: 'Notification email', type: 'email', help: 'Fallback recipient when a client has no assigned representative.' },
@@ -81,6 +82,8 @@ export default function GeneralSettings() {
           <span className="mt-1 block text-xs leading-relaxed text-slate-500">Optional. If blank, Pinnacle uses https://www.pinnaclemanagementventures.com.</span>
         </label>
       </Panel>
+
+      <ResendWebhookPanel />
 
       <Panel>
         <div className="mb-4">

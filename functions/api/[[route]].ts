@@ -29,6 +29,7 @@ import { intakeCatalogAdminRoutes } from '../_lib/routes/intakeCatalogAdmin'
 import { intakeCopyRoutes } from '../_lib/routes/intakeCopy'
 import { accountEmailsAdminRoutes } from '../_lib/routes/accountEmailsAdmin'
 import { resendWebhookRoutes } from '../_lib/routes/resendWebhooks'
+import { resendWebhookAdminRoutes } from '../_lib/routes/resendWebhookAdmin'
 import { staffServiceAssignmentRoutes, clientApplicationSignatureRoutes } from '../_lib/routes/staffServiceAssignments'
 import { staffServicePrefillRoutes } from '../_lib/routes/staffServicePrefill'
 import { invoiceAdminRoutes } from '../_lib/routes/invoiceAdmin'
@@ -133,6 +134,7 @@ app.route('/admin', securitySessionRoutes)
 app.route('/admin', serviceOfferingAdminRoutes)
 app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', accountEmailsAdminRoutes)
+app.route('/admin', resendWebhookAdminRoutes)
 app.route('/admin', signatureAdminSyncRoutes)
 app.route('/admin', staffServiceAssignmentRoutes)
 app.route('/admin', staffServicePrefillRoutes)

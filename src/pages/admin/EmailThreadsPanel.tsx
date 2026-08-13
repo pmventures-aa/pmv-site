@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api'
 import { Panel, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
+import { ResendWebhookPanel } from './settings/ResendWebhookPanel'
 
 type Thread = {
   id: string; subject: string; scope_client_user_id: string|null
@@ -50,7 +51,9 @@ export function EmailThreadsPanel() {
   useEffect(() => { if (!selectedId) return; const t = setInterval(() => void loadDetail(), POLL_MS); return () => clearInterval(t) }, [selectedId, loadDetail])
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+    <div className="space-y-4">
+      <ResendWebhookPanel compact />
+      <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
       <Panel className="!p-0">
         <div className="flex items-center justify-between border-b border-white/10 p-3">
           <p className="text-sm font-extrabold text-white">Email threads</p>
@@ -79,6 +82,7 @@ export function EmailThreadsPanel() {
       </Panel>
 
       <EmailThreadDetail detail={detail} onReplied={() => { void load(); void loadDetail() }}/>
+      </div>
 
       <ComposerDialog open={composerOpen} onClose={() => setComposerOpen(false)} onSent={(id) => { setComposerOpen(false); setSelectedId(id); void load() }}/>
     </div>
@@ -113,6 +117,7 @@ function EmailThreadDetail({ detail, onReplied }: { detail: Detail | null; onRep
       <div className="border-b border-white/10 p-4">
         <p className="text-lg font-extrabold text-white">{detail.thread.subject}</p>
         <p className="mt-1 text-xs text-slate-500">{detail.messages.length} messages · Last activity {new Date(detail.thread.last_activity_at).toLocaleString()}</p>
+        <p className="mt-1 text-[11px] text-slate-600">Sent as Pinnacle. Reply-To is a private Resend receiving address so the answer threads here instead of a personal inbox.</p>
       </div>
 
       <div className="max-h-[52vh] min-h-[320px] space-y-3 overflow-y-auto p-4">
@@ -138,13 +143,16 @@ function EmailThreadDetail({ detail, onReplied }: { detail: Detail | null; onRep
               </div>
               {m.error && <div className="mt-2 rounded border border-red-400/25 bg-red-400/[.05] p-2 text-[11px] text-red-200">Delivery error: {m.error}</div>}
               <div className="prose prose-sm prose-invert mt-3 max-w-none text-sm text-slate-200" dangerouslySetInnerHTML={{ __html: m.body_html || (m.body_text ? `<pre class="whitespace-pre-wrap font-sans">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
+              {detail.attachments.filter((a) => a.email_message_id === m.id).map((a) => (
+                <p key={a.id} className="mt-2 text-[11px] text-slate-500">Attachment: {a.file_name}</p>
+              ))}
             </div>
           )
         })}
       </div>
 
       <div className="border-t border-white/10 p-3">
-        <textarea value={reply} onChange={(e) => setReply(e.target.value)} className={`${inputCls} min-h-24 resize-y`} placeholder="Write a reply… goes out as a real email, threaded to this conversation."/>
+        <textarea value={reply} onChange={(e) => setReply(e.target.value)} className={`${inputCls} min-h-24 resize-y`} placeholder="Write a reply. It goes out from Pinnacle and stays on this thread."/>
         <div className="mt-2 flex items-center justify-end">
           <button className={btnPrimary} disabled={busy || !reply.trim()} onClick={() => void send()}>{busy ? <Loader2 size={14} className="animate-spin"/> : <Reply size={14}/>}Send reply</button>
         </div>
@@ -182,7 +190,7 @@ function ComposerDialog({ open, onClose, onSent }: { open: boolean; onClose: () 
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
-      <DialogContent size="lg" title="Compose email" description="Sends a real email through Resend. Replies from the recipient thread back into this conversation.">
+      <DialogContent size="lg" title="Compose email" description="Sends from pinnaclemanagementventures.com. Replies come back through Resend receiving and land on this thread.">
         <div className="space-y-3">
           <div>
             <label className="text-xs font-semibold text-slate-400">To</label>

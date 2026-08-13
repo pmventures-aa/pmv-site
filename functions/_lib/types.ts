@@ -17,6 +17,8 @@ export interface Env {
   RESEND_API_KEY?: string
   RESEND_FROM_EMAIL?: string
   RESEND_WEBHOOK_SECRET?: string
+  // Resend receiving domain (*.resend.app). From still uses RESEND_FROM_EMAIL.
+  RESEND_INBOUND_DOMAIN?: string
 }
 
 export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
