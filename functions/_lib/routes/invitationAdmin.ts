@@ -26,7 +26,7 @@ async function isOwner(c: { env: AppEnv['Bindings'] }, user: SessionUser): Promi
 invitationAdminRoutes.get('/invitations', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
   await c.env.DB.prepare(
     `UPDATE access_invites SET status = 'expired', updated_at = datetime('now')
-     WHERE status = 'pending' AND expires_at <= datetime('now')`,
+     WHERE status = 'pending' AND datetime(expires_at) <= datetime('now')`,
   ).run()
   const rows = await c.env.DB.prepare(
     `SELECT ai.*,inviter.full_name inviter_name,rd.name role_name,

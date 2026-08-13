@@ -115,10 +115,15 @@ export async function runDueScopeFollowups(env: Env, limit = 50): Promise<{proce
   let sent = 0; let skipped = 0; let failed = 0
   for (const row of rows.results || []) {
     const ageDays = (Date.now() - new Date(row.created_at).getTime()) / 86_400_000
-    const step = [...SCOPE_FOLLOWUP_STEPS].reverse().find((candidate) => ageDays >= candidate.day)
+    // Send the earliest due step that has not already been delivered. Walking
+    // newest-first permanently skipped day1/day3 when cron ran late.
+    let step: (typeof SCOPE_FOLLOWUP_STEPS)[number] | null = null
+    for (const candidate of SCOPE_FOLLOWUP_STEPS) {
+      if (ageDays < candidate.day) break
+      const exists = await env.DB.prepare('SELECT 1 FROM scope_followup_deliveries WHERE scope_request_id=? AND step_key=?').bind(row.id, candidate.key).first()
+      if (!exists) { step = candidate; break }
+    }
     if (!step) { skipped++; continue }
-    const exists = await env.DB.prepare('SELECT 1 FROM scope_followup_deliveries WHERE scope_request_id=? AND step_key=?').bind(row.id, step.key).first()
-    if (exists) { skipped++; continue }
     try {
       const requestUrl = `${PUBLIC_SITE_BASE}/scope-request/confirmation?request=${encodeURIComponent(row.public_token)}`
       const optOut = await unsubscribeUrl(env, row.email)

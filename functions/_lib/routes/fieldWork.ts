@@ -284,11 +284,9 @@ fieldWorkRoutes.delete('/field-assignments/:id/documents/:docId', requireStaff, 
 })
 
 // Completion writes the signature snapshot and fires the branded audit
-// email to the client. Whether that email actually leaves the box depends
-// on RESEND_API_KEY being configured (same as every other transactional
-// email in the app); we mark audit_email_sent_at either way once the
-// completion write commits so the vendor UI can show "sent" without
-// blocking on the delivery status webhook.
+// email to the client. audit_email_sent_at is set only after sendEmail
+// succeeds so the vendor UI does not claim delivery when Resend is down
+// or the client has no email on file.
 fieldWorkRoutes.post('/field-assignments/:id/complete', requireStaff, async (c) => {
   const user = c.get('user')
   const row = await loadAssignment(c.env, c.req.param('id'))
@@ -317,7 +315,6 @@ fieldWorkRoutes.post('/field-assignments/:id/complete', requireStaff, async (c) 
         vendor_signature_image_key = ?,
         vendor_signed_at = ?,
         vendor_signed_ip = ?,
-        audit_email_sent_at = ?,
         updated_at = datetime('now')
       WHERE id = ?`,
   ).bind(
@@ -328,7 +325,6 @@ fieldWorkRoutes.post('/field-assignments/:id/complete', requireStaff, async (c) 
     signatureImageKey,
     now,
     actorIp(c.req.raw),
-    now,
     row.id,
   ).run()
 
@@ -340,6 +336,10 @@ fieldWorkRoutes.post('/field-assignments/:id/complete', requireStaff, async (c) 
     })
     try {
       await sendEmail(c.env, { to: updated.client_email, subject, html, text })
+      await c.env.DB.prepare(
+        `UPDATE field_assignments SET audit_email_sent_at = ?, updated_at = datetime('now') WHERE id = ?`,
+      ).bind(now, row.id).run()
+      updated.audit_email_sent_at = now
     } catch (err) {
       console.error('field-assignment audit email failed', err)
     }

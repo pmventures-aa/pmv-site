@@ -49,7 +49,7 @@ portalRoutes.get('/dashboard', async (c) => {
     c.env.DB.prepare(`SELECT COUNT(*) n FROM invoices WHERE ${where} AND status = 'open'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM support_tickets WHERE ${where} AND status = 'open'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM planned_calls WHERE ${where} AND status = 'requested'`).bind(...p2()).first<{ n: number }>(),
-    c.env.DB.prepare(`SELECT * FROM appointments WHERE ${where} AND starts_at >= datetime('now') ORDER BY starts_at ASC LIMIT 5`).bind(...p2()).all(),
+    c.env.DB.prepare(`SELECT * FROM appointments WHERE ${where} AND datetime(starts_at) >= datetime('now') ORDER BY starts_at ASC LIMIT 5`).bind(...p2()).all(),
     c.env.DB.prepare(`SELECT * FROM secure_messages WHERE ${where} ORDER BY created_at DESC LIMIT 5`).bind(...p2()).all(),
     c.env.DB.prepare(`SELECT cs.service_key, cs.status, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE cs.client_user_id = ? AND cs.status IN ('requested','submitted','active') ORDER BY s.name`).bind(user.role === 'client' ? user.id : (params[0] ?? user.id)).all(),
     c.env.DB.prepare(`SELECT id, address, property_type, status FROM properties WHERE ${where} ORDER BY created_at DESC LIMIT 6`).bind(...p2()).all(),

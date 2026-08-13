@@ -35,7 +35,7 @@ export async function notificationPreference(
   return { inApp: row ? row.in_app_enabled === 1 : true, email: row ? row.email_enabled === 1 : false }
 }
 
-export async function runDueClientNurture(env: Env, limit = 40): Promise<{ processed:number; sent:number; skipped:number }> {
+export async function runDueClientNurture(env: Env, limit = 40): Promise<{ processed:number; sent:number; skipped:number; failed:number }> {
   const rows = await env.DB.prepare(
     `SELECT e.user_id,e.enrolled_at,e.next_step,u.email,u.first_name,u.full_name,u.status,
             COALESCE(u.marketing_email_status,'emailable') marketing_email_status
@@ -47,6 +47,7 @@ export async function runDueClientNurture(env: Env, limit = 40): Promise<{ proce
 
   let sent = 0
   let skipped = 0
+  let failed = 0
   for (const row of rows.results || []) {
     const index = Math.max(0, Number(row.next_step || 1) - 1)
     const step = CLIENT_NURTURE_STEPS[index]
@@ -94,8 +95,9 @@ export async function runDueClientNurture(env: Env, limit = 40): Promise<{ proce
       ])
       sent++
     } catch (err) {
+      failed++
       console.error('[nurture] send failed', row.user_id, step.key, err)
     }
   }
-  return { processed:(rows.results || []).length, sent, skipped }
+  return { processed:(rows.results || []).length, sent, skipped, failed }
 }

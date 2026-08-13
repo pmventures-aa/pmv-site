@@ -65,7 +65,12 @@ export function normalizeQuoteLines(raw: QuoteLineInput[]): { lines: NormalizedL
   // but excluded from the committed total until the client chooses them.
   const billable = lines.filter((line) => !line.is_optional)
   const subtotal = billable.reduce((sum, line) => sum + Math.round(line.quantity * line.unit_price_cents), 0)
-  const discount = billable.reduce((sum, line) => sum + line.discount_cents, 0)
+  // Clamp each line discount to that line's gross so one oversized discount
+  // cannot wipe out other billable lines.
+  const discount = billable.reduce((sum, line) => {
+    const gross = Math.round(line.quantity * line.unit_price_cents)
+    return sum + Math.min(gross, line.discount_cents)
+  }, 0)
   return { lines, subtotal, discount, total: Math.max(0, subtotal - discount) }
 }
 
@@ -420,7 +425,16 @@ function publicQuoteShape(quote: any, lines: any[]) {
 
 function isExpired(quote: any): boolean {
   if (!quote.valid_until) return false
-  return new Date(`${String(quote.valid_until).slice(0, 10)}T23:59:59`) < new Date()
+  // Treat valid_until as an inclusive calendar day in America/New_York so a
+  // quote "valid through Aug 13" remains usable through end of that ET day.
+  const day = String(quote.valid_until).slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date())
+  const values = Object.fromEntries(parts.map((p) => [p.type, p.value]))
+  const todayEt = `${values.year}-${values.month}-${values.day}`
+  return todayEt > day
 }
 
 quotePublicRoutes.get('/public-quotes/:token', async (c) => {

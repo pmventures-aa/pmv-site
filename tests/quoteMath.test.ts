@@ -22,6 +22,13 @@ describe('branded quote line math', () => {
       { name: 'Credit-heavy line', quantity: 1, unit_price_cents: 1000, discount_cents: 5000 },
     ])
     expect(clamped.total).toBe(0)
+    // An oversized discount on one line must not erase other billable lines.
+    const multi = normalizeQuoteLines([
+      { name: 'Service A', quantity: 1, unit_price_cents: 10000, discount_cents: 15000 },
+      { name: 'Service B', quantity: 1, unit_price_cents: 5000 },
+    ])
+    expect(multi.discount).toBe(10000)
+    expect(multi.total).toBe(5000)
   })
 
   it('drops unnamed lines and clamps quantity', () => {

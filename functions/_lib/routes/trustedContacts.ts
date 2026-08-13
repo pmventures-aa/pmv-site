@@ -18,7 +18,7 @@ trustedContactRoutes.get('/trusted-contacts', requireClient, async (c) => {
   const user = c.get('user')
   await c.env.DB.prepare(
     `UPDATE access_invites SET status = 'expired', updated_at = datetime('now')
-     WHERE invite_type = 'trusted_contact' AND client_user_id = ? AND status = 'pending' AND expires_at <= datetime('now')`,
+     WHERE invite_type = 'trusted_contact' AND client_user_id = ? AND status = 'pending' AND datetime(expires_at) <= datetime('now')`,
   ).bind(user.id).run()
 
   const rows = await c.env.DB.prepare(

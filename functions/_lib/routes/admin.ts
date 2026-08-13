@@ -92,7 +92,7 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
     c.env.DB.prepare(`SELECT COUNT(*) n FROM invoices WHERE ${w2} AND status = 'open'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(
       `SELECT a.*, u.full_name AS client_name, u.email AS client_email FROM appointments a JOIN users u ON u.id = a.client_user_id
-       WHERE ${w2.replace(/client_user_id/g, 'a.client_user_id')} AND a.starts_at >= datetime('now') AND a.status != 'cancelled'
+       WHERE ${w2.replace(/client_user_id/g, 'a.client_user_id')} AND datetime(a.starts_at) >= datetime('now') AND a.status != 'cancelled'
        ORDER BY a.starts_at ASC LIMIT 5`,
     ).bind(...p2).all(),
     c.env.DB.prepare(
@@ -193,7 +193,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
         c.env.DB.prepare("SELECT * FROM client_tasks WHERE client_user_id = ? AND status != 'done' ORDER BY created_at DESC LIMIT 8").bind(id).all(),
         c.env.DB.prepare("SELECT * FROM invoices WHERE client_user_id = ? AND status = 'open' ORDER BY created_at DESC LIMIT 8").bind(id).all(),
         c.env.DB.prepare("SELECT * FROM support_tickets WHERE client_user_id = ? AND status != 'closed' ORDER BY created_at DESC LIMIT 8").bind(id).all(),
-        c.env.DB.prepare("SELECT * FROM appointments WHERE client_user_id = ? AND starts_at >= datetime('now') ORDER BY starts_at ASC LIMIT 5").bind(id).all(),
+        c.env.DB.prepare("SELECT * FROM appointments WHERE client_user_id = ? AND datetime(starts_at) >= datetime('now') ORDER BY starts_at ASC LIMIT 5").bind(id).all(),
         c.env.DB.prepare('SELECT ae.*, actor.full_name AS actor_name, actor.email AS actor_email FROM activity_events ae LEFT JOIN users actor ON actor.id = ae.actor_user_id WHERE ae.client_user_id = ? ORDER BY ae.created_at DESC LIMIT 8').bind(id).all(),
       ])
       return c.json({ ...base, services: services.results ?? [], matters: matters.results ?? [], tasks: tasks.results ?? [], invoices: invoices.results ?? [], tickets: tickets.results ?? [], appointments: appts.results ?? [], recent_activity: activity.results ?? [] })
