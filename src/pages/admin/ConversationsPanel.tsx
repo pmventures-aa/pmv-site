@@ -65,7 +65,7 @@ export function ConversationsPanel() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-      <Panel className={`!p-0 ${selectedId ? 'hidden lg:block' : ''}`}>
+      <Panel className={`!p-0 ${selectedId ? 'hidden md:block' : ''}`}>
         <div className="flex items-center justify-between border-b border-white/10 p-3">
           <p className="text-sm font-extrabold text-white">Conversations</p>
           <button className={btnPrimary} onClick={() => setComposerOpen(true)}><Plus size={14}/>New</button>
@@ -109,7 +109,7 @@ export function ConversationsPanel() {
         </div>
       </Panel>
 
-      <div className={selectedId ? 'block' : 'hidden lg:block'}>
+      <div className={selectedId ? 'block' : 'hidden md:block'}>
         <ConversationDetail detail={detail} onBack={() => setSelectedId(null)} onChanged={() => { void load(); void loadDetail() }} />
       </div>
 
@@ -168,7 +168,7 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
       <div className="border-b border-white/10 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2">
-            <button type="button" onClick={onBack} className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold lg:hidden" aria-label="Back to conversations">
+            <button type="button" onClick={onBack} className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold md:hidden" aria-label="Back to conversations">
               <ChevronLeft size={16}/>
             </button>
             <div className="min-w-0">
