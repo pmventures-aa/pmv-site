@@ -4,7 +4,7 @@ import {
   Link2, List, ListOrdered, Maximize2, Minus, Outdent, Plus, Redo2, RemoveFormatting, RotateCw,
   Strikethrough, Underline, Undo2,
 } from 'lucide-react'
-import { Crest } from '../ui'
+import { LetterheadCrest } from './LetterheadCrest'
 import { DOC_FONTS, DOC_HIGHLIGHT, DOC_INK, DOC_SIZES, toEditorHtml } from '../../../shared/docHtml'
 import { FIRM_NAME, FIRM_PHONE, FIRM_REGION, FIRM_SITE_HOST, FIRM_TAGLINE, SUPPORT_EMAIL } from '../../../shared/letterhead'
 import './documentCanvas.css'
@@ -258,7 +258,7 @@ function PaperBrand(){
   return (
     <header>
       <div className="doc-letterhead">
-        <Crest size={76} tone="dark" decorative />
+        <LetterheadCrest />
         <div>
           <p className="doc-letterhead-name">{FIRM_NAME}</p>
           <p className="doc-letterhead-meta">{FIRM_TAGLINE}</p>

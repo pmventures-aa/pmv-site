@@ -1,3 +1,5 @@
+import { CREST_PATH } from '../../shared/letterhead'
+
 export type EmailSignature = {
   id: string
   name: string
@@ -37,5 +39,7 @@ export function signatureLabel(sig: EmailSignature): string {
 }
 
 export function previewSignatureHtml(html: string): string {
-  return String(html || '').replace(/https?:\/\/[^/"']+\/(logo-crest[^"'\s?]*)/gi, '/$1')
+  return String(html || '')
+    .replace(/https?:\/\/[^/"']+\/(logo-crest[^"'\s?]*)/gi, '/$1')
+    .replace(/\/logo-crest-transparent\.png/gi, CREST_PATH)
 }

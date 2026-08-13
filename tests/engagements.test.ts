@@ -77,8 +77,8 @@ describe('shared letterhead and hosts', () => {
     const html = brandedSignatureHtml('company')
     expect(html).toContain(FIRM_NAME)
     expect(html).toContain(FIRM_PHONE)
-    expect(html).toContain('/logo-crest-transparent.png')
-    expect(CREST_ABSOLUTE_URL).toContain('logo-crest-transparent.png')
+    expect(html).toContain('/logo-crest-letterhead.png')
+    expect(CREST_ABSOLUTE_URL).toContain('logo-crest-letterhead.png')
   })
 
   it('centralizes portal and HQ hosts', () => {
