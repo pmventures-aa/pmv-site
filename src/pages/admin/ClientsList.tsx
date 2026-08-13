@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnOutline } from '../../components/admin/ui'
+import { Avatar } from '../../components/kit/Avatar'
 import { useAppPath } from '../../lib/basePath'
 import { clientEmailHref, clientInboxHref } from '../../lib/engagements'
 import { useLiveRefresh } from '../../lib/liveRefresh'
@@ -97,10 +98,15 @@ export default function ClientsList() {
               {windowed.visible.map((c) => (
                 <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                   <td className="px-5 py-3">
-                    <Link to={p(`clients/${c.id}/overview`)} className="font-medium text-white hover:text-gold">
-                      {c.full_name || c.email}
-                    </Link>
-                    <p className="text-xs text-slate-500">{c.email}</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar userId={c.id} name={c.full_name || c.email} size={36} />
+                      <div>
+                        <Link to={p(`clients/${c.id}/overview`)} className="font-medium text-white hover:text-gold">
+                          {c.full_name || c.email}
+                        </Link>
+                        <p className="text-xs text-slate-500">{c.email}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-5 py-3 text-slate-200">{c.business_name ?? 'Not provided'}</td>
                   <td className="px-5 py-3">

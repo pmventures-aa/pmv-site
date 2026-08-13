@@ -212,7 +212,7 @@ export default function ClientDetailModern() {
     <header className="border-b border-white/10 pb-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <Avatar userId={account.id} name={account.full_name} size={60} />
+          <Avatar userId={account.id} name={account.full_name} size={60} editable uploadPath={`/admin/clients/${account.id}/avatar`} />
           <div className="min-w-0">
             <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className="uppercase tracking-[0.16em]">Client</span>{profile?.business_name && <><span>·</span><span>{profile.business_name}</span></>}</div>
             <h1 className="truncate font-display text-3xl font-medium text-white sm:text-4xl">{clientName}</h1>

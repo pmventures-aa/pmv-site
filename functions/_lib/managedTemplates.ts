@@ -13,6 +13,11 @@ export interface ManagedTemplateContent {
   sections: ManagedAgreementSection[]
 }
 
+export function slugTemplateKey(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return value.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80)
+}
+
 export function normalizeTemplateSections(value: unknown): ManagedAgreementSection[] {
   if (!Array.isArray(value)) return []
   return value.slice(0, 60).map((raw, index) => {
