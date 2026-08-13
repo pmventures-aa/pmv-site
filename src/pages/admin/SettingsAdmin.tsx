@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Bell, BriefcaseBusiness, Building2, ChevronRight, Files, Palette, Search, Settings2, ShieldCheck, SlidersHorizontal, Trash2, Users } from 'lucide-react'
 import { PageIntro, NoAccess, Panel, inputCls } from '../../components/admin/ui'
 import { useCapabilities } from '../../lib/capabilities'
@@ -25,6 +25,10 @@ const TABS = [
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
+
+function isSettingsTab(value: string | null): value is TabKey {
+  return TABS.some((item) => item.key === value)
+}
 
 function AppearanceSettings() {
   return (
@@ -52,10 +56,13 @@ function AppearanceSettings() {
 export default function SettingsAdmin() {
   const caps = useCapabilities()
   const p = useAppPath()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTabState] = useState<TabKey>(() => {
+    const fromUrl = searchParams.get('tab')
+    if (isSettingsTab(fromUrl)) return fromUrl
     if (typeof window === 'undefined') return 'general'
-    const stored = window.localStorage.getItem('pmv_settings_tab') as TabKey | null
-    return TABS.some(item => item.key === stored) ? stored! : 'general'
+    const stored = window.localStorage.getItem('pmv_settings_tab')
+    return isSettingsTab(stored) ? stored : 'general'
   })
   const [query, setQuery] = useState('')
   const visibleTabs = useMemo(() => TABS.filter((item) => !['deletions', 'templates'].includes(item.key) || caps.is_owner), [caps.is_owner])
@@ -66,9 +73,24 @@ export default function SettingsAdmin() {
   }, [query, visibleTabs])
   const current = visibleTabs.find(item => item.key === tab) || visibleTabs[0]
 
+  useEffect(() => {
+    const fromUrl = searchParams.get('tab')
+    if (isSettingsTab(fromUrl) && visibleTabs.some((item) => item.key === fromUrl)) {
+      if (fromUrl !== tab) setTabState(fromUrl)
+      return
+    }
+    if (!visibleTabs.some((item) => item.key === tab)) setTabState(visibleTabs[0].key)
+  }, [searchParams, visibleTabs, tab])
+
   function setTab(next: TabKey) {
     setTabState(next)
     if (typeof window !== 'undefined') window.localStorage.setItem('pmv_settings_tab', next)
+    setSearchParams((currentParams) => {
+      const params = new URLSearchParams(currentParams)
+      if (next === 'general') params.delete('tab')
+      else params.set('tab', next)
+      return params
+    }, { replace: true })
   }
 
   return (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Search, Mail, MailOpen, ChevronLeft } from 'lucide-react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
@@ -15,7 +15,7 @@ import { ConversationsPanel } from './ConversationsPanel'
 import { EmailThreadsPanel } from './EmailThreadsPanel'
 import { EmailTemplatesPanel } from './EmailTemplatesPanel'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
-import { NotificationsTab, OverviewTab, ReportingTab } from './CommunicationsHub'
+import { OverviewTab, ReportingTab } from './CommunicationsHub'
 import { SessionWho } from '../../components/kit/WhoSection'
 
 interface ThreadRow {
@@ -33,13 +33,12 @@ interface ClientOption {
   email: string
 }
 
-type MessageTab = 'inbox' | 'email' | 'staff' | 'notifications' | 'pulse' | 'templates'
+type MessageTab = 'inbox' | 'email' | 'staff' | 'pulse' | 'templates'
 const TABS: { id: MessageTab; label: string }[] = [
   { id: 'inbox', label: 'Client inbox' },
   { id: 'email', label: 'Email' },
   { id: 'staff', label: 'Staff DMs' },
   { id: 'templates', label: 'Templates' },
-  { id: 'notifications', label: 'Notifications' },
   { id: 'pulse', label: 'Pulse' },
 ]
 
@@ -168,6 +167,10 @@ export default function MessagesAdmin() {
   const initialClientId = searchParams.get('client')
   const { count: emailUnread } = useEmailUnreadCount()
 
+  if (rawTab === 'notifications') {
+    return <Navigate to={`${p('settings')}?tab=notifications`} replace />
+  }
+
   function setTab(next: MessageTab) {
     setSearchParams((current) => {
       const params = new URLSearchParams(current)
@@ -199,7 +202,6 @@ export default function MessagesAdmin() {
         {tab === 'email' && <EmailThreadsPanel />}
         {tab === 'templates' && <EmailTemplatesPanel />}
         {tab === 'staff' && <ConversationsPanel />}
-        {tab === 'notifications' && <NotificationsTab />}
         {tab === 'pulse' && <PulseTab />}
       </div>
     </div>

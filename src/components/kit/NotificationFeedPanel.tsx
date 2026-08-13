@@ -101,6 +101,7 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
               <p className="text-sm font-extrabold text-white">Notifications</p>
               <div className="flex items-center gap-2">
                 {unread > 0 && <button className="text-[11px] font-semibold text-slate-400 hover:text-gold" onClick={() => void markAllRead()}><Check size={11} className="mr-1 inline"/>Mark all read</button>}
+                {surface === 'admin' && <Link to={`${p('settings')}?tab=notifications`} onClick={() => setOpen(false)} className="text-[11px] font-semibold text-slate-400 hover:text-gold">Settings</Link>}
                 <button className="text-slate-500 hover:text-white" onClick={() => setOpen(false)}><X size={14}/></button>
               </div>
             </div>
