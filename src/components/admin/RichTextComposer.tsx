@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AlignCenter, AlignLeft, AlignRight, Highlighter } from 'lucide-react'
 import { DOC_FONTS, DOC_SIZES } from '../../../shared/docHtml'
 
@@ -20,6 +20,7 @@ export function RichTextComposer({
   fill = false,
   placeholder,
   surface = 'hq',
+  footer,
 }: {
   value: string
   onChange: (html: string) => void
@@ -27,6 +28,7 @@ export function RichTextComposer({
   fill?: boolean
   placeholder?: string
   surface?: 'hq' | 'letter'
+  footer?: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -120,6 +122,10 @@ export function RichTextComposer({
   const tool = letter
     ? 'grid h-8 min-w-8 place-items-center rounded px-1.5 text-[13px] text-[#3d4a5c] hover:bg-black/[.06]'
     : 'inline-flex items-center justify-center rounded-md border border-white/12 bg-white/[.025] px-2.5 py-1 text-xs font-semibold text-slate-200 hover:border-gold/45 hover:text-gold'
+  const letterFlow = fill && footer
+  const editorClass = letter
+    ? `${letterFlow ? 'min-h-[240px]' : fill ? 'h-full min-h-[240px] overflow-y-auto' : 'min-h-48'} px-8 py-5 font-serif text-[15px] leading-[1.75] text-[#1b2430] outline-none [&_a]:text-[#0a1728] [&_a]:underline [&_img]:my-2 [&_img]:max-w-full [&_[align=center]]:text-center [&_[align=right]]:text-right [&_[align=left]]:text-left`
+    : `${fill ? 'h-full min-h-[280px] overflow-y-auto' : 'min-h-48'} max-w-none bg-white px-4 py-3 text-sm text-navy-950 outline-none [&_a]:text-sky-700 [&_a]:underline [&_img]:my-2 [&_img]:max-w-full [&_[align=center]]:text-center [&_[align=right]]:text-right [&_[align=left]]:text-left`
 
   return (
     <div className={`flex min-h-0 flex-col ${fill ? 'h-full overflow-hidden' : ''} ${letter ? 'bg-transparent' : 'rounded-md border border-white/10 bg-navy-900'}`}>
@@ -202,23 +208,24 @@ export function RichTextComposer({
           </>
         )}
       </div>
-      <div className={`relative min-h-0 ${fill ? 'flex-1 overflow-hidden' : ''}`}>
-        {empty && placeholder && (
-          <p className={`pointer-events-none absolute ${letter ? 'left-8 top-5 font-serif text-[15px] italic text-[#9aa3ae]' : 'left-4 top-3 text-sm text-slate-500'}`}>{placeholder}</p>
-        )}
-        <div
-          ref={ref}
-          contentEditable
-          suppressContentEditableWarning
-          onInput={emit}
-          onBlur={emit}
-          onMouseUp={saveSelection}
-          onKeyUp={saveSelection}
-          onFocus={() => document.execCommand('defaultParagraphSeparator', false, 'div')}
-          className={letter
-            ? `${fill ? 'h-full min-h-[240px]' : 'min-h-48'} overflow-y-auto px-8 py-5 font-serif text-[15px] leading-[1.75] text-[#1b2430] outline-none [&_a]:text-[#0a1728] [&_a]:underline [&_img]:my-2 [&_img]:max-w-full [&_[align=center]]:text-center [&_[align=right]]:text-right [&_[align=left]]:text-left`
-            : `${fill ? 'h-full min-h-[280px]' : 'min-h-48'} max-w-none overflow-y-auto bg-white px-4 py-3 text-sm text-navy-950 outline-none [&_a]:text-sky-700 [&_a]:underline [&_img]:my-2 [&_img]:max-w-full [&_[align=center]]:text-center [&_[align=right]]:text-right [&_[align=left]]:text-left`}
-        />
+      <div className={`relative min-h-0 ${fill ? (letterFlow ? 'flex-1 overflow-y-auto' : 'flex-1 overflow-hidden') : ''}`}>
+        <div className={`relative ${fill && !letterFlow ? 'h-full' : ''}`}>
+          {empty && placeholder && (
+            <p className={`pointer-events-none absolute ${letter ? 'left-8 top-5 font-serif text-[15px] italic text-[#9aa3ae]' : 'left-4 top-3 text-sm text-slate-500'}`}>{placeholder}</p>
+          )}
+          <div
+            ref={ref}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={emit}
+            onBlur={emit}
+            onMouseUp={saveSelection}
+            onKeyUp={saveSelection}
+            onFocus={() => document.execCommand('defaultParagraphSeparator', false, 'div')}
+            className={editorClass}
+          />
+        </div>
+        {footer}
       </div>
     </div>
   )

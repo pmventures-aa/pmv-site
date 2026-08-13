@@ -166,21 +166,19 @@ export function EmailComposePane({
         </FieldRow>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <RichTextComposer
-            fill
-            surface="letter"
-            value={draft.html}
-            onChange={(html) => onChange({ ...draft, html })}
-            placeholder="Start writing"
-          />
-        </div>
-        {selected && (
-          <div className="relative z-10 shrink-0 bg-white px-8 pb-10 pt-6">
-            <SignaturePreview signature={selected} />
-          </div>
-        )}
+      <div className="min-h-0 flex-1 overflow-hidden bg-white">
+        <RichTextComposer
+          fill
+          surface="letter"
+          value={draft.html}
+          onChange={(html) => onChange({ ...draft, html })}
+          placeholder="Start writing"
+          footer={selected ? (
+            <div className="px-8 pb-10 pt-7">
+              <SignaturePreview signature={selected} />
+            </div>
+          ) : null}
+        />
       </div>
     </div>
   )
