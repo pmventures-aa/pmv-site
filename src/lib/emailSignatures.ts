@@ -35,3 +35,7 @@ export function signatureLabel(sig: EmailSignature): string {
   if (sig.kind === 'personal') return `${sig.name} (me)`
   return sig.name
 }
+
+export function previewSignatureHtml(html: string): string {
+  return String(html || '').replace(/https?:\/\/[^/"']+\/(logo-crest[^"'\s?]*)/gi, '/$1')
+}

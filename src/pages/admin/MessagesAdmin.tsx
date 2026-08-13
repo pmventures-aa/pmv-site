@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search, Mail, MailOpen, Send } from 'lucide-react'
+import { Search, Mail, MailOpen } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
-import { Panel, EmptyState, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
 import { ThreadView } from '../../components/kit/ThreadView'
 import { PresenceDot } from '../../components/kit/PresenceDot'
 import { usePresence } from '../../lib/presence'
@@ -157,25 +157,19 @@ export default function MessagesAdmin() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col px-3 py-3 sm:px-5 lg:px-6 lg:py-4">
-      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/85">Communications</p>
-          <h1 className="mt-1 text-xl font-bold text-white">Mail</h1>
-        </div>
-        <Link to={p('communications/email')} className={btnOutline}><Send size={14} />Campaigns</Link>
-      </div>
-      <div className="mb-3 flex shrink-0 gap-1 overflow-x-auto border-b border-white/10">
+    <div className="flex h-full min-h-0 flex-col px-3 pt-2 sm:px-5 lg:px-6">
+      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10">
         {TABS.map((item) => (
-          <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`relative shrink-0 border-b-2 px-3 py-2 text-sm font-semibold transition ${tab === item.id ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>
+          <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`relative shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${tab === item.id ? 'border-gold font-semibold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>
             {item.label}
             {item.id === 'email' && emailUnread > 0 && (
               <span className="ml-2 inline-grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{emailUnread > 99 ? '99+' : emailUnread}</span>
             )}
           </button>
         ))}
+        <Link to={p('communications/email')} className="ml-auto mb-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-400 hover:text-gold">Campaigns</Link>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col pb-3">
         {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
         {tab === 'email' && <EmailThreadsPanel />}
         {tab === 'staff' && <ConversationsPanel />}

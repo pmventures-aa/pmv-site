@@ -17,6 +17,7 @@ export default {
       fontFamily: {
         sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
         display: ['Manrope', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
+        serif: ['Georgia', '"Times New Roman"', 'Times', 'serif'],
       },
       boxShadow: {
         glass: '0 8px 32px rgba(5, 14, 25, 0.35)',
