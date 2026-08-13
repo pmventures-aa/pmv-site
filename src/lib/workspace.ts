@@ -350,7 +350,7 @@ export function hqEmployeeExperience(roleName?: string | null): { createLabel: s
     return {
       createLabel: 'New billing item',
       quickActions: [
-        { label: 'New invoice', to: 'invoices', icon: 'billing', detail: 'Create or review billing.' },
+        { label: 'New invoice', to: 'invoices', icon: 'billing', detail: 'Write, send, and mark client invoices paid.' },
         { label: 'Clients', to: 'clients', icon: 'clients', detail: 'Open the client record.' },
         { label: 'Reports', to: 'reports', icon: 'reports', detail: 'Financial and operating reports.' },
       ],
@@ -361,7 +361,7 @@ export function hqEmployeeExperience(roleName?: string | null): { createLabel: s
     quickActions: [
       { label: 'Add lead', to: 'leads/new', icon: 'plus', detail: 'Create a CRM lead and optionally send their account invite.' },
       { label: 'Assign service', to: 'service-assignments', icon: 'services', detail: 'Open service assignment workflow.' },
-      { label: 'New invoice', to: 'invoices', icon: 'billing', detail: 'Move directly into billing.' },
+      { label: 'New invoice', to: 'invoices', icon: 'billing', detail: 'Write, send, and mark a client invoice paid.' },
       { label: 'Communications', to: 'communications', icon: 'communications', detail: 'Email and threads.' },
     ],
   }

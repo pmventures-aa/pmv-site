@@ -1,13 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ChevronLeft, Plus, Search } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { DateSelect, todayIsoDate } from '../../components/kit/DateSelect'
-import { Icon } from '../../components/kit/Icon'
 import { toast } from '../../components/kit/toast'
 import { COUNTRY_OPTIONS, US_STATES } from '../../data/regions'
 import { AddressAutocomplete } from '../../components/kit/AddressAutocomplete'
+import { useAppPath } from '../../lib/basePath'
+import { clientEmailHref } from '../../lib/engagements'
+import { useLiveRefresh } from '../../lib/liveRefresh'
+import {
+  INVOICE_FOCUS,
+  formatInvoiceDate,
+  invoiceDueLabel,
+  invoiceMatchesFocus,
+  invoiceMoney,
+  invoiceNextAction,
+  invoicePlusDays,
+  invoiceStatusLabel,
+  invoiceStatusTone,
+  invoiceToday,
+  type InvoiceFocusKey,
+} from '../../../shared/invoiceWorkspace'
 
 interface ClientOption {
   id: string
@@ -34,6 +49,8 @@ interface InvoiceRow {
   business_name: string | null
   line_item_count: number
   created_at: string
+  quote_id?: string | null
+  quote_number?: string | null
 }
 
 interface ContactBlock {
@@ -51,84 +68,44 @@ interface ContactBlock {
   fax: string
 }
 
-interface LineItem {
+interface LineDraft {
   name: string
   description: string
-  quantity: number
+  quantity: string
   unit_price: string
   discount: string
-  shipped: boolean
   taxable: boolean
   local_tax_rate: string
   national_tax_rate: string
 }
 
-interface Reminder {
-  days_offset: number
-  channel: string
-  enabled: boolean
+interface QuoteOption {
+  id: string
+  quote_number: string
+  title: string
+  recipient_email: string
+  total_cents: number
+  status: string
 }
 
-const CURRENCIES = ['USD', 'CAD', 'MXN', 'AUD', 'EUR', 'GBP', 'SEK', 'PHP', 'NOK', 'DKK', 'JPY', 'RUB', 'PLN', 'INR', 'CNY']
 const PAYMENT_OPTIONS = [
   ['card', 'Card'],
-  ['apple_pay', 'Apple Pay'],
-  ['google_pay', 'Google Pay'],
   ['ach', 'ACH'],
   ['mail', 'Mail'],
+  ['apple_pay', 'Apple Pay'],
+  ['google_pay', 'Google Pay'],
 ] as const
-const DUE_SHORTCUTS = [
-  [0, 'Today'],
-  [7, '7d'],
-  [14, '14d'],
-  [30, '30d'],
-] as const
+const DUE_SHORTCUTS = [[0, 'Today'], [7, '7 days'], [14, '14 days'], [30, '30 days']] as const
 
 function emptyContact(): ContactBlock {
   return {
-    first_name: '',
-    last_name: '',
-    company: '',
-    address_line_1: '',
-    address_line_2: '',
-    country: 'United States',
-    state: '',
-    city: '',
-    postal_code: '',
-    email: '',
-    phone: '',
-    fax: '',
+    first_name: '', last_name: '', company: '', address_line_1: '', address_line_2: '',
+    country: 'United States', state: '', city: '', postal_code: '', email: '', phone: '', fax: '',
   }
 }
 
-function newLine(): LineItem {
-  return {
-    name: 'Professional services',
-    description: '',
-    quantity: 1,
-    unit_price: '0.00',
-    discount: '0.00',
-    shipped: false,
-    taxable: false,
-    local_tax_rate: '0',
-    national_tax_rate: '0',
-  }
-}
-
-function plusDays(days: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function dollars(cents: number) {
-  return `$${(Number(cents || 0) / 100).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
+function emptyLine(): LineDraft {
+  return { name: '', description: '', quantity: '1', unit_price: '0.00', discount: '0.00', taxable: false, local_tax_rate: '0', national_tax_rate: '0' }
 }
 
 function toCents(value: string) {
@@ -136,518 +113,693 @@ function toCents(value: string) {
   return Number.isFinite(n) ? Math.max(0, Math.round(n * 100)) : 0
 }
 
-function ContactFields({ value, onChange }: { value: ContactBlock; onChange: (next: ContactBlock) => void }) {
-  const set = (key: keyof ContactBlock, next: string) => onChange({ ...value, [key]: next })
+function linesToPayload(lines: LineDraft[]) {
+  return lines.filter((line) => line.name.trim()).map((line) => ({
+    name: line.name,
+    description: line.description,
+    quantity: Number(line.quantity) || 1,
+    unit_price_cents: toCents(line.unit_price),
+    discount_cents: toCents(line.discount),
+    taxable: line.taxable,
+    local_tax_rate: Number(line.local_tax_rate) || 0,
+    national_tax_rate: Number(line.national_tax_rate) || 0,
+  }))
+}
+
+function draftTotals(lines: LineDraft[], shipping = '0.00') {
+  let subtotal = 0
+  let discount = 0
+  let tax = 0
+  for (const item of lines) {
+    const gross = Math.round((Number(item.quantity) || 0) * toCents(item.unit_price))
+    const itemDiscount = Math.min(gross, toCents(item.discount))
+    const base = Math.max(0, gross - itemDiscount)
+    subtotal += gross
+    discount += itemDiscount
+    if (item.taxable) tax += Math.round(base * ((Number(item.local_tax_rate) || 0) + (Number(item.national_tax_rate) || 0)) / 100)
+  }
+  const shippingCents = toCents(shipping)
+  return { subtotal, discount, tax, shipping: shippingCents, total: Math.max(0, subtotal - discount + tax + shippingCents) }
+}
+
+function Chip({ label, active, onClick, tone = 'slate' }: { label: string; active: boolean; onClick: () => void; tone?: 'red' | 'gold' | 'slate' }) {
+  const activeCls = tone === 'red' ? 'border-rose-500/50 bg-rose-500/10 text-rose-200'
+    : tone === 'gold' ? 'border-gold/50 bg-gold/10 text-gold'
+      : 'border-white/20 bg-white/[.05] text-white'
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <label>
-        <span className="mb-1 block text-xs text-slate-400">First name</span>
-        <input className={inputCls} value={value.first_name} onChange={(e) => set('first_name', e.target.value)} />
-      </label>
-      <label>
-        <span className="mb-1 block text-xs text-slate-400">Last name</span>
-        <input className={inputCls} value={value.last_name} onChange={(e) => set('last_name', e.target.value)} />
-      </label>
-      <label className="sm:col-span-2">
-        <span className="mb-1 block text-xs text-slate-400">Company</span>
-        <input className={inputCls} value={value.company} onChange={(e) => set('company', e.target.value)} />
-      </label>
-      <div className="sm:col-span-2">
-        <span className="mb-1 block text-xs text-slate-400">Address line 1</span>
-        <AddressAutocomplete
-          value={value.address_line_1}
-          onChange={(line1) => set('address_line_1', line1)}
-          onSelect={(address) => {
-            onChange({
-              ...value,
-              address_line_1: address.line1,
-              city: address.city || value.city,
-              state: address.state || value.state,
-              postal_code: address.postal_code || value.postal_code,
-              country: address.country === 'US' ? 'United States' : (address.country || value.country),
-            })
-          }}
-          inputClassName={inputCls}
-          placeholder="123 Main St"
-        />
-      </div>
-      <label className="sm:col-span-2">
-        <span className="mb-1 block text-xs text-slate-400">Address line 2</span>
-        <input className={inputCls} value={value.address_line_2} onChange={(e) => set('address_line_2', e.target.value)} />
-      </label>
-      <label>
-        <span className="mb-1 block text-xs text-slate-400">Country</span>
-        <select className={inputCls} value={value.country} onChange={(e) => set('country', e.target.value)}>
-          {COUNTRY_OPTIONS.map((country) => <option key={country.code} value={country.label}>{country.label}</option>)}
-        </select>
-      </label>
-      <label>
-        <span className="mb-1 block text-xs text-slate-400">State / region</span>
-        {value.country === 'United States' ? (
-          <select className={inputCls} value={value.state} onChange={(e) => set('state', e.target.value)}>
-            <option value="">Select state</option>
-            {US_STATES.map(([code, name]) => <option key={code} value={name}>{name}</option>)}
-          </select>
-        ) : (
-          <input className={inputCls} value={value.state} onChange={(e) => set('state', e.target.value)} />
-        )}
-      </label>
-      <label>
-        <span className="mb-1 block text-xs text-slate-400">City</span>
-        <input className={inputCls} value={value.city} onChange={(e) => set('city', e.target.value)} />
-      </label>
-      <label>
-        <span className="mb-1 block text-xs text-slate-400">Postal code</span>
-        <input className={inputCls} value={value.postal_code} onChange={(e) => set('postal_code', e.target.value)} />
-      </label>
-      <label>
-        <span className="mb-1 block text-xs text-slate-400">Email</span>
-        <input type="email" className={inputCls} value={value.email} onChange={(e) => set('email', e.target.value)} />
-      </label>
-      <label>
-        <span className="mb-1 block text-xs text-slate-400">Phone</span>
-        <input className={inputCls} value={value.phone} onChange={(e) => set('phone', e.target.value)} />
-      </label>
-      <label>
-        <span className="mb-1 block text-xs text-slate-400">Fax</span>
-        <input className={inputCls} value={value.fax} onChange={(e) => set('fax', e.target.value)} />
-      </label>
-    </div>
+    <button type="button" onClick={onClick} className={`rounded-md border px-2.5 py-1 text-[11px] font-medium transition ${active ? activeCls : 'border-white/10 text-slate-400 hover:border-white/25 hover:text-slate-200'}`}>
+      {label}
+    </button>
   )
 }
 
+function clientLabel(client: ClientOption) {
+  return `${client.business_name ? `${client.business_name}: ` : ''}${client.full_name || client.email}`
+}
+
 export default function InvoicesAdmin() {
-  const [params] = useSearchParams()
-  const requestedClient = params.get('client') || ''
+  const p = useAppPath()
+  const [params, setParams] = useSearchParams()
+  const [screen, setScreen] = useState<'list' | 'build'>(() => (params.get('client') || params.get('new') === '1') ? 'build' : 'list')
+  const [rows, setRows] = useState<InvoiceRow[] | null>(null)
   const [clients, setClients] = useState<ClientOption[]>([])
-  const [rows, setRows] = useState<InvoiceRow[]>([])
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [clientId, setClientId] = useState(requestedClient)
-  const [invoiceNumber, setInvoiceNumber] = useState('')
-  const [customerNumber, setCustomerNumber] = useState('')
-  const [title, setTitle] = useState('Professional services invoice')
-  const [currency, setCurrency] = useState('USD')
-  const [issueDate, setIssueDate] = useState(todayIsoDate())
-  const [dueDate, setDueDate] = useState(plusDays(14))
-  const [billTo, setBillTo] = useState<ContactBlock>(emptyContact())
-  const [payableTo, setPayableTo] = useState<ContactBlock>(emptyContact())
-  const [lineItems, setLineItems] = useState<LineItem[]>([newLine()])
-  const [shipping, setShipping] = useState('0.00')
-  const [paymentMethods, setPaymentMethods] = useState<string[]>(['card', 'ach'])
-  const [cardProcessor, setCardProcessor] = useState('Default')
-  const [transactionType, setTransactionType] = useState('sale')
-  const [achProcessor, setAchProcessor] = useState('Default')
-  const [secCodes, setSecCodes] = useState<string[]>(['PPD', 'CCD', 'WEB'])
-  const [partialType, setPartialType] = useState('none')
-  const [partialAmount, setPartialAmount] = useState('0.00')
-  const [requireShipping, setRequireShipping] = useState(false)
-  const [saveCustomer, setSaveCustomer] = useState('none')
-  const [sendReceipt, setSendReceipt] = useState(true)
-  const [delivery, setDelivery] = useState('email')
-  const [additionalEmails, setAdditionalEmails] = useState('')
-  const [message, setMessage] = useState('Thank you for working with Pinnacle Management Ventures.')
-  const [reminders, setReminders] = useState<Reminder[]>([
-    { days_offset: 7, channel: 'email', enabled: true },
-    { days_offset: 1, channel: 'email', enabled: true },
-    { days_offset: -3, channel: 'email', enabled: true },
-  ])
+  const [focus, setFocus] = useState<InvoiceFocusKey>(() => (params.get('focus') as InvoiceFocusKey) || 'open')
+  const [search, setSearch] = useState(params.get('q') || '')
+  const [detailId, setDetailId] = useState<string | null>(params.get('invoice'))
+  const [error, setError] = useState('')
 
   const load = useCallback(async () => {
-    const query = new URLSearchParams()
-    if (search.trim()) query.set('q', search.trim())
-    if (status) query.set('status', status)
-    const suffix = query.toString() ? `?${query.toString()}` : ''
-    const [invoiceResult, clientResult] = await Promise.all([
-      api.get<{ invoices: InvoiceRow[] }>(`/admin/invoices${suffix}`),
-      api.get<{ clients: ClientOption[] }>('/admin/invoice-clients'),
-    ])
-    setRows(invoiceResult.invoices)
-    setClients(clientResult.clients)
-  }, [search, status])
+    try {
+      const [invoiceResult, clientResult] = await Promise.all([
+        api.get<{ invoices: InvoiceRow[] }>('/admin/invoices'),
+        api.get<{ clients: ClientOption[] }>('/admin/invoice-clients'),
+      ])
+      setRows(invoiceResult.invoices)
+      setClients(clientResult.clients)
+      setError('')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not load invoices.')
+    }
+  }, [])
 
   useEffect(() => { void load() }, [load])
   useLiveRefresh(load)
-  useEffect(() => {
-    if (requestedClient) {
-      setClientId(requestedClient)
-      setCreating(true)
+
+  function openDetail(id: string) {
+    setDetailId(id)
+    setScreen('list')
+    const next = new URLSearchParams(params)
+    next.set('invoice', id)
+    next.delete('new')
+    setParams(next, { replace: true })
+  }
+
+  function openBuild() {
+    setDetailId(null)
+    setScreen('build')
+    const next = new URLSearchParams(params)
+    next.delete('invoice')
+    next.set('new', '1')
+    setParams(next, { replace: true })
+  }
+
+  function backToList() {
+    setScreen('list')
+    setDetailId(null)
+    const next = new URLSearchParams(params)
+    next.delete('invoice')
+    next.delete('new')
+    setParams(next, { replace: true })
+  }
+
+  const visible = useMemo(() => {
+    const list = rows || []
+    const needle = search.trim().toLowerCase()
+    return list.filter((invoice) => {
+      if (!invoiceMatchesFocus(invoice, focus)) return false
+      if (!needle) return true
+      return [invoice.invoice_number, invoice.title, invoice.client_name, invoice.client_email, invoice.business_name, invoice.customer_number].some((value) => String(value || '').toLowerCase().includes(needle))
+    })
+  }, [rows, focus, search])
+
+  const counts = useMemo(() => {
+    const list = rows || []
+    return {
+      open: list.filter((invoice) => invoice.status === 'open').length,
+      overdue: list.filter((invoice) => invoiceMatchesFocus(invoice, 'overdue')).length,
+      due_soon: list.filter((invoice) => invoiceMatchesFocus(invoice, 'due_soon')).length,
+      unsent: list.filter((invoice) => invoiceMatchesFocus(invoice, 'unsent')).length,
+      paid: list.filter((invoice) => invoice.status === 'paid').length,
+      openValue: list.filter((invoice) => invoice.status === 'open').reduce((sum, invoice) => sum + invoice.amount_cents, 0),
     }
-  }, [requestedClient])
+  }, [rows])
+
+  async function sendInvoice(invoice: InvoiceRow) {
+    try {
+      const result = await api.post<{ recipients: number; sms_requested_but_not_connected?: boolean }>(`/admin/invoices/${invoice.id}/send`)
+      toast.success(`Invoice emailed to ${result.recipients} recipient${result.recipients === 1 ? '' : 's'}.${result.sms_requested_but_not_connected ? ' SMS is not connected yet.' : ''}`)
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not send the invoice.')
+    }
+  }
+
+  async function markPaid(invoice: InvoiceRow) {
+    try {
+      await api.patch(`/admin/invoices/${invoice.id}/status`, { status: 'paid' })
+      toast.success(`${invoice.invoice_number || 'Invoice'} marked paid.`)
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update the invoice.')
+    }
+  }
+
+  if (screen === 'build') {
+    return <InvoiceComposer
+      clients={clients}
+      initialClientId={params.get('client') || ''}
+      onClose={backToList}
+      onSaved={(id) => { void load(); openDetail(id) }}
+    />
+  }
+
+  if (detailId) {
+    return <InvoiceDetail invoiceId={detailId} onBack={backToList} onChanged={load} onOpen={openDetail} />
+  }
+
+  return <div>
+    <PageIntro
+      kicker="Revenue"
+      title="Invoices"
+      subtitle="Write an invoice, send it to the client portal, and mark it paid. Pinnacle records the amount and methods; it does not charge cards or ACH here."
+      action={<button className={btnPrimary} onClick={openBuild}><Plus size={14} />New invoice</button>}
+    />
+    {error && <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/[.06] p-4 text-sm text-red-200">{error}</div>}
+
+    <Panel className="mb-4 !p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {INVOICE_FOCUS.map((item) => {
+          const count = item.key === 'open' ? counts.open
+            : item.key === 'overdue' ? counts.overdue
+              : item.key === 'due_soon' ? counts.due_soon
+                : item.key === 'unsent' ? counts.unsent
+                  : item.key === 'paid' ? counts.paid
+                    : item.key === 'all' ? rows?.length || 0
+                      : rows?.filter((invoice) => invoiceMatchesFocus(invoice, item.key)).length || 0
+          return <Chip key={item.key} label={`${item.label} (${count})`} active={focus === item.key} tone={item.key === 'overdue' ? 'red' : item.key === 'unsent' ? 'gold' : 'slate'} onClick={() => setFocus(item.key)} />
+        })}
+      </div>
+      <p className="mt-3 text-xs text-slate-500">Open invoices total {invoiceMoney(counts.openValue)}. Click a row to review, send, or mark paid.</p>
+      <div className="mt-3 flex items-center gap-2">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/10 text-slate-500"><Search size={14} /></span>
+        <input className={`${inputCls} flex-1`} placeholder="Search number, client, company, or email" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+    </Panel>
+
+    {rows === null ? <p className="text-sm text-slate-400">Loading invoices…</p>
+      : visible.length === 0 ? <EmptyState label={rows.length === 0 ? 'No invoices yet. Create one for a client and it will show up here.' : 'Nothing matches this view.'} />
+      : <div className="overflow-hidden rounded-xl border border-white/10">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="bg-white/[0.025] text-[10px] uppercase tracking-wide text-slate-500">
+              <tr><th className="px-4 py-3 font-medium">Invoice</th><th className="px-4 py-3 font-medium">Client</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Amount</th><th className="px-4 py-3 font-medium">Next</th></tr>
+            </thead>
+            <tbody>
+              {visible.map((invoice) => {
+                const action = invoiceNextAction(invoice)
+                return (
+                  <tr key={invoice.id} className="cursor-pointer border-t border-white/5 transition hover:bg-white/[0.025]" onClick={() => openDetail(invoice.id)}>
+                    <td className="px-4 py-3"><b className="block text-white">{invoice.invoice_number || invoice.id.slice(0, 8)}</b><span className="text-xs text-slate-500">{invoice.title || 'Invoice'}{invoice.quote_number ? ` · from ${invoice.quote_number}` : ''} · {invoice.line_item_count} line{Number(invoice.line_item_count) === 1 ? '' : 's'}</span></td>
+                    <td className="px-4 py-3"><b className="block text-slate-200">{invoice.business_name || invoice.client_name || invoice.client_email}</b><span className="text-xs text-slate-500">{invoice.client_email}</span></td>
+                    <td className="px-4 py-3"><Tag tone={invoiceStatusTone(invoice)}>{invoiceStatusLabel(invoice)}</Tag><p className="mt-1 text-[11px] text-slate-500">{invoiceDueLabel(invoice)}</p></td>
+                    <td className="px-4 py-3 font-semibold text-white">{invoiceMoney(invoice.amount_cents, invoice.currency)}</td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      {action === 'send' && <button className={btnPrimary} onClick={() => void sendInvoice(invoice)}>Send</button>}
+                      {action === 'paid' && <button className={btnOutline} onClick={() => void markPaid(invoice)}>Mark paid</button>}
+                      {action === 'none' && <button className="text-xs font-bold text-gold hover:underline" onClick={() => openDetail(invoice.id)}>Open</button>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>}
+    <p className="mt-3 text-xs text-slate-600"><Link to={p('quotes')} className="text-gold hover:underline">Accepted quotes</Link> convert to an invoice from the quote record, or you can fill a new invoice from a matching quote.</p>
+  </div>
+}
+
+function LineItemsEditor({ lines, setLines, shipping, setShipping }: {
+  lines: LineDraft[]
+  setLines: (updater: (lines: LineDraft[]) => LineDraft[]) => void
+  shipping: string
+  setShipping: (value: string) => void
+}) {
+  const totals = draftTotals(lines, shipping)
+  const [advanced, setAdvanced] = useState(false)
+  const update = (index: number, patch: Partial<LineDraft>) => setLines((current) => current.map((line, i) => i === index ? { ...line, ...patch } : line))
+  return <div className="space-y-3">
+    {lines.map((line, index) => <div key={index} className="rounded-xl border border-white/10 bg-white/[.02] p-3">
+      <div className="grid gap-2 sm:grid-cols-[1fr_7rem_8rem_auto]">
+        <input className={inputCls} placeholder="What is this line for?" value={line.name} onChange={(e) => update(index, { name: e.target.value })} />
+        <input className={inputCls} inputMode="decimal" aria-label="Quantity" value={line.quantity} onChange={(e) => update(index, { quantity: e.target.value })} />
+        <input className={inputCls} inputMode="decimal" aria-label="Unit price" value={line.unit_price} onChange={(e) => update(index, { unit_price: e.target.value })} />
+        <button type="button" className="text-xs font-bold text-red-300 hover:text-red-200" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>Remove</button>
+      </div>
+      {advanced && <>
+        <textarea className={`${inputCls} mt-2 min-h-16`} placeholder="Description shown on the invoice" value={line.description} onChange={(e) => update(index, { description: e.target.value })} />
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          <input className={inputCls} inputMode="decimal" placeholder="Discount $" value={line.discount} onChange={(e) => update(index, { discount: e.target.value })} />
+          <label className="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" className="accent-gold" checked={line.taxable} onChange={(e) => update(index, { taxable: e.target.checked })} />Taxable</label>
+        </div>
+        {line.taxable && <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <input className={inputCls} placeholder="Local tax %" value={line.local_tax_rate} onChange={(e) => update(index, { local_tax_rate: e.target.value })} />
+          <input className={inputCls} placeholder="National tax %" value={line.national_tax_rate} onChange={(e) => update(index, { national_tax_rate: e.target.value })} />
+        </div>}
+      </>}
+    </div>)}
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={btnOutline} onClick={() => setLines((current) => [...current, emptyLine()])}>Add line</button>
+        <button type="button" className="text-xs font-bold text-slate-500 hover:text-gold" onClick={() => setAdvanced((v) => !v)}>{advanced ? 'Hide extras' : 'Notes, discount, tax'}</button>
+      </div>
+      <p className="text-sm text-slate-300">Total: <strong className="font-display text-lg text-gold">{invoiceMoney(totals.total)}</strong></p>
+    </div>
+    {advanced && <label className="block max-w-xs text-xs font-bold text-slate-400">Shipping / additional
+      <input className={`${inputCls} mt-1`} inputMode="decimal" value={shipping} onChange={(e) => setShipping(e.target.value)} />
+    </label>}
+  </div>
+}
+
+function InvoiceComposer({ clients, initialClientId, onClose, onSaved }: {
+  clients: ClientOption[]
+  initialClientId: string
+  onClose: () => void
+  onSaved: (id: string) => void
+}) {
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [clientId, setClientId] = useState(initialClientId)
+  const [title, setTitle] = useState('Professional services invoice')
+  const [dueDate, setDueDate] = useState(invoicePlusDays(14))
+  const [issueDate, setIssueDate] = useState(todayIsoDate())
+  const [billTo, setBillTo] = useState<ContactBlock>(emptyContact())
+  const [lines, setLinesState] = useState<LineDraft[]>([emptyLine()])
+  const [shipping, setShipping] = useState('0.00')
+  const [message, setMessage] = useState('Thank you for working with Pinnacle Management Ventures.')
+  const [delivery, setDelivery] = useState('email')
+  const [additionalEmails, setAdditionalEmails] = useState('')
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(['card', 'ach'])
+  const [quotes, setQuotes] = useState<QuoteOption[]>([])
+  const [quoteId, setQuoteId] = useState('')
+  const [showAddresses, setShowAddresses] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const setLines = (updater: (lines: LineDraft[]) => LineDraft[]) => setLinesState(updater)
+  const totals = draftTotals(lines, shipping)
+  const client = clients.find((item) => item.id === clientId)
+  const matchingQuotes = quotes.filter((quote) => client && quote.recipient_email.toLowerCase() === client.email.toLowerCase() && ['accepted', 'sent', 'viewed'].includes(quote.status))
+
+  useEffect(() => {
+    api.get<{ quotes: QuoteOption[] }>('/admin/quotes').then((res) => setQuotes(res.quotes)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!clientId) return
-    api.get<{ bill_to: ContactBlock; payable_to: ContactBlock }>(`/admin/invoice-clients/${clientId}/defaults`)
-      .then((defaults) => {
-        setBillTo({ ...emptyContact(), ...defaults.bill_to })
-        setPayableTo({ ...emptyContact(), ...defaults.payable_to })
-      })
+    api.get<{ bill_to: ContactBlock }>(`/admin/invoice-clients/${clientId}/defaults`)
+      .then((defaults) => setBillTo({ ...emptyContact(), ...defaults.bill_to }))
       .catch(() => {})
   }, [clientId])
 
-  const totals = useMemo(() => {
-    let subtotal = 0
-    let discount = 0
-    let tax = 0
-    for (const item of lineItems) {
-      const gross = Math.round((Number(item.quantity) || 0) * toCents(item.unit_price))
-      const itemDiscount = Math.min(gross, toCents(item.discount))
-      const base = Math.max(0, gross - itemDiscount)
-      subtotal += gross
-      discount += itemDiscount
-      if (item.taxable) tax += Math.round(base * ((Number(item.local_tax_rate) || 0) + (Number(item.national_tax_rate) || 0)) / 100)
+  async function fillFromQuote(id: string) {
+    setQuoteId(id)
+    if (!id) return
+    try {
+      const data = await api.get<{ quote: { title: string; intro_message: string | null }; line_items: Array<{ name: string; description: string | null; quantity: number; unit_price_cents: number; is_optional: number }> }>(`/admin/quotes/${id}`)
+      setTitle(data.quote.title || title)
+      if (data.quote.intro_message) setMessage(data.quote.intro_message)
+      const billed = data.line_items.filter((item) => !item.is_optional)
+      if (billed.length) {
+        setLinesState(billed.map((item) => ({
+          name: item.name,
+          description: item.description || '',
+          quantity: String(item.quantity || 1),
+          unit_price: ((item.unit_price_cents || 0) / 100).toFixed(2),
+          discount: '0.00',
+          taxable: false,
+          local_tax_rate: '0',
+          national_tax_rate: '0',
+        })))
+      }
+      toast.success('Quote lines copied onto this invoice.')
+    } catch {
+      toast.error('Could not load that quote.')
     }
-    const shippingCents = toCents(shipping)
-    return { subtotal, discount, tax, shipping: shippingCents, total: Math.max(0, subtotal - discount + tax + shippingCents) }
-  }, [lineItems, shipping])
-
-  function toggle(list: string[], value: string, setter: (next: string[]) => void) {
-    setter(list.includes(value) ? list.filter((item) => item !== value) : [...list, value])
   }
 
-  function updateLine(index: number, patch: Partial<LineItem>) {
-    setLineItems((items) => items.map((row, i) => i === index ? { ...row, ...patch } : row))
+  function goPricing() {
+    if (!clientId) return toast.error('Choose a client first.')
+    setStep(2)
   }
 
-  async function createInvoice(e: React.FormEvent) {
-    e.preventDefault()
+  function goReview() {
+    if (!linesToPayload(lines).length) return toast.error('Add at least one named line item.')
+    setStep(3)
+  }
+
+  async function save(sendAfter: boolean) {
+    const payload = linesToPayload(lines)
+    if (!payload.length) return toast.error('Add at least one line item with a name.')
     if (!clientId) return toast.error('Choose a client first.')
     setBusy(true)
     try {
-      const result = await api.post<{ id: string; invoice_number: string }>('/admin/invoices', {
+      const created = await api.post<{ id: string; invoice_number: string }>('/admin/invoices', {
         client_user_id: clientId,
-        invoice_number: invoiceNumber || undefined,
-        customer_number: customerNumber || undefined,
         title,
-        currency,
         issue_date: issueDate,
         due_date: dueDate,
         bill_to: billTo,
-        payable_to: payableTo,
-        line_items: lineItems.map((item) => ({
-          ...item,
-          unit_price_cents: toCents(item.unit_price),
-          discount_cents: toCents(item.discount),
-          local_tax_rate: Number(item.local_tax_rate) || 0,
-          national_tax_rate: Number(item.national_tax_rate) || 0,
-        })),
+        line_items: payload,
         shipping_cents: toCents(shipping),
         payment_methods: paymentMethods,
-        card_processor_label: cardProcessor,
-        transaction_type: transactionType,
-        ach_processor_label: achProcessor,
-        ach_sec_codes: secCodes,
-        partial_payment_type: partialType,
-        partial_payment_amount_cents: toCents(partialAmount),
-        require_shipping_details: requireShipping,
-        save_customer_mode: saveCustomer,
-        send_receipt: sendReceipt,
         delivery_channel: delivery,
         additional_emails: additionalEmails,
         message,
-        reminders,
+        quote_id: quoteId && matchingQuotes.find((quote) => quote.id === quoteId)?.status === 'accepted' ? quoteId : undefined,
+        reminders: [
+          { days_offset: 7, channel: 'email', enabled: true },
+          { days_offset: 1, channel: 'email', enabled: true },
+          { days_offset: -3, channel: 'email', enabled: true },
+        ],
       })
-      toast.success(`Invoice ${result.invoice_number} created.`)
-      setCreating(false)
-      setInvoiceNumber('')
-      setCustomerNumber('')
-      setLineItems([newLine()])
-      await load()
+      if (sendAfter) await api.post(`/admin/invoices/${created.id}/send`, {})
+      toast.success(sendAfter ? `Invoice ${created.invoice_number} sent.` : `Invoice ${created.invoice_number} saved.`)
+      onSaved(created.id)
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Could not create invoice.')
+      toast.error(err instanceof ApiError ? err.message : 'Could not save the invoice.')
     } finally {
       setBusy(false)
     }
   }
 
-  async function changeStatus(id: string, next: string) {
-    try {
-      await api.patch(`/admin/invoices/${id}/status`, { status: next })
-      toast.success('Invoice updated.')
-      await load()
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Could not update invoice.')
-    }
-  }
+  const steps = [{ n: 1, label: 'Client' }, { n: 2, label: 'Pricing' }, { n: 3, label: 'Review' }] as const
 
-  async function sendInvoice(id: string) {
-    try {
-      const result = await api.post<{ recipients: number; sms_requested_but_not_connected?: boolean }>(`/admin/invoices/${id}/send`)
-      toast.success(`Invoice emailed to ${result.recipients} recipient${result.recipients === 1 ? '' : 's'}.${result.sms_requested_but_not_connected ? ' SMS is not connected yet.' : ''}`)
-      await load()
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Could not send invoice.')
-    }
-  }
-
-  return (
-    <div className="mx-auto max-w-[1500px]">
-      <PageIntro
-        kicker="Billing operations"
-        title="Invoices"
-        subtitle="Create, send, track, and manage detailed client invoices without processing cards or ACH inside Pinnacle."
-        action={(
-          <button onClick={() => setCreating((value) => !value)} className={btnPrimary}>
-            <Icon name={creating ? 'close' : 'plus'} size={16} />
-            {creating ? 'Close editor' : 'New invoice'}
-          </button>
-        )}
-      />
-
-      {creating && (
-        <form onSubmit={createInvoice} className="mb-8 space-y-4">
-          <Panel className="relative overflow-hidden !p-0">
-            <div className="border-b border-white/10 bg-gradient-to-r from-gold/[0.06] to-transparent px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[.16em] text-gold">1 · Start here</p>
-              <h2 className="mt-1 text-lg font-semibold text-white">Client & invoice basics</h2>
-            </div>
-            <div className="grid gap-4 p-5 lg:grid-cols-2">
-              <label className="lg:col-span-2">
-                <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Client *</span>
-                <select required className={inputCls} value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                  <option value="">Choose client</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.business_name ? `${client.business_name}: ` : ''}{client.full_name || client.email}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="mb-1.5 block text-xs text-slate-400">Invoice number</span>
-                <input className={inputCls} placeholder="Auto-generated if blank" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
-              </label>
-              <label>
-                <span className="mb-1.5 block text-xs text-slate-400">Customer number</span>
-                <input className={inputCls} placeholder="Auto-generated if blank" value={customerNumber} onChange={(e) => setCustomerNumber(e.target.value)} />
-              </label>
-              <label className="lg:col-span-2">
-                <span className="mb-1.5 block text-xs text-slate-400">Invoice title</span>
-                <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} />
-              </label>
-              <div>
-                <span className="mb-1.5 block text-xs text-slate-400">Issue date</span>
-                <DateSelect value={issueDate} onChange={setIssueDate} ariaLabel="Issue date" />
-              </div>
-              <div>
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-400">Date due</span>
-                  <div className="flex gap-1">
-                    {DUE_SHORTCUTS.map(([days, label]) => (
-                      <button key={label} type="button" onClick={() => setDueDate(plusDays(days))} className="rounded border border-white/10 px-2 py-0.5 text-[10px] text-slate-400 hover:border-gold/30 hover:text-gold">
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <DateSelect value={dueDate} onChange={setDueDate} ariaLabel="Due date" />
-              </div>
-              <label>
-                <span className="mb-1.5 block text-xs text-slate-400">Currency</span>
-                <select className={inputCls} value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                  {CURRENCIES.map((item) => <option key={item}>{item}</option>)}
-                </select>
-              </label>
-            </div>
-          </Panel>
-
-          <Panel className="!p-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[.16em] text-gold">2 · Line items</p>
-                <h2 className="mt-1 text-lg font-semibold text-white">What are you billing for?</h2>
-              </div>
-              <button type="button" onClick={() => setLineItems((value) => [...value, newLine()])} className={btnOutline}>
-                <Icon name="plus" size={14} /> Add line
-              </button>
-            </div>
-            <div className="space-y-4 p-5">
-              {lineItems.map((item, index) => (
-                <div key={index} className="rounded-xl border border-white/10 bg-white/[.02] p-4">
-                  <div className="grid gap-3 lg:grid-cols-[1.1fr_1.5fr_.55fr_.75fr_.75fr_auto]">
-                    <input className={inputCls} placeholder="Name" value={item.name} onChange={(e) => updateLine(index, { name: e.target.value })} />
-                    <input className={inputCls} placeholder="Description" value={item.description} onChange={(e) => updateLine(index, { description: e.target.value })} />
-                    <input className={inputCls} type="number" min="0" step=".01" placeholder="Qty" value={item.quantity} onChange={(e) => updateLine(index, { quantity: Number(e.target.value) })} />
-                    <input className={inputCls} inputMode="decimal" placeholder="Unit $" value={item.unit_price} onChange={(e) => updateLine(index, { unit_price: e.target.value })} />
-                    <input className={inputCls} inputMode="decimal" placeholder="Discount $" value={item.discount} onChange={(e) => updateLine(index, { discount: e.target.value })} />
-                    <button type="button" disabled={lineItems.length === 1} onClick={() => setLineItems((value) => value.filter((_, i) => i !== index))} className="grid h-11 w-11 place-items-center rounded-lg border border-white/10 text-slate-500 hover:border-rose-400/30 hover:text-rose-300 disabled:opacity-30">
-                      <Icon name="close" size={16} />
-                    </button>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400">
-                    <label className="flex items-center gap-2"><input type="checkbox" checked={item.taxable} onChange={(e) => updateLine(index, { taxable: e.target.checked })} />Taxable</label>
-                    <label className="flex items-center gap-2"><input type="checkbox" checked={item.shipped} onChange={(e) => updateLine(index, { shipped: e.target.checked })} />Shipped</label>
-                    {item.taxable && (
-                      <>
-                        <label className="flex items-center gap-2">Local tax % <input className="w-20 rounded border border-white/10 bg-navy-900 px-2 py-1" value={item.local_tax_rate} onChange={(e) => updateLine(index, { local_tax_rate: e.target.value })} /></label>
-                        <label className="flex items-center gap-2">National tax % <input className="w-20 rounded border border-white/10 bg-navy-900 px-2 py-1" value={item.national_tax_rate} onChange={(e) => updateLine(index, { national_tax_rate: e.target.value })} /></label>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <div className="grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-2 lg:grid-cols-[1fr_300px]">
-                <label>
-                  <span className="mb-1 block text-xs text-slate-400">Shipping / additional item</span>
-                  <input className={inputCls} inputMode="decimal" value={shipping} onChange={(e) => setShipping(e.target.value)} />
-                </label>
-                <dl className="space-y-1.5 text-sm">
-                  <div className="flex justify-between"><dt className="text-slate-500">Subtotal</dt><dd>{dollars(totals.subtotal)}</dd></div>
-                  <div className="flex justify-between"><dt className="text-slate-500">Discount</dt><dd>-{dollars(totals.discount)}</dd></div>
-                  <div className="flex justify-between"><dt className="text-slate-500">Tax</dt><dd>{dollars(totals.tax)}</dd></div>
-                  <div className="flex justify-between border-t border-white/10 pt-2 text-base font-semibold"><dt>Total</dt><dd className="text-gold">{dollars(totals.total)}</dd></div>
-                </dl>
-              </div>
-            </div>
-          </Panel>
-
-          <details className="group rounded-xl border border-white/10 bg-white/[.02]">
-            <summary className="cursor-pointer list-none px-5 py-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[.16em] text-gold">3 · Address details</p>
-                  <h2 className="mt-1 text-lg font-semibold text-white">Bill to & payable to</h2>
-                  <p className="mt-1 text-sm text-slate-500">Prefilled from the client and firm profiles. Open only if something needs changing.</p>
-                </div>
-                <Icon name="chevronRight" size={18} className="transition group-open:rotate-90" />
-              </div>
-            </summary>
-            <div className="grid gap-6 border-t border-white/10 p-5 xl:grid-cols-2">
-              <div><h3 className="mb-3 text-sm font-semibold text-white">Bill to</h3><ContactFields value={billTo} onChange={setBillTo} /></div>
-              <div><h3 className="mb-3 text-sm font-semibold text-white">Payable to</h3><ContactFields value={payableTo} onChange={setPayableTo} /></div>
-            </div>
-          </details>
-
-          <details className="group rounded-xl border border-white/10 bg-white/[.02]">
-            <summary className="cursor-pointer list-none px-5 py-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[.16em] text-gold">4 · Payment preferences</p>
-                  <h2 className="mt-1 text-lg font-semibold text-white">Accepted methods & invoice controls</h2>
-                  <p className="mt-1 text-sm text-slate-500">Record/display options only. Pinnacle does not charge cards or ACH from this invoice screen.</p>
-                </div>
-                <Icon name="chevronRight" size={18} className="transition group-open:rotate-90" />
-              </div>
-            </summary>
-            <div className="grid gap-5 border-t border-white/10 p-5 lg:grid-cols-2">
-              <div>
-                <p className="mb-2 text-xs text-slate-400">Available payments</p>
-                <div className="flex flex-wrap gap-2">
-                  {PAYMENT_OPTIONS.map(([value, label]) => (
-                    <button type="button" key={value} onClick={() => toggle(paymentMethods, value, setPaymentMethods)} className={`rounded-full border px-3 py-2 text-xs ${paymentMethods.includes(value) ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-400'}`}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label><span className="mb-1 block text-xs text-slate-400">Card processor label</span><input className={inputCls} value={cardProcessor} onChange={(e) => setCardProcessor(e.target.value)} /></label>
-              <label><span className="mb-1 block text-xs text-slate-400">Transaction type</span><select className={inputCls} value={transactionType} onChange={(e) => setTransactionType(e.target.value)}><option value="sale">Sale</option><option value="authorization">Authorization</option></select></label>
-              <label><span className="mb-1 block text-xs text-slate-400">ACH processor label</span><input className={inputCls} value={achProcessor} onChange={(e) => setAchProcessor(e.target.value)} /></label>
-              <div>
-                <p className="mb-2 text-xs text-slate-400">ACH SEC codes</p>
-                <div className="flex gap-2">
-                  {['PPD', 'CCD', 'WEB'].map((value) => (
-                    <button type="button" key={value} onClick={() => toggle(secCodes, value, setSecCodes)} className={`rounded border px-3 py-2 text-xs ${secCodes.includes(value) ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-400'}`}>{value}</button>
-                  ))}
-                </div>
-              </div>
-              <label><span className="mb-1 block text-xs text-slate-400">Partial payment</span><select className={inputCls} value={partialType} onChange={(e) => setPartialType(e.target.value)}><option value="none">None</option><option value="line_items">By line items</option><option value="amount">Specific amount</option></select></label>
-              {partialType === 'amount' && <label><span className="mb-1 block text-xs text-slate-400">Partial amount ($)</span><input className={inputCls} value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} /></label>}
-              <label><span className="mb-1 block text-xs text-slate-400">Save customer to vault</span><select className={inputCls} value={saveCustomer} onChange={(e) => setSaveCustomer(e.target.value)}><option value="none">None</option><option value="optional">Optional</option><option value="required">Required</option></select></label>
-              <div className="flex flex-col gap-3 text-sm text-slate-300">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={requireShipping} onChange={(e) => setRequireShipping(e.target.checked)} />Require shipping details</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={sendReceipt} onChange={(e) => setSendReceipt(e.target.checked)} />Send receipt</label>
-              </div>
-            </div>
-          </details>
-
-          <Panel>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <label>
-                <span className="mb-1 block text-xs text-slate-400">Send invoice via</span>
-                <select className={inputCls} value={delivery} onChange={(e) => setDelivery(e.target.value)}>
-                  <option value="email">Email</option>
-                  <option value="text">Text (not connected yet)</option>
-                  <option value="email_text">Email & text</option>
-                  <option value="none">None</option>
-                </select>
-              </label>
-              <label><span className="mb-1 block text-xs text-slate-400">Additional email(s)</span><input className={inputCls} placeholder="comma separated" value={additionalEmails} onChange={(e) => setAdditionalEmails(e.target.value)} /></label>
-              <label className="lg:col-span-2"><span className="mb-1 block text-xs text-slate-400">Message</span><textarea className={`${inputCls} min-h-24`} value={message} onChange={(e) => setMessage(e.target.value)} /></label>
-              <div className="lg:col-span-2">
-                <p className="mb-2 text-xs text-slate-400">Reminder schedule</p>
-                <div className="flex flex-wrap gap-2">
-                  {reminders.map((reminder, index) => (
-                    <label key={`${reminder.days_offset}-${index}`} className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs">
-                      <input type="checkbox" checked={reminder.enabled} onChange={(e) => setReminders((items) => items.map((item, i) => i === index ? { ...item, enabled: e.target.checked } : item))} />
-                      <span>{reminder.days_offset > 0 ? `${reminder.days_offset} days before` : reminder.days_offset === 0 ? 'Due date' : `${Math.abs(reminder.days_offset)} days after`}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <button type="submit" disabled={busy} className={btnPrimary}><Icon name="billing" size={16} />{busy ? 'Creating…' : `Create invoice · ${dollars(totals.total)}`}</button>
-              <button type="button" onClick={() => setCreating(false)} className={btnOutline}>Cancel</button>
-            </div>
-          </Panel>
-        </form>
-      )}
-
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <input className={`${inputCls} max-w-md`} placeholder="Search invoice, client, company…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className={`${inputCls} sm:w-40`} value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="open">Open</option>
-          <option value="paid">Paid</option>
-          <option value="void">Void</option>
-        </select>
+  return <div>
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <button type="button" onClick={onClose} className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold"><ChevronLeft size={14} />Back to invoices</button>
+        <h2 className="text-xl font-bold text-white">New invoice</h2>
+        <p className="mt-1 text-sm text-slate-400">Client, then pricing, then send. Address and tax details stay optional.</p>
       </div>
+    </div>
+    <div className="mb-5 flex gap-2">
+      {steps.map((item) => (
+        <button key={item.n} type="button" onClick={() => { if (item.n < step) setStep(item.n) }} className={`rounded-full border px-3 py-1.5 text-xs font-bold ${step === item.n ? 'border-gold/50 bg-gold/10 text-gold' : item.n < step ? 'border-white/15 text-slate-300' : 'border-white/10 text-slate-600'}`}>
+          {item.n}. {item.label}
+        </button>
+      ))}
+    </div>
 
-      <Panel className="!p-0">
-        {rows.length === 0 ? (
-          <div className="p-6"><EmptyState label="No invoices match this view." /></div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-white/10 text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3 font-medium">Invoice</th>
-                  <th className="px-5 py-3 font-medium">Client</th>
-                  <th className="px-5 py-3 font-medium">Due</th>
-                  <th className="px-5 py-3 font-medium">Amount</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">Delivery</th>
-                  <th className="px-5 py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="border-b border-white/5 transition hover:bg-white/[.025]">
-                    <td className="px-5 py-3"><p className="font-medium text-white">{row.invoice_number || row.id.slice(0, 8)}</p><p className="text-xs text-slate-500">{row.title || 'Invoice'} · {row.line_item_count} line{Number(row.line_item_count) === 1 ? '' : 's'}</p></td>
-                    <td className="px-5 py-3"><p className="text-slate-200">{row.business_name || row.client_name || row.client_email}</p><p className="text-xs text-slate-500">{row.client_email}</p></td>
-                    <td className="px-5 py-3 text-slate-300">{row.due_date ? new Date(`${row.due_date}T12:00:00`).toLocaleDateString() : 'Not provided'}</td>
-                    <td className="px-5 py-3 font-medium text-white">{dollars(row.amount_cents)}</td>
-                    <td className="px-5 py-3"><Tag tone={row.status === 'paid' ? 'green' : row.status === 'void' ? 'slate' : 'gold'}>{row.status}</Tag></td>
-                    <td className="px-5 py-3 text-xs text-slate-400">{row.sent_at ? 'Sent' : 'Not sent'}</td>
-                    <td className="px-5 py-3">
-                      {row.status === 'open' && (
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => sendInvoice(row.id)} className="inline-flex items-center gap-1 text-xs font-medium text-gold hover:underline"><Icon name="send" size={13} />Send</button>
-                          <button onClick={() => changeStatus(row.id, 'paid')} className="text-xs text-slate-400 hover:text-white">Mark paid</button>
-                          <button onClick={() => changeStatus(row.id, 'void')} className="text-xs text-slate-500 hover:text-rose-300">Void</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    {step === 1 && <Panel>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-xs font-bold text-slate-400 sm:col-span-2">Client
+          <select className={`${inputCls} mt-1`} value={clientId} onChange={(e) => { setClientId(e.target.value); setQuoteId('') }}>
+            <option value="">Choose client</option>
+            {clients.map((item) => <option key={item.id} value={item.id}>{clientLabel(item)}</option>)}
+          </select>
+        </label>
+        {matchingQuotes.length > 0 && <label className="text-xs font-bold text-slate-400 sm:col-span-2">Fill from a quote
+          <select className={`${inputCls} mt-1`} value={quoteId} onChange={(e) => void fillFromQuote(e.target.value)}>
+            <option value="">Start blank</option>
+            {matchingQuotes.map((quote) => <option key={quote.id} value={quote.id}>{quote.quote_number} · {quote.title} · {invoiceMoney(quote.total_cents)}</option>)}
+          </select>
+        </label>}
+        <input className={inputCls} placeholder="Invoice title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <div>
+          <div className="mb-1 flex flex-wrap gap-1">
+            {DUE_SHORTCUTS.map(([days, label]) => (
+              <button key={label} type="button" onClick={() => setDueDate(invoicePlusDays(days))} className="rounded border border-white/10 px-2 py-0.5 text-[10px] text-slate-400 hover:border-gold/30 hover:text-gold">{label}</button>
+            ))}
           </div>
-        )}
-      </Panel>
+          <DateSelect value={dueDate} onChange={setDueDate} ariaLabel="Due date" />
+        </div>
+      </div>
+      <div className="mt-5 flex justify-end"><button className={btnPrimary} onClick={goPricing}>Continue to pricing</button></div>
+    </Panel>}
+
+    {step === 2 && <Panel>
+      <p className="mb-4 text-sm text-slate-400">Name, quantity, and price. Open extras only if you need a note, discount, or tax.</p>
+      <LineItemsEditor lines={lines} setLines={setLines} shipping={shipping} setShipping={setShipping} />
+      <div className="mt-5 flex justify-between gap-2">
+        <button className={btnOutline} onClick={() => setStep(1)}>Back</button>
+        <button className={btnPrimary} onClick={goReview}>Review invoice</button>
+      </div>
+    </Panel>}
+
+    {step === 3 && <Panel>
+      <p className="text-sm text-slate-300"><strong className="text-white">{client ? clientLabel(client) : 'Client'}</strong> · due {formatInvoiceDate(dueDate)}</p>
+      <p className="mt-1 text-sm text-slate-400">Total <strong className="ml-1 font-display text-xl text-gold">{invoiceMoney(totals.total)}</strong></p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="text-xs font-bold text-slate-400">Issue date<DateSelect value={issueDate} onChange={setIssueDate} ariaLabel="Issue date" /></label>
+        <label className="text-xs font-bold text-slate-400">Send via
+          <select className={`${inputCls} mt-1`} value={delivery} onChange={(e) => setDelivery(e.target.value)}>
+            <option value="email">Email</option>
+            <option value="none">Save without sending</option>
+            <option value="email_text">Email (text is not connected yet)</option>
+          </select>
+        </label>
+        <input className={`${inputCls} sm:col-span-2`} placeholder="Additional email(s), comma separated" value={additionalEmails} onChange={(e) => setAdditionalEmails(e.target.value)} />
+        <textarea className={`${inputCls} min-h-20 sm:col-span-2`} placeholder="Message on the invoice" value={message} onChange={(e) => setMessage(e.target.value)} />
+      </div>
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-bold text-slate-400">Accepted payment methods (display only)</p>
+        <div className="flex flex-wrap gap-2">
+          {PAYMENT_OPTIONS.map(([value, label]) => (
+            <button type="button" key={value} onClick={() => setPaymentMethods((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value])} className={`rounded-full border px-3 py-1.5 text-xs ${paymentMethods.includes(value) ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-400'}`}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <button type="button" className="mt-4 text-xs font-bold text-slate-500 hover:text-gold" onClick={() => setShowAddresses((v) => !v)}>{showAddresses ? 'Hide bill-to address' : 'Edit bill-to address'}</button>
+      {showAddresses && <div className="mt-3"><ContactFields value={billTo} onChange={setBillTo} /></div>}
+      <div className="mt-5 flex flex-wrap justify-between gap-2">
+        <button className={btnOutline} onClick={() => setStep(2)}>Back</button>
+        <div className="flex gap-2">
+          <button className={btnOutline} disabled={busy} onClick={() => void save(false)}>{busy ? 'Saving…' : 'Save without sending'}</button>
+          <button className={btnPrimary} disabled={busy} onClick={() => void save(true)}>{busy ? 'Working…' : 'Create and send'}</button>
+        </div>
+      </div>
+    </Panel>}
+  </div>
+}
+
+interface InvoiceDetailData {
+  invoice: InvoiceRow & {
+    message: string | null
+    additional_emails: string | null
+    delivery_channel: string
+    payment_methods: string[]
+    bill_to: ContactBlock
+    payable_to: ContactBlock
+    subtotal_cents: number
+    discount_cents: number
+    tax_cents: number
+    shipping_cents: number
+    client_phone?: string | null
+    quote_id?: string | null
+    quote_number?: string | null
+  }
+  line_items: Array<{ id: string; name: string; description: string | null; quantity: number; unit_price_cents: number; discount_cents: number; taxable: number; local_tax_rate: number; national_tax_rate: number }>
+  reminders: Array<{ id: string; days_offset: number; enabled: number }>
+}
+
+function InvoiceDetail({ invoiceId, onBack, onChanged, onOpen }: { invoiceId: string; onBack: () => void; onChanged: () => Promise<unknown> | void; onOpen: (id: string) => void }) {
+  const p = useAppPath()
+  const [data, setData] = useState<InvoiceDetailData | null>(null)
+  const [busy, setBusy] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [showMore, setShowMore] = useState(false)
+
+  const load = useCallback(() => api.get<InvoiceDetailData>(`/admin/invoices/${invoiceId}`).then(setData).catch(() => toast.error('Could not load the invoice.')), [invoiceId])
+  useEffect(() => { void load() }, [load])
+
+  if (!data) return <div><button type="button" onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold"><ChevronLeft size={14} />Back to invoices</button><p className="text-sm text-slate-400">Loading…</p></div>
+  const { invoice, line_items, reminders } = data
+  const editable = invoice.status === 'open'
+
+  async function act(label: string, fn: () => Promise<unknown>) {
+    setBusy(label)
+    try { await fn(); await load(); await onChanged() } catch (e) { toast.error(e instanceof ApiError ? e.message : `Could not ${label} the invoice.`) } finally { setBusy('') }
+  }
+
+  async function duplicate() {
+    setBusy('duplicate')
+    try {
+      const created = await api.post<{ id: string; invoice_number: string }>(`/admin/invoices/${invoice.id}/duplicate`, {})
+      toast.success(`Draft ${created.invoice_number} created from this invoice.`)
+      await onChanged()
+      onOpen(created.id)
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Could not duplicate the invoice.')
+    } finally { setBusy('') }
+  }
+
+  if (editing) {
+    return <div>
+      <button type="button" onClick={() => setEditing(false)} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold"><ChevronLeft size={14} />Cancel editing</button>
+      <InvoiceEditor
+        invoice={invoice}
+        lines={line_items.map((li) => ({
+          name: li.name,
+          description: li.description || '',
+          quantity: String(li.quantity),
+          unit_price: (li.unit_price_cents / 100).toFixed(2),
+          discount: ((li.discount_cents || 0) / 100).toFixed(2),
+          taxable: !!li.taxable,
+          local_tax_rate: String(li.local_tax_rate || 0),
+          national_tax_rate: String(li.national_tax_rate || 0),
+        }))}
+        shipping={((invoice.shipping_cents || 0) / 100).toFixed(2)}
+        onCancel={() => setEditing(false)}
+        onSaved={() => { setEditing(false); void load(); void onChanged() }}
+      />
+    </div>
+  }
+
+  return <div>
+    <button type="button" onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold"><ChevronLeft size={14} />Back to invoices</button>
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold">{invoice.invoice_number || invoice.id.slice(0, 8)}</p>
+        <h2 className="mt-1 text-xl font-bold text-white">{invoice.title || 'Invoice'}</h2>
+        <p className="mt-1 text-sm text-slate-400">{invoice.business_name || invoice.client_name} · {invoice.client_email}{invoice.quote_number ? ` · from ${invoice.quote_number}` : ''}</p>
+      </div>
+      <Tag tone={invoiceStatusTone(invoice)}>{invoiceStatusLabel(invoice)}</Tag>
+    </div>
+
+    <div className="mb-5 flex flex-wrap items-center gap-2">
+      {editable && <button className={btnPrimary} disabled={!!busy} onClick={() => act('send', () => api.post(`/admin/invoices/${invoice.id}/send`, {}))}>{busy === 'send' ? 'Sending…' : invoice.sent_at ? 'Re-send' : 'Send invoice'}</button>}
+      {editable && <button className={btnOutline} disabled={!!busy} onClick={() => act('paid', () => api.patch(`/admin/invoices/${invoice.id}/status`, { status: 'paid' }))}>Mark paid</button>}
+      {editable && <button className={btnOutline} disabled={!!busy} onClick={() => setEditing(true)}>Edit</button>}
+      <Link className={btnOutline} to={clientEmailHref(p, { id: invoice.client_user_id, email: invoice.client_email, name: invoice.client_name })}>Email</Link>
+      <Link className={btnOutline} to={p(`clients/${invoice.client_user_id}`)}>Open client</Link>
+      {invoice.quote_id && <Link className={btnOutline} to={`${p('quotes')}?quote=${encodeURIComponent(invoice.quote_id)}`}>Open quote</Link>}
+      <button className={btnOutline} disabled={!!busy} onClick={() => void duplicate()}>{busy === 'duplicate' ? 'Copying…' : 'Duplicate'}</button>
+      <button className="text-xs font-bold text-slate-500 hover:text-white" onClick={() => setShowMore((v) => !v)}>{showMore ? 'Hide decisions' : 'Void or reopen'}</button>
+    </div>
+    {showMore && (
+      <div className="mb-5 flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[.02] p-3">
+        {invoice.status !== 'open' && <button className={btnOutline} disabled={!!busy} onClick={() => act('reopen', () => api.patch(`/admin/invoices/${invoice.id}/status`, { status: 'open' }))}>Reopen</button>}
+        {editable && <button className="rounded-md border border-red-400/20 px-3 py-1.5 text-sm font-bold text-red-200 transition hover:border-red-400/50" disabled={!!busy} onClick={() => { if (confirm('Void this invoice? The client still sees it as voided.')) void act('void', () => api.patch(`/admin/invoices/${invoice.id}/status`, { status: 'void' })) }}>Void</button>}
+      </div>
+    )}
+
+    <div className="grid gap-5 lg:grid-cols-[1.35fr_.65fr]">
+      <div className="overflow-hidden rounded-xl border border-white/10">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-white/[.03] text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Line</th><th>Qty</th><th>Unit</th><th className="pr-4 text-right">Amount</th></tr></thead>
+          <tbody className="divide-y divide-white/[.07]">
+            {line_items.map((li) => <tr key={li.id}>
+              <td className="px-4 py-3"><b className="block text-slate-200">{li.name}</b>{li.description && <span className="mt-0.5 block text-xs leading-5 text-slate-500">{li.description}</span>}</td>
+              <td className="text-slate-300">{li.quantity}</td>
+              <td className="text-slate-300">{invoiceMoney(li.unit_price_cents, invoice.currency)}</td>
+              <td className="pr-4 text-right font-semibold text-white">{invoiceMoney(Math.round(li.quantity * li.unit_price_cents) - (li.discount_cents || 0), invoice.currency)}</td>
+            </tr>)}
+          </tbody>
+          <tfoot>
+            {Number(invoice.discount_cents) > 0 && <tr><td className="px-4 py-2 text-slate-500" colSpan={3}>Discount</td><td className="pr-4 text-right text-slate-300">-{invoiceMoney(invoice.discount_cents, invoice.currency)}</td></tr>}
+            {Number(invoice.tax_cents) > 0 && <tr><td className="px-4 py-2 text-slate-500" colSpan={3}>Tax</td><td className="pr-4 text-right text-slate-300">{invoiceMoney(invoice.tax_cents, invoice.currency)}</td></tr>}
+            {Number(invoice.shipping_cents) > 0 && <tr><td className="px-4 py-2 text-slate-500" colSpan={3}>Shipping</td><td className="pr-4 text-right text-slate-300">{invoiceMoney(invoice.shipping_cents, invoice.currency)}</td></tr>}
+            <tr className="border-t border-gold/25 bg-gold/[.04]"><td className="px-4 py-3 font-bold text-white" colSpan={3}>Total</td><td className="pr-4 text-right font-display text-lg font-extrabold text-gold">{invoiceMoney(invoice.amount_cents, invoice.currency)}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <div className="space-y-3">
+        <div className="rounded-xl border border-white/10 bg-white/[.02] p-4 text-sm leading-6 text-slate-400">
+          <p><strong className="text-slate-200">Issued:</strong> {formatInvoiceDate(invoice.issue_date || invoice.created_at)}</p>
+          <p><strong className="text-slate-200">Due:</strong> {invoiceDueLabel(invoice)}</p>
+          <p><strong className="text-slate-200">Delivery:</strong> {invoice.sent_at ? `Sent ${formatInvoiceDate(invoice.sent_at)}` : 'Not sent'}</p>
+          {invoice.bill_to?.company && <p><strong className="text-slate-200">Bill to:</strong> {invoice.bill_to.company}</p>}
+          {invoice.quote_number && <p><strong className="text-slate-200">From quote:</strong> {invoice.quote_number}</p>}
+          {invoice.message && <p className="mt-2 border-t border-white/[.07] pt-2 text-xs">{invoice.message}</p>}
+        </div>
+        {reminders.length > 0 && <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
+          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Reminders</p>
+          <ul className="mt-2 space-y-1.5 text-xs text-slate-400">
+            {reminders.map((reminder) => <li key={reminder.id}>{reminder.enabled ? 'On' : 'Off'} · {reminder.days_offset > 0 ? `${reminder.days_offset} days before due` : reminder.days_offset === 0 ? 'Due date' : `${Math.abs(reminder.days_offset)} days after due`}</li>)}
+          </ul>
+        </div>}
+      </div>
+    </div>
+  </div>
+}
+
+function InvoiceEditor({ invoice, lines: initialLines, shipping: initialShipping, onCancel, onSaved }: {
+  invoice: InvoiceDetailData['invoice']
+  lines: LineDraft[]
+  shipping: string
+  onCancel: () => void
+  onSaved: () => void
+}) {
+  const [title, setTitle] = useState(invoice.title || '')
+  const [dueDate, setDueDate] = useState(invoice.due_date ? invoice.due_date.slice(0, 10) : invoicePlusDays(14))
+  const [issueDate, setIssueDate] = useState(invoice.issue_date ? invoice.issue_date.slice(0, 10) : invoiceToday())
+  const [message, setMessage] = useState(invoice.message || '')
+  const [lines, setLinesState] = useState<LineDraft[]>(initialLines)
+  const [shipping, setShipping] = useState(initialShipping)
+  const [busy, setBusy] = useState(false)
+  const setLines = (updater: (lines: LineDraft[]) => LineDraft[]) => setLinesState(updater)
+
+  async function save() {
+    const payload = linesToPayload(lines)
+    if (!payload.length) return toast.error('An invoice needs at least one line item.')
+    setBusy(true)
+    try {
+      await api.patch(`/admin/invoices/${invoice.id}`, {
+        title,
+        due_date: dueDate,
+        issue_date: issueDate,
+        message,
+        line_items: payload,
+        shipping_cents: toCents(shipping),
+      })
+      toast.success('Invoice updated.')
+      onSaved()
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Could not update the invoice.')
+    } finally { setBusy(false) }
+  }
+
+  return <Panel>
+    <h2 className="text-lg font-bold text-white">Edit invoice</h2>
+    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <input className={inputCls} placeholder="Invoice title" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <DateSelect value={dueDate} onChange={setDueDate} ariaLabel="Due date" />
+      <DateSelect value={issueDate} onChange={setIssueDate} ariaLabel="Issue date" />
+      <textarea className={`${inputCls} min-h-20 sm:col-span-2`} placeholder="Message" value={message} onChange={(e) => setMessage(e.target.value)} />
+    </div>
+    <div className="mt-4"><LineItemsEditor lines={lines} setLines={setLines} shipping={shipping} setShipping={setShipping} /></div>
+    <div className="mt-4 flex gap-2">
+      <button className={btnPrimary} disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save changes'}</button>
+      <button className={btnOutline} disabled={busy} onClick={onCancel}>Cancel</button>
+    </div>
+  </Panel>
+}
+
+function ContactFields({ value, onChange }: { value: ContactBlock; onChange: (next: ContactBlock) => void }) {
+  const set = (key: keyof ContactBlock, next: string) => onChange({ ...value, [key]: next })
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <input className={inputCls} placeholder="First name" value={value.first_name} onChange={(e) => set('first_name', e.target.value)} />
+      <input className={inputCls} placeholder="Last name" value={value.last_name} onChange={(e) => set('last_name', e.target.value)} />
+      <input className={`${inputCls} sm:col-span-2`} placeholder="Company" value={value.company} onChange={(e) => set('company', e.target.value)} />
+      <div className="sm:col-span-2">
+        <AddressAutocomplete
+          value={value.address_line_1}
+          onChange={(line1) => set('address_line_1', line1)}
+          onSelect={(address) => onChange({
+            ...value,
+            address_line_1: address.line1,
+            city: address.city || value.city,
+            state: address.state || value.state,
+            postal_code: address.postal_code || value.postal_code,
+            country: address.country === 'US' ? 'United States' : (address.country || value.country),
+          })}
+          inputClassName={inputCls}
+          placeholder="123 Main St"
+        />
+      </div>
+      <input className={`${inputCls} sm:col-span-2`} placeholder="Address line 2" value={value.address_line_2} onChange={(e) => set('address_line_2', e.target.value)} />
+      <select className={inputCls} value={value.country} onChange={(e) => set('country', e.target.value)}>
+        {COUNTRY_OPTIONS.map((country) => <option key={country.code} value={country.label}>{country.label}</option>)}
+      </select>
+      {value.country === 'United States' ? (
+        <select className={inputCls} value={value.state} onChange={(e) => set('state', e.target.value)}>
+          <option value="">Select state</option>
+          {US_STATES.map(([code, name]) => <option key={code} value={name}>{name}</option>)}
+        </select>
+      ) : (
+        <input className={inputCls} placeholder="State / region" value={value.state} onChange={(e) => set('state', e.target.value)} />
+      )}
+      <input className={inputCls} placeholder="City" value={value.city} onChange={(e) => set('city', e.target.value)} />
+      <input className={inputCls} placeholder="Postal code" value={value.postal_code} onChange={(e) => set('postal_code', e.target.value)} />
+      <input className={inputCls} type="email" placeholder="Email" value={value.email} onChange={(e) => set('email', e.target.value)} />
+      <input className={inputCls} placeholder="Phone" value={value.phone} onChange={(e) => set('phone', e.target.value)} />
     </div>
   )
 }

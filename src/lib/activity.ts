@@ -35,7 +35,12 @@ const MONEY_KINDS = new Set<string>([
   'invoice_created',
   'invoice_sent',
   'invoice_status_changed',
+  'invoice_updated',
   'invoice_reminder_sent',
+  'quote_created',
+  'quote_sent',
+  'quote_accepted',
+  'quote_declined',
   'funding_created',
   'funding_status_changed',
 ])
@@ -133,10 +138,15 @@ export function describeActivity(e: ActivityEvent): string {
     case 'call_status_changed': return `${actor} set call “${d.topic}” (${client}) to ${fmtStatus(d.to)}`
     case 'appointment_created': return `${actor} scheduled “${d.title}” for ${client}`
     case 'appointment_status_changed': return `${actor} set appointment “${d.title}” (${client}) to ${fmtStatus(d.to)}`
-    case 'invoice_created': return `${actor} created an invoice for ${money(d.amount_cents)} for ${client}${d.invoice_number ? ` · ${d.invoice_number}` : ''}`
+    case 'invoice_created': return `${actor} created an invoice for ${money(d.amount_cents)} for ${client}${d.invoice_number ? ` · ${d.invoice_number}` : ''}${d.quote_number ? ` from quote ${d.quote_number}` : ''}`
     case 'invoice_sent': return `${actor} sent ${d.invoice_number || 'an invoice'} to ${d.recipients ?? 1} recipient${d.recipients === 1 ? '' : 's'} for ${client}`
     case 'invoice_status_changed': return `${actor} marked ${client}’s invoice as ${fmtStatus(d.to)}`
+    case 'invoice_updated': return `${actor} updated ${d.invoice_number || 'an invoice'} for ${client}`
     case 'invoice_reminder_sent': return `${actor} sent a payment reminder to ${client}${d.invoice_number ? ` for ${d.invoice_number}` : ''}`
+    case 'quote_created': return `${actor} created quote ${d.quote_number || ''} for ${money(d.total_cents)}`
+    case 'quote_sent': return `${actor} sent quote ${d.quote_number || ''} for ${money(d.total_cents)}`
+    case 'quote_accepted': return `${d.quote_number || 'A quote'} was accepted${d.total_cents ? ` for ${money(d.total_cents)}` : ''}`
+    case 'quote_declined': return `${d.quote_number || 'A quote'} was declined`
     case 'service_assigned_by_staff': return `${actor} assigned ${d.service_name || fmtStatus(d.service_key)} to ${client}: awaiting their signature`
     case 'funding_created': return `${actor} opened a funding application for ${client}`
     case 'funding_status_changed': return `${actor} set ${client}’s funding application to ${fmtStatus(d.to)}`

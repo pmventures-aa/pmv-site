@@ -21,7 +21,9 @@ describe('quote workspace helpers', () => {
     expect(quoteNextAction('draft')).toBe('send')
     expect(quoteNextAction('sent')).toBe('copy')
     expect(quoteNextAction('viewed')).toBe('copy')
-    expect(quoteNextAction('accepted')).toBe('none')
+    expect(quoteNextAction('accepted')).toBe('convert')
+    expect(quoteNextAction('accepted', 'inv-1')).toBe('open-invoice')
+    expect(quoteNextAction('declined')).toBe('none')
   })
 
   it('uses plain-language labels', () => {
@@ -37,7 +39,18 @@ describe('HQ quotes page', () => {
     expect(source).toContain("useState<'list' | 'build' | 'templates'>")
     expect(source).toContain('Continue to pricing')
     expect(source).toContain('Duplicate')
+    expect(source).toContain('Convert to invoice')
+    expect(source).toContain('Convert and mark paid')
     expect(source).not.toContain('RecentWindow')
     expect(source).not.toContain('StatCard')
+  })
+})
+
+describe('public quote decision', () => {
+  it('lets the recipient add notes when accepting or declining', () => {
+    const source = readFileSync(new URL('../src/pages/public/QuoteView.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('Confirm Accept')
+    expect(source).toContain('Confirm Decline')
+    expect(source).toContain('decision_note')
   })
 })
