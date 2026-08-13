@@ -22,7 +22,7 @@ export interface ClientWorkspaceCopy {
   discoveryTitle: string
   discoveryBody: string
   mobilePrimary: string[]
-  shortcutKeys: Array<'properties' | 'documents' | 'messages' | 'billing' | 'calendar' | 'team' | 'account' | 'funding'>
+  shortcutKeys: Array<'work' | 'properties' | 'documents' | 'messages' | 'billing' | 'calendar' | 'team' | 'account' | 'funding'>
 }
 
 const CLIENT_COPY: Record<OperatingWorld, ClientWorkspaceCopy> = {
@@ -41,8 +41,8 @@ const CLIENT_COPY: Record<OperatingWorld, ClientWorkspaceCopy> = {
     pulseOpenLabel: 'Open property work',
     discoveryTitle: 'Add another property need without starting over',
     discoveryBody: 'Cleaning, inspections, turnovers, and preservation stay in this same workspace.',
-    mobilePrimary: ['dashboard', 'properties', 'support', 'documents'],
-    shortcutKeys: ['properties', 'documents', 'calendar', 'billing', 'team', 'account'],
+    mobilePrimary: ['dashboard', 'work', 'messages', 'documents'],
+    shortcutKeys: ['work', 'properties', 'documents', 'calendar', 'billing', 'team', 'account'],
   },
   documents: {
     world: 'documents',
@@ -59,8 +59,8 @@ const CLIENT_COPY: Record<OperatingWorld, ClientWorkspaceCopy> = {
     pulseOpenLabel: 'Open document work',
     discoveryTitle: 'Bring another document need into this workspace',
     discoveryBody: 'Preparation, notary, RON, and courier can share the same client record.',
-    mobilePrimary: ['dashboard', 'documents', 'support', 'messages'],
-    shortcutKeys: ['documents', 'messages', 'calendar', 'billing', 'team', 'account'],
+    mobilePrimary: ['dashboard', 'work', 'messages', 'documents'],
+    shortcutKeys: ['work', 'documents', 'messages', 'calendar', 'billing', 'team', 'account'],
   },
   business: {
     world: 'business',
@@ -77,8 +77,8 @@ const CLIENT_COPY: Record<OperatingWorld, ClientWorkspaceCopy> = {
     pulseOpenLabel: 'Open operations work',
     discoveryTitle: 'Add another operations need to this relationship',
     discoveryBody: 'Admin support, systems work, and project coordination stay connected here.',
-    mobilePrimary: ['dashboard', 'support', 'documents', 'messages'],
-    shortcutKeys: ['documents', 'messages', 'billing', 'calendar', 'team', 'account'],
+    mobilePrimary: ['dashboard', 'work', 'messages', 'documents'],
+    shortcutKeys: ['work', 'documents', 'messages', 'billing', 'calendar', 'team', 'account'],
   },
   funding: {
     world: 'funding',
@@ -95,8 +95,8 @@ const CLIENT_COPY: Record<OperatingWorld, ClientWorkspaceCopy> = {
     pulseOpenLabel: 'Open funding work',
     discoveryTitle: 'Other Pinnacle support stays available',
     discoveryBody: 'Operations, documents, and property work can join this relationship when you need them.',
-    mobilePrimary: ['dashboard', 'funding', 'documents', 'support'],
-    shortcutKeys: ['funding', 'documents', 'messages', 'billing', 'team', 'account'],
+    mobilePrimary: ['dashboard', 'work', 'messages', 'documents'],
+    shortcutKeys: ['work', 'funding', 'documents', 'messages', 'billing', 'team', 'account'],
   },
   general: {
     world: 'general',
@@ -113,8 +113,8 @@ const CLIENT_COPY: Record<OperatingWorld, ClientWorkspaceCopy> = {
     pulseOpenLabel: 'Open work',
     discoveryTitle: 'Bring another need into this relationship',
     discoveryBody: 'Property, documents, operations, and funding can share the same Pinnacle record.',
-    mobilePrimary: ['dashboard', 'support', 'documents', 'messages'],
-    shortcutKeys: ['documents', 'messages', 'billing', 'calendar', 'team', 'account'],
+    mobilePrimary: ['dashboard', 'work', 'messages', 'documents'],
+    shortcutKeys: ['work', 'documents', 'messages', 'billing', 'calendar', 'team', 'account'],
   },
 }
 
