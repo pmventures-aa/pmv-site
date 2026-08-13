@@ -5,16 +5,21 @@ import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Tag, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
+import { WhoSection } from '../../components/kit/WhoSection'
 import { ResendWebhookPanel } from './settings/ResendWebhookPanel'
 import { EmailComposePane, type ComposeDraft } from './EmailComposePane'
 import { EmailSignaturesPanel } from './EmailSignaturesPanel'
 import { previewSignatureHtml, type EmailSignature } from '../../lib/emailSignatures'
 import { composeAddress } from '../../lib/engagements'
+import { parseWhoAddresses, uniqueWhoPeople, type WhoPerson, type WhoRow } from '../../lib/who'
+import { useAppPath } from '../../lib/basePath'
+import { FIRM_NAME } from '../../../shared/letterhead'
 
 type Thread = {
   id: string; subject: string; scope_client_user_id: string|null
   last_activity_at: string; created_at: string; conversation_id: string
-  message_count: number; client_name: string|null
+  message_count: number; client_name: string | null; client_email?: string | null
+  last_from?: string | null
   last_direction: 'inbound'|'outbound'|null; last_status: string|null
   unread?: number
 }
@@ -218,6 +223,7 @@ export function EmailThreadsPanel() {
                       <p className={`truncate font-display text-[13px] ${t.unread ? 'font-bold text-white' : 'font-medium text-slate-200'}`}>{t.subject}</p>
                     </div>
                     <p className="mt-1 truncate text-[11px] text-slate-500">
+                      {t.last_from && <>{t.last_from} · </>}
                       {t.client_name && <>{t.client_name} · </>}
                       {t.message_count} · {new Date(t.last_activity_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                     </p>
@@ -251,6 +257,52 @@ function StatusPill({ status }: { status: string }) {
   return <Tag tone={tone}>{status}</Tag>
 }
 
+function clientWho(thread: Thread, p: (path?: string) => string): WhoPerson[] {
+  if (!thread.scope_client_user_id) return []
+  return [{
+    name: thread.client_name,
+    email: thread.client_email,
+    userId: thread.scope_client_user_id,
+    role: 'Client',
+    href: p(`clients/${thread.scope_client_user_id}`),
+  }]
+}
+
+function messageWhoRows(m: Message): WhoRow[] {
+  const to = parseWhoAddresses(m.to_json)
+  const cc = parseWhoAddresses(m.cc_json)
+  const from: WhoPerson[] = [{
+    name: m.from_name || (m.direction === 'outbound' ? FIRM_NAME : null),
+    email: m.from_email,
+    userId: m.sender_user_id,
+    role: m.direction === 'outbound' ? 'Pinnacle' : undefined,
+  }]
+  return [
+    { label: 'From', people: from },
+    { label: 'To', people: to },
+    { label: 'Cc', people: cc },
+    { label: 'Sent', text: new Date(m.created_at).toLocaleString() },
+  ]
+}
+
+function threadWhoRows(detail: Detail, p: (path?: string) => string): WhoRow[] {
+  const people: WhoPerson[] = []
+  for (const m of detail.messages) {
+    people.push({
+      name: m.from_name,
+      email: m.from_email,
+      userId: m.sender_user_id,
+      role: m.direction === 'outbound' ? 'Pinnacle' : undefined,
+    })
+    people.push(...parseWhoAddresses(m.to_json))
+    people.push(...parseWhoAddresses(m.cc_json))
+  }
+  return [
+    { label: 'Client', people: clientWho(detail.thread, p) },
+    { label: 'People', people: uniqueWhoPeople(people) },
+  ]
+}
+
 function EmailThreadDetail({
   detail, onBack, onReply, onCompose, onSignatures,
 }: {
@@ -260,9 +312,9 @@ function EmailThreadDetail({
   onCompose: () => void
   onSignatures: () => void
 }) {
+  const p = useAppPath()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [expandedHeaders, setExpandedHeaders] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (!menuOpen) return
@@ -312,21 +364,17 @@ function EmailThreadDetail({
         </div>
       </div>
 
+      <WhoSection rows={threadWhoRows(detail, p)} />
+
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pb-24 md:space-y-3 md:p-4 md:pb-4">
         {detail.messages.map((m) => {
-          const to = safeArray<{ email: string; name?: string }>(m.to_json)
+          const to = parseWhoAddresses(m.to_json)
           const isOut = m.direction === 'outbound'
-          const isExpanded = !!expandedHeaders[m.id]
           const attachments = detail.attachments.filter((a) => a.email_message_id === m.id)
           const senderLabel = m.from_name || nameFromEmail(m.from_email)
           return (
-            <article key={m.id} className={`overflow-hidden rounded-2xl border md:rounded-lg md:p-4 ${isOut ? 'border-gold/25 bg-gold/[.04] md:border-white/10 md:bg-white/[.02]' : 'border-sky-400/25 bg-sky-400/[.05]'}`}>
-              <button
-                type="button"
-                onClick={() => setExpandedHeaders((prev) => ({ ...prev, [m.id]: !prev[m.id] }))}
-                className="flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left md:hidden"
-                aria-expanded={isExpanded}
-              >
+            <article key={m.id} className={`overflow-hidden rounded-2xl border md:rounded-lg ${isOut ? 'border-gold/25 bg-gold/[.04] md:border-white/10 md:bg-white/[.02]' : 'border-sky-400/25 bg-sky-400/[.05]'}`}>
+              <div className="flex items-start justify-between gap-2 px-3 py-2.5 md:hidden">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${isOut ? 'bg-gold/20 text-gold' : 'bg-sky-400/20 text-sky-300'}`}>
                     {isOut ? <Send size={11}/> : <Reply size={11}/>}
@@ -341,38 +389,25 @@ function EmailThreadDetail({
                 </div>
                 {m.opened_at && <span title={`Opened ${new Date(m.opened_at).toLocaleString()}`} className="text-emerald-300"><CheckCheck size={14}/></span>}
                 {(m.bounced_at || m.provider_status === 'failed' || m.provider_status === 'bounced') && <span className="text-rose-400"><XCircle size={14}/></span>}
-              </button>
+              </div>
 
-              {isExpanded && (
-                <div className="border-t border-white/10 bg-white/[.02] px-3 py-2 text-[11px] leading-5 text-slate-400 md:hidden">
-                  <p><span className="text-slate-500">From </span>{m.from_name ? `${m.from_name} <${m.from_email}>` : m.from_email}</p>
-                  <p className="mt-1"><span className="text-slate-500">To </span>{to.map((a) => a.name ? `${a.name} <${a.email}>` : a.email).join(', ') || '(no recipients)'}</p>
-                  <p className="mt-1"><span className="text-slate-500">Sent </span>{new Date(m.created_at).toLocaleString()}</p>
-                </div>
-              )}
-
-              <div className="hidden md:flex md:flex-wrap md:items-center md:justify-between md:gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`grid h-5 w-5 place-items-center rounded ${isOut ? 'bg-gold/15 text-gold' : 'bg-sky-400/15 text-sky-300'}`}>{isOut ? <Send size={11}/> : <Reply size={11}/>}</span>
-                    <span className="text-xs font-bold text-white">{m.from_name || m.from_email}</span>
-                    <span className="truncate text-[10px] text-slate-500">to {to.map((a) => a.name || a.email).join(', ')}</span>
-                  </div>
-                  <p className="mt-1 text-[10px] text-slate-500">{new Date(m.created_at).toLocaleString()}</p>
-                </div>
-                <div className="flex items-center gap-1.5">
+              <div className="hidden items-center justify-between gap-2 px-4 pt-4 md:flex">
+                <div className="flex items-center gap-2">
+                  <span className={`grid h-5 w-5 place-items-center rounded ${isOut ? 'bg-gold/15 text-gold' : 'bg-sky-400/15 text-sky-300'}`}>{isOut ? <Send size={11}/> : <Reply size={11}/>}</span>
                   <StatusPill status={m.provider_status}/>
                   {m.opened_at && <span title={`Opened ${new Date(m.opened_at).toLocaleString()}`} className="text-emerald-300"><CheckCheck size={13}/></span>}
                   {m.bounced_at && <span title={`Bounced ${new Date(m.bounced_at).toLocaleString()}`} className="text-rose-400"><XCircle size={13}/></span>}
                 </div>
               </div>
 
-              {m.error && <div className="mx-3 mb-2 mt-2 rounded-lg border border-red-400/25 bg-red-400/[.06] p-2.5 text-[11px] text-red-200 md:mx-0 md:mt-2">Delivery error: {m.error}</div>}
+              <WhoSection eyebrow={null} className="border-white/10" rows={messageWhoRows(m)} />
 
-              <div className="signature-preview prose prose-sm mx-3 mb-3 mt-1 max-w-none rounded-lg bg-white p-4 font-serif text-[15px] leading-7 text-[#1b2430] md:mx-0 md:mb-0 md:mt-3 md:rounded-md md:p-5" dangerouslySetInnerHTML={{ __html: previewSignatureHtml(m.body_html || '') || (m.body_text ? `<pre class="whitespace-pre-wrap font-serif">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
+              {m.error && <div className="mx-3 mb-2 mt-2 rounded-lg border border-red-400/25 bg-red-400/[.06] p-2.5 text-[11px] text-red-200 md:mx-4 md:mt-2">Delivery error: {m.error}</div>}
+
+              <div className="signature-preview prose prose-sm mx-3 mb-3 mt-1 max-w-none rounded-lg bg-white p-4 font-serif text-[15px] leading-7 text-[#1b2430] md:mx-4 md:mb-4 md:mt-3 md:rounded-md md:p-5" dangerouslySetInnerHTML={{ __html: previewSignatureHtml(m.body_html || '') || (m.body_text ? `<pre class="whitespace-pre-wrap font-serif">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
 
               {attachments.length > 0 && (
-                <div className="border-t border-white/10 px-3 py-2 md:border-0 md:px-0 md:pt-2">
+                <div className="border-t border-white/10 px-3 py-2 md:px-4">
                   {attachments.map((a) => (
                     <p key={a.id} className="text-[11px] text-slate-400 md:text-slate-500">Attachment: {a.file_name}</p>
                   ))}
@@ -404,9 +439,9 @@ function nameFromEmail(email: string): string {
   return email.slice(0, at)
 }
 
-function summarizeRecipients(to: Array<{ email: string; name?: string }>): string {
+function summarizeRecipients(to: WhoPerson[]): string {
   if (to.length === 0) return '(no recipients)'
-  const first = to[0].name || nameFromEmail(to[0].email)
+  const first = to[0].name || (to[0].email ? nameFromEmail(to[0].email) : 'recipient')
   if (to.length === 1) return first
   return `${first} +${to.length - 1} others`
 }

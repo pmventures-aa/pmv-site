@@ -4,7 +4,9 @@ import { AtSign, CheckCheck, ChevronLeft, Circle, Hash, Loader2, Lock, MessageSq
 import { api, ApiError } from '../../lib/api'
 import { Panel, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
+import { WhoSection } from '../../components/kit/WhoSection'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
+import { useAppPath } from '../../lib/basePath'
 
 type Conversation = {
   id: string; kind: 'dm'|'group_dm'|'email_thread'; subject: string
@@ -140,6 +142,7 @@ export function ConversationsPanel() {
 }
 
 function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | null; onBack: () => void; onChanged: () => void }) {
+  const p = useAppPath()
   const [busy, setBusy] = useState(false)
   const [body, setBody] = useState('')
   const [internal, setInternal] = useState(false)
@@ -194,7 +197,6 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
                 <Tag>{KIND_LABEL[conversation.kind] || conversation.kind}</Tag>
                 <Tag tone={STATUS_TONE[conversation.status]}>{conversation.status}</Tag>
                 {conversation.priority !== 'normal' && <Tag tone={conversation.priority==='urgent'?'red':'gold'}>{conversation.priority}</Tag>}
-                {conversation.assignee_name && <span>Assignee: {conversation.assignee_name}</span>}
               </div>
             </div>
           </div>
@@ -202,16 +204,25 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
             {conversation.status === 'open' ? <button className={btnSecondary} onClick={() => setStatus('closed')}>Close</button> : <button className={btnSecondary} onClick={() => setStatus('open')}>Reopen</button>}
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {participants.map((p) => (
-            <span key={p.user_id} className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[.02] px-2.5 py-1 text-[11px] text-slate-300" title={p.email}>
-              <span className={`inline-block h-1.5 w-1.5 rounded-full ${presenceDot(p.last_seen_at)}`}/>
-              {p.full_name || p.email}
-              <span className="text-slate-500">· {p.user_role}</span>
-            </span>
-          ))}
-        </div>
       </div>
+      <WhoSection
+        rows={[
+          { label: 'People', people: participants.map((part) => ({
+            name: part.full_name,
+            email: part.email,
+            userId: part.user_id,
+            role: part.user_role,
+            href: part.user_role === 'client' ? p(`clients/${part.user_id}`) : undefined,
+          })) },
+          { label: 'Assignee', people: conversation.assignee_name ? [{ name: conversation.assignee_name, userId: conversation.assignee_user_id, role: 'Staff' }] : [] },
+          { label: 'Client', people: conversation.client_name && conversation.scope_client_user_id ? [{
+            name: conversation.client_name,
+            userId: conversation.scope_client_user_id,
+            role: 'Client',
+            href: p(`clients/${conversation.scope_client_user_id}`),
+          }] : [] },
+        ]}
+      />
 
       <div ref={scrollRef} className="max-h-[52vh] min-h-[320px] space-y-3 overflow-y-auto p-4">
         {messages.map((m) => {
@@ -347,10 +358,3 @@ function ComposerDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
 
 function escapeHtml(s: string): string { return s.replace(/[&<>]/g, (c) => c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;') }
 
-function presenceDot(lastSeenAt: string | null): string {
-  if (!lastSeenAt) return 'bg-slate-500'
-  const ageMs = Date.now() - new Date(lastSeenAt).getTime()
-  if (ageMs < 3 * 60_000) return 'bg-emerald-400 shadow-[0_0_6px_rgba(74,222,128,.7)]'
-  if (ageMs < 15 * 60_000) return 'bg-amber-400'
-  return 'bg-slate-500'
-}

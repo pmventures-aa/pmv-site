@@ -28,12 +28,13 @@ async function loadThread(env:Env,user:SessionUser,id:string){const thread=await
 
 messageRoutes.get('/message-threads/:id',async(c)=>{
   const user=c.get('user');const thread=await loadThread(c.env,user,c.req.param('id'))
-  const[messages,attachments,reads]=await Promise.all([
+  const[messages,attachments,reads,client]=await Promise.all([
     c.env.DB.prepare(`SELECT m.id,m.thread_id,m.sender_user_id,m.body,m.created_at,u.full_name sender_name,u.email sender_email,u.role sender_role FROM thread_messages m JOIN users u ON u.id=m.sender_user_id WHERE m.thread_id=? ORDER BY m.created_at ASC`).bind(thread.id).all<any>(),
     c.env.DB.prepare(`SELECT a.id,a.message_id,a.file_name,a.content_type,a.size_bytes FROM message_attachments a JOIN thread_messages m ON m.id=a.message_id WHERE m.thread_id=?`).bind(thread.id).all(),
     c.env.DB.prepare(`SELECT tr.user_id,tr.last_read_at,u.role,u.full_name,u.email FROM thread_reads tr JOIN users u ON u.id=tr.user_id WHERE tr.thread_id=?`).bind(thread.id).all<any>(),
+    c.env.DB.prepare('SELECT full_name,email FROM users WHERE id=?').bind(thread.client_user_id).first<{full_name:string|null;email:string}>(),
   ])
-  await markRead(c.env,thread.id,user.id).run();const readRows=reads.results??[];const enriched=(messages.results??[]).map((m:any)=>{const readBy=readRows.filter((r:any)=>r.user_id!==m.sender_user_id&&new Date(r.last_read_at).getTime()>=new Date(m.created_at).getTime());return{...m,delivery_status:'delivered',read_at:readBy.length?readBy.sort((a:any,b:any)=>new Date(a.last_read_at).getTime()-new Date(b.last_read_at).getTime())[0].last_read_at:null}});return c.json({thread,messages:enriched,attachments:attachments.results??[]})
+  await markRead(c.env,thread.id,user.id).run();const readRows=reads.results??[];const enriched=(messages.results??[]).map((m:any)=>{const readBy=readRows.filter((r:any)=>r.user_id!==m.sender_user_id&&new Date(r.last_read_at).getTime()>=new Date(m.created_at).getTime());return{...m,delivery_status:'delivered',read_at:readBy.length?readBy.sort((a:any,b:any)=>new Date(a.last_read_at).getTime()-new Date(b.last_read_at).getTime())[0].last_read_at:null}});return c.json({thread:{...thread,client_name:client?.full_name??null,client_email:client?.email??null},messages:enriched,attachments:attachments.results??[]})
 })
 
 messageRoutes.post('/message-threads',async(c)=>{

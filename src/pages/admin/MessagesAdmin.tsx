@@ -15,6 +15,7 @@ import { ConversationsPanel } from './ConversationsPanel'
 import { EmailThreadsPanel } from './EmailThreadsPanel'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 import { NotificationsTab, OverviewTab, ReportingTab } from './CommunicationsHub'
+import { SessionWho } from '../../components/kit/WhoSection'
 
 interface ThreadRow {
   id: string
@@ -151,6 +152,7 @@ function PulseTab() {
       .finally(() => setLoading(false))
   }, [])
   return <div className="space-y-5">
+    <SessionWho hint="Pulse counts conversations and mail you can see from this HQ session." />
     <OverviewTab overview={overview} loading={loading} />
     <ReportingTab />
   </div>
