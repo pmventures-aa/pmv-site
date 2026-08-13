@@ -144,7 +144,7 @@ export default function MatterDetail() {
             <Link to={actionTo} className="btn-gold">{nextActionButtonLabel(matter.next_action_type)}</Link>
           </div>
         )}
-        {banner.state !== 'client' && banner.state !== 'none' && (
+        {banner.state === 'third_party' && (
           <p className="mt-2 text-sm font-medium text-slate-200">Nothing is currently required from you.</p>
         )}
       </div>
