@@ -1,5 +1,5 @@
-import { AnimatePresence, motion, useInView, useReducedMotion, type Variants } from 'motion/react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { AnimatePresence, motion, useInView, useMotionValue, useReducedMotion, useSpring, type HTMLMotionProps, type Variants } from 'motion/react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { ServiceInfo } from '../../data/services'
 import { pmvFadeUp, pmvMotion, pmvStagger } from '../../lib/motionTheme'
@@ -7,14 +7,15 @@ import { pmvFadeUp, pmvMotion, pmvStagger } from '../../lib/motionTheme'
 // Editorial helpers for the public site. Shared product transitions live in
 // lib/motionTheme so the portal and HQ can use the same timing more quietly.
 
-export function Reveal({ children, delay = 0, className = '' }: { children: ReactNode; delay?: number; className?: string }) {
+export function Reveal({ children, delay = 0, className = '', distance = 10 }: { children: ReactNode; delay?: number; className?: string; distance?: number }) {
+  const reduceMotion = useReducedMotion()
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 10 }}
+      initial={reduceMotion ? false : { opacity: 0, y: distance }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-64px' }}
-      transition={{ ...pmvMotion.gentle, delay }}
+      transition={reduceMotion ? { duration: 0 } : { ...pmvMotion.gentle, delay }}
     >
       {children}
     </motion.div>
@@ -205,5 +206,45 @@ export function Marquee({ items }: { items: string[] }) {
         ))}
       </div>
     </div>
+  )
+}
+
+export function MagneticCta({ children, className = '', onBlur, onMouseLeave, ...props }: HTMLMotionProps<'button'> & { children: ReactNode }) {
+  const reduceMotion = useReducedMotion()
+  const ref = useRef<HTMLButtonElement>(null)
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  const springX = useSpring(x, { stiffness: 280, damping: 22, mass: 0.6 })
+  const springY = useSpring(y, { stiffness: 280, damping: 22, mass: 0.6 })
+
+  function onMove(event: MouseEvent<HTMLButtonElement>) {
+    if (reduceMotion || !ref.current) return
+    const box = ref.current.getBoundingClientRect()
+    x.set((event.clientX - (box.left + box.width / 2)) * 0.22)
+    y.set((event.clientY - (box.top + box.height / 2)) * 0.22)
+  }
+
+  function reset(event: MouseEvent<HTMLButtonElement>) {
+    x.set(0)
+    y.set(0)
+    onMouseLeave?.(event)
+  }
+
+  return (
+    <motion.button
+      {...props}
+      ref={ref}
+      className={`pmv-magnetic-cta ${className}`}
+      style={reduceMotion ? undefined : { x: springX, y: springY, willChange: 'transform' }}
+      onMouseMove={onMove}
+      onMouseLeave={reset}
+      onBlur={(event) => {
+        x.set(0)
+        y.set(0)
+        onBlur?.(event)
+      }}
+    >
+      {children}
+    </motion.button>
   )
 }

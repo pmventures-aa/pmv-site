@@ -7,6 +7,7 @@ export const pmvMotion = {
   snap: { duration: 0.16, ease: [0.2, 0.8, 0.2, 1] },
   ui: { type: 'spring', stiffness: 420, damping: 36, mass: 0.78 },
   gentle: { type: 'spring', stiffness: 190, damping: 26, mass: 0.9 },
+  premium: { duration: 0.42, ease: [0.25, 1, 0.5, 1] },
   ambient: { duration: 12, ease: 'easeInOut' },
 } satisfies Record<string, Transition>
 
