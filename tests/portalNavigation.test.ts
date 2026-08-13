@@ -12,6 +12,7 @@ describe('Client portal navigation', () => {
   it('only adds property, funding, and project destinations when those services are live', () => {
     const withProperty = clientPortalNav(['property_management']).map((item) => item.key)
     expect(withProperty).toContain('properties')
+    expect(withProperty).toContain('work')
     expect(withProperty).not.toContain('funding')
     expect(withProperty.slice(0, 3)).toEqual(['dashboard', 'properties', 'support'])
 

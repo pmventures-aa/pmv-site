@@ -4,6 +4,7 @@ import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 import { Icon } from '../../components/kit/Icon'
 import { invoiceDueLabel, invoiceMoney, invoiceStatusLabel, isInvoiceOverdue } from '../../../shared/invoiceWorkspace'
 import { quoteMoney, quoteStatusLabel } from '../../../shared/quoteWorkspace'
+import { billingCompliance } from '../../../shared/cardBrandCompliance'
 
 interface LineItem {
   id: string
@@ -30,10 +31,20 @@ interface Invoice {
   issue_date?: string | null
   message?: string | null
   payment_methods_json?: string | null
+  card_processor_label?: string | null
   quote_number?: string | null
   sent_at?: string | null
   created_at: string
   line_items?: LineItem[]
+}
+
+interface PaymentMethod {
+  id: string
+  method_type: string
+  account_holder_name: string | null
+  bank_name: string | null
+  account_type: string | null
+  account_last4: string | null
 }
 
 interface PortalQuote {
@@ -48,7 +59,7 @@ interface PortalQuote {
   decided_at: string | null
 }
 
-function methods(raw: string | null | undefined) {
+function parseMethods(raw: string | null | undefined) {
   try {
     const v = JSON.parse(raw || '[]')
     return Array.isArray(v) ? v : []
@@ -61,13 +72,15 @@ const methodLabel: Record<string, string> = { card: 'Card', apple_pay: 'Apple Pa
 export default function Billing() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [quotes, setQuotes] = useState<PortalQuote[]>([])
+  const [vault, setVault] = useState<PaymentMethod[]>([])
   const [loading, setLoading] = useState(true)
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.get<{ invoices: Invoice[]; quotes?: PortalQuote[] }>('/portal/billing')
+      const res = await api.get<{ invoices: Invoice[]; quotes?: PortalQuote[]; payment_methods?: PaymentMethod[] }>('/portal/billing')
       setInvoices(res.invoices)
       setQuotes(res.quotes || [])
+      setVault(res.payment_methods || [])
     } finally { setLoading(false) }
   }, [])
   useEffect(() => { void load() }, [load])
@@ -90,12 +103,35 @@ export default function Billing() {
         <Card className="p-5">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Payment status</p>
           <p className="mt-2 text-lg font-semibold text-white">{overdueCount ? 'Past due' : openCount ? 'Action may be needed' : 'Current'}</p>
-          <p className="mt-1 text-xs text-slate-500">Payment processing is coordinated separately unless your Pinnacle team provides a payment link.</p>
+          <p className="mt-1 text-xs text-slate-500">{billingCompliance.processor}</p>
         </Card>
       </div>
 
       {loading ? <Card><p className="text-sm text-slate-400">Loading…</p></Card> : (
         <div className="space-y-8">
+          <section>
+            <h2 className="text-sm font-semibold text-white">How payment works</h2>
+            <Card className="mt-3">
+              <ul className="space-y-2 text-sm leading-6 text-slate-300">
+                <li>{billingCompliance.noCardStorage}</li>
+                <li>{billingCompliance.storedAch}</li>
+                <li>{billingCompliance.disputes}</li>
+              </ul>
+            </Card>
+            {vault.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {vault.map((m) => (
+                  <Card key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
+                    <div>
+                      <p className="text-sm font-semibold text-white">ACH ·····{m.account_last4 || '••••'}</p>
+                      <p className="mt-1 text-xs text-slate-500">{[m.account_holder_name, m.bank_name, m.account_type].filter(Boolean).join(' · ')}</p>
+                    </div>
+                    <StatusBadge tone="slate">Bank account</StatusBadge>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
           {liveQuotes.length > 0 && (
             <section>
               <h2 className="text-sm font-semibold text-white">Quotes awaiting your reply</h2>
@@ -131,7 +167,7 @@ export default function Billing() {
           {invoices.length === 0 ? <Card><EmptyState label="No invoices yet." /></Card> : (
             <div className="space-y-3">
               {invoices.map((inv) => {
-                const accepted = methods(inv.payment_methods_json)
+                const accepted = parseMethods(inv.payment_methods_json)
                 const overdue = isInvoiceOverdue(inv)
                 return (
                   <Card key={inv.id} className="!p-0 overflow-hidden">
@@ -185,6 +221,7 @@ export default function Billing() {
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Available payment methods</p>
                           {accepted.length ? <div className="mt-3 flex flex-wrap gap-2">{accepted.map((m) => <span key={m} className="rounded-full border border-white/10 bg-white/[.03] px-3 py-1.5 text-xs text-slate-300">{methodLabel[m] || m}</span>)}</div> : <p className="mt-3 text-sm text-slate-500">Contact Pinnacle for payment instructions.</p>}
+                          {inv.card_processor_label && <p className="mt-3 text-xs text-slate-500">Card charges, if any, go through {inv.card_processor_label}. Card numbers are not entered on this page.</p>}
                           {inv.message && <div className="mt-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Message</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{inv.message}</p></div>}
                         </div>
                       </div>

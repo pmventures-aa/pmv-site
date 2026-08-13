@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
+import { propertyDisplayName } from '../../../shared/propertyProfile'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
 
@@ -26,11 +28,13 @@ interface Msg {
 
 export default function Support() {
   const { user } = useAuth()
+  const [params] = useSearchParams()
   const isStaff = user?.role === 'staff' || user?.role === 'admin'
   const [tickets, setTickets] = useState<Ticket[]>([])
+  const [properties, setProperties] = useState<{ id: string; name: string | null; address: string }[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '' })
+  const [showForm, setShowForm] = useState(!!params.get('property'))
+  const [form, setForm] = useState({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '', property_id: params.get('property') || '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -40,8 +44,12 @@ export default function Support() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.get<{ tickets: Ticket[] }>('/portal/support')
+      const [res, props] = await Promise.all([
+        api.get<{ tickets: Ticket[] }>('/portal/support'),
+        api.get<{ properties: { id: string; name: string | null; address: string }[] }>('/portal/property').catch(() => ({ properties: [] })),
+      ])
       setTickets(res.tickets)
+      setProperties(props.properties)
     } finally {
       setLoading(false)
     }
@@ -57,7 +65,7 @@ export default function Support() {
     setError(null)
     try {
       await api.post('/portal/support', form)
-      setForm({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '' })
+      setForm({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '', property_id: '' })
       setShowForm(false)
       await load()
     } catch (err) {
@@ -132,6 +140,15 @@ export default function Support() {
               </select>
               <span className="mt-1 block text-[11px] text-slate-500">Urgent: 30 min · High: 2 hrs · Normal: 4 hrs</span>
             </label>
+            {properties.length > 0 && (
+              <label className="sm:col-span-3">
+                <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Property</span>
+                <select className={inputCls} value={form.property_id} onChange={(e) => setForm((f) => ({ ...f, property_id: e.target.value }))}>
+                  <option value="">Not tied to an address</option>
+                  {properties.map((prop) => <option key={prop.id} value={prop.id}>{propertyDisplayName(prop)}</option>)}
+                </select>
+              </label>
+            )}
             <label className="sm:col-span-2">
               <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Details</span>
               <textarea className={`${inputCls} min-h-24`} value={form.details} onChange={(e) => setForm((f) => ({ ...f, details: e.target.value }))} placeholder="Address, deadline, access notes, documents needed, or anything else that will help us begin." />

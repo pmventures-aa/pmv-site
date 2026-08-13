@@ -1083,8 +1083,14 @@ export default function ClientDetail() {
           createConfig={{
             postPath: 'property',
             fields: [
+              { key: 'name', label: 'Property name' },
               { key: 'address', label: 'Address', required: true },
+              { key: 'city', label: 'City' },
+              { key: 'state', label: 'State' },
+              { key: 'postal_code', label: 'ZIP' },
               { key: 'property_type', label: 'Property type' },
+              { key: 'occupancy', label: 'Occupancy' },
+              { key: 'notes', label: 'Notes', type: 'textarea' },
             ],
           }}
         />
