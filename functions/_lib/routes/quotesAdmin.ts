@@ -227,6 +227,16 @@ quoteAdminRoutes.post('/quotes', requireStaff, async (c) => {
   const validDays = Math.min(120, Math.max(1, Math.round(Number(body.valid_days) || Number(template?.valid_days) || 14)))
   const validUntil = text(body.valid_until, 40) || new Date(now.getTime() + validDays * 86_400_000).toISOString().slice(0, 10)
 
+  let clientUserId = text(body.client_user_id, 100) || null
+  if (clientUserId) {
+    const owned = await c.env.DB.prepare("SELECT id FROM users WHERE id = ? AND role = 'client'").bind(clientUserId).first<{ id: string }>()
+    if (!owned) clientUserId = null
+  }
+  if (!clientUserId) {
+    const match = await c.env.DB.prepare("SELECT id FROM users WHERE role = 'client' AND lower(email) = lower(?)").bind(recipientEmail).first<{ id: string }>()
+    clientUserId = match?.id || null
+  }
+
   const statements = [
     c.env.DB.prepare(
       `INSERT INTO service_quotes
@@ -238,7 +248,7 @@ quoteAdminRoutes.post('/quotes', requireStaff, async (c) => {
     ).bind(
       id, token, quoteNumber,
       text(body.title, 200) || template?.name || 'Service quote',
-      text(body.client_user_id, 100) || null,
+      clientUserId,
       text(body.scope_request_id, 100) || null,
       template?.id || null,
       text(body.service_key, 100) || template?.service_key || null,

@@ -42,7 +42,7 @@ portalRoutes.get('/dashboard', async (c) => {
   const { where, params } = await scopeFilter(c.env, user)
   const p2 = () => [...params]
 
-  const [matters, tasks, docs, invoices, tickets, calls, appts, msgs, services, properties, activeCases] = await Promise.all([
+  const [matters, tasks, docs, invoices, tickets, calls, appts, msgs, services, properties, activeCases, pendingQuotes] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${where} AND status != 'closed'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${where} AND status != 'done'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM document_requests WHERE ${where} AND status = 'requested'`).bind(...p2()).first<{ n: number }>(),
@@ -54,6 +54,7 @@ portalRoutes.get('/dashboard', async (c) => {
     c.env.DB.prepare(`SELECT cs.service_key, cs.status, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE cs.client_user_id = ? AND cs.status IN ('requested','submitted','active') ORDER BY s.name`).bind(user.role === 'client' ? user.id : (params[0] ?? user.id)).all(),
     c.env.DB.prepare(`SELECT id, address, property_type, status FROM properties WHERE ${where} ORDER BY created_at DESC LIMIT 6`).bind(...p2()).all(),
     c.env.DB.prepare(`SELECT id, subject, category, priority, status, service_key, property_id, response_due_at, resolution_due_at, waiting_on, created_at FROM support_tickets WHERE ${where} AND status != 'closed' ORDER BY created_at DESC LIMIT 5`).bind(...p2()).all(),
+    c.env.DB.prepare(`SELECT COUNT(*) n FROM service_quotes WHERE status IN ('sent','viewed') AND (client_user_id = ? OR lower(recipient_email) = lower(?))`).bind(user.id, user.email).first<{ n: number }>(),
   ])
 
   return c.json({
@@ -64,6 +65,7 @@ portalRoutes.get('/dashboard', async (c) => {
       open_invoices: invoices?.n ?? 0,
       open_tickets: tickets?.n ?? 0,
       pending_calls: calls?.n ?? 0,
+      pending_quotes: pendingQuotes?.n ?? 0,
     },
     upcoming_appointments: appts.results ?? [],
     recent_messages: msgs.results ?? [],
@@ -312,7 +314,41 @@ function genInvoiceNumber(): string {
   return `INV-${date}-${uuid().slice(0, 4).toUpperCase()}`
 }
 
-portalRoutes.get('/billing', async (c) => c.json({ invoices: await listScoped(c, 'invoices') }))
+portalRoutes.get('/billing', async (c) => {
+  const user = c.get('user')
+  const { where, params } = await scopeFilter(c.env, user)
+  const invoices = await c.env.DB.prepare(
+    `SELECT i.*, q.quote_number
+     FROM invoices i
+     LEFT JOIN service_quotes q ON q.id = i.quote_id
+     WHERE ${where.replace(/client_user_id/g, 'i.client_user_id')}
+     ORDER BY i.created_at DESC LIMIT 200`,
+  ).bind(...params).all<any>()
+  const rows = invoices.results ?? []
+  const ids = rows.map((row) => row.id)
+  const lineItems = ids.length
+    ? await c.env.DB.prepare(
+      `SELECT * FROM invoice_line_items WHERE invoice_id IN (${ids.map(() => '?').join(',')}) ORDER BY sort_order, created_at`,
+    ).bind(...ids).all<any>()
+    : { results: [] as any[] }
+  const byInvoice = new Map<string, any[]>()
+  for (const item of lineItems.results ?? []) {
+    const list = byInvoice.get(item.invoice_id) || []
+    list.push(item)
+    byInvoice.set(item.invoice_id, list)
+  }
+  const quotes = await c.env.DB.prepare(
+    `SELECT id, quote_number, public_token, status, title, total_cents, valid_until, decision_note, decided_at, created_at
+     FROM service_quotes
+     WHERE status NOT IN ('draft','void')
+       AND (client_user_id = ? OR lower(recipient_email) = lower(?))
+     ORDER BY created_at DESC LIMIT 50`,
+  ).bind(user.id, user.email).all()
+  return c.json({
+    invoices: rows.map((invoice) => ({ ...invoice, line_items: byInvoice.get(invoice.id) || [] })),
+    quotes: quotes.results ?? [],
+  })
+})
 
 portalRoutes.get('/billing/:id', async (c) => {
   const user = c.get('user')

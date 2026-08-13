@@ -6,7 +6,7 @@ import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } f
 import { toast } from '../../components/kit/toast'
 import { services } from '../../data/services'
 import { ScopeIntakePicker } from '../../components/admin/ScopeIntakePicker'
-import { quotePrefillFromScope } from '../../../shared/scopeIntakePrefill'
+import { quotePrefillFromScope, type ScopeIntakeRow } from '../../../shared/scopeIntakePrefill'
 import { useAppPath } from '../../lib/basePath'
 import {
   QUOTE_FOCUS,
@@ -110,7 +110,9 @@ export default function QuotesAdmin() {
   const p = useAppPath()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const [screen, setScreen] = useState<'list' | 'build' | 'templates'>('list')
+  const [screen, setScreen] = useState<'list' | 'build' | 'templates'>(() => (
+    params.get('new') === '1' || params.get('scope') || params.get('email') || params.get('client') ? 'build' : 'list'
+  ))
   const [quotes, setQuotes] = useState<QuoteRow[] | null>(null)
   const [templates, setTemplates] = useState<TemplateRow[]>([])
   const [offerings, setOfferings] = useState<OfferingOption[]>([])
@@ -153,6 +155,15 @@ export default function QuotesAdmin() {
     }
   }, [quotes])
 
+  function openBuild() {
+    setDetailId(null)
+    setScreen('build')
+    const next = new URLSearchParams(params)
+    next.delete('quote')
+    next.set('new', '1')
+    setParams(next, { replace: true })
+  }
+
   function openDetail(id: string) {
     setDetailId(id)
     const next = new URLSearchParams(params)
@@ -183,7 +194,37 @@ export default function QuotesAdmin() {
   }
 
   if (screen === 'build') {
-    return <QuoteComposer templates={templates.filter((t) => t.active)} offerings={offerings} onClose={() => setScreen('list')} onSaved={() => { setScreen('list'); void load() }} />
+    return <QuoteComposer
+      templates={templates.filter((t) => t.active)}
+      offerings={offerings}
+      initialScopeId={params.get('scope') || ''}
+      initialEmail={params.get('email') || ''}
+      initialName={params.get('name') || ''}
+      initialClientId={params.get('client') || ''}
+      onClose={() => {
+        setScreen('list')
+        const next = new URLSearchParams(params)
+        next.delete('new')
+        next.delete('scope')
+        next.delete('email')
+        next.delete('name')
+        next.delete('client')
+        setParams(next, { replace: true })
+      }}
+      onSaved={(id) => {
+        const next = new URLSearchParams(params)
+        next.delete('new')
+        next.delete('scope')
+        next.delete('email')
+        next.delete('name')
+        next.delete('client')
+        next.set('quote', id)
+        setParams(next, { replace: true })
+        setScreen('list')
+        setDetailId(id)
+        void load()
+      }}
+    />
   }
 
   if (detailId) {
@@ -197,7 +238,7 @@ export default function QuotesAdmin() {
       subtitle="Write a quote, send a branded link, and let the client accept or decline with notes. Accepted quotes convert to an invoice."
       action={<div className="flex flex-wrap items-center gap-2">
         <button className={btnOutline} onClick={() => setScreen('templates')}>Templates</button>
-        <button className={btnPrimary} onClick={() => setScreen('build')}><Plus size={14} />New quote</button>
+        <button className={btnPrimary} onClick={openBuild}><Plus size={14} />New quote</button>
       </div>}
     />
     {error && <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/[.06] p-4 text-sm text-red-200">{error}</div>}
@@ -471,15 +512,48 @@ function LineItemsEditor({ lines, setLines, offerings }: { lines: LineDraft[]; s
   </div>
 }
 
-function QuoteComposer({ templates, offerings, onClose, onSaved }: { templates: TemplateRow[]; offerings: OfferingOption[]; onClose: () => void; onSaved: () => void }) {
+function QuoteComposer({ templates, offerings, onClose, onSaved, initialScopeId = '', initialEmail = '', initialName = '', initialClientId = '' }: {
+  templates: TemplateRow[]
+  offerings: OfferingOption[]
+  onClose: () => void
+  onSaved: (id: string) => void
+  initialScopeId?: string
+  initialEmail?: string
+  initialName?: string
+  initialClientId?: string
+}) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [templateId, setTemplateId] = useState('')
-  const [showPrefill, setShowPrefill] = useState(false)
-  const [form, setForm] = useState({ title: '', recipient_name: '', recipient_email: '', recipient_phone: '', recipient_company: '', property_address: '', intro_message: '', terms: '', valid_days: '14' })
+  const [showPrefill, setShowPrefill] = useState(!!initialScopeId)
+  const [scopeRequestId, setScopeRequestId] = useState(initialScopeId)
+  const [clientUserId, setClientUserId] = useState(initialClientId)
+  const [form, setForm] = useState({ title: '', recipient_name: initialName, recipient_email: initialEmail, recipient_phone: '', recipient_company: '', property_address: '', intro_message: '', terms: '', valid_days: '14' })
   const [lines, setLinesState] = useState<LineDraft[]>([emptyLine()])
   const [busy, setBusy] = useState(false)
   const setLines = (updater: (lines: LineDraft[]) => LineDraft[]) => setLinesState(updater)
   const totals = draftTotals(lines)
+
+  useEffect(() => {
+    if (!initialScopeId) return
+    api.get<{ requests: ScopeIntakeRow[] }>('/admin/scope-intake').then((res) => {
+      const row = (res.requests || []).find((item) => item.id === initialScopeId)
+      if (!row) return
+      const prefill = quotePrefillFromScope(row)
+      setScopeRequestId(row.id)
+      setClientUserId(row.reserved_user_id || '')
+      setForm((current) => ({
+        ...current,
+        title: prefill.title,
+        recipient_name: prefill.recipient_name,
+        recipient_email: prefill.recipient_email,
+        recipient_phone: prefill.recipient_phone,
+        property_address: prefill.property_address,
+        intro_message: prefill.intro_message,
+      }))
+      setLinesState(prefill.lines)
+      setShowPrefill(true)
+    }).catch(() => {})
+  }, [initialScopeId])
 
   function applyTemplate(id: string) {
     setTemplateId(id)
@@ -531,10 +605,12 @@ function QuoteComposer({ templates, offerings, onClose, onSaved }: { templates: 
         terms: form.terms || undefined,
         valid_days: Number(form.valid_days) || 14,
         line_items: payload,
+        scope_request_id: scopeRequestId || undefined,
+        client_user_id: clientUserId || undefined,
       })
       if (sendAfter) await api.post(`/admin/quotes/${created.id}/send`, {})
       toast.success(sendAfter ? `Quote ${created.quote_number} sent.` : `Quote ${created.quote_number} saved as a draft.`)
-      onSaved()
+      onSaved(created.id)
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : 'Could not save the quote.')
     } finally { setBusy(false) }
@@ -575,6 +651,8 @@ function QuoteComposer({ templates, offerings, onClose, onSaved }: { templates: 
       {showPrefill && <div className="mt-3 space-y-3">
         <ScopeIntakePicker onPick={(row) => {
           const prefill = quotePrefillFromScope(row)
+          setScopeRequestId(row.id)
+          setClientUserId(row.reserved_user_id || '')
           setForm((current) => ({
             ...current,
             title: prefill.title,
