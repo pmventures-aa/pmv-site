@@ -156,6 +156,6 @@ describe('outbound crest embedding', () => {
     expect(panel).toContain('Vendors')
     expect(panel).toContain('Staff')
     expect(routes).toContain('/email-signatures/roster/:userId')
-    expect(profile).toContain('Branded email signature')
+    expect(profile).toContain('Save signature')
   })
 })
