@@ -9,9 +9,9 @@ import { PriceAnchor } from '../../components/public/PriceAnchor'
 import { CaseStudyStrip } from '../../components/public/Proof'
 
 const PLAN_PITCH: Record<'property'|'ops'|'legal', { eyebrow: string; title: string; body: string; from: string; to: string }> = {
-  property: { eyebrow: 'Property Care Plans', title: 'Doing this more than once? Members pay less.', body: 'Property Care plans start at $89/mo with included inspection visits, cleaning credits, priority scheduling, and 10-20% off every service on this page.', from: 'From $89/mo', to: '/care-plans?family=property' },
+  property: { eyebrow: 'Property Care Plans', title: 'Licensed managers in network, or on-call care if you keep the keys.', body: 'Use licensed property managers and CAM agents in the Pinnacle network at a lower cost than the typical percentage shop, or start a Property Care plan from $89/mo with inspections, credits, and priority scheduling.', from: 'From $89/mo', to: '/care-plans?family=property' },
   ops: { eyebrow: 'Ops-on-Call Plans', title: 'Keep this capacity on retainer.', body: 'Ops-on-Call plans start at $199/mo with included hours, a named coordinator, and 10-20% off project engagements - without renegotiating every request.', from: 'From $199/mo', to: '/care-plans?family=ops' },
-  legal: { eyebrow: 'Legal & Notary Pass', title: 'Firms on the Pass skip the per-request scramble.', body: 'The Legal & Notary Pass starts at $99/mo with included appointments and courier runs, same-day priority scheduling, and 25% off additional volume.', from: 'From $99/mo', to: '/care-plans?family=legal' },
+  legal: { eyebrow: 'Legal & Notary Pass', title: 'Firms on the Pass skip the per-request scramble.', body: 'One coordinator for mobile notary, RON, courier, and courthouse runs. The Pass starts at $99/mo with included volume, same-day priority, and 25% off everything past that.', from: 'From $99/mo', to: '/care-plans?family=legal' },
 }
 
 function PlanCrossSell({ family }: { family: 'property'|'ops'|'legal' }) {

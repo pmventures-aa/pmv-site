@@ -8,6 +8,7 @@ export interface PlanTier {
   tagline: string
   includes: string[]
   bestFor: string
+  valueNote?: string
   featured?: boolean
 }
 
@@ -19,12 +20,27 @@ export interface PlanService {
   category?: string
 }
 
+export interface PlanMoment {
+  title: string
+  body: string
+}
+
+export interface PlanPath {
+  title: string
+  body: string
+  cta: string
+  to: string
+}
+
 export interface PlanFamilyDef {
   key: PlanFamilyKey
   eyebrow: string
   headline: string
   intro: string
   benchmark: string
+  promise: string
+  moments: PlanMoment[]
+  paths?: PlanPath[]
   tiers: PlanTier[]
   services: PlanService[]
   intakeKind: 'property' | 'business' | 'legal'
@@ -55,7 +71,7 @@ const PROPERTY_SERVICES: PlanService[] = [
   { key:'insp_vacant', category:'Inspections & Reports', label:'Vacant property check', detail:'Weekly, bi-weekly, or monthly check on vacant / seasonal / investor-hold properties.', priceHint:'From $65/visit' },
   { key:'insp_damage', category:'Inspections & Reports', label:'Damage assessment report', detail:'Focused report after suspected damage, break-in, or tenant-reported issue.', priceHint:'$185-425' },
   { key:'bpo_support', category:'Broker / Association', label:'BPO support & broker coordination', detail:'BPO photo sets from $79; licensed BPOs via our partnering broker.', priceHint:'$79-265' },
-  { key:'cam_liaison', category:'Broker / Association', label:'CAM / association liaison', detail:'Community-association coordination through our credentialed CAM partner.', priceHint:'By hour' },
+  { key:'cam_liaison', category:'Broker / Association', label:'CAM / association liaison', detail:'Community-association coordination through licensed CAM agents in the Pinnacle network.', priceHint:'By hour' },
 ]
 
 const OPS_SERVICES: PlanService[] = [
@@ -78,15 +94,15 @@ const OPS_SERVICES: PlanService[] = [
 ]
 
 const LEGAL_SERVICES: PlanService[] = [
-  { key:'legal_notary', label:'Mobile notary appointment', detail:'In-person notarization at your office, home, care facility, or courthouse.', priceHint:'$85-165/appt' },
-  { key:'legal_ron', label:'Remote Online Notary (RON) session', detail:'Florida-authorized remote notarization for eligible documents.', priceHint:'$85-150/session' },
-  { key:'legal_courier', label:'Document courier / delivery', detail:'Point-to-point pickup and delivery, tracked, receipt captured.', priceHint:'$45-95/run' },
-  { key:'legal_courthouse', label:'Courthouse filing run', detail:'Filing, receipt, stamped-copy return, docket confirmation.', priceHint:'$95-175/run' },
-  { key:'legal_process', label:'Process service coordination', detail:'Coordinated through licensed process servers when required.', priceHint:'Coord fee + server' },
-  { key:'legal_signing', label:'Signing coordination / witness support', detail:'Real estate, POA, loan-doc signings with staged prep and witnesses.', priceHint:'$125-250/appt' },
-  { key:'legal_post_eviction', label:'Post-eviction turnover coordination', detail:'Post-writ property turnover: locksmith, inspection, cleanout, ready-to-list.', priceHint:'Custom' },
-  { key:'legal_prep', label:'Client-directed document prep', detail:'Format, organize, assemble packets. Not legal advice; attorney direction only.', priceHint:'By hour' },
-  { key:'legal_attorney_handoff', label:'Attorney handoff coordination', detail:'When a matter needs licensed representation - coordinate with your attorney or refer to one.', priceHint:'No fee' },
+  { key:'legal_notary', category:'Notary & signing', label:'Mobile notary appointment', detail:'In-person notarization at your office, home, care facility, or courthouse.', priceHint:'$85-165/appt' },
+  { key:'legal_ron', category:'Notary & signing', label:'Remote Online Notary (RON) session', detail:'Florida-authorized remote notarization for eligible documents.', priceHint:'$85-150/session' },
+  { key:'legal_signing', category:'Notary & signing', label:'Signing coordination / witness support', detail:'Real estate, POA, loan-doc signings with staged prep and witnesses.', priceHint:'$125-250/appt' },
+  { key:'legal_courier', category:'Courier & court', label:'Document courier / delivery', detail:'Point-to-point pickup and delivery, tracked, receipt captured.', priceHint:'$45-95/run' },
+  { key:'legal_courthouse', category:'Courier & court', label:'Courthouse filing run', detail:'Filing, receipt, stamped-copy return, docket confirmation.', priceHint:'$95-175/run' },
+  { key:'legal_process', category:'Courier & court', label:'Process service coordination', detail:'Coordinated through licensed process servers when required.', priceHint:'Coord fee + server' },
+  { key:'legal_post_eviction', category:'Files & follow-through', label:'Post-eviction turnover coordination', detail:'Post-writ property turnover: locksmith, inspection, cleanout, ready-to-list.', priceHint:'Custom' },
+  { key:'legal_prep', category:'Files & follow-through', label:'Client-directed document prep', detail:'Format, organize, assemble packets. Not legal advice; attorney direction only.', priceHint:'By hour' },
+  { key:'legal_attorney_handoff', category:'Files & follow-through', label:'Attorney handoff coordination', detail:'When a matter needs licensed representation, we coordinate with your attorney or refer to one.', priceHint:'No fee' },
 ]
 
 const PROPERTY_TIERS: PlanTier[] = [
@@ -98,7 +114,9 @@ const PROPERTY_TIERS: PlanTier[] = [
       'Priority scheduling on any ad-hoc request',
       '10% off all services',
       'Storm alert coordination in South Florida',
-    ] },
+    ],
+    valueNote:'A quarterly occupancy check and photo report, plus 10% off every add-on, without a management percentage of rent.',
+  },
   { key:'property_care', name:'Property Care', priceCents:24900, cadence:'monthly', featured:true, tagline:'Active oversight with real service credits.', bestFor:'Rentals with tenants, small investor portfolios, out-of-state owners.',
     includes:[
       '1 interior + occupancy inspection per month',
@@ -107,7 +125,9 @@ const PROPERTY_TIERS: PlanTier[] = [
       'Dedicated coordinator with named contact',
       '15% off all services',
       'Priority scheduling and emergency response option',
-    ] },
+    ],
+    valueNote:'Monthly interior inspections and a quarterly cleaning credit already replace a stack of one-off vendor calls.',
+  },
   { key:'property_managed', name:'Property Managed', priceCents:54900, cadence:'monthly', tagline:'Nearly hands-off for the owner.', bestFor:'Higher-value properties, multi-unit small portfolios, active investors.',
     includes:[
       'Bi-weekly touchpoint + monthly interior inspection',
@@ -117,7 +137,9 @@ const PROPERTY_TIERS: PlanTier[] = [
       '20% off all services',
       'First response guarantee for emergency events',
       'Consolidated monthly owner report',
-    ] },
+    ],
+    valueNote:'Bi-weekly touchpoints, service credits, and CAM liaison hours for owners who want the property handled without giving up the keys.',
+  },
 ]
 
 const OPS_TIERS: PlanTier[] = [
@@ -128,7 +150,9 @@ const OPS_TIERS: PlanTier[] = [
       'Monthly 30-minute office-hours call',
       'Priority scheduling on any project',
       '10% off consulting or project engagements',
-    ] },
+    ],
+    valueNote:'Two hours on tap plus a monthly office-hours call, without hiring a VA you have to manage.',
+  },
   { key:'ops_active', name:'Ops Active', priceCents:54900, cadence:'monthly', featured:true, tagline:'A true operating partner for the business.', bestFor:'Owner-operators, small teams, businesses in a growth or transition phase.',
     includes:[
       '8 hours of administrative or coordination work per month',
@@ -137,7 +161,9 @@ const OPS_TIERS: PlanTier[] = [
       'Priority project scheduling',
       '15% off consulting or project engagements',
       'One included discovery meeting per new project',
-    ] },
+    ],
+    valueNote:'Eight hours, a named coordinator, and a quarterly systems look, priced below a part-time hire.',
+  },
   { key:'ops_embedded', name:'Ops Embedded', priceCents:149900, cadence:'monthly', tagline:'Effectively a fractional COO layer.', bestFor:'Multi-employee businesses, active projects, transitions in flight.',
     includes:[
       '30 hours of administrative, coordination, and project work per month',
@@ -146,7 +172,9 @@ const OPS_TIERS: PlanTier[] = [
       'Quarterly business review + roadmap update',
       '20% off consulting or project engagements',
       'Priority queue on every request',
-    ] },
+    ],
+    valueNote:'Thirty hours and a weekly operating rhythm when the business needs a fractional ops layer, not another contractor thread.',
+  },
 ]
 
 const LEGAL_TIERS: PlanTier[] = [
@@ -157,7 +185,9 @@ const LEGAL_TIERS: PlanTier[] = [
       'Priority scheduling on any additional appointment',
       '25% off all additional appointments and runs',
       'RON coordination for eligible Florida notarizations',
-    ] },
+    ],
+    valueNote:'One mobile notary plus two courier runs already covers the monthly fee at typical South Florida rates.',
+  },
   { key:'legal_firm', name:'Firm', priceCents:29900, cadence:'monthly', featured:true, tagline:'For firms with regular process, filing, and signing needs.', bestFor:'Practicing firms, real estate offices, lending, closing services.',
     includes:[
       '4 mobile notary appointments per month',
@@ -166,7 +196,9 @@ const LEGAL_TIERS: PlanTier[] = [
       'Named coordinator with same-day scheduling',
       '25% off additional appointments',
       'Post-eviction turnover coordination when applicable',
-    ] },
+    ],
+    valueNote:'Four notary appointments, eight courier runs, and two courthouse filings in one named-coordinator pass.',
+  },
   { key:'legal_enterprise', name:'Enterprise', priceCents:0, cadence:'monthly', tagline:'High-volume, custom-scoped programs.', bestFor:'Firms with 10+ monthly appointments, statewide programs, agency work.',
     includes:[
       'Custom monthly volume commitment',
@@ -174,16 +206,28 @@ const LEGAL_TIERS: PlanTier[] = [
       'SLA on scheduling and completion',
       'Consolidated monthly invoicing',
       'Post-service documentation package',
-    ] },
+    ],
+    valueNote:'Volume, SLA, and one invoice for firms that cannot keep shopping vendors every week.',
+  },
 ]
 
 export const CARE_PLANS: Record<PlanFamilyKey, PlanFamilyDef> = {
   property: {
     key:'property',
     eyebrow:'Property Care Plans',
-    headline:'Steady oversight for the property, without hiring a full property manager.',
-    intro:'Pinnacle Property Care is not a licensed property-management engagement. It is coordination + service delivery on a monthly cadence, with credits, discounts, and a saved profile for your property. When licensed work is needed we coordinate with our credentialed CAM partner or our partnering broker.',
-    benchmark:'Compares to $99-249/mo coordination-only programs local to South Florida, without the licensed-PM percentage of rent.',
+    headline:'Licensed managers in network. On-call care when you want the keys.',
+    intro:'Pinnacle has licensed property managers and CAM agents in network, so owners get a better, lower-cost alternative to the typical 8-12% shop, with fees in writing. Prefer to stay in control? Put us on call with a monthly Property Care plan: inspections, credits, storm coverage, and a coordinator who already knows the property.',
+    benchmark:'Full management through licensed partners at the lower end of the South Florida band, or on-call Property Care from $89/mo instead of a percentage of rent.',
+    promise:'Same network for a one-off visit, a monthly retainer, or licensed management.',
+    moments:[
+      { title:'Licensed PM and CAM coverage', body:'Tenant placement, full management, and association liaison through licensed property managers and CAM agents already in the Pinnacle network.' },
+      { title:'Lower cost, written fees', body:'A straighter path than 8-12% of collected rent plus surprise add-ons. Every fee is in writing before you sign.' },
+      { title:'On-call if you keep the keys', body:'Monthly Property Care is the retainer version: inspections, cleaning credits, storm coordination, and priority scheduling when something comes up.' },
+    ],
+    paths:[
+      { title:'Licensed management', body:'Put the property with a licensed property manager or CAM in our network. Lower cost than the typical percentage shop, with a named coordinator at Pinnacle.', cta:'Ask about licensed management', to:'/services/property-management' },
+      { title:'On-call Property Care', body:'Keep decision-making. We inspect, clean, document, and dispatch on a monthly plan so you are not starting from zero every time something breaks.', cta:'Choose a care plan', to:'#plans' },
+    ],
     tiers:PROPERTY_TIERS,
     services:PROPERTY_SERVICES,
     intakeKind:'property',
@@ -193,8 +237,14 @@ export const CARE_PLANS: Record<PlanFamilyKey, PlanFamilyDef> = {
     key:'ops',
     eyebrow:'Business Ops Plans',
     headline:'Recurring operational capacity without the hire.',
-    intro:'Ops-on-Call is a monthly retainer for administrative capacity and project support. Use hours as they come up - triage, follow-up, systems work, coordination. Unused hours are not credit toward the next month; the plan is priced for reliable availability, not banking time.',
+    intro:'Ops-on-Call is a monthly retainer for administrative capacity and project support. Use hours as they come up: triage, follow-up, systems work, coordination. Unused hours are not credit toward the next month; the plan is priced for reliable availability, not banking time.',
     benchmark:'Priced against local VA / fractional-ops rates ($30-70/hr equivalent) but adds project-management and systems-transition capability without renegotiation.',
+    promise:'A named coordinator, included hours, and priority on the next project.',
+    moments:[
+      { title:'Hours on tap', body:'Administrative and coordination time sitting ready, so the next follow-up does not wait on a new vendor conversation.' },
+      { title:'A person who already knows the business', body:'Named coordinator, shared task board on Active and Embedded, and a cadence you can actually run.' },
+      { title:'Projects without a new SOW every time', body:'POS cutovers, CRM cleanup, and process work at member pricing once the retainer is in place.' },
+    ],
     tiers:OPS_TIERS,
     services:OPS_SERVICES,
     intakeKind:'business',
@@ -203,9 +253,15 @@ export const CARE_PLANS: Record<PlanFamilyKey, PlanFamilyDef> = {
   legal: {
     key:'legal',
     eyebrow:'Legal & Notary Pass',
-    headline:'Notary, signing, and courthouse-runner capacity, on retainer.',
-    intro:'A monthly pass for firms and solo practitioners that need reliable local mobile notary, courier, and courthouse coverage. Included appointments plus a discount on anything past the plan minimum.',
-    benchmark:'Priced below local per-appointment retail (typical mobile notary $85-165, courier $45-95, courthouse run $95-175) once you use even part of the included volume.',
+    headline:'Stop assembling a notary, a courier, and a courthouse run from scratch.',
+    intro:'The Legal & Notary Pass is a monthly lane for solo attorneys and firms: mobile notary, RON, courier, and courthouse coverage with a named coordinator. Included appointments land first. Everything past that is 25% off, with same-day priority instead of a new vendor hunt.',
+    benchmark:'Typical South Florida retail: mobile notary $85-165, courier $45-95, courthouse run $95-175. The Solo pass pays for itself once you use the included volume.',
+    promise:'One coordinator. Included volume. Same-day priority when the file has to move today.',
+    moments:[
+      { title:'Closing day, not a group text', body:'Signing, witnesses, and document return staged by someone who already has the file, the address, and the deadline.' },
+      { title:'Hospital, office, or after hours', body:'Mobile notary at the location the signer can actually reach, plus RON when Florida rules allow a remote session.' },
+      { title:'Courthouse before cutoff', body:'Filing runs with stamped-copy return and docket confirmation, instead of hoping a runner you just met knows the clerk window.' },
+    ],
     tiers:LEGAL_TIERS,
     services:LEGAL_SERVICES,
     intakeKind:'legal',
@@ -227,4 +283,12 @@ export function formatPrice(cents: number): string {
   if (cents <= 0) return 'Custom quote'
   const dollars = cents / 100
   return `$${dollars.toLocaleString('en-US')}/mo`
+}
+
+export function groupServices(services: PlanService[]) {
+  return services.reduce<Record<string, PlanService[]>>((acc, service) => {
+    const cat = service.category || 'Included'
+    ;(acc[cat] = acc[cat] || []).push(service)
+    return acc
+  }, {})
 }

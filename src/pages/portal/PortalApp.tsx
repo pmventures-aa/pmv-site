@@ -27,7 +27,8 @@ import Notifications from './Notifications'
 import Security from './Security'
 import ClientPortalDemo from './ClientPortalDemo'
 import { ModulePage } from './ModulePage'
-import { callsConfig, mattersConfig, tasksConfig, calendarConfig, fundingConfig, propertyConfig, taxConfig } from './moduleConfigs'
+import { callsConfig, mattersConfig, tasksConfig, fundingConfig, propertyConfig, taxConfig } from './moduleConfigs'
+import CalendarPage from './CalendarPage'
 
 function ClientShell() {
   const { workspace } = useAuth()
@@ -77,7 +78,7 @@ export default function PortalApp({ basePath }: { basePath: string }) {
             <Route path="tasks" element={<ModulePage config={tasksConfig} />} />
             <Route path="documents" element={<Documents />} />
             <Route path="messages" element={<Messages />} />
-            <Route path="calendar" element={<ModulePage config={calendarConfig} />} />
+            <Route path="calendar" element={<CalendarPage />} />
             <Route path="billing" element={<Billing />} />
             <Route path="funding" element={<ModulePage config={fundingConfig} />} />
             <Route path="property-management" element={<ModulePage config={propertyConfig} />} />

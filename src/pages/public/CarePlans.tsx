@@ -4,7 +4,7 @@ import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/r
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { MagneticCta, Reveal } from '../../components/public/motion'
-import { CARE_PLANS, CARE_PLAN_FAMILIES, formatPrice, type PlanFamilyKey, type PlanService, type PlanTier } from '../../../shared/carePlans'
+import { CARE_PLANS, CARE_PLAN_FAMILIES, formatPrice, groupServices, type PlanFamilyKey, type PlanService, type PlanTier } from '../../../shared/carePlans'
 import { pmvMotion } from '../../lib/motionTheme'
 import { usePageMeta } from '../../lib/usePageMeta'
 import { api, ApiError } from '../../lib/api'
@@ -18,38 +18,9 @@ const INDUSTRIES = ['Real estate','Legal / professional services','Retail','Rest
 const TEAM_SIZES = ['Solo / owner-only','2-5 people','6-15 people','16-50 people','50+ people']
 const LEGAL_ROLES = ['Solo attorney','Small firm partner','Paralegal','Real estate closing / title','Lender','Firm operations manager','Other']
 const LEGAL_VOLUMES = ['Under 5 per month','5-15 per month','15-50 per month','50+ per month']
-const INCLUDE_PREVIEW = 3
-
-function groupServices(services: PlanService[]) {
-  return services.reduce<Record<string, PlanService[]>>((acc, service) => {
-    const cat = service.category || 'Included'
-    ;(acc[cat] = acc[cat] || []).push(service)
-    return acc
-  }, {})
-}
-
-function AccordionFold({ open, children }: { open: boolean; children: ReactNode }) {
-  const reduceMotion = useReducedMotion()
-  return (
-    <AnimatePresence initial={false}>
-      {open && (
-        <motion.div
-          initial={reduceMotion ? false : { height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={reduceMotion ? { duration: 0 } : pmvMotion.premium}
-          className="overflow-hidden"
-          style={reduceMotion ? undefined : { willChange: 'opacity' }}
-        >
-          {children}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
-}
 
 export default function CarePlans(){
-  usePageMeta('Pinnacle Care Plans - Property, Ops, and Legal & Notary Retainers','Monthly care plans from Pinnacle Management Ventures: Property Care with cleaning, inspections, BPO and CAM coordination; Ops-on-Call retainers; and a Legal & Notary Pass for firms.')
+  usePageMeta('Pinnacle Care Plans - Property, Ops, and Legal & Notary Retainers','Monthly care plans from Pinnacle: licensed property managers and CAM agents in network, on-call Property Care, Ops-on-Call retainers, and a Legal & Notary Pass for firms.')
   const [params, setParams] = useSearchParams()
   const reduceMotion = useReducedMotion()
   const initialFamily = (params.get('family') as PlanFamilyKey | null)
@@ -68,17 +39,35 @@ export default function CarePlans(){
   }
 
   return <div className="pmv-care-plans min-h-screen bg-navy-950"><Header/><main>
-    <section className="pmv-hero-story relative overflow-hidden border-b border-white/[.08]"><div className="pmv-hero-gold" aria-hidden="true"/><div className="container-pmv relative z-10 py-16 sm:py-20 lg:py-24"><Reveal className="max-w-4xl" distance={15}><p className="eyebrow">Care Plans - MRR-based professional retainers</p><h1 className="mt-4 font-display text-4xl font-extrabold leading-[1.04] tracking-[-.03em] text-white sm:text-6xl">Retain us monthly. Handle the work the moment it comes up.</h1><p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">Three families of monthly plans: <strong className="text-white">Property Care</strong> for owners and investors, <strong className="text-white">Ops-on-Call</strong> for business owners without an admin, and a <strong className="text-white">Legal & Notary Pass</strong> for solo attorneys and firms. Every plan includes a saved profile, priority scheduling, and a real discount on everything past the included volume.</p><p className="mt-4 max-w-3xl text-sm leading-6 text-slate-400">Prices reflect coordination + service delivery, not licensed property management or legal representation. Licensed work is coordinated through our credentialed partners (broker, CAM, attorneys) when it applies.</p></Reveal></div></section>
+    <section className="pmv-hero-story relative overflow-hidden border-b border-white/[.08]"><div className="pmv-hero-gold" aria-hidden="true"/><div className="container-pmv relative z-10 py-14 sm:py-20 lg:py-24">
+      <AnimatePresence mode="wait">
+        <motion.div key={family} initial={reduceMotion?false:{opacity:0,y:12}} animate={{opacity:1,y:0}} exit={reduceMotion?undefined:{opacity:0,y:-8}} transition={panelTransition} className="max-w-4xl">
+          <p className="eyebrow">{familyDef.eyebrow}</p>
+          <h1 className="mt-4 font-display text-4xl font-extrabold leading-[1.04] tracking-[-.03em] text-white sm:text-6xl">{familyDef.headline}</h1>
+          <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">{familyDef.intro}</p>
+          <p className="mt-4 max-w-3xl text-sm font-semibold leading-6 text-gold/90">{familyDef.promise}</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a href="#plans" className="rounded-lg bg-gold px-5 py-2.5 text-sm font-bold text-navy-950 hover:bg-gold-300">See monthly plans</a>
+            <a href="#intake" className="rounded-lg border border-white/15 px-5 py-2.5 text-sm font-bold text-white hover:border-gold/40 hover:text-gold">Start intake</a>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </div></section>
 
     <section className="sticky top-[56px] z-20 border-b border-white/10 bg-navy-900/95 backdrop-blur sm:top-[68px]"><div className="container-pmv -mx-4 flex gap-2 overflow-x-auto px-4 py-3 sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" role="tablist" aria-label="Care plan families"><LayoutGroup>{CARE_PLAN_FAMILIES.map(key=>{const cfg=CARE_PLANS[key];const active=family===key;return <button key={key} type="button" role="tab" aria-selected={active} onClick={()=>chooseFamily(key)} className={`relative shrink-0 rounded-full border px-4 py-2 text-xs font-bold ${active?'border-gold/60 text-gold':'border-white/10 bg-white/[.02] text-slate-300 hover:border-white/25 hover:text-white'}`}>{active&&<motion.span layoutId={reduceMotion?undefined:'care-family-pill'} className="absolute inset-0 -z-0 rounded-full bg-gold/15" transition={panelTransition} aria-hidden="true"/>}<span className="relative z-10">{cfg.eyebrow}</span></button>})}</LayoutGroup></div></section>
 
     <LayoutGroup>
       <AnimatePresence mode="wait">
         <motion.div key={family} initial={reduceMotion?false:{opacity:0,y:15}} animate={{opacity:1,y:0}} exit={reduceMotion?undefined:{opacity:0,y:-10}} transition={panelTransition} style={reduceMotion?undefined:{willChange:'transform, opacity'}}>
-          <section className="container-pmv py-14 sm:py-18"><Reveal className="max-w-3xl" distance={15}><p className="eyebrow">{familyDef.eyebrow}</p><h2 className="mt-3 font-display text-3xl font-bold tracking-[-.03em] text-white sm:text-5xl">{familyDef.headline}</h2><p className="mt-5 text-base leading-7 text-slate-300">{familyDef.intro}</p><p className="mt-3 text-xs leading-6 text-slate-500">{familyDef.benchmark}</p></Reveal>
-            <div className="mt-10 grid gap-4 lg:grid-cols-3">
-              {familyDef.tiers.map((tier, index)=><Reveal key={tier.key} delay={index*0.06} distance={15}><TierCard tier={tier} selected={selectedTier===tier.key} onSelect={()=>setSelectedTier(tier.key)}/></Reveal>)}
-            </div>
+          <section className="container-pmv py-12 sm:py-16">
+            <div className="grid gap-4 md:grid-cols-3">{familyDef.moments.map((moment, index)=><Reveal key={moment.title} delay={index*0.05} distance={12}><article className="h-full rounded-2xl border border-white/10 bg-white/[.025] p-5"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">0{index+1}</p><h2 className="mt-3 font-display text-xl font-bold text-white">{moment.title}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{moment.body}</p></article></Reveal>)}</div>
+            {familyDef.paths&&<div className="mt-8 grid gap-4 lg:grid-cols-2">{familyDef.paths.map(path=><Reveal key={path.title} distance={12}><article className="flex h-full flex-col rounded-2xl border border-gold/20 bg-gold/[.04] p-6"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">How owners work with us</p><h3 className="mt-3 font-display text-2xl font-bold text-white">{path.title}</h3><p className="mt-3 flex-1 text-sm leading-7 text-slate-300">{path.body}</p>{path.to.startsWith('#')?<a href={path.to} className="mt-5 inline-flex text-sm font-bold text-gold hover:underline">{path.cta} →</a>:<Link to={path.to} className="mt-5 inline-flex text-sm font-bold text-gold hover:underline">{path.cta} →</Link>}</article></Reveal>)}</div>}
+            <p className="mt-6 max-w-3xl text-xs leading-6 text-slate-500">{familyDef.benchmark}</p>
+          </section>
+
+          <section id="plans" className="container-pmv pb-14 sm:pb-18">
+            <Reveal className="max-w-3xl" distance={15}><p className="eyebrow">Monthly plans</p><h2 className="mt-3 font-display text-3xl font-bold tracking-[-.03em] text-white sm:text-5xl">Pick a lane. Everything in it stays visible.</h2><p className="mt-5 text-base leading-7 text-slate-300">Month-to-month, cancel anytime. Included volume first, member pricing on the rest, and a saved profile so the next request is not a cold start.</p></Reveal>
+            <div className="mt-10 grid gap-4 lg:grid-cols-3">{familyDef.tiers.map((tier, index)=><Reveal key={tier.key} delay={index*0.06} distance={15}><TierCard tier={tier} selected={selectedTier===tier.key} onSelect={()=>setSelectedTier(tier.key)}/></Reveal>)}</div>
           </section>
           <ServiceMenu family={family}/>
         </motion.div>
@@ -92,34 +81,41 @@ export default function CarePlans(){
 function TierCard({tier,selected,onSelect}:{tier:PlanTier;selected:boolean;onSelect:()=>void}){
   const isCustom=tier.priceCents<=0
   const reduceMotion=useReducedMotion()
-  const [open,setOpen]=useState(false)
-  const preview=tier.includes.slice(0,INCLUDE_PREVIEW)
-  const rest=tier.includes.slice(INCLUDE_PREVIEW)
-  return <motion.article layout={reduceMotion?false:'position'} whileHover={reduceMotion?undefined:{y:-3}} transition={reduceMotion?{duration:0}:pmvMotion.premium} className={`pmv-care-card flex flex-col rounded-2xl border p-6 ${selected?'border-gold/55 bg-gold/[.06]':tier.featured?'border-gold/30 bg-white/[.03]':'border-white/10 bg-white/[.02]'}`}>
+  return <motion.article layout={reduceMotion?false:'position'} whileHover={reduceMotion?undefined:{y:-3}} transition={reduceMotion?{duration:0}:pmvMotion.premium} className={`pmv-care-card flex h-full flex-col rounded-2xl border p-6 ${selected?'border-gold/55 bg-gold/[.06]':tier.featured?'border-gold/30 bg-white/[.03]':'border-white/10 bg-white/[.02]'}`}>
     {tier.featured&&<span className="mb-2 self-start rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.14em] text-gold">Most chosen</span>}
     <h3 className="font-display text-2xl font-bold text-white">{tier.name}</h3>
     <p className="mt-1 text-sm text-slate-400">{tier.tagline}</p>
     <p className="mt-4 font-display text-3xl font-extrabold tracking-[-.02em] text-white">{formatPrice(tier.priceCents)}</p>
     {!isCustom&&<p className="text-[11px] uppercase tracking-[.14em] text-slate-500">Month-to-month · cancel anytime</p>}
-    <ul className="mt-5 space-y-2.5 text-sm text-slate-300">{preview.map(item=><li key={item} className="flex gap-2"><span className="mt-1 text-gold">✓</span><span className="leading-6">{item}</span></li>)}</ul>
-    {rest.length>0&&<>
-      <button type="button" aria-expanded={open} aria-controls={`tier-includes-${tier.key}`} aria-label={open?'Hide additional included items':'Show additional included items'} onClick={()=>setOpen(v=>!v)} className="mt-3 self-start text-left text-[11px] font-bold uppercase tracking-[.14em] text-gold">{open?'−':'+'}</button>
-      <AccordionFold open={open}><ul id={`tier-includes-${tier.key}`} className="mt-2.5 space-y-2.5 text-sm text-slate-300">{rest.map(item=><li key={item} className="flex gap-2"><span className="mt-1 text-gold">✓</span><span className="leading-6">{item}</span></li>)}</ul></AccordionFold>
-    </>}
-    <div className="mt-6 rounded-lg border border-white/10 bg-navy-950/40 p-3 text-[11px] leading-5 text-slate-400"><strong className="text-slate-300">Best for:</strong> {tier.bestFor}</div>
+    <ul className="mt-5 space-y-2.5 text-sm text-slate-300">{tier.includes.map(item=><li key={item} className="flex gap-2"><span className="mt-1 text-gold">✓</span><span className="leading-6">{item}</span></li>)}</ul>
+    {tier.valueNote&&<p className="mt-5 text-xs leading-5 text-slate-400">{tier.valueNote}</p>}
+    <div className="mt-5 rounded-lg border border-white/10 bg-navy-950/40 p-3 text-[11px] leading-5 text-slate-400"><strong className="text-slate-300">Best for:</strong> {tier.bestFor}</div>
     <button type="button" onClick={()=>{onSelect();document.getElementById('intake')?.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'})}} className={`mt-6 rounded-lg px-4 py-2.5 text-sm font-bold ${selected?'bg-gold text-navy-950 hover:bg-gold-300':tier.featured?'bg-gold text-navy-950 hover:bg-gold-300':'border border-white/15 text-white hover:border-gold/40 hover:text-gold'}`}>{selected?'Selected - continue below':`Choose ${tier.name}`}</button>
   </motion.article>
+}
+
+function CategoryChips({categories,active,onChange,counts}:{categories:string[];active:string;onChange:(key:string)=>void;counts?:Record<string,number>}){
+  return <div className="flex flex-wrap gap-2" role="tablist">{categories.map(category=>{const selected=active===category;return <button key={category} type="button" role="tab" aria-selected={selected} onClick={()=>onChange(category)} className={`rounded-full border px-3.5 py-1.5 text-xs font-bold ${selected?'border-gold/55 bg-gold/15 text-gold':'border-white/10 bg-white/[.02] text-slate-300 hover:border-white/25 hover:text-white'}`}>{category}{counts&&counts[category]?<span className="ml-1 text-[10px] opacity-70">{counts[category]}</span>:null}</button>})}</div>
+}
+
+function ServiceCard({service}:{service:PlanService}){
+  return <article className="rounded-xl border border-white/10 bg-white/[.02] p-4 transition hover:border-gold/30 hover:bg-white/[.04]"><div className="flex items-start justify-between gap-3"><p className="font-semibold text-white">{service.label}</p>{service.priceHint&&<span className="shrink-0 text-xs font-semibold text-gold">{service.priceHint}</span>}</div><p className="mt-2 text-xs leading-5 text-slate-400">{service.detail}</p></article>
 }
 
 function ServiceMenu({family}:{family:PlanFamilyKey}){
   const services=CARE_PLANS[family].services
   const grouped=groupServices(services)
   const categories=Object.keys(grouped)
-  const firstCategory=categories[0]||''
-  const [open,setOpen]=useState<string>(firstCategory)
-  useEffect(()=>{setOpen(firstCategory)},[family,firstCategory])
-  return <section className="border-y border-white/10 bg-navy-900/30"><div className="container-pmv py-14 sm:py-18"><Reveal className="max-w-3xl" distance={15}><p className="eyebrow">What you can request under this plan</p><h2 className="mt-3 font-display text-3xl font-bold text-white sm:text-4xl">Full service menu.</h2><p className="mt-4 text-sm leading-7 text-slate-400">Plan credits and priority scheduling apply across every service in this menu. Prices shown are typical retail ranges; plan members get the member discount on top.</p></Reveal>
-    <div className="mt-8 grid gap-4 lg:grid-cols-2">{categories.map(category=>{const items=grouped[category];const expanded=open===category;const panelId=`menu-${family}-${category.replace(/\s+/g,'-').toLowerCase()}`;return <div key={category} className="min-w-0"><button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={()=>setOpen(expanded?'':category)} className="flex w-full items-center justify-between gap-3 text-left"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-gold">{category}</p><span className="text-gold" aria-hidden="true">{expanded?'−':'+'}</span></button><AccordionFold open={expanded}><ul id={panelId} className="mt-3 divide-y divide-white/10 border-y border-white/10">{items.map(s=><li key={s.key} className="grid gap-1 py-4 sm:grid-cols-[1.4fr_auto] sm:items-center"><div><p className="font-semibold text-white">{s.label}</p><p className="mt-1 text-xs leading-5 text-slate-400">{s.detail}</p></div>{s.priceHint&&<span className="text-xs font-semibold text-gold sm:text-right">{s.priceHint}</span>}</li>)}</ul></AccordionFold></div>})}</div>
+  const [active,setActive]=useState(categories[0]||'')
+  useEffect(()=>{setActive(categories[0]||'')},[family])
+  const items=grouped[active]||[]
+  return <section className="border-y border-white/10 bg-navy-900/30"><div className="container-pmv py-14 sm:py-18"><Reveal className="max-w-3xl" distance={15}><p className="eyebrow">What you can request under this plan</p><h2 className="mt-3 font-display text-3xl font-bold text-white sm:text-4xl">The full menu, in the open.</h2><p className="mt-4 text-sm leading-7 text-slate-400">Plan credits and priority scheduling apply across every service here. Prices shown are typical retail ranges; members get the plan discount on top.</p></Reveal>
+    <div className="mt-8"><CategoryChips categories={categories} active={active} onChange={setActive}/></div>
+    <AnimatePresence mode="wait">
+      <motion.div key={`${family}-${active}`} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}} transition={pmvMotion.premium} className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {items.map(service=><ServiceCard key={service.key} service={service}/>)}
+      </motion.div>
+    </AnimatePresence>
   </div></section>
 }
 
@@ -133,7 +129,7 @@ function CarePlanIntake({family,initialTier}:{family:PlanFamilyKey;initialTier:s
   const [busy,setBusy]=useState(false);const [error,setError]=useState('')
   const groupedServices=useMemo(()=>groupServices(familyDef.services),[familyDef])
   const categories=Object.keys(groupedServices)
-  const [openCat,setOpenCat]=useState<string>(categories[0]||'')
+  const [activeCat,setActiveCat]=useState<string>(categories[0]||'')
 
   useEffect(()=>{if(initialTier)setTier(initialTier)},[initialTier])
 
@@ -159,12 +155,20 @@ function CarePlanIntake({family,initialTier}:{family:PlanFamilyKey;initialTier:s
     finally{setBusy(false)}
   }
 
+  const counts=Object.fromEntries(categories.map(category=>[category,groupedServices[category].filter(s=>selectedServices.has(s.key)).length]))
+  const visible=groupedServices[activeCat]||[]
+
   return <div className="overflow-hidden rounded-2xl border border-white/10 bg-navy-900/70 shadow-[0_28px_80px_rgba(0,0,0,.26)]">
     <div className="border-b border-white/10 px-5 py-4 sm:px-6"><p className="eyebrow">{familyDef.eyebrow} intake</p><p className="mt-1 text-xs text-slate-500">No account · every selection saved on the request</p></div>
     <div className="space-y-6 p-5 sm:p-6">
       <div><p className="text-sm font-bold text-white">Plan tier</p><div className="mt-3 grid gap-2 grid-cols-1 sm:grid-cols-3">{familyDef.tiers.map(t=><button key={t.key} type="button" onClick={()=>setTier(t.key)} className={`pmv-care-card rounded-xl border px-3 py-2.5 text-left ${tier===t.key?'border-gold/55 bg-gold/[.08]':'border-white/10 bg-white/[.02] hover:border-white/25'}`}><span className="block text-sm font-bold text-white">{t.name}</span><span className="mt-0.5 block text-[11px] text-slate-400">{formatPrice(t.priceCents)}</span></button>)}</div></div>
 
-      <div><p className="text-sm font-bold text-white">Services you expect to use</p><p className="mt-1 text-xs text-slate-500">Optional but recommended - it lets us pre-scope pricing and staffing.</p><div className="mt-3 space-y-3">{categories.map(category=>{const items=groupedServices[category];const expanded=openCat===category;const selectedInCat=items.filter(s=>selectedServices.has(s.key)).length;return <div key={category}><button type="button" aria-expanded={expanded} onClick={()=>setOpenCat(expanded?'':category)} className="flex w-full items-center justify-between gap-3 text-left"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/80">{category}{selectedInCat>0?` · ${selectedInCat}`:''}</p><span className="text-gold" aria-hidden="true">{expanded?'−':'+'}</span></button><AccordionFold open={expanded}><div className="mt-2 grid gap-1.5 sm:grid-cols-2">{items.map(s=><label key={s.key} className={`flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 text-left ${selectedServices.has(s.key)?'border-gold/45 bg-gold/[.05]':'border-white/10 bg-white/[.015] hover:border-white/25'}`}><input type="checkbox" checked={selectedServices.has(s.key)} onChange={()=>toggleService(s.key)} className="mt-0.5 accent-gold"/><span className="min-w-0"><span className="block text-xs font-semibold text-white">{s.label}</span>{s.priceHint&&<span className="mt-0.5 block text-[10px] text-slate-500">{s.priceHint}</span>}</span></label>)}</div></AccordionFold></div>})}</div></div>
+      <div>
+        <p className="text-sm font-bold text-white">Services you expect to use</p>
+        <p className="mt-1 text-xs text-slate-500">Optional but recommended. Switch categories; nothing is hidden behind a plus sign.</p>
+        <div className="mt-3"><CategoryChips categories={categories} active={activeCat} onChange={setActiveCat} counts={counts}/></div>
+        <div className="mt-3 grid gap-1.5 sm:grid-cols-2">{visible.map(s=><label key={s.key} className={`flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 text-left ${selectedServices.has(s.key)?'border-gold/45 bg-gold/[.05]':'border-white/10 bg-white/[.015] hover:border-white/25'}`}><input type="checkbox" checked={selectedServices.has(s.key)} onChange={()=>toggleService(s.key)} className="mt-0.5 accent-gold"/><span className="min-w-0"><span className="block text-xs font-semibold text-white">{s.label}</span>{s.priceHint&&<span className="mt-0.5 block text-[10px] text-slate-500">{s.priceHint}</span>}</span></label>)}</div>
+      </div>
 
       {familyDef.intakeKind==='property'&&<PropertyIntake intake={intake} update={updateIntake}/>}
       {familyDef.intakeKind==='business'&&<BusinessIntake intake={intake} update={updateIntake}/>}
@@ -192,7 +196,7 @@ function PropertyIntake({intake,update}:{intake:IntakeState;update:(k:string,v:I
     <InputField label="Primary use"><select className="input" value={(intake.use_purpose||'') as string} onChange={e=>update('use_purpose',e.target.value)}><option value="">Choose…</option>{USE_PURPOSE.map(t=><option key={t} value={t}>{t}</option>)}</select></InputField>
     <InputField label="Number of properties on plan"><input className="input" inputMode="numeric" placeholder="1" value={(intake.property_count||'') as string} onChange={e=>update('property_count',e.target.value)}/></InputField>
     <InputField label="Access instructions"><input className="input" placeholder="Lockbox, key hidden, tenant present, etc." value={(intake.access_notes||'') as string} onChange={e=>update('access_notes',e.target.value)}/></InputField>
-  </div><label className="mt-3 flex items-start gap-2 text-xs text-slate-400"><input type="checkbox" className="mt-0.5 accent-gold" checked={!!intake.wants_bpo} onChange={e=>update('wants_bpo',e.target.checked)}/><span>I would like BPO coordination through your broker partner as part of this plan.</span></label><label className="mt-2 flex items-start gap-2 text-xs text-slate-400"><input type="checkbox" className="mt-0.5 accent-gold" checked={!!intake.wants_cam} onChange={e=>update('wants_cam',e.target.checked)}/><span>The property is in an association and I want CAM liaison support.</span></label></div>
+  </div><label className="mt-3 flex items-start gap-2 text-xs text-slate-400"><input type="checkbox" className="mt-0.5 accent-gold" checked={!!intake.wants_bpo} onChange={e=>update('wants_bpo',e.target.checked)}/><span>I would like BPO coordination through your broker partner as part of this plan.</span></label><label className="mt-2 flex items-start gap-2 text-xs text-slate-400"><input type="checkbox" className="mt-0.5 accent-gold" checked={!!intake.wants_cam} onChange={e=>update('wants_cam',e.target.checked)}/><span>The property is in an association and I want CAM liaison support.</span></label><label className="mt-2 flex items-start gap-2 text-xs text-slate-400"><input type="checkbox" className="mt-0.5 accent-gold" checked={!!intake.wants_licensed_management} onChange={e=>update('wants_licensed_management',e.target.checked)}/><span>I want to talk about licensed property management or CAM coverage through the Pinnacle network.</span></label></div>
 }
 
 function BusinessIntake({intake,update}:{intake:IntakeState;update:(k:string,v:IntakeState[string])=>void}){

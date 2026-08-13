@@ -1,4 +1,5 @@
 import type { ModuleConfig } from './ModulePage'
+import { AddToCalendarButton } from '../../components/kit/AddToCalendar'
 
 const dt = (v: string) => (v ? new Date(v).toLocaleDateString() : 'Not provided')
 
@@ -78,6 +79,16 @@ export const calendarConfig: ModuleConfig = {
   statusField: 'status',
   statusOptions: ['proposed', 'confirmed', 'completed', 'cancelled'],
   clientCancelValue: 'cancelled',
+  rowActions: (row) => (
+    <AddToCalendarButton
+      event={{
+        id: row.id,
+        title: row.title || 'Pinnacle appointment',
+        startsAt: row.starts_at,
+        description: 'Pinnacle appointment',
+      }}
+    />
+  ),
 }
 
 export const fundingConfig: ModuleConfig = {

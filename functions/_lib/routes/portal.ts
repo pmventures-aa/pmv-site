@@ -5,6 +5,7 @@ import { uuid } from '../crypto'
 import { resolveClientId, loadScopedRow, scopeFilter, ScopeError } from '../scope'
 import { activityInsert, logActivity } from '../activity'
 import { sendEmail, escapeHtml } from '../email'
+import { calendarFeedUrls, signCalendarFeedToken } from '../calendarFeed'
 
 export const portalRoutes = new Hono<AppEnv>()
 portalRoutes.use('*', requireUser)
@@ -232,6 +233,13 @@ portalRoutes.post('/messages', async (c) => {
 })
 
 // ---------------- Calendar (appointments) ----------------
+portalRoutes.get('/calendar/feed', async (c) => {
+  const user = c.get('user')
+  const token = await signCalendarFeedToken(user.id, c.env.SESSION_SECRET)
+  const origin = new URL(c.req.url).origin
+  return c.json(calendarFeedUrls(origin, token))
+})
+
 portalRoutes.get('/calendar', async (c) => c.json({ appointments: await listScoped(c, 'appointments', 'ORDER BY starts_at ASC') }))
 
 portalRoutes.post('/calendar', async (c) => {
