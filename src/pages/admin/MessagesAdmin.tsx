@@ -91,19 +91,24 @@ function ClientInbox({ initialClientId, initialThreadId, onClearClient }: { init
       setThreads(t.threads); setClients(c.clients)
       setActiveId((prev) => {
         if (initialThreadId && t.threads.some((row) => row.id === initialThreadId)) return initialThreadId
+        if (initialClientId) {
+          const match = t.threads.find((row) => row.client_user_id === initialClientId)
+          if (match) return prev && t.threads.some((row) => row.id === prev && row.client_user_id === initialClientId) ? prev : match.id
+        }
         return prev ?? t.threads[0]?.id ?? null
       })
     } finally { setLoading(false) }
-  }, [initialThreadId])
+  }, [initialThreadId, initialClientId])
 
   useEffect(() => { void load() }, [load])
   useLiveRefresh(load)
 
   const visibleThreads = useMemo(() => {
+    const scoped = initialClientId ? threads.filter((t) => t.client_user_id === initialClientId) : threads
     const q = search.trim().toLowerCase()
-    if (!q) return threads
-    return threads.filter((t) => `${t.client_name || ''} ${t.client_email} ${t.subject}`.toLowerCase().includes(q))
-  }, [threads, search])
+    if (!q) return scoped
+    return scoped.filter((t) => `${t.client_name || ''} ${t.client_email} ${t.subject}`.toLowerCase().includes(q))
+  }, [threads, search, initialClientId])
 
   const clientIds = useMemo(() => Array.from(new Set(visibleThreads.map((t) => t.client_user_id))), [visibleThreads])
   const presence = usePresence(clientIds, 'admin')

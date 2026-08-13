@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
@@ -36,6 +36,7 @@ export default function Support() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [thread, setThread] = useState<Msg[]>([])
   const [reply, setReply] = useState('')
+  const threadRequest = useRef(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,12 +70,19 @@ export default function Support() {
 
   async function openThread(id: string) {
     if (openId === id) {
+      threadRequest.current += 1
       setOpenId(null)
+      setThread([])
       return
     }
+    const requestId = ++threadRequest.current
     setOpenId(id)
-    const res = await api.get<{ messages: Msg[] }>(`/portal/support/${id}/messages`)
-    setThread(res.messages)
+    try {
+      const res = await api.get<{ messages: Msg[] }>(`/portal/support/${id}/messages`)
+      if (threadRequest.current === requestId) setThread(res.messages)
+    } catch {
+      if (threadRequest.current === requestId) setThread([])
+    }
   }
 
   async function sendReply(id: string) {

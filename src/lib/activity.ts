@@ -173,7 +173,11 @@ export function describeActivity(e: ActivityEvent): string {
   }
 }
 
-function parseSqliteUtc(s: string): Date { return new Date(s.replace(' ', 'T') + 'Z') }
+export function parseSqliteUtc(s: string): Date {
+  if (!s) return new Date(NaN)
+  const raw = s.includes('T') ? s : `${s.replace(' ', 'T')}Z`
+  return new Date(raw)
+}
 
 export function timeAgo(iso: string): string {
   const ms = Date.now() - parseSqliteUtc(iso).getTime()

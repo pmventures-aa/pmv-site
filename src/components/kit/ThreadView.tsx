@@ -113,7 +113,7 @@ export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: ()
 
   async function send(e: React.FormEvent) {
     e.preventDefault()
-    if (!draft.trim()) return
+    if (!draft.trim() && pendingFiles.length === 0) return
     setSending(true)
     try {
       const res = await api.post<{ id: string }>(`/portal/message-threads/${threadId}/messages`, { body: draft.trim() })
@@ -219,7 +219,7 @@ export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: ()
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
           />
-          <button type="submit" disabled={sending || !draft.trim()} className="btn-gold shrink-0 disabled:opacity-60">{sending ? 'Sending…' : 'Send'}</button>
+          <button type="submit" disabled={sending || (!draft.trim() && pendingFiles.length === 0)} className="btn-gold shrink-0 disabled:opacity-60">{sending ? 'Sending…' : 'Send'}</button>
         </div>
         <p className="mt-2 text-[10px] text-slate-600">Attachments: PDF, PNG, JPG, WebP, DOCX, XLSX, or TXT · 15 MB maximum each</p>
       </form>

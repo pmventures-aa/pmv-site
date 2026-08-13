@@ -16,7 +16,7 @@ export async function resolvePartyByEmail(env: Env, email: string | null | undef
       `SELECT id, role FROM users WHERE lower(email) = ? LIMIT 1`,
     ).bind(addr).first<{ id: string; role: string }>(),
     env.DB.prepare(
-      `SELECT id FROM contact_inquiries WHERE lower(email) = ? AND archived_at IS NULL ORDER BY datetime(created_at) DESC LIMIT 1`,
+      `SELECT id FROM contact_inquiries WHERE lower(email) = ? AND archived_at IS NULL AND converted_at IS NULL ORDER BY datetime(created_at) DESC LIMIT 1`,
     ).bind(addr).first<{ id: string }>(),
   ])
   return {

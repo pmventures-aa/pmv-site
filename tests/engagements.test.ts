@@ -48,6 +48,7 @@ describe('engagement deep links', () => {
   it('formats a display address and detects campaign query params', () => {
     expect(composeAddress('Ada', 'a@x.com')).toBe('Ada <a@x.com>')
     expect(isCampaignAudienceQuery(new URLSearchParams('lead=l1'))).toBe(true)
+    expect(isCampaignAudienceQuery(new URLSearchParams('client=c1'))).toBe(true)
     expect(isCampaignAudienceQuery(new URLSearchParams('tab=email&thread=1'))).toBe(false)
   })
 })

@@ -43,5 +43,5 @@ export function composeAddress(name: string | null | undefined, email: string | 
 }
 
 export function isCampaignAudienceQuery(params: URLSearchParams): boolean {
-  return Boolean(params.get('lead') || params.get('leadIds') || params.get('list'))
+  return Boolean(params.get('lead') || params.get('leadIds') || params.get('list') || params.get('client'))
 }

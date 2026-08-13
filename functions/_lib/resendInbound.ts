@@ -173,9 +173,9 @@ export async function ingestReceivedEmail(
     const actor = await env.DB.prepare(
       `SELECT id FROM users WHERE role IN ('admin','staff') AND status = 'active' ORDER BY CASE role WHEN 'admin' THEN 0 ELSE 1 END, created_at LIMIT 1`,
     ).first<{ id: string }>()
-    const known = await env.DB.prepare('SELECT id FROM users WHERE lower(email) = ? LIMIT 1').bind(from.email).first<{ id: string }>()
-    const scopeClientId = known?.id || null
-    const createdBy = actor?.id || known?.id
+    const party = await mergeParty(env, {}, [from.email])
+    const scopeClientId = party.clientUserId
+    const createdBy = actor?.id || scopeClientId
     if (!createdBy) throw new Error('no HQ user available to own the inbound thread')
     const conversationId = uuid()
     threadId = uuid()

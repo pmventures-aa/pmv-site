@@ -47,7 +47,9 @@ documentOperationsAdminRoutes.patch('/document-ops/envelopes/:id',async c=>{
   const allowedPriority=['low','normal','high','urgent'],allowedReminder=['none','daily','every_3_days','weekly']
   const priority=allowedPriority.includes(b?.priority)?b.priority:env.priority||'normal'
   const reminder=allowedReminder.includes(b?.reminder_frequency)?b.reminder_frequency:env.reminder_frequency||'none'
-  const tags=Array.isArray(b?.tags)?b.tags.map((v:any)=>String(v).trim()).filter(Boolean).slice(0,20):JSON.parse(env.tags_json||'[]')
+  let tags:string[]
+  if(Array.isArray(b?.tags)) tags=b.tags.map((v:any)=>String(v).trim()).filter(Boolean).slice(0,20)
+  else { try { const parsed=JSON.parse(env.tags_json||'[]'); tags=Array.isArray(parsed)?parsed:[] } catch { tags=[] } }
   await c.env.DB.prepare(`UPDATE envelopes SET title=?,message=?,priority=?,signing_order_mode=?,expires_at=?,reminder_frequency=?,approval_status=?,approval_note=?,tags_json=?,updated_at=? WHERE id=?`).bind(
     b?.title!==undefined?String(b.title).trim().slice(0,200):env.title,
     b?.message!==undefined?(String(b.message).trim().slice(0,3000)||null):env.message,

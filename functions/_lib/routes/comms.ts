@@ -393,7 +393,12 @@ commsRoutes.post('/comms/messages/:id/send', requireStaff, requireCapability('ca
   const message = await c.env.DB.prepare('SELECT * FROM comms_messages WHERE id = ?').bind(id).first<any>()
   if (!message) return c.json({ error: 'not found' }, 404)
   if (message.status !== 'draft') return c.json({ error: 'only drafts can be sent this way' }, 400)
-  const audience: Audience = JSON.parse(message.audience_json || '{}')
+  let audience: Audience
+  try {
+    audience = parseAudience({ audience: JSON.parse(message.audience_json || '{}') })
+  } catch {
+    return c.json({ error: 'invalid stored audience' }, 400)
+  }
   const draftMessageType = parseMessageType(message.message_type)
   if (draftMessageType === 'marketing') {
     try { await getMarketingComplianceConfig(c.env) }

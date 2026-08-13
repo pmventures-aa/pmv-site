@@ -32,6 +32,11 @@ export const SCOPE_FOLLOWUP_STEPS = [
   },
 ] as const
 
+export function nextScopeFollowupStep(ageDays: number, deliveredKeys: Iterable<string> = []) {
+  const delivered = new Set(deliveredKeys)
+  return SCOPE_FOLLOWUP_STEPS.find((step) => ageDays >= step.day && !delivered.has(step.key)) ?? null
+}
+
 function easternParts(date: Date) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
@@ -115,10 +120,9 @@ export async function runDueScopeFollowups(env: Env, limit = 50): Promise<{proce
   let sent = 0; let skipped = 0; let failed = 0
   for (const row of rows.results || []) {
     const ageDays = (Date.now() - new Date(row.created_at).getTime()) / 86_400_000
-    const step = [...SCOPE_FOLLOWUP_STEPS].reverse().find((candidate) => ageDays >= candidate.day)
+    const delivered = await env.DB.prepare('SELECT step_key FROM scope_followup_deliveries WHERE scope_request_id=?').bind(row.id).all<{step_key:string}>()
+    const step = nextScopeFollowupStep(ageDays, (delivered.results || []).map((item) => item.step_key))
     if (!step) { skipped++; continue }
-    const exists = await env.DB.prepare('SELECT 1 FROM scope_followup_deliveries WHERE scope_request_id=? AND step_key=?').bind(row.id, step.key).first()
-    if (exists) { skipped++; continue }
     try {
       const requestUrl = `${PUBLIC_SITE_BASE}/scope-request/confirmation?request=${encodeURIComponent(row.public_token)}`
       const optOut = await unsubscribeUrl(env, row.email)

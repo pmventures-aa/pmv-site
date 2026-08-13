@@ -67,7 +67,7 @@ export async function trustedContexts(env: Env, user: SessionUser): Promise<Trus
     client_name: row.client_name || 'Pinnacle client',
     client_business_name: row.client_business_name || null,
     relationship_label: row.relationship_label || null,
-    permissions: normalizeTrustedPermissions(JSON.parse(row.permissions_json || '{}')),
+    permissions: normalizeTrustedPermissions((() => { try { return JSON.parse(row.permissions_json || '{}') } catch { return {} } })()),
   }))
 }
 

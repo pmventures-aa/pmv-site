@@ -77,7 +77,7 @@ export function ConversationsPanel() {
   const loadDetail = useCallback(async () => {
     if (!selectedId) { setDetail(null); return }
     try { setDetail(await api.get<Detail>(`/admin/conversations/${selectedId}`)) }
-    catch (err) { if (err instanceof ApiError) toast.error(err.message) }
+    catch (err) { setDetail(null); if (err instanceof ApiError) toast.error(err.message) }
   }, [selectedId])
   useEffect(() => { void loadDetail() }, [loadDetail])
   useEffect(() => { if (!selectedId) return; const t = setInterval(() => void loadDetail(), POLL_MS); return () => clearInterval(t) }, [selectedId, loadDetail])

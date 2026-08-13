@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
@@ -128,22 +128,35 @@ export default function ClientDetailModern() {
   const [note, setNote] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set())
+  const [loadedTabs, setLoadedTabs] = useState<{ id: string | null; tabs: Set<Tab> }>({ id: null, tabs: new Set() })
+  const idRef = useRef(id)
+  idRef.current = id
 
   const load = useCallback(async (section: Tab = tab, force = false) => {
     if (!id) return
-    if (!force && loadedTabs.has(section)) return
-    const result = await api.get<Partial<Bundle>>(`/admin/clients/${id}?section=${section}`)
-    setData((current) => ({
-      account: result.account ?? current?.account,
-      profile: result.profile === undefined ? current?.profile ?? null : result.profile,
-      assigned_staff: result.assigned_staff ?? current?.assigned_staff ?? [], recent_activity: result.recent_activity ?? current?.recent_activity ?? [],
-      services: result.services ?? current?.services ?? [], matters: result.matters ?? current?.matters ?? [], tasks: result.tasks ?? current?.tasks ?? [], documents: result.documents ?? current?.documents ?? [], invoices: result.invoices ?? current?.invoices ?? [], funding: result.funding ?? current?.funding ?? [], properties: result.properties ?? current?.properties ?? [], tax_filings: result.tax_filings ?? current?.tax_filings ?? [], tickets: result.tickets ?? current?.tickets ?? [], calls: result.calls ?? current?.calls ?? [], appointments: result.appointments ?? current?.appointments ?? [], application_answers: result.application_answers ?? current?.application_answers ?? [], payment_methods: result.payment_methods ?? current?.payment_methods ?? [], notes: result.notes ?? current?.notes ?? [], onboarding_progress: result.onboarding_progress ?? current?.onboarding_progress ?? { answered: 0, total: 0 }, service_catalog: result.service_catalog ?? current?.service_catalog ?? [], service_applications: result.service_applications ?? current?.service_applications ?? [],
-    } as Bundle))
-    setLoadedTabs((current) => new Set(current).add(section))
+    if (!force && loadedTabs.id === id && loadedTabs.tabs.has(section)) return
+    const requestId = id
+    const result = await api.get<Partial<Bundle>>(`/admin/clients/${requestId}?section=${section}`)
+    if (idRef.current !== requestId) return
+    setData((current) => {
+      const sameClient = current?.account?.id === requestId
+      const base = sameClient ? current : null
+      return {
+      account: result.account ?? base?.account,
+      profile: result.profile === undefined ? base?.profile ?? null : result.profile,
+      assigned_staff: result.assigned_staff ?? base?.assigned_staff ?? [], recent_activity: result.recent_activity ?? base?.recent_activity ?? [],
+      services: result.services ?? base?.services ?? [], matters: result.matters ?? base?.matters ?? [], tasks: result.tasks ?? base?.tasks ?? [], documents: result.documents ?? base?.documents ?? [], invoices: result.invoices ?? base?.invoices ?? [], funding: result.funding ?? base?.funding ?? [], properties: result.properties ?? base?.properties ?? [], tax_filings: result.tax_filings ?? base?.tax_filings ?? [], tickets: result.tickets ?? base?.tickets ?? [], calls: result.calls ?? base?.calls ?? [], appointments: result.appointments ?? base?.appointments ?? [], application_answers: result.application_answers ?? base?.application_answers ?? [], payment_methods: result.payment_methods ?? base?.payment_methods ?? [], notes: result.notes ?? base?.notes ?? [], onboarding_progress: result.onboarding_progress ?? base?.onboarding_progress ?? { answered: 0, total: 0 }, service_catalog: result.service_catalog ?? base?.service_catalog ?? [], service_applications: result.service_applications ?? base?.service_applications ?? [],
+    } as Bundle
+    })
+    setLoadedTabs((current) => {
+      const tabs = current.id === requestId ? new Set(current.tabs) : new Set<Tab>()
+      tabs.add(section)
+      return { id: requestId, tabs }
+    })
   }, [id, loadedTabs, tab])
 
-  useEffect(() => { load(tab).catch(() => setData(null)) }, [tab])
+  useEffect(() => { setData(null); setLoadedTabs({ id: null, tabs: new Set() }) }, [id])
+  useEffect(() => { load(tab).catch(() => { if (idRef.current === id) setData(null) }) }, [id, tab, load])
   useEffect(() => { if(id&&!section)navigate(p(`clients/${id}/overview`),{replace:true}) },[id,section,navigate,p])
 
   const timeline = useMemo(() => {

@@ -45,7 +45,7 @@ messageRoutes.post('/message-threads',async(c)=>{
 })
 
 messageRoutes.post('/message-threads/:id/messages',async(c)=>{
-  const user=c.get('user');const thread=await loadThread(c.env,user,c.req.param('id'));const body=await c.req.json<{body:string}>().catch(()=>({body:''}));if(!body.body?.trim())return c.json({error:'Message body is required.'},400);const messageBody=body.body.trim().slice(0,8000);const messageId=uuid()
+  const user=c.get('user');const thread=await loadThread(c.env,user,c.req.param('id'));const body=await c.req.json<{body:string}>().catch(()=>({body:''}));const messageBody=(body.body||'').trim().slice(0,8000);const messageId=uuid()
   await c.env.DB.batch([c.env.DB.prepare(`INSERT INTO thread_messages(id,thread_id,sender_user_id,body) VALUES(?,?,?,?)`).bind(messageId,thread.id,user.id,messageBody),c.env.DB.prepare(`UPDATE message_threads SET last_message_at=datetime('now') WHERE id=?`).bind(thread.id),markRead(c.env,thread.id,user.id),activityInsert(c.env,{actorUserId:user.id,clientUserId:thread.client_user_id,kind:notifyKind(user),detail:{subject:thread.subject}})])
   c.executionCtx.waitUntil(notifyNewMessage(c.env,user,thread.client_user_id,thread.subject,messageBody));return c.json({ok:true,id:messageId},201)
 })

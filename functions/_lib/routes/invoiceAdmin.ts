@@ -75,6 +75,15 @@ function parseJsonObject<T extends object>(raw: string | null | undefined, fallb
   }
 }
 
+function parseJsonArray(raw: string | null | undefined): unknown[] {
+  try {
+    const parsed = JSON.parse(raw || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 async function clientDefaults(env: Env, clientId: string) {
   const row = await env.DB.prepare(
     `SELECT u.id, u.email, u.full_name, u.first_name, u.last_name, u.phone,
@@ -206,8 +215,8 @@ invoiceAdminRoutes.get('/invoices/:id', requireStaff, async (c) => {
       ...invoice,
       bill_to: parseJsonObject(invoice.bill_to_json, {}),
       payable_to: parseJsonObject(invoice.payable_to_json, {}),
-      payment_methods: JSON.parse(invoice.payment_methods_json || '[]'),
-      ach_sec_codes: JSON.parse(invoice.ach_sec_codes_json || '[]'),
+      payment_methods: parseJsonArray(invoice.payment_methods_json),
+      ach_sec_codes: parseJsonArray(invoice.ach_sec_codes_json),
     },
     line_items: lineItems.results ?? [],
     reminders: reminders.results ?? [],

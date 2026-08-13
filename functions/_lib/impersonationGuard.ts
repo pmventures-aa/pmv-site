@@ -1,6 +1,7 @@
 import type { Context, Next } from 'hono'
 import type { AppEnv, Env } from './types'
 import { uuid } from './crypto'
+import { getUser } from './session'
 
 // Server-side deny-list for actions that should NEVER execute while an
 // impersonation session is active - even by an owner. Keeps the audit
@@ -56,17 +57,28 @@ export async function impersonationGuard(c: Context<AppEnv>, next: Next) {
   }
 }
 
+export function impersonationBlockReason(
+  user: { impersonation_session_id?: string | null } | null | undefined,
+  method: string,
+  path: string,
+): string | null {
+  if (!user?.impersonation_session_id) return null
+  const hit = DENYLIST.find((entry) => entry.method === method.toUpperCase() && entry.path === path)
+  return hit?.reason ?? null
+}
+
 // Route middleware: apply to any route that should NEVER run under
 // impersonation. Blocks the request with 403 and audits.
+// Resolves the session here because this runs as global middleware
+// before per-route requireUser has set c.get('user').
 export async function denyDuringImpersonation(c: Context<AppEnv>, next: Next) {
-  const user = c.get('user')
-  if (!user?.impersonation_session_id) return next()
+  const user = await getUser(c.env, c.req.raw)
   const method = c.req.method.toUpperCase()
   const path = new URL(c.req.url).pathname
-  const hit = DENYLIST.find((entry) => entry.method === method && entry.path === path)
-  if (!hit) return next()
-  await logBlock(c.env, user.impersonation_session_id, method, path, hit.reason)
-  return c.json({ error: 'blocked during impersonation', reason: hit.reason }, 403)
+  const reason = impersonationBlockReason(user, method, path)
+  if (!reason || !user?.impersonation_session_id) return next()
+  await logBlock(c.env, user.impersonation_session_id, method, path, reason)
+  return c.json({ error: 'blocked during impersonation', reason }, 403)
 }
 
 // Convenience: return the denylist for the frontend banner to disable buttons.

@@ -74,7 +74,7 @@ export function EmailThreadsPanel() {
   const loadDetail = useCallback(async () => {
     if (!selectedId) { setDetail(null); return }
     try { setDetail(await api.get<Detail>(`/admin/email-threads/${selectedId}`)) }
-    catch (err) { if (err instanceof ApiError) toast.error(err.message) }
+    catch (err) { setDetail(null); if (err instanceof ApiError) toast.error(err.message) }
   }, [selectedId])
 
   useEffect(() => { void load(); void loadSignatures() }, [load, loadSignatures])

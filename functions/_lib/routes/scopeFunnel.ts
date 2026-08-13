@@ -252,8 +252,13 @@ scopeFunnelPublicRoutes.post('/scope-requests/:token/book', async (c) => {
 scopeFunnelPublicRoutes.post('/scope-requests/:token/convert', requireUser, async (c) => {
   const user = c.get('user')
   if (user.role !== 'client') return c.json({error:'client account required'},403)
-  const row = await c.env.DB.prepare('SELECT id,inquiry_id FROM public_scope_requests WHERE public_token=?').bind(c.req.param('token')).first<any>()
+  const row = await c.env.DB.prepare('SELECT id,inquiry_id,email,reserved_user_id,converted_user_id FROM public_scope_requests WHERE public_token=?').bind(c.req.param('token')).first<any>()
   if (!row) return c.json({error:'request not found'},404)
+  if (row.converted_user_id && row.converted_user_id !== user.id) return c.json({error:'this request is already linked to another account'},409)
+  const emailMatch = typeof row.email === 'string' && row.email.trim().toLowerCase() === user.email.trim().toLowerCase()
+  const reservedMatch = row.reserved_user_id === user.id
+  if (!emailMatch && !reservedMatch) return c.json({error:'this request belongs to a different email address'},403)
+  if (row.converted_user_id === user.id) return c.json({ok:true})
   await c.env.DB.batch([
     c.env.DB.prepare("UPDATE public_scope_requests SET converted_user_id=?,status='converted',updated_at=datetime('now') WHERE id=?").bind(user.id,row.id),
     c.env.DB.prepare("UPDATE contact_inquiries SET client_user_id=?,updated_at=datetime('now') WHERE id=? AND converted_at IS NULL").bind(user.id,row.inquiry_id),
