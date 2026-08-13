@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search, Mail, MailOpen } from 'lucide-react'
+import { Search, Mail, MailOpen, ChevronLeft } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
@@ -110,7 +110,7 @@ function ClientInbox({ initialClientId, onClearClient }: { initialClientId?: str
   }
 
   return <Panel className="grid h-[72vh] grid-cols-1 gap-0 overflow-hidden !p-0 md:grid-cols-[320px_1fr]">
-    <aside className="flex min-h-0 flex-col border-b border-white/10 md:border-b-0 md:border-r">
+    <aside className={`min-h-0 flex-col border-b border-white/10 md:flex md:border-b-0 md:border-r ${activeId ? 'hidden' : 'flex'}`}>
       <div className="flex items-center gap-2 border-b border-white/10 p-2.5">
         <div className="relative min-w-0 flex-1"><Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" /><input className={`${inputCls} !pl-8`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search conversations" /></div>
         <NewThreadDialog clients={clients} initialClientId={initialClientId} onCreated={onCreated} />
@@ -119,7 +119,21 @@ function ClientInbox({ initialClientId, onClearClient }: { initialClientId?: str
         {loading ? <p className="p-4 text-sm text-slate-400">Loading conversations…</p> : visibleThreads.length === 0 ? <div className="p-4"><EmptyState label={search ? 'No conversations match your search.' : 'No secure conversations yet.'} /></div> : <ul className="divide-y divide-white/5">{visibleThreads.map((t) => <li key={t.id}><button onClick={() => setActiveId(t.id)} className={`block w-full px-3 py-2.5 text-left transition ${activeId === t.id ? 'bg-gold/10 ring-1 ring-inset ring-gold/20' : 'hover:bg-white/5'}`}><div className="flex items-center gap-2"><span className="text-slate-500">{t.unread ? <Mail size={14} /> : <MailOpen size={14} />}</span><PresenceDot entry={presence[t.client_user_id]} size={7} /><p className={`min-w-0 flex-1 truncate text-sm font-medium ${t.unread ? 'text-white' : 'text-slate-300'}`}>{t.client_name || t.client_email}</p><span className="shrink-0 text-[10px] text-slate-500">{timeAgo(t.last_message_at)}</span></div><p className={`mt-1 truncate pl-[34px] text-xs ${t.unread ? 'text-slate-200' : 'text-slate-500'}`}>{t.subject}</p></button></li>)}</ul>}
       </div>
     </aside>
-    <section className="min-h-0 bg-navy-950/20">{activeId ? <ThreadView threadId={activeId} onSent={load} /> : <div className="grid h-full place-items-center p-6"><EmptyState label="Select a conversation or start a new secure message." /></div>}</section>
+    <section className={`min-h-0 flex-col bg-navy-950/20 ${activeId ? 'flex' : 'hidden md:flex'}`}>
+      {activeId ? (
+        <>
+          <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 md:hidden">
+            <button type="button" onClick={() => setActiveId(null)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold" aria-label="Back to conversations">
+              <ChevronLeft size={16}/>
+            </button>
+            <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-[.12em] text-slate-400">Conversation</p>
+          </div>
+          <div className="min-h-0 flex-1"><ThreadView threadId={activeId} onSent={load} /></div>
+        </>
+      ) : (
+        <div className="grid h-full place-items-center p-6"><EmptyState label="Select a conversation or start a new secure message." /></div>
+      )}
+    </section>
   </Panel>
 }
 

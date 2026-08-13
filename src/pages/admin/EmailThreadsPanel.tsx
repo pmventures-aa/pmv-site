@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CheckCheck, MailPlus, PenLine, RefreshCw, Reply, Send, XCircle } from 'lucide-react'
+import { CheckCheck, ChevronLeft, MailPlus, PenLine, RefreshCw, Reply, Send, XCircle } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Tag, btnPrimary, btnSecondary } from '../../components/admin/ui'
@@ -168,8 +168,8 @@ export function EmailThreadsPanel() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ResendWebhookPanel compact />
-      <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border border-white/10 bg-navy-900/40">
-        <aside className="flex w-[min(100%,320px)] shrink-0 flex-col border-r border-white/10">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-navy-900/40 md:flex-row">
+        <aside className={`w-full shrink-0 flex-col border-b border-white/10 md:flex md:w-[320px] md:border-b-0 md:border-r ${selectedId ? 'hidden' : 'flex'}`}>
           <div className="flex items-center gap-2 border-b border-white/10 p-2.5">
             <button type="button" className={btnPrimary} onClick={startCompose}><MailPlus size={14}/>New Email</button>
             <button type="button" className={btnSecondary} onClick={() => { void load(); void loadDetail() }} aria-label="Refresh mail" title="Refresh mail">
@@ -202,9 +202,10 @@ export function EmailThreadsPanel() {
           </div>
         </aside>
 
-        <section className="relative min-w-0 flex-1 bg-navy-950/40">
+        <section className={`relative min-w-0 flex-1 bg-navy-950/40 ${selectedId ? 'flex flex-col' : 'hidden md:flex md:flex-col'}`}>
           <EmailThreadDetail
             detail={detail}
+            onBack={() => setSelectedId(null)}
             onReply={startReply}
             onCompose={startCompose}
             onSignatures={() => setManagingSignatures(true)}
@@ -221,9 +222,10 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function EmailThreadDetail({
-  detail, onReply, onCompose, onSignatures,
+  detail, onBack, onReply, onCompose, onSignatures,
 }: {
   detail: Detail | null
+  onBack: () => void
   onReply: () => void
   onCompose: () => void
   onSignatures: () => void
@@ -233,9 +235,14 @@ function EmailThreadDetail({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
-        <div className="min-w-0">
-          <p className="font-display text-xl font-semibold tracking-[-.02em] text-white">{detail.thread.subject}</p>
-          <p className="mt-1 text-xs text-slate-500">{detail.messages.length} messages · Last activity {new Date(detail.thread.last_activity_at).toLocaleString()}</p>
+        <div className="flex min-w-0 items-start gap-2">
+          <button type="button" onClick={onBack} className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold md:hidden" aria-label="Back to inbox">
+            <ChevronLeft size={16}/>
+          </button>
+          <div className="min-w-0">
+            <p className="font-display text-lg font-semibold tracking-[-.02em] text-white sm:text-xl">{detail.thread.subject}</p>
+            <p className="mt-1 text-xs text-slate-500">{detail.messages.length} messages · Last activity {new Date(detail.thread.last_activity_at).toLocaleString()}</p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={btnPrimary} onClick={onReply}><Reply size={14}/>Reply</button>
