@@ -86,7 +86,7 @@ export default function ProviderNetworkAdmin() {
     setBusyId(row.id)
     try {
       await api.patch(`/admin/employees/${row.id}/network`, {
-        network_status: row.network_status || 'active',
+        ...(row.network_status ? { network_status: row.network_status } : {}),
         availability_status: patch.availability_status ?? row.availability_status ?? 'available',
         is_preferred_provider: patch.is_preferred_provider ?? !!row.is_preferred_provider,
         service_area_summary: row.service_area_summary || '',

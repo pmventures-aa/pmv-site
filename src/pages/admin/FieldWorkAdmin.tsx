@@ -248,8 +248,12 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
   const pinnedQueryRef = useRef('')
 
   useEffect(() => {
-    api.get<{ clients: ClientOption[] }>('/admin/clients').then((r) => setClients(r.clients ?? [])).catch(() => {})
-    api.get<{ employees: StaffOption[] }>('/admin/employees').then((r) => setVendors(r.employees ?? [])).catch(() => {})
+    api.get<{ clients: ClientOption[] }>('/admin/clients').then((r) => setClients(r.clients ?? [])).catch((err) => {
+      toast.error(err instanceof ApiError ? err.message : 'Could not load clients for dispatch.')
+    })
+    api.get<{ staff: StaffOption[] }>('/admin/staff-directory').then((r) => setVendors(r.staff ?? [])).catch((err) => {
+      toast.error(err instanceof ApiError ? err.message : 'Could not load providers for dispatch.')
+    })
   }, [])
 
   useEffect(() => {
