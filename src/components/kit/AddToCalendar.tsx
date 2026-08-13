@@ -31,19 +31,45 @@ export function CalendarSubscribePanel({ feedPath }: { feedPath: string }) {
   const [httpsUrl, setHttpsUrl] = useState('')
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   async function loadFeed() {
-    setError('')
+    setError(''); setBusy(true)
     try {
       const res = await fetch(`/api${feedPath}`, { credentials: 'include' })
       const data = await res.json().catch(() => ({})) as { error?: string; webcal_url?: string; https_url?: string }
-      if (!res.ok) throw new Error(data.error || 'Could not create a calendar link.')
-      setWebcal(data.webcal_url || '')
+      if (!res.ok) throw new Error(data.error || `Server responded ${res.status}.`)
+      if (!data.webcal_url) throw new Error('The server did not return a subscription link.')
+      setWebcal(data.webcal_url)
       setHttpsUrl(data.https_url || '')
       setOpen(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create a calendar link.')
-    }
+    } finally { setBusy(false) }
+  }
+
+  // Fallback: pull the current appointments as a one-shot .ics download
+  // when the auto-subscribe endpoint isn't available. Uses the /api base
+  // path that the subscribe call already uses so the surface is consistent.
+  async function downloadOneOff() {
+    setError(''); setBusy(true)
+    try {
+      const listPath = feedPath.replace(/\/feed$/, '')
+      const res = await fetch(`/api${listPath}`, { credentials: 'include' })
+      const data = await res.json().catch(() => ({})) as { appointments?: Array<{ id: string; title: string; starts_at: string; status?: string }> }
+      if (!res.ok) throw new Error('Could not load your appointments right now.')
+      const events = (data.appointments || []).map((a) => ({
+        id: a.id,
+        title: a.title || 'Pinnacle appointment',
+        startsAt: a.starts_at,
+        description: a.status ? `Pinnacle appointment (${a.status.replace(/_/g, ' ')})` : 'Pinnacle appointment',
+      }))
+      if (!events.length) throw new Error('You have no upcoming appointments to add.')
+      const { buildIcs } = await import('../../../shared/ics')
+      downloadIcsFile(buildIcs(events, 'Pinnacle'), 'pinnacle-appointments.ics')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not download appointments.')
+    } finally { setBusy(false) }
   }
 
   async function copy(value: string) {
@@ -63,11 +89,21 @@ export function CalendarSubscribePanel({ feedPath }: { feedPath: string }) {
           <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">Apple Calendar</p>
           <p className="mt-1 text-sm text-slate-300">Add one appointment as a file, or subscribe so new Pinnacle times show up automatically.</p>
         </div>
-        <button type="button" onClick={() => void loadFeed()} className="rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-bold text-gold hover:bg-gold/15">
-          Subscribe in Apple Calendar
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={busy} onClick={() => void loadFeed()} className="rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-bold text-gold hover:bg-gold/15 disabled:opacity-60">
+            {busy ? 'Working...' : 'Subscribe in Apple Calendar'}
+          </button>
+          <button type="button" disabled={busy} onClick={() => void downloadOneOff()} className="rounded-lg border border-white/15 px-3 py-2 text-xs font-bold text-white hover:border-gold/40 hover:text-gold disabled:opacity-60">
+            Download .ics file
+          </button>
+        </div>
       </div>
-      {error && <p className="mt-3 text-xs text-rose-300">{error}</p>}
+      {error && (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-rose-300">{error}</p>
+          <p className="text-[11px] text-slate-500">If subscribing keeps failing, use "Download .ics file" to add your current appointments right now, and we'll get the auto-subscribe working shortly.</p>
+        </div>
+      )}
       {open && webcal && (
         <div className="mt-4 space-y-3 text-xs leading-5 text-slate-400">
           <p>On iPhone or iPad: Calendar → Calendars → Add Calendar → Add Subscription Calendar, then paste the link. On a Mac: File → New Calendar Subscription.</p>
