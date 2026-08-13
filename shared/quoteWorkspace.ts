@@ -37,9 +37,10 @@ export function quoteMatchesFocus(status: string, focus: QuoteFocusKey): boolean
   return (spec.statuses as readonly string[]).includes(status)
 }
 
-export function quoteNextAction(status: string): 'send' | 'copy' | 'none' {
+export function quoteNextAction(status: string, invoiceId?: string | null): 'send' | 'copy' | 'convert' | 'open-invoice' | 'none' {
   if (status === 'draft') return 'send'
   if (status === 'sent' || status === 'viewed') return 'copy'
+  if (status === 'accepted') return invoiceId ? 'open-invoice' : 'convert'
   return 'none'
 }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Plus, Search } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
@@ -35,8 +35,13 @@ interface QuoteRow {
   sent_at: string | null
   viewed_at: string | null
   decided_at: string | null
+  decision_note?: string | null
+  client_user_id?: string | null
   created_at: string
   line_item_count: number
+  invoice_id?: string | null
+  invoice_number?: string | null
+  invoice_status?: string | null
 }
 
 interface LineDraft {
@@ -102,6 +107,9 @@ function publicQuoteUrl(token: string) {
 }
 
 export default function QuotesAdmin() {
+  const p = useAppPath()
+  const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
   const [screen, setScreen] = useState<'list' | 'build' | 'templates'>('list')
   const [quotes, setQuotes] = useState<QuoteRow[] | null>(null)
   const [templates, setTemplates] = useState<TemplateRow[]>([])
@@ -109,7 +117,7 @@ export default function QuotesAdmin() {
   const [focus, setFocus] = useState<QuoteFocusKey>('working')
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
-  const [detailId, setDetailId] = useState<string | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(params.get('quote'))
 
   const load = useCallback(() => Promise.all([
     api.get<{ quotes: QuoteRow[] }>('/admin/quotes').then((r) => setQuotes(r.quotes)),
@@ -145,6 +153,20 @@ export default function QuotesAdmin() {
     }
   }, [quotes])
 
+  function openDetail(id: string) {
+    setDetailId(id)
+    const next = new URLSearchParams(params)
+    next.set('quote', id)
+    setParams(next, { replace: true })
+  }
+
+  function backToList() {
+    setDetailId(null)
+    const next = new URLSearchParams(params)
+    next.delete('quote')
+    setParams(next, { replace: true })
+  }
+
   async function copyLink(quote: QuoteRow) {
     await navigator.clipboard.writeText(publicQuoteUrl(quote.public_token))
     toast.success('Quote link copied.')
@@ -165,14 +187,14 @@ export default function QuotesAdmin() {
   }
 
   if (detailId) {
-    return <QuoteDetail quoteId={detailId} offerings={offerings} onBack={() => setDetailId(null)} onChanged={load} />
+    return <QuoteDetail quoteId={detailId} offerings={offerings} onBack={backToList} onChanged={load} />
   }
 
   return <div>
     <PageIntro
       kicker="Revenue"
-      title="Quotes"
-      subtitle="Write a quote, send a branded link, and track whether they opened or accepted it. Recipients do not need an account."
+        title="Quotes"
+      subtitle="Write a quote, send a branded link, and let the client accept or decline with notes. Accepted quotes convert to an invoice."
       action={<div className="flex flex-wrap items-center gap-2">
         <button className={btnOutline} onClick={() => setScreen('templates')}>Templates</button>
         <button className={btnPrimary} onClick={() => setScreen('build')}><Plus size={14} />New quote</button>
@@ -210,17 +232,19 @@ export default function QuotesAdmin() {
                 </thead>
                 <tbody>
                   {visible.map((quote) => {
-                    const action = quoteNextAction(quote.status)
+                    const action = quoteNextAction(quote.status, quote.invoice_id)
                     return (
-                      <tr key={quote.id} className="cursor-pointer border-t border-white/5 transition hover:bg-white/[0.025]" onClick={() => setDetailId(quote.id)}>
+                      <tr key={quote.id} className="cursor-pointer border-t border-white/5 transition hover:bg-white/[0.025]" onClick={() => openDetail(quote.id)}>
                         <td className="px-4 py-3"><b className="block text-white">{quote.quote_number}</b><span className="text-xs text-slate-500">{quote.title}</span></td>
                         <td className="px-4 py-3"><b className="block text-slate-200">{quote.recipient_name}</b><span className="text-xs text-slate-500">{quote.recipient_company || quote.recipient_email}</span></td>
-                        <td className="px-4 py-3"><Tag tone={quoteStatusTone(quote.status)}>{quoteStatusLabel(quote.status)}</Tag><p className="mt-1 text-[11px] text-slate-500">{quoteIdleLabel(quote)}</p></td>
+                        <td className="px-4 py-3"><Tag tone={quoteStatusTone(quote.status)}>{quoteStatusLabel(quote.status)}</Tag><p className="mt-1 text-[11px] text-slate-500">{quote.invoice_number ? `Invoice ${quote.invoice_number}` : quoteIdleLabel(quote)}</p></td>
                         <td className="px-4 py-3 font-semibold text-white">{quoteMoney(quote.total_cents)}</td>
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           {action === 'send' && <button className={btnPrimary} onClick={() => void sendQuote(quote)}>Send</button>}
                           {action === 'copy' && <button className={btnOutline} onClick={() => void copyLink(quote)}>Copy link</button>}
-                          {action === 'none' && <button className="text-xs font-bold text-gold hover:underline" onClick={() => setDetailId(quote.id)}>Open</button>}
+                          {action === 'convert' && <button className={btnPrimary} onClick={() => openDetail(quote.id)}>Convert</button>}
+                          {action === 'open-invoice' && quote.invoice_id && <button className={btnOutline} onClick={() => navigate(`${p('invoices')}?invoice=${encodeURIComponent(quote.invoice_id!)}`)}>Open invoice</button>}
+                          {action === 'none' && <button className="text-xs font-bold text-gold hover:underline" onClick={() => openDetail(quote.id)}>Open</button>}
                         </td>
                       </tr>
                     )
@@ -234,29 +258,52 @@ export default function QuotesAdmin() {
 }
 
 interface QuoteDetailData {
-  quote: QuoteRow & { intro_message: string | null; scope_notes: string | null; terms: string | null; pass_through_note: string | null; subtotal_cents: number; discount_cents: number; recipient_phone?: string | null; property_address?: string | null }
+  quote: QuoteRow & { intro_message: string | null; scope_notes: string | null; terms: string | null; pass_through_note: string | null; subtotal_cents: number; discount_cents: number; recipient_phone?: string | null; property_address?: string | null; decision_note?: string | null; client_user_id?: string | null }
   line_items: Array<{ id: string; offering_id: string | null; name: string; description: string | null; quantity: number; unit_price_cents: number; is_optional: number; is_pass_through: number }>
   events: Array<{ kind: string; actor: string | null; detail: string | null; created_at: string }>
+  invoice: { id: string; invoice_number: string | null; status: string; amount_cents: number } | null
 }
 
 function QuoteDetail({ quoteId, offerings, onBack, onChanged }: { quoteId: string; offerings: OfferingOption[]; onBack: () => void; onChanged: () => void }) {
   const p = useAppPath()
+  const navigate = useNavigate()
   const [data, setData] = useState<QuoteDetailData | null>(null)
   const [busy, setBusy] = useState('')
   const [editing, setEditing] = useState(false)
   const [showMore, setShowMore] = useState(false)
+  const [decisionNote, setDecisionNote] = useState('')
 
   const load = useCallback(() => api.get<QuoteDetailData>(`/admin/quotes/${quoteId}`).then(setData).catch(() => toast.error('Could not load the quote.')), [quoteId])
   useEffect(() => { void load() }, [load])
 
   if (!data) return <div><button type="button" onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold"><ChevronLeft size={14} />Back to quotes</button><p className="text-sm text-slate-400">Loading…</p></div>
-  const { quote, line_items, events } = data
+  const { quote, line_items, events, invoice } = data
   const editable = ['draft', 'sent', 'viewed'].includes(quote.status)
   const publicUrl = publicQuoteUrl(quote.public_token)
 
   async function act(label: string, fn: () => Promise<unknown>) {
     setBusy(label)
     try { await fn(); await load(); onChanged() } catch (e) { toast.error(e instanceof ApiError ? e.message : `Could not ${label} the quote.`) } finally { setBusy('') }
+  }
+
+  async function convertQuote(opts: { mark_paid?: boolean; send?: boolean }) {
+    setBusy(opts.mark_paid ? 'paid' : opts.send ? 'send-invoice' : 'convert')
+    try {
+      const created = await api.post<{ id: string; invoice_number: string }>(`/admin/invoices/from-quote/${quote.id}`, {
+        mark_paid: opts.mark_paid === true,
+        due_days: 30,
+      })
+      if (opts.send) await api.post(`/admin/invoices/${created.id}/send`, {})
+      toast.success(opts.mark_paid
+        ? `Paid invoice ${created.invoice_number} created from this quote.`
+        : opts.send
+          ? `Invoice ${created.invoice_number} created and sent.`
+          : `Invoice ${created.invoice_number} created from this quote.`)
+      onChanged()
+      navigate(`${p('invoices')}?invoice=${encodeURIComponent(created.id)}`)
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Could not convert this quote to an invoice.')
+    } finally { setBusy('') }
   }
 
   async function duplicate() {
@@ -324,10 +371,30 @@ function QuoteDetail({ quoteId, offerings, onBack, onChanged }: { quoteId: strin
       {editable && <button className="text-xs font-bold text-slate-500 hover:text-white" onClick={() => setShowMore((v) => !v)}>{showMore ? 'Hide decisions' : 'Mark accepted, declined, or void'}</button>}
     </div>
     {showMore && editable && (
-      <div className="mb-5 flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[.02] p-3">
-        <button className={btnOutline} disabled={!!busy} onClick={() => act('accept', () => api.patch(`/admin/quotes/${quote.id}/status`, { status: 'accepted' }))}>Mark accepted</button>
-        <button className={btnOutline} disabled={!!busy} onClick={() => act('decline', () => api.patch(`/admin/quotes/${quote.id}/status`, { status: 'declined' }))}>Mark declined</button>
-        <button className="rounded-md border border-red-400/20 px-3 py-1.5 text-sm font-bold text-red-200 transition hover:border-red-400/50" disabled={!!busy} onClick={() => { if (confirm('Void this quote? The public link stops working.')) void act('void', () => api.patch(`/admin/quotes/${quote.id}/status`, { status: 'void' })) }}>Void</button>
+      <div className="mb-5 space-y-3 rounded-xl border border-white/10 bg-white/[.02] p-3">
+        <textarea className={`${inputCls} min-h-16`} placeholder="Optional notes from the client or this call" value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} />
+        <div className="flex flex-wrap gap-2">
+          <button className={btnOutline} disabled={!!busy} onClick={() => act('accept', () => api.patch(`/admin/quotes/${quote.id}/status`, { status: 'accepted', note: decisionNote.trim() || undefined }))}>Mark accepted</button>
+          <button className={btnOutline} disabled={!!busy} onClick={() => act('decline', () => api.patch(`/admin/quotes/${quote.id}/status`, { status: 'declined', note: decisionNote.trim() || undefined }))}>Mark declined</button>
+          <button className="rounded-md border border-red-400/20 px-3 py-1.5 text-sm font-bold text-red-200 transition hover:border-red-400/50" disabled={!!busy} onClick={() => { if (confirm('Void this quote? The public link stops working.')) void act('void', () => api.patch(`/admin/quotes/${quote.id}/status`, { status: 'void' })) }}>Void</button>
+        </div>
+      </div>
+    )}
+    {quote.status === 'accepted' && !invoice && (
+      <div className="mb-5 rounded-xl border border-gold/25 bg-gold/[.06] p-4">
+        <p className="text-sm font-semibold text-white">This quote is accepted. Convert it to an invoice to bill the work.</p>
+        <p className="mt-1 text-xs leading-5 text-slate-400">Billable lines copy over. Optional add-ons stay off the invoice. You can send it, or mark it paid if the client already paid.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className={btnPrimary} disabled={!!busy} onClick={() => void convertQuote({})}>{busy === 'convert' ? 'Converting…' : 'Convert to invoice'}</button>
+          <button className={btnOutline} disabled={!!busy} onClick={() => void convertQuote({ send: true })}>{busy === 'send-invoice' ? 'Sending…' : 'Convert and send'}</button>
+          <button className={btnOutline} disabled={!!busy} onClick={() => void convertQuote({ mark_paid: true })}>{busy === 'paid' ? 'Saving…' : 'Convert and mark paid'}</button>
+        </div>
+      </div>
+    )}
+    {invoice && (
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/[.05] px-4 py-3">
+        <p className="text-sm text-slate-200">Linked invoice <strong className="text-white">{invoice.invoice_number || invoice.id.slice(0, 8)}</strong> · {invoice.status === 'paid' ? 'Paid' : invoice.status === 'void' ? 'Void' : 'Open'}</p>
+        <Link className={btnOutline} to={`${p('invoices')}?invoice=${encodeURIComponent(invoice.id)}`}>Open invoice</Link>
       </div>
     )}
 
@@ -351,12 +418,13 @@ function QuoteDetail({ quoteId, offerings, onBack, onChanged }: { quoteId: strin
           {quote.recipient_company && <p><strong className="text-slate-200">Company:</strong> {quote.recipient_company}</p>}
           {quote.property_address && <p><strong className="text-slate-200">Property:</strong> {quote.property_address}</p>}
           <p><strong className="text-slate-200">Valid through:</strong> {quote.valid_until ? new Date(`${quote.valid_until.slice(0, 10)}T12:00:00`).toLocaleDateString() : 'Not set'}</p>
+          {quote.decision_note && <p className="mt-2 border-t border-white/[.07] pt-2 text-xs"><strong className="text-slate-200">Decision notes:</strong> {quote.decision_note}</p>}
           {quote.intro_message && <p className="mt-2 border-t border-white/[.07] pt-2 text-xs">{quote.intro_message}</p>}
         </div>
         <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
           <p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Activity</p>
           <ul className="mt-2 space-y-1.5 text-xs text-slate-400">
-            {events.map((event, index) => <li key={index}><span className="font-semibold text-slate-300">{quoteEventLabel(event.kind)}</span> · {new Date(event.created_at.includes('T') ? event.created_at : `${event.created_at.replace(' ', 'T')}Z`).toLocaleString()}</li>)}
+            {events.map((event, index) => <li key={index}><span className="font-semibold text-slate-300">{quoteEventLabel(event.kind)}</span>{event.detail ? ` · ${event.detail}` : ''} · {new Date(event.created_at.includes('T') ? event.created_at : `${event.created_at.replace(' ', 'T')}Z`).toLocaleString()}</li>)}
           </ul>
         </div>
       </div>

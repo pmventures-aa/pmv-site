@@ -171,8 +171,11 @@ quoteAdminRoutes.get('/quotes', requireStaff, async (c) => {
   }
   const rows = await c.env.DB.prepare(
     `SELECT q.id, q.quote_number, q.public_token, q.status, q.title, q.recipient_name, q.recipient_email, q.recipient_company,
-            q.service_key, q.total_cents, q.valid_until, q.sent_at, q.viewed_at, q.decided_at, q.created_at,
-            (SELECT COUNT(*) FROM service_quote_line_items li WHERE li.quote_id = q.id) AS line_item_count
+            q.service_key, q.total_cents, q.valid_until, q.sent_at, q.viewed_at, q.decided_at, q.decision_note, q.client_user_id, q.created_at,
+            (SELECT COUNT(*) FROM service_quote_line_items li WHERE li.quote_id = q.id) AS line_item_count,
+            (SELECT i.id FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void' ORDER BY i.created_at DESC LIMIT 1) AS invoice_id,
+            (SELECT i.invoice_number FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void' ORDER BY i.created_at DESC LIMIT 1) AS invoice_number,
+            (SELECT i.status FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void' ORDER BY i.created_at DESC LIMIT 1) AS invoice_status
      FROM service_quotes q
      WHERE ${clauses.join(' AND ')}
      ORDER BY CASE q.status WHEN 'draft' THEN 0 WHEN 'sent' THEN 1 WHEN 'viewed' THEN 1 ELSE 2 END, q.created_at DESC
@@ -184,11 +187,14 @@ quoteAdminRoutes.get('/quotes', requireStaff, async (c) => {
 quoteAdminRoutes.get('/quotes/:id', requireStaff, async (c) => {
   const quote = await c.env.DB.prepare('SELECT * FROM service_quotes WHERE id = ?').bind(c.req.param('id') || '').first<any>()
   if (!quote) return c.json({ error: 'quote not found' }, 404)
-  const [lines, events] = await Promise.all([
+  const [lines, events, invoice] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM service_quote_line_items WHERE quote_id = ? ORDER BY sort_order, created_at').bind(quote.id).all(),
     c.env.DB.prepare('SELECT kind, actor, detail, created_at FROM service_quote_events WHERE quote_id = ? ORDER BY created_at DESC LIMIT 50').bind(quote.id).all(),
+    c.env.DB.prepare(
+      `SELECT id, invoice_number, status, amount_cents FROM invoices WHERE quote_id = ? AND status != 'void' ORDER BY created_at DESC LIMIT 1`,
+    ).bind(quote.id).first(),
   ])
-  return c.json({ quote, line_items: lines.results || [], events: events.results || [] })
+  return c.json({ quote, line_items: lines.results || [], events: events.results || [], invoice: invoice || null })
 })
 
 quoteAdminRoutes.post('/quotes', requireStaff, async (c) => {
@@ -390,13 +396,20 @@ quoteAdminRoutes.patch('/quotes/:id/status', requireStaff, async (c) => {
   const actor = c.get('user')
   const quote = await c.env.DB.prepare('SELECT * FROM service_quotes WHERE id = ?').bind(c.req.param('id') || '').first<any>()
   if (!quote) return c.json({ error: 'quote not found' }, 404)
-  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
-  // Staff can void a live quote or record an offline decision.
+  const body = await c.req.json<{ status?: string; note?: string }>().catch(() => ({} as { status?: string; note?: string }))
+  // Staff can void a live quote or record an offline decision, with an optional note.
   const next = body.status && ['void', 'accepted', 'declined'].includes(body.status) ? body.status : null
   if (!next) return c.json({ error: 'status must be void, accepted, or declined' }, 400)
   if (['accepted', 'declined', 'void'].includes(quote.status)) return c.json({ error: `quote is already ${quote.status}` }, 409)
-  await c.env.DB.prepare("UPDATE service_quotes SET status = ?, decided_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").bind(next, quote.id).run()
-  await insertEvent(c, quote.id, next === 'void' ? 'voided' : next, `staff:${actor.id}`)
+  const note = next === 'void' ? null : (text(body.note, 1000) || null)
+  if (next === 'accepted' || next === 'declined') {
+    await c.env.DB.prepare("UPDATE service_quotes SET status = ?, decided_at = datetime('now'), decision_note = ?, updated_at = datetime('now') WHERE id = ?")
+      .bind(next, note, quote.id).run()
+  } else {
+    await c.env.DB.prepare("UPDATE service_quotes SET status = ?, decided_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+      .bind(next, quote.id).run()
+  }
+  await insertEvent(c, quote.id, next === 'void' ? 'voided' : next, `staff:${actor.id}`, note || undefined)
   return c.json({ ok: true })
 })
 
@@ -420,6 +433,7 @@ function publicQuoteShape(quote: any, lines: any[]) {
     total_cents: quote.total_cents,
     sent_at: quote.sent_at,
     decided_at: quote.decided_at,
+    decision_note: quote.decision_note || null,
     created_at: quote.created_at,
     line_items: lines.map((line) => ({
       name: line.name,
