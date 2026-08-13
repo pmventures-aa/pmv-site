@@ -29,6 +29,7 @@ interface Bundle {
   tasks: any[]
   documents: any[]
   invoices: any[]
+  quotes?: { id: string; quote_number: string; title: string; status: string; total_cents: number; decided_at: string | null; decision_note: string | null; invoice_id: string | null }[]
   funding: any[]
   properties: any[]
   tax_filings: any[]
@@ -66,8 +67,8 @@ function displayDate(value: string | null | undefined) {
 }
 
 function statusTone(status: string): 'gold' | 'green' | 'blue' | 'slate' | 'red' {
-  if (['active', 'approved', 'paid', 'completed', 'filed', 'closed', 'done'].includes(status)) return 'green'
-  if (['submitted', 'in_progress', 'under_review', 'scheduled'].includes(status)) return 'blue'
+  if (['active', 'approved', 'paid', 'completed', 'filed', 'closed', 'done', 'accepted'].includes(status)) return 'green'
+  if (['submitted', 'in_progress', 'under_review', 'scheduled', 'sent', 'viewed'].includes(status)) return 'blue'
   if (['requested', 'pending', 'open', 'draft'].includes(status)) return 'gold'
   if (['declined', 'blocked', 'void', 'cancelled'].includes(status)) return 'red'
   return 'slate'
@@ -128,6 +129,7 @@ export default function ClientDetailModern() {
   const [note, setNote] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [convertingId, setConvertingId] = useState<string | null>(null)
   const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set())
 
   const load = useCallback(async (section: Tab = tab, force = false) => {
@@ -138,7 +140,7 @@ export default function ClientDetailModern() {
       account: result.account ?? current?.account,
       profile: result.profile === undefined ? current?.profile ?? null : result.profile,
       assigned_staff: result.assigned_staff ?? current?.assigned_staff ?? [], recent_activity: result.recent_activity ?? current?.recent_activity ?? [],
-      services: result.services ?? current?.services ?? [], matters: result.matters ?? current?.matters ?? [], tasks: result.tasks ?? current?.tasks ?? [], documents: result.documents ?? current?.documents ?? [], invoices: result.invoices ?? current?.invoices ?? [], funding: result.funding ?? current?.funding ?? [], properties: result.properties ?? current?.properties ?? [], tax_filings: result.tax_filings ?? current?.tax_filings ?? [], tickets: result.tickets ?? current?.tickets ?? [], calls: result.calls ?? current?.calls ?? [], appointments: result.appointments ?? current?.appointments ?? [], application_answers: result.application_answers ?? current?.application_answers ?? [], payment_methods: result.payment_methods ?? current?.payment_methods ?? [], notes: result.notes ?? current?.notes ?? [], onboarding_progress: result.onboarding_progress ?? current?.onboarding_progress ?? { answered: 0, total: 0 }, service_catalog: result.service_catalog ?? current?.service_catalog ?? [], service_applications: result.service_applications ?? current?.service_applications ?? [],
+      services: result.services ?? current?.services ?? [], matters: result.matters ?? current?.matters ?? [], tasks: result.tasks ?? current?.tasks ?? [], documents: result.documents ?? current?.documents ?? [], invoices: result.invoices ?? current?.invoices ?? [], quotes: result.quotes ?? current?.quotes ?? [], funding: result.funding ?? current?.funding ?? [], properties: result.properties ?? current?.properties ?? [], tax_filings: result.tax_filings ?? current?.tax_filings ?? [], tickets: result.tickets ?? current?.tickets ?? [], calls: result.calls ?? current?.calls ?? [], appointments: result.appointments ?? current?.appointments ?? [], application_answers: result.application_answers ?? current?.application_answers ?? [], payment_methods: result.payment_methods ?? current?.payment_methods ?? [], notes: result.notes ?? current?.notes ?? [], onboarding_progress: result.onboarding_progress ?? current?.onboarding_progress ?? { answered: 0, total: 0 }, service_catalog: result.service_catalog ?? current?.service_catalog ?? [], service_applications: result.service_applications ?? current?.service_applications ?? [],
     } as Bundle))
     setLoadedTabs((current) => new Set(current).add(section))
   }, [id, loadedTabs, tab])
@@ -183,6 +185,20 @@ export default function ClientDetailModern() {
     return items.slice(0, 8)
   }, [data])
 
+  async function convertQuote(quoteId: string) {
+    if (convertingId) return
+    setConvertingId(quoteId)
+    try {
+      const created = await api.post<{ id: string; invoice_number: string }>(`/admin/invoices/from-quote/${quoteId}`, { due_days: 30 })
+      toast.success(`Invoice ${created.invoice_number} created from this quote.`)
+      navigate(`${p('invoices')}?invoice=${encodeURIComponent(created.id)}`)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not convert this quote to an invoice.')
+    } finally {
+      setConvertingId(null)
+    }
+  }
+
   async function addNote(e: React.FormEvent) {
     e.preventDefault()
     if (!id || !note.trim()) return
@@ -203,6 +219,8 @@ export default function ClientDetailModern() {
   const activeServices = data.services.filter((s) => ['active', 'submitted', 'requested'].includes(s.status))
   const openWork = data.tasks.filter((x) => x.status !== 'done').length + data.matters.filter((x) => x.status !== 'closed').length + data.tickets.filter((x) => x.status !== 'closed').length
   const openInvoices = data.invoices.filter((x) => x.status === 'open')
+  const clientQuotes = data.quotes || []
+  const liveQuotes = clientQuotes.filter((x) => ['draft', 'sent', 'viewed', 'accepted'].includes(x.status))
   const openBalance = openInvoices.reduce((sum, row) => sum + (Number(row.amount_cents) || 0), 0)
   const nextAppointment = [...data.appointments].filter((a) => new Date(a.starts_at).getTime() >= Date.now()).sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())[0]
 
@@ -230,6 +248,7 @@ export default function ClientDetailModern() {
         <span><strong className="font-medium text-slate-300">{activeServices.length}</strong> active/current services</span>
         <span><strong className="font-medium text-slate-300">{openWork}</strong> open work items</span>
         <span><strong className="font-medium text-slate-300">{openInvoices.length}</strong> open invoices</span>
+        {liveQuotes.length > 0 && <span><strong className="font-medium text-slate-300">{liveQuotes.length}</strong> live quote{liveQuotes.length === 1 ? '' : 's'}</span>}
         <span>Client since {new Date(account.created_at).toLocaleDateString()}</span>
       </div>
     </header>
@@ -306,7 +325,28 @@ export default function ClientDetailModern() {
 
     {tab === 'documents' && <div className="mt-7"><SectionTitle eyebrow="Files" title="Documents" action={<Link to={p(`clients/${account.id}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage documents →</Link>} /><SimpleTable rows={data.documents} empty="No documents." columns={[{ key: 'file_name', label: 'Document', render: (r) => r.file_name || r.category || 'Document' }, { key: 'category', label: 'Category' }, { key: 'review_status', label: 'Review status', render: (r) => r.review_status ? <Tag tone={statusTone(r.review_status)}>{r.review_status.replace(/_/g, ' ')}</Tag> : 'Not provided' }, { key: 'created_at', label: 'Added', render: (r) => displayDate(r.created_at) }]} /></div>}
 
-    {tab === 'billing' && <div className="mt-7 space-y-9"><section><SectionTitle eyebrow="Financial" title="Invoices" action={<Link to={`${p('invoices')}?client=${encodeURIComponent(account.id)}`} className="text-sm font-medium text-gold hover:underline">New invoice →</Link>} /><SimpleTable rows={data.invoices} empty="No invoices." columns={[{ key: 'description', label: 'Invoice', render: (r) => <Link to={`${p('invoices')}?invoice=${encodeURIComponent(r.id)}`} className="font-medium text-white hover:text-gold">{r.description || r.title || r.invoice_number || `Invoice ${String(r.id).slice(0, 8)}`}</Link> }, { key: 'amount_cents', label: 'Amount', render: (r) => money(r.amount_cents) }, { key: 'due_date', label: 'Due', render: (r) => r.due_date ? new Date(r.due_date).toLocaleDateString() : 'Not provided' }, { key: 'status', label: 'Status', render: (r) => <Tag tone={statusTone(r.status)}>{r.status}</Tag> }]} /></section><section><SectionTitle title="ACH methods on file" /><div className="border-y border-white/10">{data.payment_methods.length ? data.payment_methods.map((method) => <div key={method.id} className="flex items-center justify-between gap-4 border-t border-white/5 py-4 first:border-t-0"><div><p className="text-sm font-medium text-white">{method.account_holder_name}</p><p className="mt-1 text-xs text-slate-500">{method.bank_name || 'Bank'} · {method.account_type || 'account'} ending {method.account_last4}</p></div><span className="text-xs text-slate-600">Sensitive details available in Manage records</span></div>) : <p className="py-5 text-sm text-slate-500">No ACH payment methods on file.</p>}</div></section></div>}
+    {tab === 'billing' && <div className="mt-7 space-y-9">
+      <section>
+        <SectionTitle eyebrow="Financial" title="Quotes" action={<Link to={`${p('quotes')}?new=1&client=${encodeURIComponent(account.id)}&email=${encodeURIComponent(account.email)}&name=${encodeURIComponent(account.full_name || account.email)}`} className="text-sm font-medium text-gold hover:underline">New quote →</Link>} />
+        <SimpleTable rows={clientQuotes} empty="No quotes for this client." columns={[
+          { key: 'quote_number', label: 'Quote', render: (r) => <Link to={`${p('quotes')}?quote=${encodeURIComponent(r.id)}`} className="font-medium text-white hover:text-gold">{r.quote_number}: {r.title}</Link> },
+          { key: 'total_cents', label: 'Amount', render: (r) => money(r.total_cents) },
+          { key: 'status', label: 'Status', render: (r) => <Tag tone={statusTone(r.status)}>{r.status}</Tag> },
+          { key: 'next', label: 'Next', render: (r) => (
+            <div className="flex flex-wrap gap-3">
+              {r.status === 'accepted' && !r.invoice_id && <button type="button" disabled={convertingId === r.id} onClick={() => void convertQuote(r.id)} className="text-xs font-semibold text-emerald-300 hover:underline">{convertingId === r.id ? 'Converting…' : 'Convert to invoice'}</button>}
+              {r.invoice_id && <Link to={`${p('invoices')}?invoice=${encodeURIComponent(r.invoice_id)}`} className="text-xs font-semibold text-gold hover:underline">Open invoice</Link>}
+              {r.decision_note && <span className="text-xs text-slate-500">{r.decision_note}</span>}
+            </div>
+          ) },
+        ]} />
+      </section>
+      <section>
+        <SectionTitle title="Invoices" action={<Link to={`${p('invoices')}?client=${encodeURIComponent(account.id)}`} className="text-sm font-medium text-gold hover:underline">New invoice →</Link>} />
+        <SimpleTable rows={data.invoices} empty="No invoices." columns={[{ key: 'description', label: 'Invoice', render: (r) => <Link to={`${p('invoices')}?invoice=${encodeURIComponent(r.id)}`} className="font-medium text-white hover:text-gold">{r.description || r.title || r.invoice_number || `Invoice ${String(r.id).slice(0, 8)}`}</Link> }, { key: 'amount_cents', label: 'Amount', render: (r) => money(r.amount_cents) }, { key: 'due_date', label: 'Due', render: (r) => r.due_date ? new Date(r.due_date).toLocaleDateString() : 'Not provided' }, { key: 'status', label: 'Status', render: (r) => <Tag tone={statusTone(r.status)}>{r.status}</Tag> }]} />
+      </section>
+      <section><SectionTitle title="ACH methods on file" /><div className="border-y border-white/10">{data.payment_methods.length ? data.payment_methods.map((method) => <div key={method.id} className="flex items-center justify-between gap-4 border-t border-white/5 py-4 first:border-t-0"><div><p className="text-sm font-medium text-white">{method.account_holder_name}</p><p className="mt-1 text-xs text-slate-500">{method.bank_name || 'Bank'} · {method.account_type || 'account'} ending {method.account_last4}</p></div><span className="text-xs text-slate-600">Sensitive details available in Manage records</span></div>) : <p className="py-5 text-sm text-slate-500">No ACH payment methods on file.</p>}</div></section>
+    </div>}
 
     {tab === 'relationships' && <div className="mt-7"><ClientRelationships clientId={account.id}/></div>}
 

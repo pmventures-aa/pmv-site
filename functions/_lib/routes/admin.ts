@@ -84,7 +84,7 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
   const clientCount = await c.env.DB.prepare(`SELECT COUNT(*) n FROM client_profiles WHERE ${where}`).bind(...params).first<{ n: number }>()
 
   const { where: w2, params: p2 } = await scopeFilter(c.env, user)
-  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices, appts, activity, overdueTasks, overdueInvoices, staleTickets, staleInquiries] = await Promise.all([
+  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices, appts, activity, overdueTasks, overdueInvoices, staleTickets, staleInquiries, staleQuotes, acceptedQuotes] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) n FROM support_tickets WHERE ${w2} AND status = 'open'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${w2} AND status != 'closed'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${w2} AND status != 'done'`).bind(...p2).first<{ n: number }>(),
@@ -133,6 +133,19 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
        WHERE status = 'new' AND archived_at IS NULL AND created_at < datetime('now', '-2 days')
        ORDER BY created_at ASC LIMIT 5`,
     ).all(),
+    c.env.DB.prepare(
+      `SELECT id, quote_number, title, recipient_name, recipient_email, total_cents, sent_at, status
+       FROM service_quotes
+       WHERE status IN ('sent','viewed') AND COALESCE(sent_at, created_at) < datetime('now', '-3 days')
+       ORDER BY COALESCE(sent_at, created_at) ASC LIMIT 5`,
+    ).all(),
+    c.env.DB.prepare(
+      `SELECT q.id, q.quote_number, q.title, q.recipient_name, q.recipient_email, q.total_cents, q.decided_at
+       FROM service_quotes q
+       WHERE q.status = 'accepted'
+         AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void')
+       ORDER BY q.decided_at DESC LIMIT 5`,
+    ).all(),
   ])
 
   return c.json({
@@ -151,6 +164,8 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
       overdue_invoices: overdueInvoices.results ?? [],
       stale_tickets: staleTickets.results ?? [],
       stale_inquiries: staleInquiries.results ?? [],
+      stale_quotes: staleQuotes.results ?? [],
+      accepted_quotes: acceptedQuotes.results ?? [],
     },
   })
 })
@@ -225,8 +240,18 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
     }
     if (section === 'documents') { const rows = await c.env.DB.prepare('SELECT * FROM client_documents WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 200').bind(id).all(); return c.json({ ...base, documents: rows.results ?? [] }) }
     if (section === 'billing') {
-      const [invoices, methods] = await Promise.all([c.env.DB.prepare('SELECT * FROM invoices WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 200').bind(id).all(), c.env.DB.prepare('SELECT id, service_key, method_type, account_holder_name, bank_name, account_type, account_last4, created_at FROM client_payment_methods WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all()])
-      return c.json({ ...base, invoices: invoices.results ?? [], payment_methods: methods.results ?? [] })
+      const [invoices, methods, quotes] = await Promise.all([
+        c.env.DB.prepare('SELECT * FROM invoices WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 200').bind(id).all(),
+        c.env.DB.prepare('SELECT id, service_key, method_type, account_holder_name, bank_name, account_type, account_last4, created_at FROM client_payment_methods WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all(),
+        c.env.DB.prepare(
+          `SELECT q.id, q.quote_number, q.title, q.status, q.total_cents, q.decided_at, q.decision_note,
+                  (SELECT i.id FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void' ORDER BY i.created_at DESC LIMIT 1) AS invoice_id
+           FROM service_quotes q
+           WHERE q.client_user_id = ? OR lower(q.recipient_email) = lower((SELECT email FROM users WHERE id = ?))
+           ORDER BY q.created_at DESC LIMIT 50`,
+        ).bind(id, id).all(),
+      ])
+      return c.json({ ...base, invoices: invoices.results ?? [], payment_methods: methods.results ?? [], quotes: quotes.results ?? [] })
     }
     const onboarding = await c.env.DB.prepare(`SELECT (SELECT COUNT(*) FROM onboarding_questions q JOIN client_services cs ON cs.service_key=q.service_key WHERE cs.client_user_id=? AND q.required=1) total, (SELECT COUNT(*) FROM client_onboarding_responses r WHERE r.client_user_id=? AND r.value IS NOT NULL AND r.value!='') answered`).bind(id, id).first<any>()
     return c.json({ ...base, onboarding_progress: { answered: onboarding?.answered ?? 0, total: onboarding?.total ?? 0 } })

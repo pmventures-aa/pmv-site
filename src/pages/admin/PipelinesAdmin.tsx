@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, inputCls, btnOutline } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
@@ -11,7 +11,7 @@ import { ageDays, ageLabel, leadBoardStage } from '../../../shared/leadPipeline'
 import { LeadPipelineBoard, type LeadRecord } from './LeadPipelineBoard'
 
 interface PipelineItem { id:string; client_user_id:string; client_name:string|null; client_email:string; status:string; created_at:string; submitted_at?:string|null; title?:string; type?:string; service_key?:string; service_name?:string; assigned_rep_name?:string|null; assigned_rep_email?:string|null; is_unassigned?:number; may_require_attorney_coordination?:number; amount_requested_cents?:number|null; use_of_funds?:string|null }
-interface QuoteItem { id:string; quote_number:string; status:string; title:string; recipient_name:string; recipient_email:string; recipient_company:string|null; total_cents:number; valid_until:string|null; sent_at:string|null; created_at:string }
+interface QuoteItem { id:string; quote_number:string; status:string; title:string; recipient_name:string; recipient_email:string; recipient_company:string|null; total_cents:number; valid_until:string|null; sent_at:string|null; created_at:string; invoice_id?:string|null; invoice_number?:string|null; decision_note?:string|null }
 
 const QUOTE_COLUMNS:KanbanColumn[]=[{key:'draft',label:'Draft'},{key:'sent',label:'Sent'},{key:'viewed',label:'Viewed'},{key:'accepted',label:'Accepted'},{key:'declined',label:'Declined'}]
 
@@ -37,8 +37,47 @@ const JOURNEY_STAGES:{key:keyof JourneyCounts;label:string;module:ModuleKey;capt
 
 function money(cents?:number|null){return typeof cents==='number'?`$${(cents/100).toLocaleString()}`:'Not provided'}
 
+function QuotePipelineCard({
+  quote,
+  p,
+  onConvert,
+  converting,
+  onMove,
+}: {
+  quote: QuoteItem
+  p: (path: string) => string
+  onConvert: (quote: QuoteItem) => void
+  converting: boolean
+  onMove: (quote: QuoteItem, status: string) => void
+}) {
+  return (
+    <div className="pmv-kanban-card">
+      <div className="flex items-start justify-between gap-2">
+        <Link to={`${p('quotes')}?quote=${encodeURIComponent(quote.id)}`} className="font-bold text-white hover:text-gold">{quote.recipient_company||quote.recipient_name}</Link>
+        <Tag tone={quote.status==='accepted'?'green':quote.status==='declined'?'red':quote.status==='viewed'?'gold':quote.status==='sent'?'blue':'slate'}>{quote.status}</Tag>
+      </div>
+      <p className="mt-1 text-xs text-slate-400">{quote.quote_number} · {quote.title}</p>
+      <p className="mt-2 font-display text-lg font-bold text-gold">{money(quote.total_cents)}</p>
+      {quote.decision_note && <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">Note: {quote.decision_note}</p>}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <Tag tone={ageDays(quote.sent_at||quote.created_at)>=7&&!['accepted','declined'].includes(quote.status)?'red':'slate'}>{ageLabel(quote.sent_at||quote.created_at)}{quote.sent_at?' since sent':' old'}</Tag>
+        {quote.valid_until&&<Tag tone="slate">Valid to {new Date(quote.valid_until).toLocaleDateString()}</Tag>}
+        {quote.invoice_number&&<Tag tone="green">Invoice {quote.invoice_number}</Tag>}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Link to={`${p('messages')}?tab=email&compose=1&to=${encodeURIComponent(quote.recipient_email)}&name=${encodeURIComponent(quote.recipient_name)}`} className="text-xs font-bold text-gold hover:underline">Email</Link>
+        <Link to={`${p('quotes')}?quote=${encodeURIComponent(quote.id)}`} className="text-xs font-bold text-gold hover:underline">Open quote</Link>
+        {quote.status==='accepted'&&!quote.invoice_id&&<button type="button" disabled={converting} onClick={()=>onConvert(quote)} className="text-xs font-bold text-emerald-300 hover:underline">{converting?'Converting…':'Convert to invoice'}</button>}
+        {quote.invoice_id&&<Link to={`${p('invoices')}?invoice=${encodeURIComponent(quote.invoice_id)}`} className="text-xs font-bold text-gold hover:underline">Open invoice</Link>}
+      </div>
+      <StageSelect value={quote.status} columns={QUOTE_COLUMNS} onChange={status=>onMove(quote,status)}/>
+    </div>
+  )
+}
+
 export default function PipelinesAdmin(){
   const p=useAppPath()
+  const navigate=useNavigate()
   const[tab,setTab]=useState<ModuleKey>('inquiries')
   const[leads,setLeads]=useState<LeadRecord[]>([])
   const[items,setItems]=useState<PipelineItem[]>([])
@@ -48,6 +87,7 @@ export default function PipelinesAdmin(){
   const[loading,setLoading]=useState(true)
   const[query,setQuery]=useState('')
   const[compact,setCompact]=useState(()=>typeof window!=='undefined'&&window.localStorage.getItem('pmv_pipeline_compact')==='1')
+  const[convertingId,setConvertingId]=useState<string|null>(null)
   const movingRef=useRef(new Set<string>())
 
   const loadCounts=useCallback(async()=>{
@@ -103,6 +143,18 @@ export default function PipelinesAdmin(){
     try{await api.patch(`/admin/quotes/${item.id}/status`,{status});toast.success(`Quote ${item.quote_number} marked ${status}.`);void loadCounts()}
     catch(err){setQuotes(cur=>cur.map(q=>q.id===item.id?{...q,status:previous}:q));toast.error(err instanceof ApiError?err.message:'Could not update the quote.')}
     finally{movingRef.current.delete(item.id)}
+  }
+
+  async function convertAcceptedQuote(quote:QuoteItem){
+    if(convertingId||movingRef.current.has(quote.id))return
+    setConvertingId(quote.id)
+    movingRef.current.add(quote.id)
+    try{
+      const created=await api.post<{id:string;invoice_number:string}>(`/admin/invoices/from-quote/${quote.id}`,{due_days:30})
+      toast.success(`Invoice ${created.invoice_number} created from ${quote.quote_number}.`)
+      navigate(`${p('invoices')}?invoice=${encodeURIComponent(created.id)}`)
+    }catch(err){toast.error(err instanceof ApiError?err.message:'Could not convert this quote to an invoice.')}
+    finally{movingRef.current.delete(quote.id);setConvertingId(null)}
   }
 
   async function moveItem(item:PipelineItem,status:string){
@@ -171,7 +223,7 @@ export default function PipelinesAdmin(){
 
     {tab==='inquiries'?<LeadPipelineBoard leads={leads} loading={loading} onLeadsChange={setLeads} onRefresh={refreshCurrent}/>
     :loading?<Panel><p className="text-sm text-slate-400">Loading pipeline data...</p></Panel>
-    :tab==='quotes'?(filteredQuotes.length===0?<Panel><p className="text-sm font-semibold text-white">No live quotes.</p><p className="mt-1 text-xs text-slate-500">Build a branded quote in the Quotes workspace and it will appear here as it moves toward a decision.</p><Link to={p('quotes')} className="mt-3 inline-block text-xs font-bold text-gold hover:underline">Open Quotes Workspace</Link></Panel>:<KanbanBoard columns={QUOTE_COLUMNS} items={filteredQuotes} getStatus={q=>q.status} onMove={moveQuote} renderCard={q=><div className="pmv-kanban-card"><div className="flex items-start justify-between gap-2"><span className="font-bold text-white">{q.recipient_company||q.recipient_name}</span><Tag tone={q.status==='accepted'?'green':q.status==='declined'?'red':q.status==='viewed'?'gold':q.status==='sent'?'blue':'slate'}>{q.status}</Tag></div><p className="mt-1 text-xs text-slate-400">{q.quote_number} · {q.title}</p><p className="mt-2 font-display text-lg font-bold text-gold">{money(q.total_cents)}</p><div className="mt-2 flex flex-wrap gap-1.5"><Tag tone={ageDays(q.sent_at||q.created_at)>=7&&!['accepted','declined'].includes(q.status)?'red':'slate'}>{ageLabel(q.sent_at||q.created_at)}{q.sent_at?' since sent':' old'}</Tag>{q.valid_until&&<Tag tone="slate">Valid to {new Date(q.valid_until).toLocaleDateString()}</Tag>}</div><div className="mt-3 flex items-center justify-between gap-2"><Link to={`${p('messages')}?tab=email&compose=1&to=${encodeURIComponent(q.recipient_email)}&name=${encodeURIComponent(q.recipient_name)}`} className="text-xs font-bold text-gold hover:underline">Email</Link><Link to={p('quotes')} className="text-xs font-bold text-gold hover:underline">Open in Quotes</Link></div><StageSelect value={q.status} columns={QUOTE_COLUMNS} onChange={status=>moveQuote(q,status)}/></div>}/>)
+    :tab==='quotes'?(filteredQuotes.length===0?<Panel><p className="text-sm font-semibold text-white">No live quotes.</p><p className="mt-1 text-xs text-slate-500">Build a branded quote in the Quotes workspace and it will appear here as it moves toward a decision.</p><Link to={p('quotes')} className="mt-3 inline-block text-xs font-bold text-gold hover:underline">Open Quotes Workspace</Link></Panel>:<KanbanBoard columns={QUOTE_COLUMNS} items={filteredQuotes} getStatus={q=>q.status} onMove={moveQuote} renderCard={q=><QuotePipelineCard quote={q} p={p} converting={convertingId===q.id} onConvert={(item)=>void convertAcceptedQuote(item)} onMove={moveQuote} />}/>)
     :visibleItems.length===0?<Panel><p className="text-sm font-semibold text-white">No work matches this view.</p><p className="mt-1 text-xs text-slate-500">Try a different search or pipeline section.</p></Panel>:<KanbanBoard columns={columns} items={visibleItems} getStatus={i=>i.status} onMove={moveItem} renderCard={i=><div className="pmv-kanban-card"><div className="flex items-start justify-between gap-2"><Link to={p(`clients/${i.client_user_id}`)} className="font-bold text-white hover:text-gold">{i.client_name||i.client_email}</Link><Tag tone={ageDays(i.submitted_at||i.created_at)>=7?'red':'slate'}>{ageLabel(i.submitted_at||i.created_at)}</Tag></div><p className="mt-1 text-xs text-slate-400">{tab==='service_applications'&&(i.service_name??i.service_key)}{tab==='matters'&&(i.title??i.type??'Project')}{tab==='tasks'&&(i.title??'Task')}{tab==='funding'&&`${money(i.amount_requested_cents)} requested`}</p>{tab==='service_applications'&&<div className="mt-2 flex flex-wrap gap-1.5">{i.is_unassigned?<Tag tone="red">Unassigned</Tag>:<Tag tone="slate">{i.assigned_rep_name||i.assigned_rep_email||'Assigned Team'}</Tag>}{!!i.may_require_attorney_coordination&&<Tag tone="gold">Attorney Coordination Review</Tag>}</div>}{tab==='funding'&&i.use_of_funds&&<p className="mt-2 line-clamp-2 text-xs text-slate-500">{i.use_of_funds}</p>}<div className="mt-3"><Link to={clientEmailHref(p,{id:i.client_user_id,email:i.client_email,name:i.client_name})} className="text-xs font-bold text-gold hover:underline">Email</Link></div><StageSelect value={i.status} columns={columns} onChange={status=>moveItem(i,status)}/></div>}/>}
   </div>
 }

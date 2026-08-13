@@ -24,7 +24,8 @@ interface OverdueTask { id:string; title:string; due_date:string; client_user_id
 interface OverdueInvoice { id:string; amount_cents:number; due_date:string; client_user_id:string; client_name:string|null; client_email:string }
 interface StaleTicket { id:string; subject:string; created_at:string; client_user_id:string; client_name:string|null; client_email:string }
 interface StaleInquiry { id:string; name:string; email:string; created_at:string }
-interface NeedsAttention { overdue_tasks:OverdueTask[]; overdue_invoices:OverdueInvoice[]; stale_tickets:StaleTicket[]; stale_inquiries:StaleInquiry[] }
+interface QuoteAttention { id:string; quote_number:string; title:string; recipient_name:string; recipient_email:string; total_cents:number; sent_at?:string|null; decided_at?:string|null; status?:string }
+interface NeedsAttention { overdue_tasks:OverdueTask[]; overdue_invoices:OverdueInvoice[]; stale_tickets:StaleTicket[]; stale_inquiries:StaleInquiry[]; stale_quotes?:QuoteAttention[]; accepted_quotes?:QuoteAttention[] }
 interface DashboardResponse { stats:Stats; upcoming_appointments:Appointment[]; recent_activity:ActivityEvent[]; needs_attention:NeedsAttention }
 
 function money(cents:number):string { return `$${(cents/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}` }
@@ -37,7 +38,7 @@ export default function AdminDashboard(){
   const load=useCallback(async()=>{try{const next=await api.get<DashboardResponse>('/admin/dashboard');setData(next);setLoadError(null)}catch(error){setLoadError(error instanceof ApiError?error.message:'The HQ overview could not load.')}},[])
   useEffect(()=>{void load()},[load])
   useLiveRefresh(load)
-  const stats=data?.stats; const na=data?.needs_attention; const attentionCount=na?na.overdue_tasks.length+na.overdue_invoices.length+na.stale_tickets.length+na.stale_inquiries.length:0
+  const stats=data?.stats; const na=data?.needs_attention; const attentionCount=na?na.overdue_tasks.length+na.overdue_invoices.length+na.stale_tickets.length+na.stale_inquiries.length+(na.stale_quotes?.length||0)+(na.accepted_quotes?.length||0):0
   const quick='group inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/[.08] bg-white/[.018] px-3.5 py-2.5 text-xs font-semibold text-slate-300 transition-all duration-200 hover:-translate-y-px hover:border-gold/30 hover:bg-gold/[.03] hover:text-gold'
 
   return <div className="pb-24 lg:pb-0">
@@ -72,6 +73,8 @@ export default function AdminDashboard(){
     {data&&attentionCount>0&&<Panel className="mt-7 !border-gold/20 !p-0 overflow-hidden"><div className="flex items-center justify-between border-b border-white/[.07] px-5 py-4 sm:px-6"><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold/70">Priority queue</p><h2 className="mt-1 text-sm font-semibold text-white">Needs attention</h2></div><span className="rounded-full border border-gold/20 bg-gold/[.07] px-2.5 py-1 text-xs font-semibold text-gold">{attentionCount}</span></div><ul className="divide-y divide-white/[.055]">
       {na!.overdue_tasks.map((t)=><li key={`task-${t.id}`} className="px-5 py-4 text-sm transition hover:bg-white/[0.018] sm:px-6"><Link to={p(`clients/${t.client_user_id}`)} className="font-medium text-white hover:text-gold">Overdue task: {t.title}</Link><p className="mt-1.5 text-xs text-slate-500">{t.client_name||t.client_email} · due {new Date(t.due_date).toLocaleDateString()}</p></li>)}
       {na!.overdue_invoices.map((inv)=><li key={`inv-${inv.id}`} className="px-5 py-4 text-sm transition hover:bg-white/[0.018] sm:px-6"><Link to={`${p('invoices')}?invoice=${encodeURIComponent(inv.id)}`} className="font-medium text-white hover:text-gold">Overdue invoice: {money(inv.amount_cents)}</Link><p className="mt-1.5 text-xs text-slate-500">{inv.client_name||inv.client_email} · due {new Date(inv.due_date).toLocaleDateString()}</p></li>)}
+      {(na!.stale_quotes||[]).map((q)=><li key={`quote-${q.id}`} className="px-5 py-4 text-sm transition hover:bg-white/[0.018] sm:px-6"><Link to={`${p('quotes')}?quote=${encodeURIComponent(q.id)}`} className="font-medium text-white hover:text-gold">Quote waiting on a reply: {q.quote_number}</Link><p className="mt-1.5 text-xs text-slate-500">{q.recipient_name} · {money(q.total_cents)} · {q.status}</p></li>)}
+      {(na!.accepted_quotes||[]).map((q)=><li key={`won-${q.id}`} className="px-5 py-4 text-sm transition hover:bg-white/[0.018] sm:px-6"><Link to={`${p('quotes')}?quote=${encodeURIComponent(q.id)}`} className="font-medium text-white hover:text-gold">Accepted quote needs an invoice: {q.quote_number}</Link><p className="mt-1.5 text-xs text-slate-500">{q.recipient_name} · {money(q.total_cents)}</p></li>)}
       {na!.stale_tickets.map((tk)=><li key={`tk-${tk.id}`} className="px-5 py-4 text-sm transition hover:bg-white/[0.018] sm:px-6"><Link to={p(`clients/${tk.client_user_id}`)} className="font-medium text-white hover:text-gold">No response yet: {tk.subject}</Link><p className="mt-1.5 text-xs text-slate-500">{tk.client_name||tk.client_email} · opened {timeAgo(tk.created_at)}</p></li>)}
       {na!.stale_inquiries.map((i)=><li key={`inq-${i.id}`} className="px-5 py-4 text-sm transition hover:bg-white/[0.018] sm:px-6"><Link to={p(`leads/${i.id}`)} className="font-medium text-white hover:text-gold">Uncontacted lead: {i.name}</Link><p className="mt-1.5 text-xs text-slate-500">{i.email} · submitted {timeAgo(i.created_at)}</p></li>)}
     </ul></Panel>}

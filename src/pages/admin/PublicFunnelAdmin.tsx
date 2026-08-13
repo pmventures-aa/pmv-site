@@ -63,6 +63,17 @@ export default function PublicFunnelAdmin(){
       <p className="text-sm text-slate-300"><strong className="text-gold">{data.scope_requests.length}</strong> recent website requests{openRequests>0&&<span className="text-slate-500"> · {openRequests} waiting</span>}</p>
       <Link to={p('pipelines')} className="text-xs font-bold text-gold hover:underline">Open Pipeline</Link>
     </div>}
+    {data&&openRequests>0&&<div className="rounded-xl border border-gold/20 bg-gold/[.05] p-4">
+      <p className="text-sm font-semibold text-white">Turn a website request into a quote</p>
+      <ul className="mt-3 space-y-2">
+        {data.scope_requests.filter(r=>r.status==='new').slice(0,6).map(row=>(
+          <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="text-slate-300">{row.contact_name} · {row.job_type.replace(/_/g,' ')} · {row.email}</span>
+            <Link to={`${p('quotes')}?new=1&scope=${encodeURIComponent(row.id)}`} className="text-xs font-bold text-gold hover:underline">Convert to quote</Link>
+          </li>
+        ))}
+      </ul>
+    </div>}
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {TABS.map(item=>{

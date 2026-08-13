@@ -12,7 +12,7 @@ const RESULT_LIMIT = 8
 
 searchRoutes.get('/search', requireStaff, async (c) => {
   const q = (c.req.query('q') ?? '').trim()
-  if (q.length < 2) return c.json({ clients: [], inquiries: [], matters: [], invoices: [] })
+  if (q.length < 2) return c.json({ clients: [], inquiries: [], matters: [], invoices: [], quotes: [] })
   const user = c.get('user')
   const like = `%${q}%`
 
@@ -20,7 +20,7 @@ searchRoutes.get('/search', requireStaff, async (c) => {
   const matterScope = await scopeFilter(c.env, user, 'm.client_user_id')
   const invoiceScope = await scopeFilter(c.env, user, 'i.client_user_id')
 
-  const [clients, inquiries, matters, invoices] = await Promise.all([
+  const [clients, inquiries, matters, invoices, quotes] = await Promise.all([
     c.env.DB.prepare(
       `SELECT u.id, u.full_name, u.email, cp.business_name
        FROM users u LEFT JOIN client_profiles cp ON cp.user_id = u.id
@@ -42,12 +42,26 @@ searchRoutes.get('/search', requireStaff, async (c) => {
        ORDER BY m.created_at DESC LIMIT ?`,
     ).bind(...matterScope.params, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
-      `SELECT i.id, i.amount_cents, i.status, i.client_user_id, u.full_name AS client_name, u.email AS client_email
+      `SELECT i.id, i.amount_cents, i.status, i.invoice_number, i.title, i.client_user_id, u.full_name AS client_name, u.email AS client_email
        FROM invoices i JOIN users u ON u.id = i.client_user_id
-       WHERE ${invoiceScope.where} AND (u.full_name LIKE ? OR u.email LIKE ? OR i.id LIKE ?)
+       WHERE ${invoiceScope.where} AND (
+         u.full_name LIKE ? OR u.email LIKE ? OR i.id LIKE ? OR COALESCE(i.invoice_number,'') LIKE ? OR COALESCE(i.title,'') LIKE ?
+       )
        ORDER BY i.created_at DESC LIMIT ?`,
-    ).bind(...invoiceScope.params, like, like, like, RESULT_LIMIT).all(),
+    ).bind(...invoiceScope.params, like, like, like, like, like, RESULT_LIMIT).all(),
+    c.env.DB.prepare(
+      `SELECT id, quote_number, title, status, recipient_name, recipient_email, total_cents
+       FROM service_quotes
+       WHERE quote_number LIKE ? OR title LIKE ? OR recipient_name LIKE ? OR recipient_email LIKE ? OR COALESCE(recipient_company,'') LIKE ?
+       ORDER BY created_at DESC LIMIT ?`,
+    ).bind(like, like, like, like, like, RESULT_LIMIT).all(),
   ])
 
-  return c.json({ clients: clients.results ?? [], inquiries: inquiries.results ?? [], matters: matters.results ?? [], invoices: invoices.results ?? [] })
+  return c.json({
+    clients: clients.results ?? [],
+    inquiries: inquiries.results ?? [],
+    matters: matters.results ?? [],
+    invoices: invoices.results ?? [],
+    quotes: quotes.results ?? [],
+  })
 })

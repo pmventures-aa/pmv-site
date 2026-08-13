@@ -178,6 +178,7 @@ export default function LeadDetail() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to={leadEmailHref(p, { id: r.id, email: r.email, name: r.name })} className={btnPrimary}>Email</Link>
+            <Link to={`${p('quotes')}?new=1&email=${encodeURIComponent(r.email)}&name=${encodeURIComponent(r.name)}`} className={btnOutline}>New quote</Link>
             <Link to={campaignAudienceHref(p, { lead: r.id })} className={btnOutline}>Campaign</Link>
             <Link className={btnOutline} to={p(`leads/${r.id}/activity`)}>Add note</Link>
             {!r.converted_at && !data.conversion && <button className={btnOutline} disabled={busy} onClick={convert}>Convert to client</button>}
