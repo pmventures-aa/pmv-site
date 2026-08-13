@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireClient, requireUser } from '../mid'
-import { createInvite, rotateInviteToken, sendInviteEmail } from '../invites'
+import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult } from '../invites'
 import { normalizeTrustedPermissions, TRUSTED_SECTION_LABELS, TRUSTED_SECTIONS, trustedAccess, trustedContexts, type TrustedSection } from '../trustedAccess'
 import { uuid } from '../crypto'
 
@@ -86,9 +86,11 @@ trustedContactRoutes.post('/trusted-contacts/invite', requireClient, async (c) =
   const profile = await c.env.DB.prepare('SELECT business_name FROM client_profiles WHERE user_id = ?').bind(user.id).first<{ business_name: string | null }>()
   const clientName = profile?.business_name || user.full_name || user.email
   try {
-    await sendInviteEmail(c.env, { id: invite.id, invite_type: 'trusted_contact', email, full_name: fullName, client_name: clientName }, invite.token, invite.expiresAt)
+    const providerId = await sendInviteEmail(c.env, { id: invite.id, invite_type: 'trusted_contact', email, full_name: fullName, client_name: clientName }, invite.token, invite.expiresAt)
+    await recordInviteEmailResult(c.env, invite.id, { status: 'sent', providerId })
     return c.json({ ok: true, id: trustedId, invite_id: invite.id, expires_at: invite.expiresAt, email_status: 'sent' }, 201)
   } catch (err) {
+    await recordInviteEmailResult(c.env, invite.id, { status: 'failed', error: err instanceof Error ? err.message : 'email failed' })
     return c.json({ ok: true, id: trustedId, invite_id: invite.id, expires_at: invite.expiresAt, email_status: 'failed', error: err instanceof Error ? err.message : 'email failed' }, 201)
   }
 })
@@ -123,13 +125,19 @@ trustedContactRoutes.post('/trusted-contacts/:id/resend', requireClient, async (
 
   const rotated = await rotateInviteToken(c.env, row.access_invite_id)
   const profile = await c.env.DB.prepare('SELECT business_name FROM client_profiles WHERE user_id = ?').bind(user.id).first<{ business_name: string | null }>()
-  await sendInviteEmail(c.env, {
-    id: row.access_invite_id,
-    invite_type: 'trusted_contact',
-    email: row.email,
-    full_name: row.full_name,
-    client_name: profile?.business_name || user.full_name || user.email,
-  }, rotated.token, rotated.expiresAt)
+  try {
+    const providerId = await sendInviteEmail(c.env, {
+      id: row.access_invite_id,
+      invite_type: 'trusted_contact',
+      email: row.email,
+      full_name: row.full_name,
+      client_name: profile?.business_name || user.full_name || user.email,
+    }, rotated.token, rotated.expiresAt)
+    await recordInviteEmailResult(c.env, row.access_invite_id, { status: 'sent', providerId })
+  } catch (err) {
+    await recordInviteEmailResult(c.env, row.access_invite_id, { status: 'failed', error: err instanceof Error ? err.message : 'email failed' })
+    throw err
+  }
   return c.json({ ok: true, expires_at: rotated.expiresAt })
 })
 

@@ -42,11 +42,16 @@ function parseMessageType(value: unknown): MessageType {
   return value === 'operational' || value === 'internal' ? value : 'marketing'
 }
 
-function userEligible(row: any, type: MessageType): boolean {
+export function userEligible(row: any, type: MessageType): boolean {
+  if (row.status === 'suspended') return false
+  const pendingStaff = row.status === 'pending' && (row.role === 'staff' || row.role === 'admin')
+  if (type === 'internal') return (row.role === 'staff' || row.role === 'admin') && (row.status === 'active' || pendingStaff)
+  if (type === 'operational') {
+    if (row.status !== 'active' && !pendingStaff) return false
+    return !['bounced', 'suppressed'].includes(row.marketing_email_status || 'emailable')
+  }
   if (row.status !== 'active') return false
-  if (type === 'internal') return row.role === 'staff' || row.role === 'admin'
-  if (type === 'marketing') return (row.marketing_email_status || 'emailable') === 'emailable'
-  return !['bounced', 'suppressed'].includes(row.marketing_email_status || 'emailable')
+  return (row.marketing_email_status || 'emailable') === 'emailable'
 }
 
 function leadEligible(row: any, type: MessageType): boolean {
@@ -115,11 +120,13 @@ async function resolveAudience(env: Env, audience: Audience, type: MessageType):
   const byEmail = new Map<string, Recipient>()
 
   for (const segment of audience.segments ?? []) {
-    if (segment === 'all_employees' || segment === 'all_vendors' || segment.startsWith('vendor_category:')) {
+    if (segment === 'all_employees' || segment === 'all_vendors' || segment === 'pending_vendors' || segment.startsWith('vendor_category:')) {
       let where = ''
       const params: string[] = []
       if (segment === 'all_employees') {
         where = "u.role IN ('staff','admin') AND (tm.party_type IS NULL OR tm.party_type = 'employee')"
+      } else if (segment === 'pending_vendors') {
+        where = "u.role = 'staff' AND tm.party_type = 'vendor' AND u.status = 'pending'"
       } else if (segment === 'all_vendors') {
         where = "u.role = 'staff' AND tm.party_type = 'vendor'"
       } else {
@@ -190,15 +197,16 @@ commsRoutes.get('/comms/audience', requireStaff, async (c) => {
   const [counts, categories, users, leads, lists] = await Promise.all([
     c.env.DB.prepare(
       `SELECT
-        (SELECT COUNT(*) FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE u.role IN ('staff','admin') AND u.status = 'active' AND (tm.party_type IS NULL OR tm.party_type = 'employee')) AS employees,
-        (SELECT COUNT(*) FROM users u JOIN team_members tm ON tm.user_id = u.id WHERE u.role = 'staff' AND u.status = 'active' AND tm.party_type = 'vendor') AS vendors,
+        (SELECT COUNT(*) FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE u.role IN ('staff','admin') AND u.status IN ('active','pending') AND (tm.party_type IS NULL OR tm.party_type = 'employee')) AS employees,
+        (SELECT COUNT(*) FROM users u JOIN team_members tm ON tm.user_id = u.id WHERE u.role = 'staff' AND u.status IN ('active','pending') AND tm.party_type = 'vendor') AS vendors,
+        (SELECT COUNT(*) FROM users u JOIN team_members tm ON tm.user_id = u.id WHERE u.role = 'staff' AND u.status = 'pending' AND tm.party_type = 'vendor') AS pending_vendors,
         (SELECT COUNT(*) FROM users WHERE role = 'client' AND status = 'active') AS clients,
         (SELECT COUNT(*) FROM contact_inquiries WHERE converted_at IS NULL AND archived_at IS NULL) AS leads,
         (SELECT COUNT(*) FROM contact_inquiries WHERE converted_at IS NULL AND archived_at IS NULL AND lifecycle_stage = 'prospect') AS prospects,
         (SELECT COUNT(*) FROM contact_inquiries WHERE converted_at IS NULL AND archived_at IS NULL AND lifecycle_stage = 'opportunity') AS opportunities`,
     ).first(),
     c.env.DB.prepare(
-      "SELECT DISTINCT vendor_category AS category, COUNT(*) AS n FROM team_members tm JOIN users u ON u.id = tm.user_id WHERE tm.party_type = 'vendor' AND u.status = 'active' AND vendor_category IS NOT NULL GROUP BY vendor_category ORDER BY vendor_category",
+      "SELECT DISTINCT vendor_category AS category, COUNT(*) AS n FROM team_members tm JOIN users u ON u.id = tm.user_id WHERE tm.party_type = 'vendor' AND u.status IN ('active','pending') AND vendor_category IS NOT NULL GROUP BY vendor_category ORDER BY vendor_category",
     ).all(),
     c.env.DB.prepare(
       `SELECT u.id, u.email, u.full_name, u.role, u.status, u.marketing_email_status, tm.party_type, tm.vendor_category, tm.title
@@ -211,7 +219,7 @@ commsRoutes.get('/comms/audience', requireStaff, async (c) => {
     c.env.DB.prepare(`SELECT id, name, list_type, record_type FROM crm_lists WHERE archived_at IS NULL ORDER BY name`).all(),
   ])
   return c.json({
-    counts: counts ?? { employees: 0, vendors: 0, clients: 0, leads: 0, prospects: 0, opportunities: 0 },
+    counts: counts ?? { employees: 0, vendors: 0, pending_vendors: 0, clients: 0, leads: 0, prospects: 0, opportunities: 0 },
     vendor_categories: categories.results ?? [],
     people: users.results ?? [],
     leads: leads.results ?? [],

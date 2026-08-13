@@ -9,7 +9,7 @@ import { RichTextComposer } from '../../components/admin/RichTextComposer'
 import { Dialog, DialogContent, DialogTrigger } from '../../components/kit/Dialog'
 
 interface AudienceData {
-  counts: { employees: number; vendors: number; clients: number; leads: number; prospects: number; opportunities: number }
+  counts: { employees: number; vendors: number; pending_vendors?: number; clients: number; leads: number; prospects: number; opportunities: number }
   vendor_categories: { category: string; n: number }[]
   people: { id: string; email: string; full_name: string | null; role: string; status: string; marketing_email_status?: string; party_type: string | null; vendor_category: string | null; title: string | null }[]
   leads: { id: string; name: string; email: string; phone: string | null; company_name: string | null; record_type: string; lifecycle_stage: string; status: string; email_status: string }[]
@@ -24,6 +24,14 @@ const fmt = (d: string | null) => d ? new Date(d).toLocaleString() : 'Not provid
 
 function AudienceCheck({ checked, onChange, title, count, detail }: { checked: boolean; onChange: () => void; title: string; count?: number; detail?: string }) {
   return <label className={`flex cursor-pointer items-start gap-3 border-b border-white/5 px-3 py-3 transition last:border-b-0 ${checked ? 'bg-white/[.05]' : 'hover:bg-white/[.025]'}`}><input className="mt-1" type="checkbox" checked={checked} onChange={onChange} /><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2 text-sm font-medium text-slate-200"><span>{title}</span>{count !== undefined && <span className="text-xs font-normal text-slate-500">{count.toLocaleString()}</span>}</span>{detail && <span className="mt-0.5 block text-xs text-slate-500">{detail}</span>}</span></label>
+}
+
+function personKind(person: AudienceData['people'][number]) {
+  if (person.party_type === 'vendor') return person.status === 'pending' ? 'Pending vendor' : 'Vendor'
+  if (person.role === 'client') return 'Client'
+  if (person.status === 'pending') return 'Pending staff'
+  if (person.role === 'admin') return 'Admin'
+  return 'Employee'
 }
 
 export default function CommunicationsCRMAdmin() {
@@ -116,11 +124,11 @@ export default function CommunicationsCRMAdmin() {
     if (!audience) return
     const email = directEmail.trim().toLowerCase(); setDirectStatus(null)
     if (!email || !email.includes('@')) return setDirectStatus('Enter a valid email address.')
-    const customer = audience.people.find((person) => person.role === 'client' && person.email.toLowerCase() === email)
-    if (customer) { if (!userIds.includes(customer.id)) setUserIds((ids) => [...ids, customer.id]); setDirectStatus(`${customer.full_name || customer.email} added as a recipient.`); setDirectEmail(''); return }
+    const person = audience.people.find((row) => row.email.toLowerCase() === email)
+    if (person) { if (!userIds.includes(person.id)) setUserIds((ids) => [...ids, person.id]); setDirectStatus(`${person.full_name || person.email} added as a ${personKind(person).toLowerCase()}.`); setDirectEmail(''); return }
     const lead = audience.leads.find((record) => record.email.toLowerCase() === email)
     if (lead) { if (!inquiryIds.includes(lead.id)) setInquiryIds((ids) => [...ids, lead.id]); setDirectStatus(`${lead.name || lead.email} added as a recipient.`); setDirectEmail(''); return }
-    setDirectStatus('That address is not attached to a client or CRM record. Add the record first so the communication remains part of the relationship history.')
+    setDirectStatus('That address is not attached to a client, vendor, staff, or CRM record. Add the record first so the communication remains part of the relationship history.')
   }
   async function uploadImage(file: File) { const res = await api.upload<{ ok: boolean; url: string }>('/admin/comms/images', file); return res.url }
   function insertSignature() { if (!signature.trim()) return window.alert('No signature is saved to your HQ profile yet.'); setBodyHtml((html) => `${html}<br>${signature}`) }
@@ -190,8 +198,8 @@ export default function CommunicationsCRMAdmin() {
             <div className="border-b border-white/10 px-4 py-3"><div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-white">Recipients</p><p className="text-xs text-slate-500">Eligible after suppression rules</p></div><p className="text-xl font-semibold text-white">{eligibleCount ?? 'Not provided'}</p></div></div>
             <div className="flex border-b border-white/10 px-2">{([['records','Records'],['segments','Groups'],['lists','Lists']] as const).map(([key,label]) => <button key={key} onClick={() => setAudienceTab(key)} className={`flex-1 border-b-2 px-2 py-3 text-xs font-medium ${audienceTab === key ? 'border-gold text-white' : 'border-transparent text-slate-500'}`}>{label}</button>)}</div>
             <div className="max-h-[280px] overflow-y-auto">
-              {audienceTab === 'records' && <><div className="p-3"><input className={inputCls} placeholder="Search clients and CRM records" value={recipientSearch} onChange={(e) => setRecipientSearch(e.target.value)} /></div>{recordMatches.people.slice(0,100).map((p) => <AudienceCheck key={p.id} checked={userIds.includes(p.id)} onChange={() => toggle(p.id,setUserIds)} title={p.full_name || p.email} detail={p.email} />)}{messageType !== 'internal' && recordMatches.leads.slice(0,100).map((p) => <AudienceCheck key={p.id} checked={inquiryIds.includes(p.id)} onChange={() => toggle(p.id,setInquiryIds)} title={p.name || p.email} detail={`${p.company_name ? `${p.company_name} · ` : ''}${p.email}`} />)}</>}
-              {audienceTab === 'segments' && <><AudienceCheck checked={segments.includes('all_employees')} onChange={() => toggle('all_employees',setSegments)} title="All employees" count={audience?.counts.employees || 0} />{messageType !== 'internal' && <><AudienceCheck checked={segments.includes('all_clients')} onChange={() => toggle('all_clients',setSegments)} title="All clients" count={audience?.counts.clients || 0} /><AudienceCheck checked={segments.includes('all_leads')} onChange={() => toggle('all_leads',setSegments)} title="All leads and prospects" count={audience?.counts.leads || 0} /></>}</>}
+              {audienceTab === 'records' && <><div className="p-3"><input className={inputCls} placeholder="Search people, vendors, and CRM records" value={recipientSearch} onChange={(e) => setRecipientSearch(e.target.value)} /></div>{recordMatches.people.slice(0,100).map((p) => <AudienceCheck key={p.id} checked={userIds.includes(p.id)} onChange={() => toggle(p.id,setUserIds)} title={p.full_name || p.email} detail={`${personKind(p)}${p.vendor_category ? ` · ${p.vendor_category}` : ''} · ${p.email}`} />)}{messageType !== 'internal' && recordMatches.leads.slice(0,100).map((p) => <AudienceCheck key={p.id} checked={inquiryIds.includes(p.id)} onChange={() => toggle(p.id,setInquiryIds)} title={p.name || p.email} detail={`${p.company_name ? `${p.company_name} · ` : ''}${p.email}`} />)}</>}
+              {audienceTab === 'segments' && <><AudienceCheck checked={segments.includes('all_employees')} onChange={() => toggle('all_employees',setSegments)} title="All employees" count={audience?.counts.employees || 0} /><AudienceCheck checked={segments.includes('all_vendors')} onChange={() => toggle('all_vendors',setSegments)} title="All vendors" count={audience?.counts.vendors || 0} detail="Active and pending providers" /><AudienceCheck checked={segments.includes('pending_vendors')} onChange={() => toggle('pending_vendors',setSegments)} title="Pending vendors" count={audience?.counts.pending_vendors || 0} detail="Invited or still in vetting" />{(audience?.vendor_categories || []).map((c) => <AudienceCheck key={c.category} checked={segments.includes(`vendor_category:${c.category}`)} onChange={() => toggle(`vendor_category:${c.category}`,setSegments)} title={c.category} count={c.n} />)}{messageType !== 'internal' && <><AudienceCheck checked={segments.includes('all_clients')} onChange={() => toggle('all_clients',setSegments)} title="All clients" count={audience?.counts.clients || 0} /><AudienceCheck checked={segments.includes('all_leads')} onChange={() => toggle('all_leads',setSegments)} title="All leads and prospects" count={audience?.counts.leads || 0} /></>}</>}
               {audienceTab === 'lists' && (audience?.lists.length ? audience.lists.map((l) => <AudienceCheck key={l.id} checked={listIds.includes(l.id)} onChange={() => toggle(l.id,setListIds)} title={l.name} detail={l.list_type} />) : <div className="p-4 text-xs text-slate-500">No CRM lists are available.</div>)}
             </div>
             <div className="border-t border-white/10 p-4"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">Delivery</p><div className="mt-2 flex gap-4 text-sm text-slate-300"><label className="flex items-center gap-2"><input type="radio" checked={sendMode==='now'} onChange={() => setSendMode('now')} />Send now</label><label className="flex items-center gap-2"><input type="radio" checked={sendMode==='schedule'} onChange={() => setSendMode('schedule')} />Schedule</label></div>{sendMode==='schedule' && <div className="mt-3 space-y-2"><input type="datetime-local" className={inputCls} value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} /><select className={inputCls} value={recurrence} onChange={(e) => setRecurrence(e.target.value as any)}><option value="">One time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>}</div>

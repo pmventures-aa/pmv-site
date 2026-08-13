@@ -111,6 +111,15 @@ resendWebhookRoutes.post('/webhooks/resend', async (c) => {
          clicked_at = CASE WHEN ? = 'email.clicked' THEN COALESCE(clicked_at, datetime('now')) ELSE clicked_at END
        WHERE provider_id = ?`,
     ).bind(mapped.status, error, mapped.failure ? 1 : 0, eventType, eventType, providerId),
+    c.env.DB.prepare(
+      `UPDATE access_invites SET
+         email_status = ?,
+         email_error = COALESCE(?, email_error),
+         email_sent_at = CASE WHEN ? = 'sent' THEN COALESCE(email_sent_at, datetime('now')) ELSE email_sent_at END,
+         email_delivered_at = CASE WHEN ? = 'delivered' THEN COALESCE(email_delivered_at, datetime('now')) ELSE email_delivered_at END,
+         updated_at = datetime('now')
+       WHERE email_provider_id = ?`,
+    ).bind(mapped.status, error, mapped.status, mapped.status, providerId),
   ])
 
   return c.json({ ok: true })

@@ -22,6 +22,8 @@ import { PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../..
 import { getCurrentProviderAgreementVersion } from '../managedTemplates'
 import { toDisplayCase } from '../../../shared/displayCase'
 import { advanceInquiryLifecycle } from '../lifecycle'
+import { getInviteByToken } from '../invites'
+import { canCompleteStagedVendorSignup, type ExistingAccount } from '../vendorStaging'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -173,6 +175,7 @@ authRoutes.post('/vendor-signup', async (c) => {
     provider_agreement_version?: string
     provider_agreement_accepted?: boolean
     provider_signature_name?: string
+    invite_token?: string
   }>().catch(() => null)
   if (!body) return c.json({ error: 'invalid request body' }, 400)
 
@@ -203,22 +206,40 @@ authRoutes.post('/vendor-signup', async (c) => {
     return c.json({ error: 'too many signups from this network. Try again later.' }, 429)
   }
 
-  const exists = await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(e).first()
-  if (exists) return c.json({ error: 'an account with that email already exists' }, 409)
+  const existing = await c.env.DB.prepare(
+    `SELECT u.id, u.role, u.status, u.password_hash, tm.party_type
+     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
+     WHERE u.email = ?`,
+  ).bind(e).first<ExistingAccount>()
+  if (existing && !canCompleteStagedVendorSignup(existing)) {
+    return c.json({ error: 'an account with that email already exists' }, 409)
+  }
 
-  const id = uuid()
+  const id = existing?.id || uuid()
   const hash = await hashPassword(body.password, c.env.SESSION_SECRET)
   const title = companyName ? `${vendorCategory}: ${companyName}` : vendorCategory
+  const statements = existing
+    ? [
+      c.env.DB.prepare(
+        `UPDATE users SET password_hash = ?, full_name = ?, phone = COALESCE(?, phone) WHERE id = ?`,
+      ).bind(hash, fullName, phone || null, id),
+      c.env.DB.prepare(
+        `UPDATE team_members SET title = ?, party_type = 'vendor', vendor_category = COALESCE(?, vendor_category), network_status = 'vetting' WHERE user_id = ?`,
+      ).bind(title, vendorCategory, id),
+    ]
+    : [
+      c.env.DB.prepare(
+        `INSERT INTO users (id, email, password_hash, role, full_name, phone, two_factor_enabled, status)
+         VALUES (?, ?, ?, 'staff', ?, ?, 0, 'pending')`,
+      ).bind(id, e, hash, fullName, phone || null),
+      c.env.DB.prepare(
+        `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category, network_status)
+         VALUES (?, ?, 'support_specialist', ?, 'vendor', ?, 'vetting')`,
+      ).bind(uuid(), id, title, vendorCategory),
+    ]
 
   await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO users (id, email, password_hash, role, full_name, phone, two_factor_enabled, status)
-       VALUES (?, ?, ?, 'staff', ?, ?, 0, 'pending')`,
-    ).bind(id, e, hash, fullName, phone || null),
-    c.env.DB.prepare(
-      `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category)
-       VALUES (?, ?, 'support_specialist', ?, 'vendor', ?)`,
-    ).bind(uuid(), id, title, vendorCategory),
+    ...statements,
     c.env.DB.prepare(
       `INSERT INTO provider_agreement_acceptances
        (id, user_id, agreement_version, signature_name, ip_address, user_agent, acceptance_method)
@@ -226,6 +247,26 @@ authRoutes.post('/vendor-signup', async (c) => {
     ).bind(uuid(), id, currentAgreementVersion, signatureName, actorIp(c.req.raw), actorUserAgent(c.req.raw)),
     activityInsert(c.env, { actorUserId: id, kind: 'vendor_signup_submitted', detail: { email: e, full_name: fullName, vendor_category: vendorCategory, company_name: companyName || undefined } }),
   ])
+
+  if (existing) {
+    const member = await c.env.DB.prepare('SELECT id FROM team_members WHERE user_id = ?').bind(id).first<{ id: string }>()
+    if (!member) {
+      await c.env.DB.prepare(
+        `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category, network_status)
+         VALUES (?, ?, 'support_specialist', ?, 'vendor', ?, 'vetting')`,
+      ).bind(uuid(), id, title, vendorCategory).run()
+    }
+  }
+
+  const inviteToken = typeof body.invite_token === 'string' ? body.invite_token.trim() : ''
+  if (inviteToken) {
+    const invite = await getInviteByToken(c.env, inviteToken)
+    if (invite && invite.invite_type === 'vendor' && invite.status === 'pending' && invite.email === e) {
+      await c.env.DB.prepare(
+        `UPDATE access_invites SET status = 'accepted', accepted_by_user_id = ?, accepted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+      ).bind(id, invite.id).run()
+    }
+  }
 
   c.executionCtx.waitUntil(
     notifyStaff(c.env, {

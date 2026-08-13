@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { Building2, Copy, ExternalLink, MailPlus, UserRound } from 'lucide-react'
 import { vendorApplicationCopy } from '../../lib/workspace'
+import { useAppPath } from '../../lib/basePath'
 
 interface Invite {
   id: string; invite_type: string; email: string; full_name: string | null; status: string
   expires_at: string; created_at: string; inviter_name: string | null; role_name: string | null
   client_name: string | null; metadata_json: string
+  email_status?: string | null; email_sent_at?: string | null; email_delivered_at?: string | null; email_error?: string | null
+  staged_user_id?: string | null; staged_user_name?: string | null; staged_user_status?: string | null
 }
 interface RoleDef { id: string; name: string; party_type: string }
 
@@ -27,10 +30,18 @@ const providerServices = [
 ] as const
 const blank: InviteForm = { invite_type: 'vendor', full_name: '', email: '', vendor_category: '', company_name: '', role_definition_id: '', lead_id: '', recipient_context: 'flexible', known_services: [], personal_note: '' }
 function tone(status: string): 'green' | 'red' | 'gold' | 'slate' {
-  if (status === 'accepted') return 'green'
-  if (status === 'expired' || status === 'revoked') return 'red'
-  if (status === 'pending') return 'gold'
+  if (status === 'accepted' || status === 'delivered') return 'green'
+  if (status === 'expired' || status === 'revoked' || status === 'failed' || status === 'bounced') return 'red'
+  if (status === 'pending' || status === 'sent' || status === 'queued') return 'gold'
   return 'slate'
+}
+function emailLabel(row: Invite) {
+  if (row.email_status === 'delivered') return 'Delivered'
+  if (row.email_status === 'sent') return 'Sent'
+  if (row.email_status === 'failed') return 'Failed'
+  if (row.email_status === 'bounced') return 'Bounced'
+  if (row.email_status === 'queued') return 'Queued'
+  return 'Not tracked'
 }
 function parseBulk(raw:string,type:'client'|'vendor'){
   return raw.split(/\n+/).map(line=>line.trim()).filter(Boolean).map(line=>{
@@ -45,6 +56,7 @@ function inviteContext(row: Invite) {
 }
 
 export default function InvitationsAdmin() {
+  const p = useAppPath()
   const [params] = useSearchParams()
   const prefill = useMemo(() => ({ ...blank, invite_type: params.get('type') || 'vendor', full_name: params.get('name') || '', email: params.get('email') || '', lead_id: params.get('lead') || '' }), [params])
   const [rows, setRows] = useState<Invite[]>([])
@@ -78,8 +90,8 @@ export default function InvitationsAdmin() {
   async function send(e: React.FormEvent) {
     e.preventDefault(); setBusy(true)
     try {
-      const result = await api.post<{ email_status: string; email_error?: string }>('/admin/invitations', form)
-      if (result.email_status === 'sent') toast.success(`Branded invitation sent to ${form.email}.`)
+      const result = await api.post<{ email_status: string; email_error?: string; staged_user_id?: string | null }>('/admin/invitations', form)
+      if (result.email_status === 'sent') toast.success(`Invitation emailed to ${form.email}. Tracking is on; delivered updates when the mailbox accepts it.${form.invite_type==='vendor'?' A pending vendor profile is on Team & Vendors.':''}`)
       else toast.error(`Invitation created, but the email was not sent. ${result.email_error || ''}`)
       setShowForm(false); setForm(blank); await load()
     } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Could not create invitation.') }
@@ -90,7 +102,7 @@ export default function InvitationsAdmin() {
     setBusy(true);try{const result=await api.post<{sent:number;failed:number}>('/admin/invitations/bulk',{rows:batch});toast.success(`${result.sent} invitation${result.sent===1?'':'s'} sent${result.failed?` · ${result.failed} need attention`:''}.`);setBulkText('');setShowBulk(false);await load()}catch(err){toast.error(err instanceof ApiError?err.message:'Could not send invitations.')}finally{setBusy(false)}
   }
   async function action(id: string, kind: 'resend' | 'revoke') {
-    try { await api.post(`/admin/invitations/${id}/${kind}`, {}); toast.success(kind === 'resend' ? 'A fresh branded 24-hour invitation was sent.' : 'Invitation revoked.'); await load() }
+    try { await api.post(`/admin/invitations/${id}/${kind}`, {}); toast.success(kind === 'resend' ? 'A fresh branded 24-hour invitation was emailed. Tracking is on.' : 'Invitation revoked.'); await load() }
     catch (err) { toast.error(err instanceof ApiError ? err.message : `Could not ${kind} invitation.`) }
   }
   async function copyGeneralApplication() {
@@ -101,15 +113,15 @@ export default function InvitationsAdmin() {
     setForm((current)=>({...current,known_services:current.known_services.includes(key)?current.known_services.filter((item)=>item!==key):[...current.known_services,key]}))
   }
 
-  const visible = rows.filter((r) => filter === 'all' || r.status === filter || (filter === 'vendor' && r.invite_type === 'vendor'))
-  const counts = { pending: rows.filter((r) => r.status === 'pending').length, accepted: rows.filter((r) => r.status === 'accepted').length, expired: rows.filter((r) => r.status === 'expired').length }
+  const visible = rows.filter((r) => filter === 'all' || r.status === filter || (filter === 'vendor' && r.invite_type === 'vendor') || (filter === 'delivered' && r.email_status === 'delivered'))
+  const counts = { pending: rows.filter((r) => r.status === 'pending').length, accepted: rows.filter((r) => r.status === 'accepted').length, delivered: rows.filter((r) => r.email_status === 'delivered').length }
 
   return <div>
     <PageIntro kicker="Professional network growth" title="Invitations & Applications" subtitle="Send a personal, tracked invitation when you know the professional, or share the open application when you do not need a private link." action={<div className="flex flex-wrap gap-2"><button className={btnOutline} onClick={()=>setShowBulk(v=>!v)}>{showBulk?'Close bulk tools':'Bulk invitations'}</button><button className={btnPrimary} onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close invitation' : 'Create invitation'}</button></div>} />
 
     <Panel className="mb-6 overflow-hidden !border-gold/20 !p-0"><div className="grid lg:grid-cols-[1fr_auto]"><div className="p-5 sm:p-6"><div className="flex items-start gap-4"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-gold/20 bg-gold/[.07] text-gold"><MailPlus size={19}/></span><div><p className="eyebrow">Open provider application</p><h2 className="mt-2 text-lg font-semibold text-white">A general link for any professional or business</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Anyone with this link can apply without a private invitation. They choose whether they are applying as an individual, sole proprietor, or business and select every service they want Pinnacle to review.</p></div></div></div><div className="flex flex-wrap items-center gap-2 border-t border-white/10 bg-white/[.018] p-5 lg:border-l lg:border-t-0"><button type="button" className={btnOutline} onClick={copyGeneralApplication}><Copy size={15}/>Copy link</button><a className={btnPrimary} href={generalProviderUrl} target="_blank" rel="noreferrer">Open application<ExternalLink size={14}/></a></div></div></Panel>
 
-    <div className="mb-6 grid grid-cols-3 gap-3 sm:max-w-lg">{([['Pending', counts.pending], ['Accepted', counts.accepted], ['Expired', counts.expired]] as const).map(([label, value]) => <Panel key={label} className="!p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-semibold text-white">{value}</p></Panel>)}</div>
+    <div className="mb-6 grid grid-cols-3 gap-3 sm:max-w-lg">{([['Pending', counts.pending], ['Accepted', counts.accepted], ['Delivered', counts.delivered]] as const).map(([label, value]) => <Panel key={label} className="!p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-semibold text-white">{value}</p></Panel>)}</div>
 
     {showBulk&&<Panel className="mb-6 !border-gold/20"><div className="grid gap-5 lg:grid-cols-[.75fr_1.25fr]"><div><p className="eyebrow">Automated outreach</p><h2 className="mt-2 text-lg font-semibold text-white">Send a batch of private invitations</h2><p className="mt-2 text-sm leading-6 text-slate-400">Useful after importing leads, building a provider list, or inviting an existing relationship into Pinnacle. Each person gets their own tracked 24-hour link and branded email.</p><div className="mt-4 flex gap-2">{(['client','vendor'] as const).map(t=><button key={t} onClick={()=>setBulkType(t)} className={`rounded-md border px-3 py-2 text-xs ${bulkType===t?'border-gold/40 bg-gold/10 text-gold':'border-white/10 text-slate-400'}`}>{t==='client'?'Prospective clients':'Professional providers'}</button>)}</div></div><div><label className="block text-xs text-slate-400">One person per line: <strong className="text-slate-300">email, name, company, specialty</strong></label><textarea className={`${inputCls} mt-2 min-h-[150px]`} value={bulkText} onChange={e=>setBulkText(e.target.value)} placeholder={bulkType==='vendor'?'pro@example.com, Jordan Lee, Lee Inspections, Property inspector':'client@example.com, Jamie Smith, Smith Holdings'}/><div className="mt-3 flex items-center justify-between"><span className="text-xs text-slate-500">{parseBulk(bulkText,bulkType).length} ready to invite · max 100 per batch</span><button disabled={busy} onClick={sendBulk} className={btnPrimary}>{busy?'Sending…':'Send branded invites'}</button></div></div></div></Panel>}
 
@@ -121,7 +133,7 @@ export default function InvitationsAdmin() {
       {form.lead_id&&<p className="text-xs text-slate-500">Connected CRM lead: {form.lead_id}</p>}
     </div><aside className="border-t border-white/10 bg-white/[.018] p-5 sm:p-6 lg:border-l lg:border-t-0"><p className="eyebrow">Email preview</p><h3 className="mt-3 text-lg font-semibold text-white">{form.invite_type==='vendor'?vendorCopy.sideTitle:form.invite_type==='staff'?'Activate Pinnacle HQ access':'A clear invitation into Pinnacle'}</h3><p className="mt-3 text-xs leading-6 text-slate-400">{form.invite_type==='vendor'?vendorCopy.sideBody:form.invite_type==='staff'?'The email includes the role they are being invited into and how HQ access is activated.':'The email explains the private client workspace and what happens after they accept.'}</p>{selectedKnownServices.length>0&&<div className="mt-4 rounded-lg border border-gold/20 bg-gold/[.05] p-3"><p className="text-[10px] font-bold uppercase tracking-[.13em] text-gold">Known experience</p><p className="mt-1 text-xs leading-5 text-slate-300">{selectedKnownServices.join(' · ')}</p></div>}<div className="mt-4 rounded-lg border border-white/10 p-3 text-xs leading-5 text-slate-400"><strong className="text-white">Flexible registration:</strong> They can apply personally, as a sole proprietor, or as a business. All prefilled information remains editable.</div><p className="mt-4 text-[11px] leading-5 text-slate-500">Private invitation links expire after 24 hours. The open provider application above does not use a private invitation token.</p></aside></div><div className="flex flex-wrap gap-3 border-t border-white/10 px-5 py-4 sm:px-6"><button className={btnPrimary} disabled={busy}>{busy?'Sending personalized email…':'Send personalized invitation'}</button><button type="button" className={btnOutline} onClick={()=>setShowForm(false)}>Cancel</button></div></form></Panel>}
 
-    <div className="mb-4 flex flex-wrap gap-2">{['all','pending','accepted','expired','vendor'].map((f)=><button key={f} className={`rounded-full border px-3 py-1.5 text-xs capitalize ${filter===f?'border-gold/40 bg-gold/10 text-gold':'border-white/10 text-slate-400 hover:text-white'}`} onClick={()=>setFilter(f)}>{f}</button>)}</div>
-    <Panel className="!p-0">{loading?<p className="p-6 text-sm text-slate-400">Loading invitations…</p>:visible.length===0?<div className="p-6"><EmptyState label="No invitations match this view."/></div>:<><div className="divide-y divide-white/10 md:hidden">{visible.map((r)=><article key={r.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-medium text-white">{r.full_name||r.email}</p><p className="mt-1 text-xs text-slate-500">{r.email}</p></div><Tag tone={tone(r.status)}>{r.status}</Tag></div><dl className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-600">Type</dt><dd className="mt-1 capitalize text-slate-300">{r.invite_type.replace(/_/g,' ')}</dd></div><div><dt className="text-slate-600">Context</dt><dd className="mt-1 text-slate-300">{inviteContext(r)}</dd></div><div className="col-span-2"><dt className="text-slate-600">Expires</dt><dd className="mt-1 text-slate-400">{new Date(r.expires_at).toLocaleString()}</dd></div></dl><div className="mt-4 flex gap-4 border-t border-white/[.07] pt-3">{r.status!=='accepted'&&<button className="text-xs font-medium text-gold" onClick={()=>action(r.id,'resend')}>Resend</button>}{r.status==='pending'&&<button className="text-xs font-medium text-rose-300" onClick={()=>action(r.id,'revoke')}>Revoke</button>}</div></article>)}</div><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[860px] text-left text-sm"><thead><tr className="border-b border-white/10 text-xs uppercase tracking-wide text-slate-500"><th className="px-5 py-3 font-medium">Recipient</th><th className="px-5 py-3 font-medium">Type</th><th className="px-5 py-3 font-medium">Status</th><th className="px-5 py-3 font-medium">Expires</th><th className="px-5 py-3 font-medium">Context</th><th className="px-5 py-3 font-medium">Actions</th></tr></thead><tbody>{visible.map((r)=><tr key={r.id} className="border-b border-white/5 last:border-0"><td className="px-5 py-3"><p className="font-medium text-white">{r.full_name||r.email}</p><p className="text-xs text-slate-500">{r.email}</p></td><td className="px-5 py-3 capitalize text-slate-300">{r.invite_type.replace(/_/g,' ')}</td><td className="px-5 py-3"><Tag tone={tone(r.status)}>{r.status}</Tag></td><td className="px-5 py-3 text-slate-400">{new Date(r.expires_at).toLocaleString()}</td><td className="px-5 py-3 text-slate-400">{inviteContext(r)}</td><td className="px-5 py-3"><div className="flex gap-3">{r.status!=='accepted'&&<button className="text-xs font-medium text-gold hover:underline" onClick={()=>action(r.id,'resend')}>Resend</button>}{r.status==='pending'&&<button className="text-xs font-medium text-rose-300 hover:underline" onClick={()=>action(r.id,'revoke')}>Revoke</button>}</div></td></tr>)}</tbody></table></div></>}</Panel>
+    <div className="mb-4 flex flex-wrap gap-2">{['all','pending','accepted','expired','delivered','vendor'].map((f)=><button key={f} className={`rounded-full border px-3 py-1.5 text-xs capitalize ${filter===f?'border-gold/40 bg-gold/10 text-gold':'border-white/10 text-slate-400 hover:text-white'}`} onClick={()=>setFilter(f)}>{f}</button>)}</div>
+    <Panel className="!p-0">{loading?<p className="p-6 text-sm text-slate-400">Loading invitations…</p>:visible.length===0?<div className="p-6"><EmptyState label="No invitations match this view."/></div>:<><div className="divide-y divide-white/10 md:hidden">{visible.map((r)=><article key={r.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-medium text-white">{r.full_name||r.email}</p><p className="mt-1 text-xs text-slate-500">{r.email}</p></div><div className="flex flex-col items-end gap-1"><Tag tone={tone(r.status)}>{r.status}</Tag><Tag tone={tone(r.email_status||'')}>{emailLabel(r)}</Tag></div></div><dl className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-600">Type</dt><dd className="mt-1 capitalize text-slate-300">{r.invite_type.replace(/_/g,' ')}</dd></div><div><dt className="text-slate-600">Context</dt><dd className="mt-1 text-slate-300">{inviteContext(r)}</dd></div><div className="col-span-2"><dt className="text-slate-600">Expires</dt><dd className="mt-1 text-slate-400">{new Date(r.expires_at).toLocaleString()}</dd></div>{r.email_error&&<div className="col-span-2"><dt className="text-slate-600">Email error</dt><dd className="mt-1 text-rose-300">{r.email_error}</dd></div>}</dl><div className="mt-4 flex flex-wrap gap-4 border-t border-white/[.07] pt-3">{r.status!=='accepted'&&<button className="text-xs font-medium text-gold" onClick={()=>action(r.id,'resend')}>Resend</button>}{r.status==='pending'&&<button className="text-xs font-medium text-rose-300" onClick={()=>action(r.id,'revoke')}>Revoke</button>}{r.staged_user_id&&<Link to={p(`network/${r.staged_user_id}/profile`)} className="text-xs font-medium text-slate-300 hover:text-gold">Open profile</Link>}</div></article>)}</div><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[980px] text-left text-sm"><thead><tr className="border-b border-white/10 text-xs uppercase tracking-wide text-slate-500"><th className="px-5 py-3 font-medium">Recipient</th><th className="px-5 py-3 font-medium">Type</th><th className="px-5 py-3 font-medium">Invite</th><th className="px-5 py-3 font-medium">Email</th><th className="px-5 py-3 font-medium">Expires</th><th className="px-5 py-3 font-medium">Profile</th><th className="px-5 py-3 font-medium">Actions</th></tr></thead><tbody>{visible.map((r)=><tr key={r.id} className="border-b border-white/5 last:border-0"><td className="px-5 py-3"><p className="font-medium text-white">{r.full_name||r.email}</p><p className="text-xs text-slate-500">{r.email}</p></td><td className="px-5 py-3 capitalize text-slate-300">{r.invite_type.replace(/_/g,' ')}</td><td className="px-5 py-3"><Tag tone={tone(r.status)}>{r.status}</Tag></td><td className="px-5 py-3"><div className="space-y-1"><Tag tone={tone(r.email_status||'')}>{emailLabel(r)}</Tag>{r.email_delivered_at&&<p className="text-[11px] text-slate-500">{new Date(r.email_delivered_at).toLocaleString()}</p>}{r.email_error&&<p className="text-[11px] text-rose-300">{r.email_error}</p>}</div></td><td className="px-5 py-3 text-slate-400">{new Date(r.expires_at).toLocaleString()}</td><td className="px-5 py-3">{r.staged_user_id?<Link to={p(`network/${r.staged_user_id}/profile`)} className="text-xs font-medium text-gold hover:underline">{r.staged_user_status==='pending'?'Pending profile':'Open profile'}</Link>:<span className="text-xs text-slate-600">Not staged</span>}</td><td className="px-5 py-3"><div className="flex gap-3">{r.status!=='accepted'&&<button className="text-xs font-medium text-gold hover:underline" onClick={()=>action(r.id,'resend')}>Resend</button>}{r.status==='pending'&&<button className="text-xs font-medium text-rose-300 hover:underline" onClick={()=>action(r.id,'revoke')}>Revoke</button>}</div></td></tr>)}</tbody></table></div></>}</Panel>
   </div>
 }

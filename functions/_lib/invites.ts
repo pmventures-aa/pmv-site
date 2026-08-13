@@ -61,6 +61,7 @@ export async function createInvite(
     roleDefinitionId?: string | null
     metadata?: Record<string, unknown>
     invitedByUserId?: string | null
+    stagedUserId?: string | null
   },
 ): Promise<{ id: string; token: string; expiresAt: string }> {
   const token = newInviteToken()
@@ -69,8 +70,8 @@ export async function createInvite(
   const expiresAt = inviteExpiry(24)
   await env.DB.prepare(
     `INSERT INTO access_invites
-      (id, invite_type, email, full_name, client_user_id, role_definition_id, metadata_json, token_hash, status, invited_by_user_id, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      (id, invite_type, email, full_name, client_user_id, role_definition_id, metadata_json, token_hash, status, invited_by_user_id, expires_at, staged_user_id, email_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, 'queued')`,
   ).bind(
     id,
     input.inviteType,
@@ -82,6 +83,7 @@ export async function createInvite(
     tokenHash,
     input.invitedByUserId || null,
     expiresAt,
+    input.stagedUserId || null,
   ).run()
   return { id, token, expiresAt }
 }
@@ -204,4 +206,20 @@ export async function sendInviteEmail(
     idempotencyKey: `invite-${row.id}-${expiresAt}`,
     tags: [{ name: 'category', value: 'access_invite' }, { name: 'invite_type', value: row.invite_type }],
   })
+}
+
+export async function recordInviteEmailResult(
+  env: Env,
+  inviteId: string,
+  result: { status: 'sent' | 'failed'; providerId?: string | null; error?: string | null },
+): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE access_invites SET
+       email_status = ?,
+       email_provider_id = COALESCE(?, email_provider_id),
+       email_error = ?,
+       email_sent_at = CASE WHEN ? = 'sent' THEN datetime('now') ELSE email_sent_at END,
+       updated_at = datetime('now')
+     WHERE id = ?`,
+  ).bind(result.status, result.providerId || null, result.error || null, result.status, inviteId).run()
 }
