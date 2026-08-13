@@ -12,6 +12,23 @@ function pause(ms: number) {
   return new Promise<void>((resolve) => globalThis.setTimeout(resolve, ms))
 }
 
+export function readApiPayload(
+  res: { ok: boolean; status: number; contentType: string | null },
+  data: unknown,
+): unknown {
+  if (!res.ok) {
+    const message = data && typeof data === 'object' && 'error' in data && typeof (data as { error: unknown }).error === 'string'
+      ? (data as { error: string }).error
+      : `request failed (${res.status})`
+    throw new ApiError(message, res.status)
+  }
+  const contentType = res.contentType || ''
+  if (data == null && contentType.includes('text/html')) {
+    throw new ApiError('The service could not be reached. Try again.', 502)
+  }
+  return data
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method || 'GET').toUpperCase()
   const attempts = method === 'GET' || method === 'HEAD' ? 2 : 1
@@ -37,15 +54,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!res) throw new ApiError('The service could not be reached. Try again.', 0)
-  let data: any = null
+  let data: unknown = null
   try {
     data = await res.json()
   } catch {
-    // no body
+    // SPA fallbacks return HTML; empty bodies are also non-JSON.
   }
-  if (!res.ok) {
-    throw new ApiError(data?.error || `request failed (${res.status})`, res.status)
-  }
+  const payload = readApiPayload(
+    { ok: res.ok, status: res.status, contentType: res.headers.get('content-type') },
+    data,
+  )
 
   if (typeof window !== 'undefined' && method !== 'GET' && method !== 'HEAD') {
     // Let shared HQ chrome refresh notification/activity state immediately
@@ -53,7 +71,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     window.dispatchEvent(new Event('pmv:activity'))
   }
 
-  return data as T
+  return payload as T
 }
 
 export const api = {

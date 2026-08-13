@@ -11,6 +11,7 @@ import { EmailComposePane, type ComposeDraft } from './EmailComposePane'
 import { EmailSignaturesPanel } from './EmailSignaturesPanel'
 import { previewSignatureHtml, type EmailSignature } from '../../lib/emailSignatures'
 import { composeAddress } from '../../lib/engagements'
+import { readComposeQuery, stripComposeQuery } from '../../lib/emailComposeQuery'
 import { parseWhoAddresses, uniqueWhoPeople, type WhoPerson, type WhoRow } from '../../lib/who'
 import { useAppPath } from '../../lib/basePath'
 import { FIRM_NAME } from '../../../shared/letterhead'
@@ -102,24 +103,22 @@ export function EmailThreadsPanel() {
   }
 
   useEffect(() => {
+    const compose = readComposeQuery(searchParams)
+    if (!compose) {
+      seededCompose.current = false
+      return
+    }
     if (seededCompose.current) return
-    if (searchParams.get('compose') !== '1') return
     seededCompose.current = true
-    const to = searchParams.get('to') || ''
-    const name = searchParams.get('name') || ''
     composeScope.current = {
-      clientId: searchParams.get('scopeClient') || null,
-      inquiryId: searchParams.get('lead') || null,
+      clientId: compose.clientId,
+      inquiryId: compose.inquiryId,
     }
     setManagingSignatures(false)
-    setDraft({ mode: 'new', to: composeAddress(name, to), cc: '', bcc: '', subject: '', html: '' })
+    setDraft({ mode: 'new', to: composeAddress(compose.name, compose.to), cc: '', bcc: '', subject: '', html: '' })
     setSearchParams((current) => {
-      const next = new URLSearchParams(current)
-      next.delete('compose')
-      next.delete('to')
-      next.delete('name')
-      next.delete('scopeClient')
-      next.delete('lead')
+      const next = stripComposeQuery(current)
+      if (next.toString() === current.toString()) return current
       return next
     }, { replace: true })
   }, [searchParams, setSearchParams])
