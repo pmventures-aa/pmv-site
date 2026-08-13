@@ -44,6 +44,7 @@ describe('Messages hub who coverage', () => {
     inbox: readFileSync(new URL('../src/components/kit/ThreadView.tsx', import.meta.url), 'utf8'),
     staff: readFileSync(new URL('../src/pages/admin/ConversationsPanel.tsx', import.meta.url), 'utf8'),
     hub: readFileSync(new URL('../src/pages/admin/CommunicationsHub.tsx', import.meta.url), 'utf8'),
+    templates: readFileSync(new URL('../src/pages/admin/EmailTemplatesPanel.tsx', import.meta.url), 'utf8'),
   }
 
   it('keeps a signed-in who control on the Communications chrome when HQ nav is hidden', () => {
@@ -57,5 +58,6 @@ describe('Messages hub who coverage', () => {
     expect(files.inbox).toContain('WhoSection')
     expect(files.staff).toContain('WhoSection')
     expect(files.hub).toContain('SessionWho')
+    expect(files.templates).toContain('SessionWho')
   })
 })

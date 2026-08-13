@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlignCenter, AlignLeft, AlignRight, Highlighter } from 'lucide-react'
+import { DOC_FONTS, DOC_SIZES } from '../../../shared/docHtml'
 
 const LETTER_COLORS = [
   { label: 'Navy', value: '#0a1728' },
@@ -96,6 +97,25 @@ export function RichTextComposer({
     }
   }
 
+  function applyFontSize(px: string) {
+    restoreSelection()
+    document.execCommand('styleWithCSS', false, 'true')
+    document.execCommand('fontSize', false, '7')
+    const root = ref.current
+    if (!root) return
+    root.querySelectorAll('font[size="7"]').forEach((el) => {
+      const span = document.createElement('span')
+      span.style.fontSize = px
+      span.innerHTML = (el as HTMLElement).innerHTML
+      el.replaceWith(span)
+    })
+    root.querySelectorAll<HTMLElement>('span').forEach((span) => {
+      if (span.style.fontSize === 'xxx-large' || span.style.fontSize === 'x-large') span.style.fontSize = px
+    })
+    saveSelection()
+    emit()
+  }
+
   const empty = !value || value === '<br>' || value === '<div><br></div>'
   const tool = letter
     ? 'grid h-8 min-w-8 place-items-center rounded px-1.5 text-[13px] text-[#3d4a5c] hover:bg-black/[.06]'
@@ -104,6 +124,42 @@ export function RichTextComposer({
   return (
     <div className={`flex min-h-0 flex-col ${fill ? 'h-full' : ''} ${letter ? 'bg-transparent' : 'rounded-md border border-white/10 bg-navy-900'}`}>
       <div className={`flex shrink-0 flex-wrap items-center gap-1 ${letter ? 'border-b border-[#e7e4dc] bg-[#f4f1ea] px-3 py-1.5' : 'border-b border-white/10 p-2 gap-1.5'}`}>
+        {letter && (
+          <>
+            <select
+              className="h-8 max-w-[7.5rem] rounded border border-[#ddd6c8] bg-white px-1 text-[12px] text-[#1b2430]"
+              defaultValue="P"
+              title="Paragraph style"
+              onMouseDown={saveSelection}
+              onChange={(e) => exec('formatBlock', e.target.value)}
+            >
+              <option value="P">Body</option>
+              <option value="H1">Title</option>
+              <option value="H2">Heading</option>
+              <option value="H3">Subheading</option>
+              <option value="BLOCKQUOTE">Quote</option>
+            </select>
+            <select
+              className="h-8 max-w-[8.5rem] rounded border border-[#ddd6c8] bg-white px-1 text-[12px] text-[#1b2430]"
+              defaultValue={DOC_FONTS[0].value}
+              title="Font"
+              onMouseDown={saveSelection}
+              onChange={(e) => exec('fontName', e.target.value)}
+            >
+              {DOC_FONTS.map((font) => <option key={font.label} value={font.value}>{font.label}</option>)}
+            </select>
+            <select
+              className="h-8 w-[4.4rem] rounded border border-[#ddd6c8] bg-white px-1 text-[12px] text-[#1b2430]"
+              defaultValue="15px"
+              title="Size"
+              onMouseDown={saveSelection}
+              onChange={(e) => applyFontSize(e.target.value)}
+            >
+              {DOC_SIZES.map((size) => <option key={size} value={size}>{size.replace('px', '')}</option>)}
+            </select>
+            <span className="mx-1 h-4 w-px bg-[#ddd6c8]" />
+          </>
+        )}
         <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('bold')} title="Bold"><strong>B</strong></button>
         <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('italic')} title="Italic"><em>I</em></button>
         <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => exec('underline')} title="Underline"><span className="underline">U</span></button>

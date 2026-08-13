@@ -4,6 +4,7 @@ import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { logActivity } from '../activity'
 import { escapeHtml, notifyStaff, sendEmailStrict } from '../email'
+import { renderHqEmailOrFallback } from '../hqEmailTemplates'
 import { PUBLIC_SITE_BASE } from '../scopeFunnel'
 
 // Branded quote workspace: staff build quotes (optionally from reusable
@@ -336,7 +337,7 @@ quoteAdminRoutes.post('/quotes/:id/send', requireStaff, async (c) => {
   const validUntil = quote.valid_until
     ? new Date(`${String(quote.valid_until).slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null
-  const html = [
+  const htmlFallback = [
     `<p>Hi ${escapeHtml(quote.recipient_name)},</p>`,
     `<p>Pinnacle Management Ventures has prepared quote <strong>${escapeHtml(quote.quote_number)}</strong> - ${escapeHtml(quote.title)} - for <strong>${escapeHtml(amount)}</strong>.</p>`,
     quote.intro_message ? `<p>${escapeHtml(quote.intro_message)}</p>` : '',
@@ -344,6 +345,20 @@ quoteAdminRoutes.post('/quotes/:id/send', requireStaff, async (c) => {
     validUntil ? `<p>This quote is valid through ${escapeHtml(validUntil)}.</p>` : '',
     '<p>Reply to this email or call (561) 388-7879 with any questions.</p>',
   ].join('')
+  const rendered = await renderHqEmailOrFallback(c.env, 'quote_send', {
+    first_name: String(quote.recipient_name || 'there').trim().split(/\s+/)[0] || 'there',
+    quote_number: String(quote.quote_number || ''),
+    quote_title: String(quote.title || ''),
+    quote_amount: amount,
+    quote_intro: quote.intro_message ? String(quote.intro_message) : '',
+    valid_until: validUntil || '',
+    action_url: url,
+  }, {
+    subject: `Your Pinnacle quote ${quote.quote_number} - ${amount}`,
+    html: htmlFallback,
+    text: `Pinnacle quote ${quote.quote_number}: ${quote.title}, ${amount}. Review and accept at ${url}`,
+  })
+  const html = rendered.html
 
   // Without an email provider the quote still goes live on its public link so
   // staff can share it manually; the response tells the UI no email was sent.
@@ -352,9 +367,9 @@ quoteAdminRoutes.post('/quotes/:id/send', requireStaff, async (c) => {
     try {
       await sendEmailStrict(c.env, {
         to: quote.recipient_email,
-        subject: `Your Pinnacle quote ${quote.quote_number} - ${amount}`,
+        subject: rendered.subject,
         html,
-        text: `Pinnacle quote ${quote.quote_number}: ${quote.title}, ${amount}. Review and accept at ${url}`,
+        text: rendered.text,
         replyTo: 'orders@pinnaclemanagementventures.com',
         idempotencyKey: `quote/${quote.id}/${new Date().toISOString().slice(0, 16)}`,
         tags: [{ name: 'type', value: 'quote' }],

@@ -64,6 +64,7 @@ import { communicationsHubRoutes } from '../_lib/routes/communicationsHub'
 import { conversationRoutes } from '../_lib/routes/conversations'
 import { emailThreadRoutes } from '../_lib/routes/emailThreads'
 import { emailSignatureRoutes } from '../_lib/routes/emailSignatures'
+import { hqEmailTemplateRoutes } from '../_lib/routes/hqEmailTemplates'
 import { notificationFeedRoutes } from '../_lib/routes/notificationFeed'
 import { clientBannerAdminRoutes, clientBannerSelfRoutes } from '../_lib/routes/clientBanners'
 import { impersonationRoutes } from '../_lib/routes/impersonation'
@@ -126,6 +127,7 @@ app.route('/admin', communicationsHubRoutes)
 app.route('/admin', conversationRoutes)
 app.route('/portal', conversationRoutes)
 app.route('/admin', emailSignatureRoutes)
+app.route('/admin', hqEmailTemplateRoutes)
 app.route('/admin', emailThreadRoutes)
 app.route('/admin', notificationFeedRoutes)
 app.route('/portal', notificationFeedRoutes)

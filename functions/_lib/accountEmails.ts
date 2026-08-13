@@ -11,6 +11,7 @@ import {
   type AccountRole,
   type RenderedEmail,
 } from './emailTemplates/welcome'
+import { renderHqEmailOrFallback } from './hqEmailTemplates'
 import { HQ_WWW_LOGIN, PORTAL_WWW_BASE, PORTAL_WWW_LOGIN } from './appUrls'
 
 export type AccountEmailKind = 'account_welcome' | 'setup_invite' | 'portal_reminder' | 'vendor_application_received' | 'vendor_approved'
@@ -168,7 +169,7 @@ export async function sendAccountWelcome(env: Env, input: {
   idempotencyKey?: string
 }): Promise<AccountEmailResult> {
   const kind: AccountEmailKind = input.creationType === 'self_signup' ? 'account_welcome' : 'setup_invite'
-  const rendered = renderAccountWelcome({
+  const fallback = renderAccountWelcome({
     firstName: input.firstName,
     email: input.email,
     role: input.role,
@@ -177,6 +178,18 @@ export async function sendAccountWelcome(env: Env, input: {
     actionUrl: input.actionUrl,
     businessName: input.businessName,
   })
+  const setupNote = input.role === 'client' && input.creationType !== 'self_signup'
+    ? 'Your secure setup link can be used once and expires in 24 hours. If it expires, contact Pinnacle and we can issue a new one.'
+    : ''
+  const rendered = await renderHqEmailOrFallback(env, input.role === 'client' ? 'account_welcome_client' : 'account_welcome_hq', {
+    first_name: (input.firstName || '').trim().split(/\s+/)[0] || 'there',
+    full_name: input.firstName || '',
+    email: input.email,
+    role_label: input.role === 'admin' ? 'administrator' : 'team member',
+    action_label: input.actionLabel,
+    action_url: input.actionUrl,
+    setup_note: setupNote,
+  }, fallback)
   return sendTrackedAccountEmail(env, {
     userId: input.userId,
     role: input.role,
@@ -196,7 +209,10 @@ export async function sendVendorApplicationReceived(env: Env, input: {
   email: string
   firstName?: string | null
 }): Promise<AccountEmailResult> {
-  const rendered = renderVendorApplicationReceived({ firstName: input.firstName, email: input.email })
+  const rendered = await renderHqEmailOrFallback(env, 'vendor_application_received', {
+    first_name: (input.firstName || '').trim().split(/\s+/)[0] || 'there',
+    email: input.email,
+  }, renderVendorApplicationReceived({ firstName: input.firstName, email: input.email }))
   return sendTrackedAccountEmail(env, {
     userId: input.userId,
     role: 'staff',
@@ -215,7 +231,11 @@ export async function sendVendorApproved(env: Env, input: {
   actorUserId?: string | null
   idempotencyKey?: string
 }): Promise<AccountEmailResult> {
-  const rendered = renderVendorApproved({ firstName: input.firstName, actionUrl: HQ_LOGIN_URL })
+  const rendered = await renderHqEmailOrFallback(env, 'vendor_approved', {
+    first_name: (input.firstName || '').trim().split(/\s+/)[0] || 'there',
+    action_url: HQ_LOGIN_URL,
+    action_label: 'Open Pinnacle HQ',
+  }, renderVendorApproved({ firstName: input.firstName, actionUrl: HQ_LOGIN_URL }))
   return sendTrackedAccountEmail(env, {
     userId: input.userId,
     role: 'staff',
@@ -239,7 +259,12 @@ export async function sendPortalReminder(env: Env, input: {
   idempotencyKey: string
 }): Promise<AccountEmailResult> {
   const actionUrl = input.role === 'client' ? CLIENT_LOGIN_URL : HQ_LOGIN_URL
-  const rendered = renderPortalReminder({ firstName: input.firstName, role: input.role, actionUrl })
+  const rendered = await renderHqEmailOrFallback(env, 'portal_reminder', {
+    first_name: (input.firstName || '').trim().split(/\s+/)[0] || 'there',
+    workspace_label: input.role === 'client' ? 'your secure Client Portal' : 'Pinnacle HQ',
+    action_label: input.role === 'client' ? 'Open My Client Portal' : 'Open Pinnacle HQ',
+    action_url: actionUrl,
+  }, renderPortalReminder({ firstName: input.firstName, role: input.role, actionUrl }))
   return sendTrackedAccountEmail(env, {
     userId: input.userId,
     role: input.role,

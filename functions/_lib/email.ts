@@ -1,5 +1,6 @@
 import type { Env } from './types'
 import { renderPinnacleEmailLayout } from './emailTemplates/layout'
+import { renderHqEmailBySlug } from './hqEmailTemplates'
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -68,6 +69,16 @@ function applyTemplateTokens(value:string, subject:string, body:string):string {
 }
 
 async function brandedNotification(env:Env, kind:string, subject:string, html:string):Promise<{subject:string;html:string}> {
+  const vars = { event_subject: subject, event_body: html, first_name: 'there' }
+  try {
+    const stored = await renderHqEmailBySlug(env, `notify_${kind}`, vars)
+    if (stored?.skipped) return { subject, html: '' }
+    if (stored) return { subject: stored.subject, html: stored.html }
+    const generic = await renderHqEmailBySlug(env, 'staff_notification', vars)
+    if (generic && !generic.skipped) return { subject: generic.subject, html: generic.html }
+  } catch (err) {
+    console.error('[notification] hq template render failed', err)
+  }
   let override:NotificationTemplateRow|null=null
   try {
     override=await env.DB.prepare('SELECT subject,preheader,eyebrow,title,body_html,cta_label,enabled FROM notification_template_overrides WHERE event_key=?').bind(kind).first<NotificationTemplateRow>()
