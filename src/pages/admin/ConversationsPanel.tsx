@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AtSign, CheckCheck, Circle, Hash, Loader2, Lock, MessageSquare, Paperclip, PinIcon, Plus, Send, User, X } from 'lucide-react'
+import { AtSign, CheckCheck, ChevronLeft, Circle, Hash, Loader2, Lock, MessageSquare, Paperclip, PinIcon, Plus, Send, User, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { Panel, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
@@ -65,7 +65,7 @@ export function ConversationsPanel() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-      <Panel className="!p-0">
+      <Panel className={`!p-0 ${selectedId ? 'hidden lg:block' : ''}`}>
         <div className="flex items-center justify-between border-b border-white/10 p-3">
           <p className="text-sm font-extrabold text-white">Conversations</p>
           <button className={btnPrimary} onClick={() => setComposerOpen(true)}><Plus size={14}/>New</button>
@@ -109,7 +109,9 @@ export function ConversationsPanel() {
         </div>
       </Panel>
 
-      <ConversationDetail detail={detail} onChanged={() => { void load(); void loadDetail() }} />
+      <div className={selectedId ? 'block' : 'hidden lg:block'}>
+        <ConversationDetail detail={detail} onBack={() => setSelectedId(null)} onChanged={() => { void load(); void loadDetail() }} />
+      </div>
 
       <ComposerDialog
         open={composerOpen}
@@ -120,7 +122,7 @@ export function ConversationsPanel() {
   )
 }
 
-function ConversationDetail({ detail, onChanged }: { detail: Detail | null; onChanged: () => void }) {
+function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | null; onBack: () => void; onChanged: () => void }) {
   const [busy, setBusy] = useState(false)
   const [body, setBody] = useState('')
   const [internal, setInternal] = useState(false)
@@ -165,13 +167,18 @@ function ConversationDetail({ detail, onChanged }: { detail: Detail | null; onCh
     <Panel className="!p-0">
       <div className="border-b border-white/10 p-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-lg font-extrabold text-white">{conversation.subject}</p>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-              <Tag>{KIND_LABEL[conversation.kind] || conversation.kind}</Tag>
-              <Tag tone={STATUS_TONE[conversation.status]}>{conversation.status}</Tag>
-              {conversation.priority !== 'normal' && <Tag tone={conversation.priority==='urgent'?'red':'gold'}>{conversation.priority}</Tag>}
-              {conversation.assignee_name && <span>Assignee: {conversation.assignee_name}</span>}
+          <div className="flex min-w-0 items-start gap-2">
+            <button type="button" onClick={onBack} className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold lg:hidden" aria-label="Back to conversations">
+              <ChevronLeft size={16}/>
+            </button>
+            <div className="min-w-0">
+              <p className="text-lg font-extrabold text-white">{conversation.subject}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                <Tag>{KIND_LABEL[conversation.kind] || conversation.kind}</Tag>
+                <Tag tone={STATUS_TONE[conversation.status]}>{conversation.status}</Tag>
+                {conversation.priority !== 'normal' && <Tag tone={conversation.priority==='urgent'?'red':'gold'}>{conversation.priority}</Tag>}
+                {conversation.assignee_name && <span>Assignee: {conversation.assignee_name}</span>}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
