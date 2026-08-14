@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import { appendFileSync } from 'node:fs'
 import type { AppEnv, Env, SessionUser } from '../types'
 import { requireClient, requireUser } from '../mid'
 import { uuid, encryptSensitive } from '../crypto'
@@ -24,7 +23,8 @@ export const serviceApplicationRoutes = new Hono<AppEnv>()
 
 function agentDebugLog(entry: { hypothesisId: string; location: string; message: string; data: Record<string, unknown>; timestamp: number }) {
   try {
-    appendFileSync('/opt/cursor/logs/debug.log', `${JSON.stringify(entry)}\n`)
+    const processApi = (globalThis as unknown as { process?: { getBuiltinModule?: (name: string) => { appendFileSync?: (path: string, data: string) => void } } }).process
+    processApi?.getBuiltinModule?.('fs').appendFileSync?.('/opt/cursor/logs/debug.log', `${JSON.stringify(entry)}\n`)
   } catch {
     // Cloudflare production has no writable host filesystem; local debugging does.
   }
