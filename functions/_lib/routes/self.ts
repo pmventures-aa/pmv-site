@@ -174,9 +174,9 @@ const PWCHANGE_LOCKOUT_SECONDS = 15 * 60
 selfRoutes.post('/change-password', requireClient, async (c) => {
   const user = c.get('user')
   const { current_password, new_password } = await c.req
-    .json<{ current_password: string; new_password: string }>()
+    .json<{ current_password?: string; new_password: string }>()
     .catch(() => ({ current_password: '', new_password: '' }))
-  if (!current_password || !new_password) return c.json({ error: 'current and new password are required' }, 400)
+  if (!new_password) return c.json({ error: 'new password is required' }, 400)
   if (new_password.length < MIN_PASSWORD) return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
 
   const failKey = `pwchange_fail:${user.id}`
@@ -186,11 +186,15 @@ selfRoutes.post('/change-password', requireClient, async (c) => {
   }
 
   const row = await c.env.DB.prepare('SELECT password_hash FROM users WHERE id = ?').bind(user.id).first<{ password_hash: string | null }>()
-  const ok = row?.password_hash ? await verifyPassword(current_password, row.password_hash, c.env.SESSION_SECRET) : false
-  if (!ok) {
-    await c.env.SESSIONS.put(failKey, String(fails + 1), { expirationTtl: PWCHANGE_LOCKOUT_SECONDS })
-    return c.json({ error: 'current password is incorrect' }, 401)
+  if (row?.password_hash) {
+    if (!current_password) return c.json({ error: 'current and new password are required' }, 400)
+    const ok = await verifyPassword(current_password, row.password_hash, c.env.SESSION_SECRET)
+    if (!ok) {
+      await c.env.SESSIONS.put(failKey, String(fails + 1), { expirationTtl: PWCHANGE_LOCKOUT_SECONDS })
+      return c.json({ error: 'current password is incorrect' }, 401)
+    }
   }
+  // Auth0-only accounts (null password_hash) may set an initial password while signed in.
   await c.env.SESSIONS.delete(failKey)
 
   const hash = await hashPassword(new_password, c.env.SESSION_SECRET)

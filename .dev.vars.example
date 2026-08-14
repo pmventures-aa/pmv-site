@@ -33,3 +33,15 @@ PAYMENT_ENCRYPTION_KEY=local-dev-payment-key-not-real-either
 # Optional — Resend receiving domain for Reply-To (not From). Leave unset to
 # use ziloifaluk.resend.app from wrangler.toml.
 # RESEND_INBOUND_DOMAIN=ziloifaluk.resend.app
+
+# Optional — Auth0 Regular Web Application (server-only). Leave unset or set
+# AUTH0_ENABLED=false to hide Continue with Google/Microsoft. Never put the
+# client secret in frontend/Vite env vars.
+# AUTH0_DOMAIN=your-tenant.us.auth0.com
+# AUTH0_CLIENT_ID=
+# AUTH0_CLIENT_SECRET=
+# AUTH0_AUDIENCE=
+# AUTH0_CALLBACK_URL=http://localhost:8788/api/auth/auth0/callback
+# AUTH0_LOGOUT_URL=http://localhost:5173/portal/login
+# AUTH0_ENABLED=true
+# AUTH0_CONNECTIONS=google-oauth2,windowslive

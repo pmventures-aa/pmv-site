@@ -501,6 +501,8 @@ authRoutes.post('/login', async (c) => {
 })
 
 authRoutes.post('/logout', async (c) => {
+  // Local Pinnacle session is always invalidated first. Federated Auth0 logout
+  // is optional and never required for a safe sign-out.
   const user = await getUser(c.env, c.req.raw)
   await destroySession(c.env, c.req.raw)
   c.header('Set-Cookie', clearCookie())

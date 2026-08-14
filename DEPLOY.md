@@ -39,6 +39,29 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 | `RESEND_FROM_EMAIL` | No | Var (`wrangler.toml` `[vars]`) | Verified sender identity. The code defaults to `Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>` if this is not set. |
 | `RESEND_WEBHOOK_SECRET` | No | Secret | Optional Cloudflare copy of the Svix signing secret for `POST /api/webhooks/resend`. HQ → Settings → General can create the Resend webhook and store this secret in D1 instead. |
 | `RESEND_INBOUND_DOMAIN` | No | Var (`wrangler.toml` `[vars]`) | Resend receiving domain. Defaults in wrangler to `ziloifaluk.resend.app`. Used only as Reply-To so replies can be received without changing pinnaclemanagementventures.com MX or the From address. |
+| `AUTH0_DOMAIN` | No* | Secret/Var | Auth0 tenant domain (`your-tenant.us.auth0.com`). Required together with client id/secret to enable external portal sign-in. |
+| `AUTH0_CLIENT_ID` | No* | Secret/Var | Auth0 Regular Web Application client ID. |
+| `AUTH0_CLIENT_SECRET` | No* | Secret | Auth0 client secret — **server-only**, never expose via Vite/`VITE_*`. |
+| `AUTH0_AUDIENCE` | No | Var | Optional API audience when the Auth0 app requests an access token audience. |
+| `AUTH0_CALLBACK_URL` | No | Var | Exact callback URL. Production default: `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback`. |
+| `AUTH0_LOGOUT_URL` | No | Var | Post-login error / logout return. Production default: `https://www.pinnaclemanagementventures.com/portal/login`. |
+| `AUTH0_ENABLED` | No | Var | Set to `false` to force-disable Auth0 even if credentials exist. Omit or `true` when credentials are present. |
+| `AUTH0_CONNECTIONS` | No | Var | Comma-separated Auth0 connections to offer (`google-oauth2,windowslive`). Buttons only render for configured connections. |
+
+\*Auth0 is optional. When any required Auth0 value is missing, provider buttons stay hidden and password login continues to work.
+
+### Auth0 dashboard settings (production)
+
+| Setting | Value |
+|---|---|
+| Application type | Regular Web Application |
+| Allowed Callback URLs | `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback` |
+| Allowed Logout URLs | `https://www.pinnaclemanagementventures.com/portal/login` |
+| Allowed Web Origins | `https://www.pinnaclemanagementventures.com` |
+| Local Callback | `http://localhost:8788/api/auth/auth0/callback` (when using `wrangler pages dev`) |
+| Local Logout / origin | `http://localhost:5173/portal/login` and `http://localhost:5173` |
+
+Auth0 authenticates identity only. Pinnacle KV sessions + D1 remain the sole authorization source. Auth0 Organizations are deferred — see `docs/auth0-architecture.md`.
 
 **Local dev:** copy `.dev.vars.example` to `.dev.vars` (gitignored) and fill in test values — `wrangler pages dev` reads it automatically.
 
