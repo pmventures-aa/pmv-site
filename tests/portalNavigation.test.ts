@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { clientMobilePrimary, clientPortalNav, portalMobilePrimary, portalNav } from '../src/components/layout/nav'
 
@@ -25,6 +26,13 @@ describe('Client portal navigation', () => {
   it('exposes the four mobile primary destinations from the default nav', () => {
     const keys = new Set(portalNav.map((item) => item.key))
     for (const key of portalMobilePrimary) expect(keys.has(key)).toBe(true)
+  })
+
+  it('keeps the portal bottom tab bar as the client mobile primary pattern', () => {
+    const shell = readFileSync(new URL('../src/components/layout/Shell.tsx', import.meta.url), 'utf8')
+    expect(shell).toContain('Primary client destinations')
+    expect(shell).toContain('More')
+    expect(shell).toContain('grid-cols-5')
   })
 
   it('uses world-specific mobile tabs when a primary service is active', () => {

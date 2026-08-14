@@ -281,28 +281,43 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   return c.json({ assignment: row })
 })
 
+const LIST_COLUMNS = `fa.id, fa.kind, fa.service_key, fa.client_user_id, fa.vendor_user_id, fa.assigned_by_user_id,
+       fa.title, fa.site_label, fa.site_address, fa.site_city, fa.site_state, fa.site_postal_code,
+       fa.site_lat, fa.site_lng, fa.scheduled_at, fa.status,
+       fa.departed_at, fa.arrived_at, fa.arrival_source, fa.completed_at, fa.audit_email_sent_at, fa.notes,
+       fa.vendor_fee_cents, fa.vendor_fee_base_cents, fa.vendor_fee_adjustment_cents, fa.vendor_fee_reason,
+       fa.created_at, fa.updated_at,
+       cu.full_name AS client_name, cu.email AS client_email,
+       vu.full_name AS vendor_name, vu.email AS vendor_email`
+
 fieldWorkRoutes.get('/field-assignments', requireStaff, async (c) => {
   const user = c.get('user')
   const status = c.req.query('status') || ''
   const kind = c.req.query('kind') || ''
+  const mine = c.req.query('mine') === '1'
+  const limitRaw = Number(c.req.query('limit') || 80)
+  const limit = Number.isFinite(limitRaw) ? Math.min(200, Math.max(1, Math.round(limitRaw))) : 80
   const clauses: string[] = ['1=1']
   const params: unknown[] = []
-  if (user.role !== 'admin') {
-    clauses.push('(fa.vendor_user_id = ? OR fa.assigned_by_user_id = ?)')
-    params.push(user.id, user.id)
+  if (mine || user.role !== 'admin') {
+    if (mine) {
+      clauses.push('fa.vendor_user_id = ?')
+      params.push(user.id)
+    } else {
+      clauses.push('(fa.vendor_user_id = ? OR fa.assigned_by_user_id = ?)')
+      params.push(user.id, user.id)
+    }
   }
   if (status) { clauses.push('fa.status = ?'); params.push(status) }
   if (kind && KIND_VALUES.has(kind)) { clauses.push('fa.kind = ?'); params.push(kind) }
   const res = await c.env.DB.prepare(
-    `SELECT fa.*,
-       cu.full_name AS client_name, cu.email AS client_email,
-       vu.full_name AS vendor_name, vu.email AS vendor_email
+    `SELECT ${LIST_COLUMNS}
      FROM field_assignments fa
      LEFT JOIN users cu ON cu.id = fa.client_user_id
      LEFT JOIN users vu ON vu.id = fa.vendor_user_id
      WHERE ${clauses.join(' AND ')}
      ORDER BY (fa.status = 'completed') ASC, COALESCE(fa.scheduled_at, fa.created_at) DESC
-     LIMIT 200`,
+     LIMIT ${limit}`,
   ).bind(...params).all<AssignmentRow>()
   return c.json({ assignments: res.results ?? [] })
 })
@@ -605,7 +620,7 @@ fieldWorkRoutes.get('/field-map', requireStaff, async (c) => {
               u.full_name, u.email
        FROM field_agent_locations loc
        JOIN users u ON u.id = loc.user_id
-       WHERE julianday('now') - julianday(loc.updated_at) < 1`,
+       WHERE julianday('now') - julianday(loc.updated_at) < 1 AND loc.sharing_active = 1`,
     ).all()
   } catch {
     agents = { results: [] }

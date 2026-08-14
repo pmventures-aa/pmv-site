@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, LogOut, Bell, ShieldCheck, UserRound } from 'lucide-react'
@@ -156,7 +156,7 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
           <div className="flex items-center gap-3"><NotificationFeedPanel surface="portal"/><MailBell /><span className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600">{badge}</span></div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-4 pb-20 sm:px-5 lg:px-6 lg:py-5 lg:pb-5"><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className="flex-1 px-4 py-4 pb-20 sm:px-5 lg:px-6 lg:py-5 lg:pb-5"><AdminPageBoundary><Suspense fallback={<p className="text-sm text-slate-400">Loading…</p>}><Outlet /></Suspense></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
 

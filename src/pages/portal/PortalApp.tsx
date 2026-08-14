@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { Shell } from '../../components/layout/Shell'
@@ -11,28 +12,29 @@ import ForgotPassword from '../auth/ForgotPassword'
 import ResetPassword from '../auth/ResetPassword'
 import SetPassword from '../auth/SetPassword'
 import TrustedInvite from '../auth/TrustedInvite'
-import OnboardingWizard from './OnboardingWizard'
-import Dashboard from './Dashboard'
-import Services from './Services'
-import ServiceApplication from './ServiceApplication'
-import Documents from './Documents'
-import Messages from './Messages'
-import Support from './Support'
-import Billing from './Billing'
-import BusinessProfile from './BusinessProfile'
-import MyTeam from './MyTeam'
-import TrustedContacts from './TrustedContacts'
-import TrustedPortal from './TrustedPortal'
-import Notifications from './Notifications'
-import Security from './Security'
-import ClientPortalDemo from './ClientPortalDemo'
-import { ModulePage } from './ModulePage'
 import { callsConfig, tasksConfig, fundingConfig, taxConfig } from './moduleConfigs'
-import CalendarPage from './CalendarPage'
-import Properties from './Properties'
-import PropertyProfile from './PropertyProfile'
-import Matters from './Matters'
-import MatterDetail from './MatterDetail'
+
+const OnboardingWizard = lazy(() => import('./OnboardingWizard'))
+const Dashboard = lazy(() => import('./Dashboard'))
+const Services = lazy(() => import('./Services'))
+const ServiceApplication = lazy(() => import('./ServiceApplication'))
+const Documents = lazy(() => import('./Documents'))
+const Messages = lazy(() => import('./Messages'))
+const Support = lazy(() => import('./Support'))
+const Billing = lazy(() => import('./Billing'))
+const BusinessProfile = lazy(() => import('./BusinessProfile'))
+const MyTeam = lazy(() => import('./MyTeam'))
+const TrustedContacts = lazy(() => import('./TrustedContacts'))
+const TrustedPortal = lazy(() => import('./TrustedPortal'))
+const Notifications = lazy(() => import('./Notifications'))
+const Security = lazy(() => import('./Security'))
+const ClientPortalDemo = lazy(() => import('./ClientPortalDemo'))
+const ModulePage = lazy(() => import('./ModulePage').then((m) => ({ default: m.ModulePage })))
+const CalendarPage = lazy(() => import('./CalendarPage'))
+const Properties = lazy(() => import('./Properties'))
+const PropertyProfile = lazy(() => import('./PropertyProfile'))
+const Matters = lazy(() => import('./Matters'))
+const MatterDetail = lazy(() => import('./MatterDetail'))
 
 function ClientShell() {
   const { workspace } = useAuth()
@@ -58,6 +60,7 @@ function CatchAll() {
 export default function PortalApp({ basePath }: { basePath: string }) {
   return (
     <BasePathProvider base={basePath}>
+      <Suspense fallback={<p className="px-4 py-8 text-sm text-slate-400">Loading…</p>}>
       <Routes>
         <Route path="login" element={<Login surface="client" />} />
         <Route path="signup" element={<Signup />} />
@@ -106,6 +109,7 @@ export default function PortalApp({ basePath }: { basePath: string }) {
         <Route path="_root" element={<PortalRoot />} />
         <Route path="*" element={<CatchAll />} />
       </Routes>
+      </Suspense>
     </BasePathProvider>
   )
 }

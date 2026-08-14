@@ -6,39 +6,43 @@ import './index.css'
 import './enterprise-polish.css'
 import './auth-light-fix.css'
 import './mobile-enterprise.css'
-import './public-motion.css'
-import './brand-motion.css'
-import './mail-workspace.css'
 import Home from './pages/Home'
-import ServicesOverview from './pages/public/ServicesOverview'
-import ServiceDetail from './pages/public/ServiceDetail'
-import { BusinessOperationsHub, PropertyFieldHub, MobileDocumentHub } from './pages/public/ServiceHubs'
-import ProjectGuidePage from './pages/public/ProjectGuides'
-import About from './pages/public/About'
-import HowItWorks from './pages/public/HowItWorks'
-import Resources from './pages/public/Resources'
-import ServiceArea from './pages/public/ServiceArea'
-import Contact from './pages/public/Contact'
-import Professionals from './pages/public/Professionals'
-import Terms from './pages/public/Terms'
-import Privacy from './pages/public/Privacy'
-import ElectronicCommunications from './pages/public/ElectronicCommunications'
-import Accessibility from './pages/public/Accessibility'
-import ProviderAgreement from './pages/public/ProviderAgreement'
-import VerifyDocument from './pages/public/VerifyDocument'
-import SignerExperience from './pages/public/SignerExperience'
-import SharedDocument from './pages/public/SharedDocument'
-import ScopeRequest from './pages/public/ScopeRequest'
-import ScopeConfirmation from './pages/public/ScopeConfirmation'
-import InstantQuote from './pages/public/InstantQuote'
-import QuoteView from './pages/public/QuoteView'
-import CarePlans, { CarePlansConfirmation } from './pages/public/CarePlans'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
 import { installAudioUnlock } from './lib/sound'
 import { AppToaster } from './components/kit/Toaster'
 import { LoadingScreen } from './components/LoadingScreen'
 import { ScrollToTop } from './components/ScrollToTop'
+
+const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
+const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
+const MailApp = lazy(() => import('./pages/mail/MailApp'))
+const ServicesOverview = lazy(() => import('./pages/public/ServicesOverview'))
+const ServiceDetail = lazy(() => import('./pages/public/ServiceDetail'))
+const BusinessOperationsHub = lazy(() => import('./pages/public/ServiceHubs').then((m) => ({ default: m.BusinessOperationsHub })))
+const PropertyFieldHub = lazy(() => import('./pages/public/ServiceHubs').then((m) => ({ default: m.PropertyFieldHub })))
+const MobileDocumentHub = lazy(() => import('./pages/public/ServiceHubs').then((m) => ({ default: m.MobileDocumentHub })))
+const ProjectGuidePage = lazy(() => import('./pages/public/ProjectGuides'))
+const About = lazy(() => import('./pages/public/About'))
+const HowItWorks = lazy(() => import('./pages/public/HowItWorks'))
+const Resources = lazy(() => import('./pages/public/Resources'))
+const ServiceArea = lazy(() => import('./pages/public/ServiceArea'))
+const Contact = lazy(() => import('./pages/public/Contact'))
+const Professionals = lazy(() => import('./pages/public/Professionals'))
+const Terms = lazy(() => import('./pages/public/Terms'))
+const Privacy = lazy(() => import('./pages/public/Privacy'))
+const ElectronicCommunications = lazy(() => import('./pages/public/ElectronicCommunications'))
+const Accessibility = lazy(() => import('./pages/public/Accessibility'))
+const ProviderAgreement = lazy(() => import('./pages/public/ProviderAgreement'))
+const VerifyDocument = lazy(() => import('./pages/public/VerifyDocument'))
+const SignerExperience = lazy(() => import('./pages/public/SignerExperience'))
+const SharedDocument = lazy(() => import('./pages/public/SharedDocument'))
+const ScopeRequest = lazy(() => import('./pages/public/ScopeRequest'))
+const ScopeConfirmation = lazy(() => import('./pages/public/ScopeConfirmation'))
+const InstantQuote = lazy(() => import('./pages/public/InstantQuote'))
+const QuoteView = lazy(() => import('./pages/public/QuoteView'))
+const CarePlans = lazy(() => import('./pages/public/CarePlans'))
+const CarePlansConfirmation = lazy(() => import('./pages/public/CarePlans').then((m) => ({ default: m.CarePlansConfirmation })))
 
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
@@ -68,6 +72,26 @@ const secureBase = isSecureHost ? (surface === 'admin' ? '/hq' : '') : ''
 document.documentElement.dataset.pmvSurface = surface
 installAudioUnlock()
 
+if (surface === 'public') {
+  void import('./public-motion.css')
+  void import('./brand-motion.css')
+} else {
+  void import('./mail-workspace.css')
+}
+
+const manifestHref = surface === 'admin' ? '/manifest-hq.json' : surface === 'portal' ? '/manifest-portal.json' : null
+if (manifestHref) {
+  const link = document.createElement('link')
+  link.rel = 'manifest'
+  link.href = manifestHref
+  document.head.appendChild(link)
+}
+if ((surface === 'admin' || surface === 'portal') && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
+
 function App() {
   if (surface === 'mail') {
     return <Suspense fallback={<SurfaceFallback variant="orb" label="Loading Mail Workspace…" />}><MailApp /></Suspense>
@@ -79,6 +103,7 @@ function App() {
     return <Suspense fallback={<SurfaceFallback variant="orb" label="Loading your portal…" />}><Routes><Route path="/*" element={<PortalApp basePath="" />} /></Routes></Suspense>
   }
   return (
+    <Suspense fallback={<SurfaceFallback />}>
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/services" element={<ServicesOverview />} />
@@ -115,6 +140,7 @@ function App() {
       <Route path="/admin/*" element={<Suspense fallback={<SurfaceFallback />}><AdminApp basePath="/admin" /></Suspense>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   )
 }
 

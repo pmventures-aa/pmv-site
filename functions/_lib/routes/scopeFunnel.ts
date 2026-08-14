@@ -265,11 +265,21 @@ scopeFunnelPublicRoutes.post('/scope-requests/:token/convert', requireUser, asyn
 scopeFunnelPublicRoutes.get('/public-proof', async (c) => {
   const serviceKey = clean(c.req.query('service_key'),100)
   const audience = clean(c.req.query('audience'),80)
+  const monthKey = new Date().toISOString().slice(0,7)
+  const cacheKey = `public-proof:${monthKey}:${serviceKey}:${audience}`
+  try {
+    const cached = await c.env.SESSIONS.get(cacheKey, 'json') as { case_studies: unknown; metrics: unknown } | null
+    if (cached && Array.isArray(cached.case_studies) && cached.metrics) {
+      c.header('Cache-Control','public, max-age=3600, s-maxage=2592000')
+      return c.json(cached)
+    }
+  } catch {
+    // KV miss/failure should not block the public page.
+  }
   const clauses = ['published=1']; const values:string[] = []
   if (serviceKey) { clauses.push('(service_key=? OR service_key IS NULL)'); values.push(serviceKey) }
   if (audience) { clauses.push('(audience=? OR audience IS NULL)'); values.push(audience) }
   const cases = await c.env.DB.prepare(`SELECT id,service_key,guide_slug,audience,headline,outcome,timeline_label,redacted_location,image_url,image_alt FROM public_case_studies WHERE ${clauses.join(' AND ')} ORDER BY sort_order,updated_at DESC LIMIT 4`).bind(...values).all()
-  const monthKey = new Date().toISOString().slice(0,7)
   let metrics = await c.env.DB.prepare('SELECT * FROM public_metric_snapshots WHERE month_key=?').bind(monthKey).first<any>()
   if (!metrics) {
     const [properties,jobs,response,states] = await Promise.all([
@@ -281,8 +291,14 @@ scopeFunnelPublicRoutes.get('/public-proof', async (c) => {
     metrics = {month_key:monthKey,properties_served:Number(properties?.n||0),jobs_completed:Number(jobs?.n||0),average_response_minutes:response?.n==null?null:Number(response.n),states_covered:Number(states?.n||0)}
     await c.env.DB.prepare('INSERT OR IGNORE INTO public_metric_snapshots(month_key,properties_served,jobs_completed,average_response_minutes,states_covered) VALUES(?,?,?,?,?)').bind(monthKey,metrics.properties_served,metrics.jobs_completed,metrics.average_response_minutes,metrics.states_covered).run()
   }
+  const payload = {case_studies:cases.results||[],metrics}
+  try {
+    await c.env.SESSIONS.put(cacheKey, JSON.stringify(payload), { expirationTtl: 600 })
+  } catch {
+    // Ignore cache write failures.
+  }
   c.header('Cache-Control','public, max-age=3600, s-maxage=2592000')
-  return c.json({case_studies:cases.results||[],metrics})
+  return c.json(payload)
 })
 
 scopeFunnelAdminRoutes.get('/scope-intake', requireStaff, async (c) => {
