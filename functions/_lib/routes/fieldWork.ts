@@ -13,6 +13,7 @@ import { requireNamedPermission } from '../capabilities'
 import { DispatchProviderConflict, loadDispatchProviderProfile, provisionDispatchProvider } from '../vendorStaging'
 import { toDisplayCase } from '../../../shared/displayCase'
 import { isEligibleProviderAccount } from '../../../shared/operations'
+import { estimateVendorFee, loadVendorFeeSettings, saveVendorFeeSettings } from '../vendorFeeAdjustment'
 
 export const fieldWorkRoutes = new Hono<AppEnv>()
 
@@ -150,6 +151,52 @@ fieldWorkRoutes.post('/dispatch-providers', requireStaff, async (c) => {
   }
 })
 
+fieldWorkRoutes.get('/dispatch-fee-settings', requireStaff, async (c) => {
+  const settings = await loadVendorFeeSettings(c.env)
+  return c.json({ settings })
+})
+
+fieldWorkRoutes.patch('/dispatch-fee-settings', requireStaff, async (c) => {
+  const body = await c.req.json<{
+    enabled?: boolean
+    max_adjustment_cents?: number
+    down_only?: boolean
+  }>().catch(() => ({} as Record<string, unknown>))
+
+  const current = await loadVendorFeeSettings(c.env)
+  const next = {
+    enabled: typeof body.enabled === 'boolean' ? body.enabled : current.enabled,
+    maxAdjustmentCents: typeof body.max_adjustment_cents === 'number' && Number.isFinite(body.max_adjustment_cents)
+      ? Math.min(5000, Math.max(100, Math.round(body.max_adjustment_cents)))
+      : current.maxAdjustmentCents,
+    downOnly: typeof body.down_only === 'boolean' ? body.down_only : current.downOnly,
+  }
+  await saveVendorFeeSettings(c.env, next)
+  return c.json({ settings: next })
+})
+
+fieldWorkRoutes.post('/dispatch-fee-estimate', requireStaff, async (c) => {
+  const body = await c.req.json<{
+    service_key?: string
+    site_postal_code?: string
+    site_city?: string
+    site_state?: string
+    base_cents?: number
+  }>().catch(() => ({} as Record<string, unknown>))
+
+  const serviceKey = typeof body.service_key === 'string' ? body.service_key.trim() : ''
+  if (!serviceKey) return c.json({ error: 'service_key is required' }, 400)
+
+  const estimate = await estimateVendorFee(c.env, {
+    service_key: serviceKey,
+    site_postal_code: typeof body.site_postal_code === 'string' ? body.site_postal_code : null,
+    site_city: typeof body.site_city === 'string' ? body.site_city : null,
+    site_state: typeof body.site_state === 'string' ? body.site_state : null,
+    base_cents: typeof body.base_cents === 'number' ? body.base_cents : null,
+  })
+  return c.json({ estimate })
+})
+
 fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   const user = c.get('user')
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
@@ -163,13 +210,36 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   if (!(await canAccessClient(c.env, user, clientUserId))) return c.json({ error: 'forbidden' }, 403)
   const eligibleProviderId = await resolveEligibleFieldProvider(c.env, vendorUserId)
   if (!eligibleProviderId) return c.json({ error: 'provider must be an active staff or admin account' }, 400)
+
+  let vendorFeeBaseCents = num(body.vendor_fee_base_cents)
+  let vendorFeeAdjustmentCents = num(body.vendor_fee_adjustment_cents) ?? 0
+  let vendorFeeCents = num(body.vendor_fee_cents)
+  let vendorFeeReason = typeof body.vendor_fee_reason === 'string' ? body.vendor_fee_reason.trim().slice(0, 500) : null
+
+  if (!vendorFeeCents && serviceKey) {
+    const estimate = await estimateVendorFee(c.env, {
+      service_key: serviceKey,
+      site_postal_code: typeof body.site_postal_code === 'string' ? body.site_postal_code : null,
+      site_city: typeof body.site_city === 'string' ? body.site_city : null,
+      site_state: typeof body.site_state === 'string' ? body.site_state : null,
+      base_cents: vendorFeeBaseCents,
+    })
+    vendorFeeBaseCents = estimate.baseCents
+    vendorFeeAdjustmentCents = estimate.adjustmentCents
+    vendorFeeCents = estimate.offeredCents
+    vendorFeeReason = estimate.reason
+  } else if (vendorFeeCents && vendorFeeBaseCents == null) {
+    vendorFeeBaseCents = Math.max(0, vendorFeeCents - vendorFeeAdjustmentCents)
+  }
+
   const id = uuid()
   await c.env.DB.prepare(
     `INSERT INTO field_assignments (
        id, kind, service_key, client_user_id, vendor_user_id, assigned_by_user_id,
        title, site_label, site_address, site_city, site_state, site_postal_code,
-       site_lat, site_lng, scheduled_at, notes
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       site_lat, site_lng, scheduled_at, notes,
+       vendor_fee_base_cents, vendor_fee_adjustment_cents, vendor_fee_cents, vendor_fee_reason
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id,
     kind,
@@ -187,13 +257,24 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
     num(body.site_lng),
     typeof body.scheduled_at === 'string' ? body.scheduled_at : null,
     (body.notes as string) || null,
+    vendorFeeBaseCents,
+    vendorFeeAdjustmentCents,
+    vendorFeeCents,
+    vendorFeeReason,
   ).run()
 
   await logActivity(c.env, {
     actorUserId: user.id,
     clientUserId,
     kind: 'field_assignment_created',
-    detail: { id, service_key: serviceKey, kind_value: kind, vendor_user_id: eligibleProviderId },
+    detail: {
+      id,
+      service_key: serviceKey,
+      kind_value: kind,
+      vendor_user_id: eligibleProviderId,
+      vendor_fee_cents: vendorFeeCents,
+      vendor_fee_adjustment_cents: vendorFeeAdjustmentCents,
+    },
   })
 
   const row = await loadAssignment(c.env, id)

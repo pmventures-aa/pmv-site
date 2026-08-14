@@ -20,6 +20,7 @@ import { useAuth } from '../../lib/auth'
 import { Avatar } from '../../components/kit/Avatar'
 import { toast } from '../../components/kit/toast'
 import { hqWorkspaceCopy } from '../../lib/workspace'
+import { formatVendorFee } from '../../../shared/vendorFeeAdjustment'
 
 interface Assignment {
   id: string
@@ -50,6 +51,10 @@ interface Assignment {
   client_name: string | null
   client_email: string | null
   vendor_name: string | null
+  vendor_fee_cents?: number | null
+  vendor_fee_base_cents?: number | null
+  vendor_fee_adjustment_cents?: number | null
+  vendor_fee_reason?: string | null
 }
 
 interface DocumentRow {
@@ -182,6 +187,14 @@ export function FieldWorkList() {
                     <p className="mt-2 truncate text-sm font-semibold text-white">{assignment.title || assignment.service_key.replace(/_/g, ' ')}</p>
                     <p className="mt-1 truncate text-xs text-slate-400">{siteLine(assignment)}</p>
                     <p className="mt-1 text-xs text-slate-500">Client: {assignment.client_name || assignment.client_email || 'Not provided'}</p>
+                    {assignment.vendor_fee_cents ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Offered payout: <span className="text-slate-300">{formatVendorFee(assignment.vendor_fee_cents)}</span>
+                        {assignment.vendor_fee_adjustment_cents ? (
+                          <span className="text-gold"> ({assignment.vendor_fee_adjustment_cents > 0 ? '+' : ''}{(assignment.vendor_fee_adjustment_cents / 100).toFixed(0)} local)</span>
+                        ) : null}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </button>
@@ -652,6 +665,23 @@ export default function FieldWorkDetail() {
               </a>
             )}
           </Panel>
+          {assignment.vendor_fee_cents ? (
+            <Panel>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Your payout offer</p>
+              <p className="mt-1 text-lg font-semibold text-white">{formatVendorFee(assignment.vendor_fee_cents)}</p>
+              {assignment.vendor_fee_base_cents && assignment.vendor_fee_base_cents !== assignment.vendor_fee_cents ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  Catalog base {formatVendorFee(assignment.vendor_fee_base_cents)}
+                  {assignment.vendor_fee_adjustment_cents ? (
+                    <span className="text-gold"> · {assignment.vendor_fee_adjustment_cents > 0 ? '+' : ''}{(assignment.vendor_fee_adjustment_cents / 100).toFixed(0)} local adjustment</span>
+                  ) : null}
+                </p>
+              ) : null}
+              {assignment.vendor_fee_reason ? (
+                <p className="mt-2 text-xs leading-5 text-slate-500">{assignment.vendor_fee_reason}</p>
+              ) : null}
+            </Panel>
+          ) : null}
           {assignment.notes && (
             <Panel>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Job notes</p>

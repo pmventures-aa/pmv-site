@@ -12,6 +12,8 @@ import { ScopeIntakePicker } from '../../components/admin/ScopeIntakePicker'
 import { fieldPrefillFromScope } from '../../../shared/scopeIntakePrefill'
 import { composeAddressQuery, isUsefulGeoQuery, type GeoHit } from '../../../shared/geocode'
 import { useAuth } from '../../lib/auth'
+import { DispatchFeeSettingsPanel } from '../../components/admin/DispatchFeeSettingsPanel'
+import { formatVendorFee, type VendorFeeEstimate } from '../../../shared/vendorFeeAdjustment'
 
 interface StaffOption { id: string; full_name: string | null; email: string; party_type: string | null; vendor_category: string | null }
 interface ClientOption { id: string; full_name: string | null; email: string; business_name: string | null }
@@ -32,6 +34,8 @@ interface Assignment {
   vendor_user_id: string
   completed_at: string | null
   audit_email_sent_at: string | null
+  vendor_fee_cents?: number | null
+  vendor_fee_adjustment_cents?: number | null
 }
 
 type MapPayload = {
@@ -49,8 +53,10 @@ type MapPayload = {
     arrival_lat: number | null
     arrival_lng: number | null
     vendor_user_id: string
-    vendor_name: string | null
-  }>
+  vendor_name: string | null
+  vendor_fee_cents?: number | null
+  vendor_fee_adjustment_cents?: number | null
+}>
   agents: Array<{
     user_id: string
     assignment_id: string | null
@@ -162,6 +168,8 @@ export default function FieldWorkAdmin() {
 
       <FieldLiveMap pins={mapPins} className="mb-4" />
 
+      {!showCreate && <DispatchFeeSettingsPanel className="mb-4" />}
+
       {showCreate && (
         <CreateAssignment
           initialVendorId={dispatchVendorId}
@@ -209,6 +217,12 @@ export default function FieldWorkAdmin() {
                   <p className="mt-1 text-xs text-slate-500">
                     Client: <span className="text-slate-300">{a.client_name || 'Not provided'}</span>
                     &nbsp;·&nbsp; Provider: <span className="text-slate-300">{a.vendor_name || 'Not provided'}</span>
+                    {a.vendor_fee_cents ? (
+                      <>
+                        &nbsp;·&nbsp; Fee: <span className="text-slate-300">{formatVendorFee(a.vendor_fee_cents)}</span>
+                        {a.vendor_fee_adjustment_cents ? <span className="text-gold"> ({a.vendor_fee_adjustment_cents > 0 ? '+' : ''}{(a.vendor_fee_adjustment_cents / 100).toFixed(0)} local)</span> : null}
+                      </>
+                    ) : null}
                   </p>
                 </div>
                 {a.scheduled_at && (
@@ -249,6 +263,9 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
   })
   const [saving, setSaving] = useState(false)
   const [geoStatus, setGeoStatus] = useState<'idle' | 'looking' | 'pinned' | 'miss'>('idle')
+  const [feeEstimate, setFeeEstimate] = useState<VendorFeeEstimate | null>(null)
+  const [feeManual, setFeeManual] = useState('')
+  const [feeLoading, setFeeLoading] = useState(false)
   const pinnedQueryRef = useRef('')
 
   useEffect(() => {
@@ -313,6 +330,33 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
       window.clearTimeout(handle)
     }
   }, [form.kind, form.site_address, form.site_city, form.site_state, form.site_postal_code])
+
+  useEffect(() => {
+    if (!form.service_key) return
+    let cancelled = false
+    const handle = window.setTimeout(async () => {
+      setFeeLoading(true)
+      try {
+        const res = await api.post<{ estimate: VendorFeeEstimate }>('/admin/dispatch-fee-estimate', {
+          service_key: form.service_key,
+          site_postal_code: form.site_postal_code || undefined,
+          site_city: form.site_city || undefined,
+          site_state: form.site_state || undefined,
+        })
+        if (cancelled) return
+        setFeeEstimate(res.estimate)
+        setFeeManual((res.estimate.offeredCents / 100).toFixed(2))
+      } catch {
+        if (!cancelled) setFeeEstimate(null)
+      } finally {
+        if (!cancelled) setFeeLoading(false)
+      }
+    }, 350)
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
+    }
+  }, [form.service_key, form.site_postal_code, form.site_city, form.site_state])
 
   async function submit() {
     if (!form.service_key) {
@@ -407,6 +451,10 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
         ...form,
         vendor_user_id: vendorUserId,
         client_user_id: clientUserId,
+        vendor_fee_base_cents: feeEstimate?.baseCents ?? null,
+        vendor_fee_adjustment_cents: feeEstimate?.adjustmentCents ?? 0,
+        vendor_fee_cents: feeManual ? Math.round(Number(feeManual) * 100) : feeEstimate?.offeredCents ?? null,
+        vendor_fee_reason: feeEstimate?.reason ?? null,
         site_lat: form.site_lat ? Number(form.site_lat) : null,
         site_lng: form.site_lng ? Number(form.site_lng) : null,
         scheduled_at: form.scheduled_at || null,
@@ -510,6 +558,44 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
               <p className="text-xs leading-5 text-slate-500 sm:col-span-2">Pinnacle will create the provider profile, connect this assignment to it, and add them to Network & Dispatch. You can finish vetting later.</p>
             </div>
           )}
+        </div>
+        <div className="sm:col-span-2 rounded-xl border border-gold/15 bg-gold/[.03] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <span className="block text-xs font-semibold text-slate-200">Provider payout offer</span>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Snapdocs-style local adjustment uses recent payouts near the job ZIP to suggest a fee providers are more likely to accept.</p>
+            </div>
+            {feeLoading && <span className="text-xs text-slate-500">Calculating…</span>}
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,180px)_1fr]">
+            <label>
+              <span className="mb-1 block text-xs text-slate-400">Offered fee</span>
+              <input
+                className={inputCls}
+                type="number"
+                min="0"
+                step="0.01"
+                value={feeManual}
+                onChange={(e) => setFeeManual(e.target.value)}
+                placeholder="0.00"
+              />
+            </label>
+            <div className="text-xs leading-5 text-slate-400">
+              {feeEstimate ? (
+                <>
+                  <p>
+                    Base catalog payout: <span className="text-slate-200">{formatVendorFee(feeEstimate.baseCents)}</span>
+                    {feeEstimate.marketMedianCents ? (
+                      <> · Recent local median: <span className="text-slate-200">{formatVendorFee(feeEstimate.marketMedianCents)}</span> ({feeEstimate.sampleSize} jobs)</>
+                    ) : null}
+                  </p>
+                  <p className="mt-1">{feeEstimate.reason}</p>
+                </>
+              ) : (
+                <p>Enter a service and ZIP to calculate a suggested provider fee.</p>
+              )}
+            </div>
+          </div>
         </div>
         <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Title</span><input className={inputCls} placeholder='e.g. "Loan signing: Boca Raton office"' value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Scheduled for</span><input className={inputCls} type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}/></label>

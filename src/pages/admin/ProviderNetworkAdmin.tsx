@@ -29,6 +29,7 @@ import {
   type NetworkView,
 } from '../../lib/networkRoster'
 import { FieldLiveMap, type FieldMapPin } from '../../components/admin/FieldLiveMap'
+import { DispatchFeeSettingsPanel } from '../../components/admin/DispatchFeeSettingsPanel'
 import { useAuth } from '../../lib/auth'
 import { locationAgeLabel, locationFreshness } from '../../../shared/operations'
 
@@ -228,6 +229,8 @@ export default function ProviderNetworkAdmin() {
         <Metric icon={ShieldCheck} label="In vetting" value={providers.filter((r) => r.network_status === 'vetting' || r.status === 'pending').length} />
         <Metric icon={MapPinned} label="Open dispatch" value={providers.reduce((n, r) => n + openLoad(r), 0)} />
       </div>
+
+      <DispatchFeeSettingsPanel className="mb-4" />
 
       <FieldLiveMap
         pins={mapPins}
