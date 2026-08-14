@@ -295,9 +295,9 @@ export function publicIntakeCopy(world: OperatingWorld) {
   }
   return {
     eyebrow: 'Start here',
-    title: 'Tell us what needs to be handled.',
-    body: 'One defined task or several connected pieces. Give us the practical facts and we will identify the scope, the right people, and the next step.',
-    cta: 'Send my request',
+    title: 'Tell Us What You Need Help With',
+    body: 'One defined task or several connected pieces. You do not need professional terminology. Give us the practical facts and we will identify the scope, the right people, and the next step.',
+    cta: 'Submit My Request',
     pickerTitle: 'What outcome are you after?',
     locationTitle: 'Where does the work need to happen?',
   }

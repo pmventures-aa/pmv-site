@@ -109,7 +109,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       <div className="flex flex-wrap items-center gap-2">
         {canSetStatusDropdown && config.statusOptions ? (
           <select
-            className="rounded-lg border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
+            className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white"
             value={row[config.statusField!]}
             onChange={(e) => setStatus(row.id, e.target.value)}
           >
@@ -156,8 +156,8 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
       />
 
       {showForm && config.createFields && (
-        <Card className="mb-6">
-          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
+        <Card className="mb-4">
+          <form onSubmit={onCreate} className="grid gap-3 sm:grid-cols-2">
             {config.createFields.map((f) => (
               <label key={f.key} className={f.type === 'textarea' ? 'sm:col-span-2' : ''}>
                 <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">{f.label}</span>
@@ -193,23 +193,23 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
 
       <Card className="overflow-x-auto !p-0">
         {loading ? (
-          <div className="p-6 text-sm text-slate-400">Loading…</div>
+          <div className="p-4 text-sm text-slate-400">Loading…</div>
         ) : loadError ? (
-          <div className="space-y-2 p-6 text-sm text-slate-400">
+          <div className="space-y-2 p-4 text-sm text-slate-400">
             <p>Couldn't load this list.</p>
             <button onClick={() => load()} className="text-gold hover:underline">
               Try again
             </button>
           </div>
         ) : items.length === 0 ? (
-          <div className="p-6">
+          <div className="p-4">
             <EmptyState label={config.emptyLabel} />
           </div>
         ) : (
           <>
             <ul className="divide-y divide-white/10 md:hidden">
               {items.map((row, i) => (
-                <li key={row.id ?? i} className="space-y-2 px-4 py-4">
+                <li key={row.id ?? i} className="space-y-1.5 px-3 py-3">
                   {config.columns.map((col, index) => (
                     <div key={col.key} className={index === 0 ? '' : 'flex items-start justify-between gap-3 text-xs'}>
                       {index === 0 ? (
@@ -231,27 +231,27 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
               <thead>
                 <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                   {config.columns.map((col) => (
-                    <th key={col.key} className="whitespace-nowrap px-5 py-3 font-medium">
+                    <th key={col.key} className="whitespace-nowrap px-3 py-2 font-medium">
                       {col.label}
                     </th>
                   ))}
-                  {config.statusField && <th className="whitespace-nowrap px-5 py-3 font-medium">Status</th>}
-                  {config.rowActions && <th className="whitespace-nowrap px-5 py-3 font-medium">Calendar</th>}
+                  {config.statusField && <th className="whitespace-nowrap px-3 py-2 font-medium">Status</th>}
+                  {config.rowActions && <th className="whitespace-nowrap px-3 py-2 font-medium">Calendar</th>}
                 </tr>
               </thead>
               <tbody>
                 {items.map((row, i) => (
                   <tr key={row.id ?? i} className="border-b border-white/5 last:border-0">
                     {config.columns.map((col) => (
-                      <td key={col.key} className="whitespace-nowrap px-5 py-3 text-slate-200">
+                      <td key={col.key} className="whitespace-nowrap px-3 py-2 text-slate-200">
                         {col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')}
                       </td>
                     ))}
                     {config.statusField && (
-                      <td className="whitespace-nowrap px-5 py-3">{statusControls(row)}</td>
+                      <td className="whitespace-nowrap px-3 py-2">{statusControls(row)}</td>
                     )}
                     {config.rowActions && (
-                      <td className="whitespace-nowrap px-5 py-3">{config.rowActions(row)}</td>
+                      <td className="whitespace-nowrap px-3 py-2">{config.rowActions(row)}</td>
                     )}
                   </tr>
                 ))}

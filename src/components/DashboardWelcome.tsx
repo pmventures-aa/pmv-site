@@ -47,10 +47,35 @@ export function DashboardWelcome({
     setQuote(next)
   }
 
-  const rounded = variant === 'portal' ? 'rounded-2xl' : 'rounded-xl'
+  if (variant === 'portal') {
+    return (
+      <section className={`pmv-welcome relative overflow-hidden rounded-md border border-white/10 bg-navy-950/80 ${className}`} aria-label={`${time.label}, ${displayName}`}>
+        <div className={`pointer-events-none absolute inset-0 pmv-welcome-wash pmv-welcome-wash-${time.period}`} />
+        <div className="relative flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
+          <div className="flex min-w-0 items-center gap-3">
+            <SkyMark period={time.period} className="h-10 w-[60px] shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/80">{time.label} · {dateLabel}</p>
+              <h1 className="mt-0.5 font-display text-xl font-medium text-white">{displayName}, welcome in.</h1>
+              {subtitle && <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
+            </div>
+          </div>
+          <div className="min-w-0 max-w-md">
+            <p className="text-xs leading-5 text-slate-400">
+              <span className="text-slate-200">{quote.text}</span>
+              <span className="ml-1.5 text-slate-500">{quote.author}</span>
+            </p>
+            <button type="button" onClick={anotherQuote} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-gold hover:text-gold-300">
+              <RefreshCw size={11} /> Another
+            </button>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   return (
-    <section className={`pmv-welcome relative overflow-hidden border border-white/10 bg-navy-950/80 ${rounded} ${className}`} aria-label={`${time.label}, ${displayName}`}>
+    <section className={`pmv-welcome relative overflow-hidden rounded-xl border border-white/10 bg-navy-950/80 ${className}`} aria-label={`${time.label}, ${displayName}`}>
       <div className={`pointer-events-none absolute inset-0 pmv-welcome-wash pmv-welcome-wash-${time.period}`} />
       <div className="relative grid gap-6 p-5 sm:p-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(280px,.95fr)] xl:items-center xl:gap-10">
         <div className="flex items-center gap-4 sm:gap-5">

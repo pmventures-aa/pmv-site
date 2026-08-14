@@ -171,26 +171,26 @@ export default function Dashboard() {
   const shortcuts = copy.shortcutKeys.map((key) => shortcutCatalog[key])
 
   return (
-    <motion.div className="pb-8 lg:pb-4" initial="hidden" animate="show" variants={pmvStagger}>
-      <GetStartedPrompt className="mb-6" />
+    <motion.div className="pb-4" initial="hidden" animate="show" variants={pmvStagger}>
+      <GetStartedPrompt className="mb-3" />
 
-      <motion.header variants={pmvFadeUp} className="pb-2">
+      <motion.header variants={pmvFadeUp} className="pb-1">
         <DashboardWelcome name={user?.first_name || user?.full_name} userId={user?.id} variant="portal" subtitle={copy.homeSubtitle} />
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-3 flex flex-wrap gap-2">
           <Link to={p(copy.primaryCta.to)} className="btn-gold">{copy.primaryCta.label}</Link>
           <Link to={p(copy.secondaryCta.to)} className="btn-outline">{copy.secondaryCta.label}</Link>
         </div>
       </motion.header>
 
-      <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-        <div className="min-w-0 space-y-8">
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(240px,300px)]">
+        <div className="min-w-0 space-y-5">
           {nextMove && (
-            <motion.section variants={pmvFadeUp} className="rounded-2xl border border-gold/20 bg-gradient-to-br from-gold/[.08] via-white/[.02] to-transparent p-5 sm:p-6">
-              <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-gold/80">{nextMove.eyebrow}</p>
-              <h2 className="mt-2 font-display text-xl font-medium text-white sm:text-2xl">{nextMove.title}</h2>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">{nextMove.body}</p>
-              <Link to={nextMove.to} className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-gold hover:underline">
-                {nextMove.label} <ArrowRight size={14} />
+            <motion.section variants={pmvFadeUp} className="rounded-md border border-gold/20 bg-gold/[.04] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-gold/80">{nextMove.eyebrow}</p>
+              <h2 className="mt-1 font-display text-lg font-medium text-white">{nextMove.title}</h2>
+              <p className="mt-1 max-w-xl text-sm text-slate-400">{nextMove.body}</p>
+              <Link to={nextMove.to} className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-gold hover:underline">
+                {nextMove.label} <ArrowRight size={13} />
               </Link>
             </motion.section>
           )}
@@ -204,9 +204,9 @@ export default function Dashboard() {
               <Link to={p('matters')} className="text-xs font-semibold text-gold hover:underline">View all work</Link>
             </div>
             {!loaded ? (
-              <div className="h-28 animate-pulse rounded-xl border border-white/[.06] bg-white/[.02]" />
+              <div className="h-16 animate-pulse rounded-md border border-white/[.06] bg-white/[.02]" />
             ) : matters.length === 0 && cases.length === 0 ? (
-              <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] px-5 py-4">
+              <div className="rounded-md border border-emerald-400/20 bg-emerald-400/[.04] px-3 py-2.5">
                 <p className="text-sm font-medium text-white">Nothing is currently required from you.</p>
                 <p className="mt-1 text-xs leading-5 text-slate-400">Something come up? <Link to={p('support')} className="font-semibold text-gold hover:underline">Start a request</Link></p>
               </div>
@@ -234,7 +234,7 @@ export default function Dashboard() {
                   const yours = waitingOnYou(item.waiting_on)
                   return (
                     <li key={item.id}>
-                      <Link to={p('support')} className="grid gap-2 py-4 sm:grid-cols-[1fr_150px_auto] sm:items-center">
+                      <Link to={p('support')} className="grid gap-2 py-2.5 sm:grid-cols-[1fr_150px_auto] sm:items-center">
                         <span>
                           <strong className="block text-sm font-semibold text-white">{item.subject}</strong>
                           <span className="mt-0.5 block text-xs text-slate-500">
@@ -265,7 +265,7 @@ export default function Dashboard() {
               <ul className="divide-y divide-white/[.08] border-y border-white/[.08]">
                 {data.properties.slice(0, 4).map((property) => (
                   <li key={property.id}>
-                    <Link to={p(`property-management/${property.id}`)} className="flex items-center justify-between gap-3 py-3.5">
+                    <Link to={p(`property-management/${property.id}`)} className="flex items-center justify-between gap-3 py-2.5">
                       <span className="min-w-0">
                         <span className="flex items-center gap-2 text-sm font-medium text-white">
                           <Building2 size={14} className="shrink-0 text-gold/80" />
@@ -282,8 +282,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        <aside className="space-y-6">
-          <motion.section variants={pmvFadeUp} className="rounded-2xl border border-white/[.08] bg-white/[.02] p-5">
+        <aside className="space-y-4">
+          <motion.section variants={pmvFadeUp} className="rounded-md border border-white/[.08] bg-white/[.02] p-3">
             <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Relationship pulse</p>
             <dl className="mt-3 divide-y divide-white/[.08] border-y border-white/[.08]">
               {[
@@ -293,7 +293,7 @@ export default function Dashboard() {
                 ['Quotes to review', loaded ? String(stats?.pending_quotes ?? 0) : '…'],
                 ['Open invoices', loaded ? String(stats?.open_invoices ?? 0) : '…'],
               ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between gap-4 py-3 text-sm">
+                <div key={label} className="flex items-center justify-between gap-3 py-2 text-sm">
                   <dt className="text-slate-500">{label}</dt>
                   <dd className="text-right font-medium text-slate-200">{value}</dd>
                 </div>
@@ -302,8 +302,8 @@ export default function Dashboard() {
           </motion.section>
 
           {nextAppointment ? (
-            <motion.section variants={pmvFadeUp} className="rounded-2xl border border-white/[.08] bg-white/[.02] p-5">
-              <div className="mb-3 flex items-center justify-between">
+            <motion.section variants={pmvFadeUp} className="rounded-md border border-white/[.08] bg-white/[.02] p-3">
+              <div className="mb-2 flex items-center justify-between">
                 <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Coming up</p>
                 <Link to={p('calendar')} className="text-xs font-semibold text-gold hover:underline">Calendar</Link>
               </div>
@@ -322,7 +322,7 @@ export default function Dashboard() {
           ) : null}
 
           {!!data?.enabled_services?.length && (
-            <motion.section variants={pmvFadeUp} className="rounded-2xl border border-white/[.08] bg-white/[.02] p-5">
+            <motion.section variants={pmvFadeUp} className="rounded-md border border-white/[.08] bg-white/[.02] p-3">
               <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Connected services</p>
               <ul className="mt-3 space-y-2">
                 {data.enabled_services.slice(0, 5).map((service) => (
@@ -337,39 +337,39 @@ export default function Dashboard() {
         </aside>
       </div>
 
-      <motion.section variants={pmvFadeUp} className="mt-10">
+      <motion.section variants={pmvFadeUp} className="mt-6">
         <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-slate-500">Jump to</p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {shortcuts.map((item) => (
             <Link
               key={item.label}
               to={item.to}
-              className="inline-flex items-center gap-2 rounded-full border border-white/[.08] bg-white/[.02] px-3.5 py-2 text-sm text-slate-300 transition hover:border-gold/30 hover:bg-gold/[.04] hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/[.08] bg-white/[.02] px-2.5 py-1.5 text-xs text-slate-300 transition hover:border-gold/30 hover:bg-gold/[.04] hover:text-white"
             >
-              <item.icon size={14} className="text-gold/80" />
+              <item.icon size={13} className="text-gold/80" />
               {item.label}
-              {item.note ? <span className="rounded-full bg-gold px-1.5 text-[10px] font-bold text-navy-950">{item.note}</span> : null}
+              {item.note ? <span className="rounded-sm bg-gold px-1 text-[10px] font-bold text-navy-950">{item.note}</span> : null}
             </Link>
           ))}
         </div>
       </motion.section>
 
       {undiscoveredServices.length > 0 && (
-        <motion.section variants={pmvFadeUp} className="mt-10 border-t border-white/[.06] pt-8">
-          <div className="mb-4 flex items-end justify-between gap-4">
+        <motion.section variants={pmvFadeUp} className="mt-6 border-t border-white/[.06] pt-5">
+          <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-slate-500">More from Pinnacle</p>
-              <h2 className="mt-1 font-display text-xl font-medium text-white">{copy.discoveryTitle}</h2>
-              <p className="mt-1 max-w-xl text-sm text-slate-500">{copy.discoveryBody}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-slate-500">More from Pinnacle</p>
+              <h2 className="mt-0.5 font-display text-base font-medium text-white">{copy.discoveryTitle}</h2>
+              <p className="mt-0.5 max-w-xl text-xs text-slate-500">{copy.discoveryBody}</p>
             </div>
             <Link to={p('services')} className="text-xs font-semibold text-gold hover:underline">See everything</Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {undiscoveredServices.map((service) => (
               <Link
                 key={service.key}
                 to={p(`services/${service.key}/apply`)}
-                className="group flex items-center justify-between gap-3 rounded-xl border border-white/[.06] bg-white/[.015] px-4 py-3.5 transition hover:border-gold/25 hover:bg-white/[.03]"
+                className="group flex items-center justify-between gap-3 rounded-md border border-white/[.06] bg-white/[.015] px-3 py-2.5 transition hover:border-gold/25 hover:bg-white/[.03]"
               >
                 <span className="min-w-0">
                   <span className="block text-[10px] font-semibold uppercase tracking-[.14em] text-slate-500">{service.category || 'Service'}</span>

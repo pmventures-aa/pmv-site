@@ -63,9 +63,6 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
     }
   }
 
-  const signupQuery = serviceKey
-    ? `?service=${encodeURIComponent(serviceKey)}${offeringId ? `&offering=${encodeURIComponent(offeringId)}` : ''}`
-    : ''
   const forgotQuery = `?surface=${surface}${email ? `&email=${encodeURIComponent(email)}` : ''}`
 
   return (
@@ -73,10 +70,11 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
       surface={surface}
       liveCopy
       eyebrow={surface === 'staff' ? hqCopy.loginEyebrow : clientCopy.loginEyebrow}
-      title={surface === 'staff' ? 'Come back in' : 'Your workspace'}
+      title={surface === 'staff' ? 'Come back in' : 'Welcome Back to Pinnacle'}
+      subtitle={surface === 'client' ? 'Access your matters, documents, agreements, billing, and updates.' : undefined}
       sideLabel={surface === 'staff' ? hqCopy.badge : clientCopy.badge}
       footer={surface === 'client'
-        ? <span>New to Pinnacle? <Link to={`../signup${signupQuery}`} className="font-bold text-gold transition hover:text-gold-300">Start your workspace</Link></span>
+        ? <span>Not a client yet? <a href="/scope-request?source=login" className="font-bold text-gold transition hover:text-gold-300">Start a Request</a></span>
         : <span className="text-slate-500">HQ and provider access is provisioned by Pinnacle.</span>}
     >
       <ErrorBanner message={error} />
@@ -103,9 +101,9 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
           <div className="flex items-start gap-3">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-gold/20 bg-gold/[.06] text-gold"><LockKeyhole size={15} /></span>
             <div>
-              <p className="text-sm font-bold text-white">Need a different kind of help?</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Property, documents, operations, and funding each have their own workspace. Start from the work in front of you.</p>
-              <Link to={`../signup${signupQuery}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-gold hover:text-gold-300"><LockKeyhole size={13} /> Start your workspace</Link>
+              <p className="text-sm font-bold text-white">Not a client yet?</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Start with the situation. We will help determine the next step.</p>
+              <a href="/scope-request?source=login" className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-gold hover:text-gold-300">Start a Request</a>
             </div>
           </div>
         </div>

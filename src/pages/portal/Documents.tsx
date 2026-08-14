@@ -71,14 +71,14 @@ export default function Documents() {
       <PageHeader
         eyebrow="Files"
         title="Documents"
-        subtitle="Documents you’ve shared with Pinnacle through service applications and other portal workflows. Staff-only internal documents are never shown here."
+        subtitle="Files you shared with Pinnacle. Staff-only files stay hidden."
         action={<button className="btn-outline" onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancel' : '+ Log expected document'}</button>}
       />
 
       {showForm && (
-        <Card className="mb-6">
-          <p className="mb-4 text-sm leading-relaxed text-slate-400">Use this to note a document you plan to provide outside an intake wizard. Actual intake file uploads happen securely inside the application when requested.</p>
-          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-3">
+        <Card className="mb-4">
+          <p className="mb-3 text-xs text-slate-400">Note a file you will send outside an intake. Uploads happen inside the application when requested.</p>
+          <form onSubmit={onCreate} className="grid gap-3 sm:grid-cols-3">
             <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Category</span><input className={inputCls} value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} placeholder="agreement, financial…" /></label>
             <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Tax year</span><input className={inputCls} type="number" value={form.tax_year} onChange={(e) => setForm((f) => ({ ...f, tax_year: e.target.value }))} /></label>
             <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">File name / description</span><input className={inputCls} value={form.file_name} onChange={(e) => setForm((f) => ({ ...f, file_name: e.target.value }))} /></label>
@@ -88,20 +88,20 @@ export default function Documents() {
       )}
 
       <Card className="overflow-x-auto !p-0">
-        {loading ? <div className="p-6 text-sm text-slate-400">Loading…</div> : loadError ? (
-          <div className="space-y-2 p-6 text-sm text-slate-400"><p>Couldn't load documents.</p><button onClick={() => load()} className="text-gold hover:underline">Try again</button></div>
-        ) : docs.length === 0 ? <div className="p-6"><EmptyState label="No client-visible documents yet." /></div> : (
+        {loading ? <div className="p-4 text-sm text-slate-400">Loading…</div> : loadError ? (
+          <div className="space-y-2 p-4 text-sm text-slate-400"><p>Couldn't load documents.</p><button onClick={() => load()} className="text-gold hover:underline">Try again</button></div>
+        ) : docs.length === 0 ? <div className="p-4"><EmptyState label="No client-visible documents yet." /></div> : (
           <table className="w-full min-w-[600px] text-sm">
-            <thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500"><th className="px-5 py-3 font-medium">File</th><th className="px-5 py-3 font-medium">Category</th><th className="px-5 py-3 font-medium">Tax year</th><th className="px-5 py-3 font-medium">Status</th></tr></thead>
+            <thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500"><th className="px-3 py-2 font-medium">File</th><th className="px-3 py-2 font-medium">Category</th><th className="px-3 py-2 font-medium">Tax year</th><th className="px-3 py-2 font-medium">Status</th></tr></thead>
             <tbody>{docs.map((doc) => (
               <tr key={doc.id} className="border-b border-white/5 last:border-0">
-                <td className="px-5 py-3">
+                <td className="px-3 py-2">
                   {doc.r2_key ? <a href={`/api/portal/documents/${doc.id}/file`} target="_blank" rel="noreferrer" className="font-medium text-gold hover:underline">{doc.file_name ?? 'Open document'}</a> : <span className="text-slate-200">{doc.file_name ?? 'Not provided'}</span>}
                   {doc.size_bytes ? <span className="ml-2 text-xs text-slate-500">{sizeLabel(doc.size_bytes)}</span> : null}
                 </td>
-                <td className="px-5 py-3 text-slate-200">{doc.category?.replace(/_/g, ' ') ?? 'Not provided'}</td>
-                <td className="px-5 py-3 text-slate-200">{doc.tax_year ?? 'Not provided'}</td>
-                <td className="px-5 py-3"><StatusBadge tone={doc.review_status === 'approved' ? 'green' : doc.review_status === 'rejected' ? 'red' : 'gold'}>{doc.review_status}</StatusBadge></td>
+                <td className="px-3 py-2 text-slate-200">{doc.category?.replace(/_/g, ' ') ?? 'Not provided'}</td>
+                <td className="px-3 py-2 text-slate-200">{doc.tax_year ?? 'Not provided'}</td>
+                <td className="px-3 py-2"><StatusBadge tone={doc.review_status === 'approved' ? 'green' : doc.review_status === 'rejected' ? 'red' : 'gold'}>{doc.review_status}</StatusBadge></td>
               </tr>
             ))}</tbody>
           </table>
