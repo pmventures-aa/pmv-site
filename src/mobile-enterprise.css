@@ -192,6 +192,13 @@ body { -webkit-text-size-adjust: 100%; }
   }
 }
 
+/* Vendor HQ bottom tab bar clearance (portal already uses pb-20 on Shell) */
+@media (max-width: 1023px) {
+  [data-pmv-surface='admin'] [aria-label='Primary vendor destinations'] {
+    padding-bottom: max(0.4rem, env(safe-area-inset-bottom));
+  }
+}
+
 /* Landscape phones: keep hero from taking full viewport when height is limited */
 @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
   [data-pmv-surface='public'] .pmv-hero-story {
