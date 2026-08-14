@@ -2,10 +2,18 @@ import { Eye, EyeOff, LockKeyhole } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth, isApiError } from '../../lib/auth'
+import { api } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
+import { Auth0Buttons, AuthDivider, type Auth0ProviderId, type Auth0ProviderOption } from '../../components/auth/Auth0Buttons'
 import { clientWorkspaceForWorld, hqWorkspaceCopy, rememberOperatingWorld, rememberedHqParty, rememberedWorld, worldFromServiceParam } from '../../lib/workspace'
+
+const AUTH_ERROR_COPY: Record<string, string> = {
+  signin: 'We could not complete sign-in. If you already have a Pinnacle account, sign in with your email and password, then connect this method from Account Security.',
+  link: 'If this sign-in method can be connected to your Pinnacle account, check your email for a confirmation link. You can also sign in with your password and connect it from Account Security.',
+  unavailable: 'This sign-in method is unavailable right now. Please use your email and password.',
+}
 
 export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const { login, logout } = useAuth()
@@ -19,17 +27,49 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [providers, setProviders] = useState<Auth0ProviderOption[]>([])
 
   const clientWorld = useMemo(() => worldFromServiceParam(serviceKey) || rememberedWorld() || 'general', [serviceKey])
   const clientCopy = clientWorkspaceForWorld(clientWorld)
   const hqCopy = hqWorkspaceCopy(rememberedHqParty())
+  const showAuth0 = surface === 'client' && providers.length > 0
 
   useEffect(() => {
     if (surface === 'client' && clientWorld !== 'general') rememberOperatingWorld(clientWorld)
   }, [surface, clientWorld])
 
+  useEffect(() => {
+    const code = params.get('auth_error')
+    if (code && AUTH_ERROR_COPY[code]) setError(AUTH_ERROR_COPY[code])
+  }, [params])
+
+  useEffect(() => {
+    if (surface !== 'client') return
+    api.get<{ enabled: boolean; providers: Auth0ProviderOption[] }>('/auth/auth0/status')
+      .then((data) => setProviders(data.enabled ? data.providers : []))
+      .catch(() => setProviders([]))
+  }, [surface])
+
+  function returnToPath() {
+    if (serviceKey) {
+      const offeringQuery = offeringId ? `?offering=${encodeURIComponent(offeringId)}` : ''
+      return `${p(`services/${encodeURIComponent(serviceKey)}/apply`)}${offeringQuery}`
+    }
+    return p()
+  }
+
+  function startProvider(id: Auth0ProviderId) {
+    if (busy) return
+    primeAudio()
+    setBusy(true)
+    setError(null)
+    const returnTo = encodeURIComponent(returnToPath())
+    window.location.assign(`/api/auth/auth0/login?connection=${encodeURIComponent(id)}&returnTo=${returnTo}`)
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (busy) return
     primeAudio()
     setError(null)
     setBusy(true)
@@ -81,19 +121,30 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
       {serviceKey && surface === 'client' && (
         <p className="mb-4 text-xs leading-5 text-slate-400">After you sign in, we will return you to the service you were exploring.</p>
       )}
+
+      {showAuth0 && (
+        <>
+          <Auth0Buttons providers={providers} busy={busy} onStart={startProvider} />
+          <p className="mt-3 text-center text-[11px] leading-5 text-slate-500">
+            By continuing with Google or Microsoft, you agree to the <a href="/terms" className="font-semibold text-gold hover:text-gold-300">Terms of Service</a> and <a href="/privacy" className="font-semibold text-gold hover:text-gold-300">Privacy Policy</a>.
+          </p>
+          <AuthDivider />
+        </>
+      )}
+
       <form onSubmit={onSubmit} className="space-y-5">
         <Field label="Email Address">
-          <input className={inputCls} type="email" autoComplete="email" inputMode="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+          <input className={inputCls} type="email" autoComplete="email" inputMode="email" required autoFocus={!showAuth0} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
         </Field>
         <Field label="Password" hint={<Link to={`../forgot-password${forgotQuery}`} className="font-semibold text-gold hover:text-gold-300">Forgot password?</Link>}>
           <div className="relative">
             <input className={`${inputCls} pr-12`} type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
-            <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-500 transition hover:text-gold" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+            <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-500 transition hover:text-gold focus-visible:text-gold" aria-label={showPassword ? 'Hide password' : 'Show password'}>
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
         </Field>
-        <button type="submit" disabled={busy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
+        <button type="submit" disabled={busy} aria-busy={busy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
       </form>
 
       {surface === 'client' && (

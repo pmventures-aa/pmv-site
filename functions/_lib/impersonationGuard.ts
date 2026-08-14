@@ -13,6 +13,9 @@ import { uuid } from './crypto'
 const DENYLIST: Array<{ method: string; path: string; reason: string }> = [
   { method: 'POST', path: '/api/auth/change-password', reason: 'password change during impersonation' },
   { method: 'POST', path: '/api/auth/logout', reason: 'logout during impersonation - use /admin/impersonate/end' },
+  { method: 'POST', path: '/api/auth/auth0/link', reason: 'identity linking during impersonation' },
+  { method: 'POST', path: '/api/auth/auth0/unlink', reason: 'identity unlinking during impersonation' },
+  { method: 'GET', path: '/api/auth/auth0/logout', reason: 'logout during impersonation - use /admin/impersonate/end' },
   { method: 'POST', path: '/api/admin/impersonate', reason: 'nested impersonation' },
   { method: 'DELETE', path: '/api/me', reason: 'account deletion during impersonation' },
   { method: 'POST', path: '/api/me/two-factor/disable', reason: '2FA disable during impersonation' },

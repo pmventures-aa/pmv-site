@@ -28,7 +28,11 @@ Built to run entirely on **Cloudflare** (Pages + Functions + D1 + KV).
 - **API:** Hono, running as Cloudflare Pages Functions at `/api/*`
 - **Database:** Cloudflare D1 (SQLite) — 18 tables, app-level access control
 - **Sessions:** Cloudflare KV
-- **Auth:** Email + password (PBKDF2-SHA256, HMAC-peppered), opaque KV-backed sessions
+- **Auth:** Email + password (PBKDF2-SHA256, HMAC-peppered) with optional Auth0
+  Universal Login (Google / Microsoft) as an identity provider. Auth0 never
+  grants access on its own — the backend maps a verified Auth0 identity to an
+  internal Pinnacle user and issues the same HttpOnly session cookie used by
+  password login.
 
 ## Run it locally
 

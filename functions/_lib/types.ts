@@ -19,6 +19,18 @@ export interface Env {
   RESEND_WEBHOOK_SECRET?: string
   // Resend receiving domain (*.resend.app). From still uses RESEND_FROM_EMAIL.
   RESEND_INBOUND_DOMAIN?: string
+  // Optional Auth0 Regular Web Application (server-only). When unset, Auth0
+  // sign-in is disabled and provider buttons are hidden. Partial configuration
+  // is treated as invalid rather than showing a non-functional button.
+  AUTH0_DOMAIN?: string
+  AUTH0_CLIENT_ID?: string
+  AUTH0_CLIENT_SECRET?: string
+  AUTH0_AUDIENCE?: string
+  AUTH0_CALLBACK_URL?: string
+  AUTH0_LOGOUT_URL?: string
+  AUTH0_CONNECTIONS?: string
+  AUTH0_GOOGLE_CONNECTION?: string
+  AUTH0_MICROSOFT_CONNECTION?: string
 }
 
 export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'

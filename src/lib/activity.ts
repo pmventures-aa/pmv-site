@@ -20,6 +20,8 @@ const SECURITY_KINDS = new Set<string>([
   'login',
   'logout',
   'login_failed',
+  'identity_linked',
+  'identity_unlinked',
   'password_changed',
   'password_reset',
   'permission_changed',
@@ -157,6 +159,8 @@ export function describeActivity(e: ActivityEvent): string {
     case 'login': return `${actor} signed in${d.location ? ` from ${d.location}` : ''}${d.ip ? ` · ${d.ip}` : ''}`
     case 'logout': return `${actor} signed out`
     case 'login_failed': return `Failed sign-in attempt for ${d.email || 'a user'}${d.ip ? ` from ${d.ip}` : ''}`
+    case 'identity_linked': return `${actor} connected a ${d.provider || 'sign-in'} method`
+    case 'identity_unlinked': return `${actor} removed a connected sign-in method`
     case 'password_changed': return `${actor} changed their password`
     case 'password_reset': return `${actor} reset the password for ${d.email || 'a user'}`
     case 'permission_changed': return `${actor} changed permissions${d.target_name ? ` for ${d.target_name}` : ''}`

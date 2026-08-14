@@ -55,6 +55,12 @@ export async function createSession(env: Env, user: SessionUser, request?: Reque
   return token
 }
 
+/** Destroy any existing session cookie and issue a new session ID. */
+export async function rotateSession(env: Env, request: Request, user: SessionUser): Promise<string> {
+  await destroySession(env, request)
+  return createSession(env, user, request)
+}
+
 export function sessionCookie(token: string): string {
   return `${COOKIE}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${TTL_SECONDS}`
 }

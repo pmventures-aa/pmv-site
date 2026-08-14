@@ -39,6 +39,50 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 | `RESEND_FROM_EMAIL` | No | Var (`wrangler.toml` `[vars]`) | Verified sender identity. The code defaults to `Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>` if this is not set. |
 | `RESEND_WEBHOOK_SECRET` | No | Secret | Optional Cloudflare copy of the Svix signing secret for `POST /api/webhooks/resend`. HQ → Settings → General can create the Resend webhook and store this secret in D1 instead. |
 | `RESEND_INBOUND_DOMAIN` | No | Var (`wrangler.toml` `[vars]`) | Resend receiving domain. Defaults in wrangler to `ziloifaluk.resend.app`. Used only as Reply-To so replies can be received without changing pinnaclemanagementventures.com MX or the From address. |
+| `AUTH0_DOMAIN` | No | Secret | Auth0 tenant domain (`your-tenant.us.auth0.com`). When unset with the other AUTH0_* values, Auth0 sign-in is disabled and provider buttons are hidden. |
+| `AUTH0_CLIENT_ID` | No | Secret | Auth0 Regular Web Application client ID. |
+| `AUTH0_CLIENT_SECRET` | No | Secret | Auth0 client secret. Server-only — never a `VITE_*` or frontend variable. |
+| `AUTH0_CALLBACK_URL` | No* | Secret/Var | Exact callback URL. Production: `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback`. Required if any other AUTH0_* value is set. |
+| `AUTH0_LOGOUT_URL` | No* | Secret/Var | Exact Auth0 logout return URL. Production: `https://www.pinnaclemanagementventures.com/portal/login`. Required if any other AUTH0_* value is set. |
+| `AUTH0_AUDIENCE` | No | Secret/Var | Optional API audience. Omit for the client-portal identity flow; Pinnacle does not persist Auth0 access tokens. |
+| `AUTH0_CONNECTIONS` | No | Var | Comma-separated `google,microsoft`. Defaults to both when Auth0 is fully configured. |
+
+\*If any Auth0 variable is set, `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_CALLBACK_URL`, and `AUTH0_LOGOUT_URL` are all required. Partial configuration disables the feature instead of showing a broken button.
+
+### Auth0 Regular Web Application
+
+Create a **Regular Web Application** (confidential backend, Authorization Code Flow). Do not use a SPA/public client. Register these exact URLs — no production wildcards:
+
+**Allowed Callback URLs**
+- `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback`
+- `https://secure.pinnaclemanagementventures.com/api/auth/auth0/callback`
+- `https://client.pinnaclemanagementventures.com/api/auth/auth0/callback`
+- `http://localhost:8788/api/auth/auth0/callback`
+- `http://localhost:5173/api/auth/auth0/callback`
+- `http://127.0.0.1:8788/api/auth/auth0/callback`
+- `http://127.0.0.1:5173/api/auth/auth0/callback`
+
+**Allowed Logout URLs**
+- `https://www.pinnaclemanagementventures.com/portal/login`
+- `https://secure.pinnaclemanagementventures.com/login`
+- `https://client.pinnaclemanagementventures.com/login`
+- `http://localhost:8788/portal/login`
+- `http://localhost:5173/portal/login`
+- `http://127.0.0.1:8788/portal/login`
+- `http://127.0.0.1:5173/portal/login`
+
+**Allowed Web Origins**
+- `https://www.pinnaclemanagementventures.com`
+- `https://secure.pinnaclemanagementventures.com`
+- `https://client.pinnaclemanagementventures.com`
+- `http://localhost:8788`
+- `http://localhost:5173`
+- `http://127.0.0.1:8788`
+- `http://127.0.0.1:5173`
+
+Enable the Google and Microsoft social connections used by the portal. Auth0 Organizations are **not** created automatically for individual Pinnacle clients; internal business/relationship records remain authoritative. Organization mapping can be added later for genuine multi-user business clients without changing this identity-only flow.
+
+Local logout (`POST /api/auth/logout`) always invalidates the Pinnacle session first. Federated Auth0 logout is optional via `GET /api/auth/auth0/logout?federated=1`.
 
 **Local dev:** copy `.dev.vars.example` to `.dev.vars` (gitignored) and fill in test values — `wrangler pages dev` reads it automatically.
 

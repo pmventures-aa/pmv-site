@@ -30,6 +30,19 @@ PAYMENT_ENCRYPTION_KEY=local-dev-payment-key-not-real-either
 # if HQ has not already stored the signing secret from Create webhook.
 # RESEND_WEBHOOK_SECRET=
 
-# Optional — Resend receiving domain for Reply-To (not From). Leave unset to
-# use ziloifaluk.resend.app from wrangler.toml.
-# RESEND_INBOUND_DOMAIN=ziloifaluk.resend.app
+# Optional — Auth0 Regular Web Application (server-only). Leave all AUTH0_*
+# values unset to disable Auth0 in local/test environments. Do not set a
+# client secret in any VITE_* or frontend variable. Partial configuration is
+# treated as invalid and provider buttons stay hidden.
+# AUTH0_DOMAIN=your-tenant.us.auth0.com
+# AUTH0_CLIENT_ID=
+# AUTH0_CLIENT_SECRET=
+# AUTH0_CALLBACK_URL=http://localhost:8788/api/auth/auth0/callback
+# AUTH0_LOGOUT_URL=http://localhost:8788/portal/login
+# Optional. Omit unless an API audience is required.
+# AUTH0_AUDIENCE=
+# Comma-separated: google,microsoft (default both when Auth0 is fully configured)
+# AUTH0_CONNECTIONS=google,microsoft
+# AUTH0_GOOGLE_CONNECTION=google-oauth2
+# AUTH0_MICROSOFT_CONNECTION=windowslive
+
