@@ -118,6 +118,7 @@ async function getPosition(): Promise<GeolocationPosition | null> {
 
 export function FieldWorkList() {
   const p = useAppPath()
+  const navigate = useNavigate()
   const { user, workspace } = useAuth()
   const copy = hqWorkspaceCopy(workspace.party_type, workspace.vendor_category, workspace.role_name)
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -146,7 +147,7 @@ export function FieldWorkList() {
         <button
           type="button"
           onClick={() => setTab('active')}
-          className={`rounded-md border px-3 py-1.5 text-xs font-medium ${tab === 'active' ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-300 hover:border-white/25'}`}
+          className={`min-h-11 rounded-md border px-3 py-2 text-xs font-medium ${tab === 'active' ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-300 hover:border-white/25'}`}
         >
           Active {mine.filter((a) => a.status !== 'completed' && a.status !== 'cancelled').length > 0 && (
             <span className="ml-1 rounded bg-black/20 px-1.5 py-0.5 text-[10px]">{mine.filter((a) => a.status !== 'completed' && a.status !== 'cancelled').length}</span>
@@ -155,7 +156,7 @@ export function FieldWorkList() {
         <button
           type="button"
           onClick={() => setTab('completed')}
-          className={`rounded-md border px-3 py-1.5 text-xs font-medium ${tab === 'completed' ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-300 hover:border-white/25'}`}
+          className={`min-h-11 rounded-md border px-3 py-2 text-xs font-medium ${tab === 'completed' ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-300 hover:border-white/25'}`}
         >
           Completed
         </button>
@@ -174,9 +175,8 @@ export function FieldWorkList() {
               <button
                 key={assignment.id}
                 type="button"
-                onClick={() => p(`field-work/${assignment.id}`)}
-                onMouseUp={(e) => { e.preventDefault(); window.location.href = p(`field-work/${assignment.id}`) }}
-                className="w-full rounded-md border border-white/10 bg-white/[.02] p-4 text-left transition hover:border-gold/40 hover:bg-white/[.04]"
+                onClick={() => navigate(p(`field-work/${assignment.id}`))}
+                className="min-h-[4.5rem] w-full rounded-md border border-white/10 bg-white/[.02] p-4 text-left transition hover:border-gold/40 hover:bg-white/[.04]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -442,13 +442,20 @@ export default function FieldWorkDetail() {
   const tone = statusTone(assignment.status)
   const isRon = assignment.kind === 'ron'
   const done = assignment.status === 'completed'
+  const nextAction: 'depart' | 'arrive' | 'sign' | null = done
+    ? null
+    : (!isRon && !assignment.departed_at)
+      ? 'depart'
+      : (!isRon && !assignment.arrived_at)
+        ? 'arrive'
+        : 'sign'
 
   return (
-    <div>
+    <div className="pb-24 lg:pb-0">
       <button
         type="button"
-        onClick={() => navigate(p('field-work'))}
-        className="mb-3 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-white"
+        onClick={() => navigate(p('field-work/mine'))}
+        className="mb-3 inline-flex min-h-11 items-center gap-1 text-xs text-slate-400 hover:text-white"
       >
         <ChevronLeft size={14} /> Back to my assignments
       </button>
@@ -547,6 +554,7 @@ export default function FieldWorkDetail() {
             )}
           </Panel>
 
+          <div id="vendor-sign-panel">
           <Panel>
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{isRon ? '2' : '3'}. Signature &amp; complete</p>
             {done ? (
@@ -634,7 +642,7 @@ export default function FieldWorkDetail() {
                   type="button"
                   onClick={complete}
                   disabled={busy === 'complete'}
-                  className={`${btnPrimary} w-full !py-3 disabled:opacity-60`}
+                  className={`${btnPrimary} min-h-12 w-full !py-3 disabled:opacity-60`}
                 >
                   {busy === 'complete' ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
                   Sign &amp; mark assignment completed
@@ -642,6 +650,7 @@ export default function FieldWorkDetail() {
               </div>
             )}
           </Panel>
+          </div>
         </div>
 
         {/* right column: at-a-glance details */}
@@ -690,6 +699,43 @@ export default function FieldWorkDetail() {
           )}
         </div>
       </div>
+
+      {nextAction && (
+        <div className="fixed inset-x-0 bottom-[3.85rem] z-30 border-t border-white/10 bg-navy-950/95 px-3 py-2.5 backdrop-blur lg:hidden print:hidden">
+          {nextAction === 'depart' && (
+            <button
+              type="button"
+              onClick={markDeparted}
+              disabled={busy === 'depart'}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 text-sm font-semibold text-gold disabled:opacity-60"
+            >
+              {busy === 'depart' ? <Loader2 size={16} className="animate-spin" /> : <Car size={18} />}
+              Leave for site
+            </button>
+          )}
+          {nextAction === 'arrive' && (
+            <button
+              type="button"
+              onClick={() => markArrived('manual')}
+              disabled={busy === 'arrive'}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 text-sm font-semibold text-gold disabled:opacity-60"
+            >
+              {busy === 'arrive' ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={18} />}
+              I have arrived
+            </button>
+          )}
+          {nextAction === 'sign' && (
+            <button
+              type="button"
+              onClick={() => document.getElementById('vendor-sign-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 text-sm font-semibold text-gold"
+            >
+              <ShieldCheck size={16} />
+              Sign &amp; complete
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

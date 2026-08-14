@@ -167,6 +167,12 @@ body { -webkit-text-size-adjust: 100%; }
   }
   .pmv-tab-strip::-webkit-scrollbar { display: none; }
   .pmv-tab-strip > * { flex: 0 0 auto; }
+
+  /* Vendor field-work: keep assignment cards and primary actions thumb-reachable */
+  [data-pmv-surface='admin'] #vendor-sign-panel canvas {
+    min-height: 140px;
+    touch-action: none;
+  }
 }
 
 @media (max-width: 420px) {

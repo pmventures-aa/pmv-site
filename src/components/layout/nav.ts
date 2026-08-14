@@ -82,4 +82,6 @@ export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
   ]
 }
 
+export const vendorMobilePrimary = ['assignments', 'messages'] as const
+
 export const vendorNav: NavItem[] = vendorNavForWorld('general')
