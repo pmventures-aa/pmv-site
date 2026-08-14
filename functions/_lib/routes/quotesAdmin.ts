@@ -1,11 +1,13 @@
 import { Hono } from 'hono'
-import type { AppEnv } from '../types'
+import type { AppEnv, Env } from '../types'
 import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { logActivity } from '../activity'
 import { escapeHtml, notifyStaff, sendEmailStrict } from '../email'
 import { renderHqEmailOrFallback } from '../hqEmailTemplates'
 import { PUBLIC_SITE_BASE } from '../scopeFunnel'
+import { applyCatalogToQuoteLines, type CatalogOffering } from '../../../shared/quoteCatalog'
+import { ensureServiceOfferingsSeeded } from './serviceOfferings'
 
 // Branded quote workspace: staff build quotes (optionally from reusable
 // templates), send a branded public link, and the recipient accepts or
@@ -30,6 +32,19 @@ export interface QuoteLineInput {
   discount_cents?: number
   is_optional?: boolean
   is_pass_through?: boolean
+}
+
+async function loadOfferingCatalog(env: Env): Promise<Map<string, CatalogOffering>> {
+  await ensureServiceOfferingsSeeded(env)
+  const rows = await env.DB.prepare(
+    'SELECT id, name, description, starting_price_cents, pricing_label FROM service_offerings WHERE active = 1',
+  ).all<CatalogOffering>()
+  return new Map((rows.results || []).map((row) => [row.id, row]))
+}
+
+async function resolveQuoteLines(env: Env, raw: QuoteLineInput[]) {
+  const catalog = await loadOfferingCatalog(env)
+  return normalizeQuoteLines(applyCatalogToQuoteLines(raw, catalog))
 }
 
 interface NormalizedLine {
@@ -106,7 +121,7 @@ quoteAdminRoutes.post('/quote-templates', requireStaff, async (c) => {
   const body = await c.req.json<any>().catch(() => null)
   const name = text(body?.name, 160)
   if (!name) return c.json({ error: 'template name is required' }, 400)
-  const { lines } = normalizeQuoteLines(Array.isArray(body?.line_items) ? body.line_items : [])
+  const { lines } = await resolveQuoteLines(c.env, Array.isArray(body?.line_items) ? body.line_items : [])
   if (!lines.length) return c.json({ error: 'add at least one line item' }, 400)
   const id = `tpl-${uuid().slice(0, 12)}`
   await c.env.DB.prepare(
@@ -133,7 +148,7 @@ quoteAdminRoutes.patch('/quote-templates/:id', requireStaff, async (c) => {
   if ('intro_message' in body) add('intro_message', text(body.intro_message, 4000) || null)
   if ('terms' in body) add('terms', text(body.terms, 4000) || null)
   if (Array.isArray(body.line_items)) {
-    const { lines } = normalizeQuoteLines(body.line_items)
+    const { lines } = await resolveQuoteLines(c.env, body.line_items)
     if (!lines.length) return c.json({ error: 'a template needs at least one line item' }, 400)
     add('line_items_json', JSON.stringify(lines))
   }
@@ -217,7 +232,7 @@ quoteAdminRoutes.post('/quotes', requireStaff, async (c) => {
   const rawLines: QuoteLineInput[] = Array.isArray(body.line_items) && body.line_items.length
     ? body.line_items
     : template ? parseTemplateLines(template.line_items_json) : []
-  const { lines, subtotal, discount, total } = normalizeQuoteLines(rawLines)
+  const { lines, subtotal, discount, total } = await resolveQuoteLines(c.env, rawLines)
   if (!lines.length) return c.json({ error: 'add at least one line item' }, 400)
 
   const id = uuid()
@@ -315,7 +330,7 @@ quoteAdminRoutes.patch('/quotes/:id', requireStaff, async (c) => {
 
   const statements: D1PreparedStatement[] = []
   if (Array.isArray(body.line_items)) {
-    const { lines, subtotal, discount, total } = normalizeQuoteLines(body.line_items)
+    const { lines, subtotal, discount, total } = await resolveQuoteLines(c.env, body.line_items)
     if (!lines.length) return c.json({ error: 'a quote needs at least one line item' }, 400)
     add('subtotal_cents', subtotal)
     add('discount_cents', discount)

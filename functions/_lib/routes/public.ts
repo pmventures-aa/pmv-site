@@ -5,6 +5,7 @@ import { activityInsert } from '../activity'
 import { notifyStaff, escapeHtml } from '../email'
 import { icsResponse, loadFeedAppointments, verifyCalendarFeedToken } from '../calendarFeed'
 import type { SessionUser } from '../types'
+import { getAnotherBriefingQuote, getBriefingQuote } from '../briefingQuotes'
 
 const CONTACT_MAX_PER_HOUR = 10
 
@@ -88,4 +89,17 @@ publicRoutes.get('/calendar-feed/:token', async (c) => {
   if (!user || user.status === 'suspended') return c.json({ error: 'invalid calendar link' }, 404)
   const events = await loadFeedAppointments(c.env, user)
   return icsResponse(events, 'Pinnacle')
+})
+
+publicRoutes.get('/briefing-quote', async (c) => {
+  const seed = (c.req.query('seed') || '').trim()
+  const quote = await getBriefingQuote(c.env, seed)
+  return c.json({ quote })
+})
+
+publicRoutes.get('/briefing-quote/another', async (c) => {
+  const seed = (c.req.query('seed') || '').trim()
+  const current = (c.req.query('current') || '').trim()
+  const quote = await getAnotherBriefingQuote(c.env, current, seed)
+  return c.json({ quote })
 })

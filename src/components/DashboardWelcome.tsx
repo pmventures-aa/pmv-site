@@ -1,7 +1,8 @@
 import { RefreshCw } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import { quoteFromSeed, quotes } from '../data/quotes'
+import { useEffect, useMemo, useState } from 'react'
+import { quoteFromSeed } from '../data/quotes'
 import { WELCOME_SESSION_KEY } from '../lib/auth'
+import { fetchAnotherBriefingQuote, fetchBriefingQuote } from '../lib/briefingQuote'
 import { welcomeTime } from '../lib/welcomeSky'
 import { SkyMark } from './welcome/SkyMark'
 
@@ -40,10 +41,18 @@ export function DashboardWelcome({
     [],
   )
   const [quote, setQuote] = useState(() => quoteFromSeed(`${userId || displayName}:${sessionNonce()}`))
+  const quoteSeed = useMemo(() => `${userId || displayName}:${sessionNonce()}`, [userId, displayName])
 
-  function anotherQuote() {
-    let next = quote
-    while (next === quote && quotes.length > 1) next = quotes[Math.floor(Math.random() * quotes.length)]
+  useEffect(() => {
+    let cancelled = false
+    void fetchBriefingQuote(quoteSeed).then((next) => {
+      if (!cancelled) setQuote(next)
+    })
+    return () => { cancelled = true }
+  }, [quoteSeed])
+
+  async function anotherQuote() {
+    const next = await fetchAnotherBriefingQuote(quoteSeed, quote.text)
     setQuote(next)
   }
 
@@ -65,7 +74,7 @@ export function DashboardWelcome({
               <span className="text-slate-200">{quote.text}</span>
               <span className="ml-1.5 text-slate-500">{quote.author}</span>
             </p>
-            <button type="button" onClick={anotherQuote} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-gold hover:text-gold-300">
+            <button type="button" onClick={() => void anotherQuote()} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-gold hover:text-gold-300">
               <RefreshCw size={11} /> Another
             </button>
           </div>
@@ -105,8 +114,8 @@ export function DashboardWelcome({
               <strong className="font-bold text-slate-200">Today: </strong>{quote.prompt}
             </p>
           )}
-          <button type="button" onClick={anotherQuote} className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-gold transition hover:text-gold-300">
-            <RefreshCw size={12} /> Another thought
+          <button type="button" onClick={() => void anotherQuote()} className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-gold transition hover:text-gold-300">
+            <RefreshCw size={12} /> Another quote
           </button>
         </div>
       </div>
