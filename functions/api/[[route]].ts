@@ -74,9 +74,19 @@ import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib
 import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
 import { geoRoutes } from '../_lib/routes/geo'
 import { loadWorkspaceContext } from '../_lib/workspaceContext'
+import { logAuth0StartupWarnings } from '../_lib/routes/auth0'
 import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
 
 const app = new Hono<AppEnv>().basePath('/api')
+
+let auth0StartupChecked = false
+app.use('*', async (c, next) => {
+  if (!auth0StartupChecked) {
+    auth0StartupChecked = true
+    logAuth0StartupWarnings(c.env)
+  }
+  await next()
+})
 
 // Impersonation audit + destructive-action guard. Both wrap the whole
 // app: guard 403s a denylisted path before the handler runs;

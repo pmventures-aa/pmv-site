@@ -6,6 +6,7 @@ import { useAppPath } from '../../lib/basePath'
 import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
 import { clientWorkspaceForWorld, hqWorkspaceCopy, rememberOperatingWorld, rememberedHqParty, rememberedWorld, worldFromServiceParam } from '../../lib/workspace'
+import { AUTH_ERROR_MESSAGES, Auth0Providers } from '../../components/auth/Auth0Providers'
 
 export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const { login, logout } = useAuth()
@@ -19,6 +20,15 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [oauthBusy, setOauthBusy] = useState(false)
+
+  const authErrorCode = params.get('auth_error')
+  const returnTo = params.get('returnTo') || (serviceKey ? `${p(`services/${encodeURIComponent(serviceKey)}/apply`)}${offeringId ? `?offering=${encodeURIComponent(offeringId)}` : ''}` : p())
+
+  useEffect(() => {
+    if (!authErrorCode) return
+    setError(AUTH_ERROR_MESSAGES[authErrorCode] || AUTH_ERROR_MESSAGES.sign_in_failed)
+  }, [authErrorCode])
 
   const clientWorld = useMemo(() => worldFromServiceParam(serviceKey) || rememberedWorld() || 'general', [serviceKey])
   const clientCopy = clientWorkspaceForWorld(clientWorld)
@@ -81,6 +91,19 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
       {serviceKey && surface === 'client' && (
         <p className="mb-4 text-xs leading-5 text-slate-400">After you sign in, we will return you to the service you were exploring.</p>
       )}
+      {surface === 'client' && (
+        <>
+          <Auth0Providers mode="login" returnTo={returnTo} disabled={busy} onBusyChange={setOauthBusy} />
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-white/10" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-[0.18em] text-slate-500">
+              <span className="bg-navy-950 px-3">or use email</span>
+            </div>
+          </div>
+        </>
+      )}
       <form onSubmit={onSubmit} className="space-y-5">
         <Field label="Email Address">
           <input className={inputCls} type="email" autoComplete="email" inputMode="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
@@ -93,7 +116,7 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
             </button>
           </div>
         </Field>
-        <button type="submit" disabled={busy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
+        <button type="submit" disabled={busy || oauthBusy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
       </form>
 
       {surface === 'client' && (

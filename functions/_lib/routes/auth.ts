@@ -25,6 +25,7 @@ import { toDisplayCase } from '../../../shared/displayCase'
 import { advanceInquiryLifecycle } from '../lifecycle'
 import { getInviteByToken } from '../invites'
 import { canCompleteStagedVendorSignup, type ExistingAccount } from '../vendorStaging'
+import { auth0Routes, logAuth0StartupWarnings } from './auth0'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -66,6 +67,8 @@ async function resetThrottled(env: AppEnv['Bindings'], email: string, ip: string
 }
 
 export const authRoutes = new Hono<AppEnv>()
+
+authRoutes.route('/', auth0Routes)
 
 authRoutes.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
 

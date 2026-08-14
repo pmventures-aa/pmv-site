@@ -19,6 +19,15 @@ export interface Env {
   RESEND_WEBHOOK_SECRET?: string
   // Resend receiving domain (*.resend.app). From still uses RESEND_FROM_EMAIL.
   RESEND_INBOUND_DOMAIN?: string
+  // Auth0 social sign-in (optional — disabled when unset).
+  AUTH0_DOMAIN?: string
+  AUTH0_CLIENT_ID?: string
+  AUTH0_CLIENT_SECRET?: string
+  AUTH0_AUDIENCE?: string
+  AUTH0_CALLBACK_URL?: string
+  AUTH0_LOGOUT_URL?: string
+  AUTH0_CONNECTION_GOOGLE?: string
+  AUTH0_CONNECTION_MICROSOFT?: string
 }
 
 export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
