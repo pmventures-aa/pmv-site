@@ -24,4 +24,22 @@ export default defineConfig({
   preview: {
     proxy: apiProxy,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('node_modules/motion')) return 'motion'
+          if (id.includes('node_modules/pdf-lib')) return 'pdf'
+          if (id.includes('node_modules/lucide-react')) return 'icons'
+          if (
+            id.includes('node_modules/react-router') ||
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/react/')
+          ) return 'react'
+          return 'vendor'
+        },
+      },
+    },
+  },
 })
