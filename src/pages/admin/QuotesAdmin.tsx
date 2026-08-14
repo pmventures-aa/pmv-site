@@ -17,6 +17,7 @@ import {
   quoteNextAction,
   quoteStatusLabel,
   quoteStatusTone,
+  publicQuoteUrl,
   type QuoteFocusKey,
 } from '../../../shared/quoteWorkspace'
 
@@ -100,10 +101,6 @@ function Chip({ label, active, onClick, tone = 'slate' }: { label: string; activ
       {label}
     </button>
   )
-}
-
-function publicQuoteUrl(token: string) {
-  return `${window.location.origin}/quote/${token}`
 }
 
 export default function QuotesAdmin() {

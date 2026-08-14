@@ -5,6 +5,7 @@ import {
   quoteNextAction,
   quoteStatusLabel,
   quoteEventLabel,
+  publicQuoteUrl,
 } from '../shared/quoteWorkspace'
 
 describe('quote workspace helpers', () => {
@@ -31,9 +32,20 @@ describe('quote workspace helpers', () => {
     expect(quoteEventLabel('viewed')).toBe('Opened by recipient')
     expect(quoteEventLabel('sent')).toBe('Sent to recipient')
   })
+
+  it('builds public quote links on www, not the current host', () => {
+    expect(publicQuoteUrl('tok_abc')).toBe('https://www.pinnaclemanagementventures.com/quote/tok_abc')
+    expect(publicQuoteUrl('a/b')).toBe('https://www.pinnaclemanagementventures.com/quote/a%2Fb')
+  })
 })
 
 describe('HQ quotes page', () => {
+  it('uses the public www quote URL for preview and copy links', () => {
+    const source = readFileSync(new URL('../src/pages/admin/QuotesAdmin.tsx', import.meta.url), 'utf8')
+    expect(source).not.toContain('window.location.origin}/quote/')
+    expect(source).toContain('publicQuoteUrl')
+  })
+
   it('keeps the work queue, composer, and templates on separate screens', () => {
     const source = readFileSync(new URL('../src/pages/admin/QuotesAdmin.tsx', import.meta.url), 'utf8')
     expect(source).toContain("useState<'list' | 'build' | 'templates'>")

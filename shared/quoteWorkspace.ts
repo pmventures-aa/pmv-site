@@ -1,3 +1,9 @@
+import { PUBLIC_SITE_URL } from './letterhead'
+
+export function publicQuoteUrl(token: string): string {
+  return `${PUBLIC_SITE_URL}/quote/${encodeURIComponent(token)}`
+}
+
 export function quoteMoney(cents: number): string {
   return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 }
