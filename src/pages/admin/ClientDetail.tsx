@@ -9,6 +9,7 @@ import { Avatar } from '../../components/kit/Avatar'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { InlineLoading } from '../../components/LoadingScreen'
 import { useAuth } from '../../lib/auth'
+import { MILESTONE_STATUSES, RESPONSIBILITY_STATES, milestoneStatusLabel } from '../../../shared/matterWorkspace'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
@@ -615,6 +616,131 @@ function MatterNotesDialog({ clientId, matterId, title }: { clientId: string; ma
   )
 }
 
+function MatterClientViewDialog({ matterId, title, onSaved }: { matterId: string; title: string; onSaved: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [milestones, setMilestones] = useState<{ id: string; name: string; status: string; derived?: boolean }[]>([])
+  const [form, setForm] = useState({
+    responsibility_state: 'pinnacle',
+    next_action_label: '',
+    next_action_type: 'other',
+    next_action_due_at: '',
+    blocked_reason_client_safe: '',
+    completion_summary: '',
+  })
+
+  const load = useCallback(async () => {
+    const res = await api.get<{
+      matter: {
+        responsibility_state: string | null
+        next_action_label: string | null
+        next_action_type: string | null
+        next_action_due_at: string | null
+        blocked_reason_client_safe: string | null
+        completion_summary: string | null
+      }
+      milestones: { id: string; name: string; status: string; derived?: boolean }[]
+    }>(`/portal/matters/${matterId}`)
+    setForm({
+      responsibility_state: res.matter.responsibility_state || 'pinnacle',
+      next_action_label: res.matter.next_action_label || '',
+      next_action_type: res.matter.next_action_type || 'other',
+      next_action_due_at: (res.matter.next_action_due_at || '').slice(0, 10),
+      blocked_reason_client_safe: res.matter.blocked_reason_client_safe || '',
+      completion_summary: res.matter.completion_summary || '',
+    })
+    setMilestones(res.milestones || [])
+  }, [matterId])
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api.patch(`/portal/matters/${matterId}`, form)
+      toast.success('Client view saved.')
+      onSaved()
+      setOpen(false)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not save the client view.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function setMilestone(id: string, status: string) {
+    if (id.startsWith('derived-')) {
+      toast.error('Open this work once from the portal or recreate it so milestones are stored.')
+      return
+    }
+    try {
+      await api.patch(`/portal/matters/${matterId}/milestones/${id}`, { status })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update that milestone.')
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) void load() }}>
+      <DialogTrigger asChild>
+        <button className="text-xs font-medium text-gold hover:underline">Client view</button>
+      </DialogTrigger>
+      <DialogContent title={`Client view: ${title}`} description="What the client sees: who is waiting, the next action, and milestones.">
+        <form onSubmit={save} className="space-y-3">
+          <label>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Waiting on</span>
+            <select className={inputCls} value={form.responsibility_state} onChange={(e) => setForm((f) => ({ ...f, responsibility_state: e.target.value }))}>
+              {RESPONSIBILITY_STATES.map((state) => <option key={state} value={state}>{state.replace(/_/g, ' ')}</option>)}
+            </select>
+          </label>
+          {(form.responsibility_state === 'third_party') && (
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Client-safe explanation</span>
+              <textarea className={`${inputCls} min-h-[70px]`} required value={form.blocked_reason_client_safe} onChange={(e) => setForm((f) => ({ ...f, blocked_reason_client_safe: e.target.value }))} placeholder="We are waiting on the county clerk to record the package." />
+            </label>
+          )}
+          <label>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Next action</span>
+            <input className={inputCls} value={form.next_action_label} onChange={(e) => setForm((f) => ({ ...f, next_action_label: e.target.value }))} placeholder="Upload the signed HOA packet" />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Action type</span>
+              <select className={inputCls} value={form.next_action_type} onChange={(e) => setForm((f) => ({ ...f, next_action_type: e.target.value }))}>
+                {['upload', 'sign', 'pay', 'approve', 'schedule', 'message', 'acknowledge', 'other'].map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Due</span>
+              <input className={inputCls} type="date" value={form.next_action_due_at} onChange={(e) => setForm((f) => ({ ...f, next_action_due_at: e.target.value }))} />
+            </label>
+          </div>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Completion summary</span>
+            <textarea className={`${inputCls} min-h-[70px]`} value={form.completion_summary} onChange={(e) => setForm((f) => ({ ...f, completion_summary: e.target.value }))} />
+          </label>
+          {milestones.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Milestones</p>
+              <ul className="space-y-2">
+                {milestones.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-slate-200">{item.name}</span>
+                    <select className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white" value={item.status} onChange={(e) => void setMilestone(item.id, e.target.value)}>
+                      {MILESTONE_STATUSES.map((status) => <option key={status} value={status}>{milestoneStatusLabel(status)}</option>)}
+                    </select>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <button type="submit" disabled={busy} className={btnPrimary}>{busy ? 'Saving…' : 'Save client view'}</button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 interface StaffMember {
   id: string
   full_name: string | null
@@ -986,10 +1112,31 @@ export default function ClientDetail() {
             { key: 'title', label: 'Title' },
             { key: 'type', label: 'Type' },
             { key: 'assigned_staff_user_id', label: 'Assigned to', render: (r) => staffName(r.assigned_staff_user_id) },
-            { key: 'notes', label: '', render: (r) => <MatterNotesDialog clientId={clientId} matterId={r.id} title={r.title} /> },
+            { key: 'notes', label: '', render: (r) => (
+              <span className="flex items-center gap-3">
+                <MatterNotesDialog clientId={clientId} matterId={r.id} title={r.title} />
+                <MatterClientViewDialog matterId={r.id} title={r.title} onSaved={load} />
+              </span>
+            ) },
           ]}
           statusKey="status"
-          onStatusChange={(itemId, status) => setStatus('matters', itemId, status)}
+          onStatusChange={async (itemId, status) => {
+            if (status === 'blocked') {
+              const reason = window.prompt('Client-safe explanation for the wait (required).')
+              if (!reason?.trim()) {
+                toast.error('A client-safe explanation is required when a matter is waiting on a third party.')
+                return
+              }
+              try {
+                await api.patch(`/portal/matters/${itemId}`, { status, blocked_reason_client_safe: reason.trim(), responsibility_state: 'third_party' })
+                await load()
+              } catch (err) {
+                toast.error(err instanceof ApiError ? err.message : 'Could not update status. Try again.')
+              }
+              return
+            }
+            setStatus('matters', itemId, status)
+          }}
           emptyLabel="No matters."
           clientId={clientId}
           onCreated={load}
@@ -1001,6 +1148,7 @@ export default function ClientDetail() {
               { key: 'title', label: 'Title', required: true },
               { key: 'type', label: 'Type', placeholder: 'tax_resolution, document_prep…' },
               { key: 'due_date', label: 'Due date', type: 'date' },
+              { key: 'next_action_label', label: 'Client next action' },
               { key: 'assigned_staff_user_id', label: 'Assigned to', type: 'select', options: staffOptions },
             ],
           }}

@@ -11,6 +11,7 @@ import { SlaClock } from '../../components/kit/SlaClock'
 import { GetStartedPrompt } from '../../components/portal/GetStartedPrompt'
 import { pmvFadeUp, pmvStagger } from '../../lib/motionTheme'
 import { clientWorkspace } from '../../lib/workspace'
+import { nextActionHref, responsibilityBanner } from '../../../shared/matterWorkspace'
 import { AddToCalendarButton } from '../../components/kit/AddToCalendar'
 import { DashboardWelcome } from '../../components/DashboardWelcome'
 
@@ -29,6 +30,20 @@ interface DashboardData {
   enabled_services: { service_key: string; name: string; status: string }[]
   properties: { id: string; address: string; property_type: string; status: string }[]
   active_cases: { id: string; subject: string; priority: string; status: string; response_due_at: string | null; resolution_due_at: string | null; waiting_on: string }[]
+  active_matters?: {
+    id: string
+    title: string
+    status: string
+    client_stage: string | null
+    responsibility_state: string | null
+    next_action_type: string | null
+    next_action_label: string | null
+    next_action_due_at: string | null
+    due_date: string | null
+    blocked_reason_client_safe: string | null
+    last_client_update_at: string | null
+    owner_name: string | null
+  }[]
 }
 
 interface CatalogItem { key: string; name: string; category: string }
@@ -60,12 +75,25 @@ export default function Dashboard() {
 
   const stats = data?.stats
   const cases = data?.active_cases ?? []
+  const matters = data?.active_matters ?? []
   const needsYou = cases.filter((item) => waitingOnYou(item.waiting_on))
+  const waitingOnClient = matters.filter((item) => responsibilityBanner(item.responsibility_state, item.status).state === 'client')
+  const pinnacleWorking = matters.filter((item) => responsibilityBanner(item.responsibility_state, item.status).state === 'pinnacle')
   const nextAppointment = data?.upcoming_appointments?.[0]
-  const clientActions = (stats?.pending_documents ?? 0) + (stats?.open_invoices ?? 0) + (stats?.open_tasks ?? 0) + (stats?.pending_quotes ?? 0) + needsYou.length
+  const clientActions = (stats?.pending_documents ?? 0) + (stats?.open_invoices ?? 0) + (stats?.open_tasks ?? 0) + (stats?.pending_quotes ?? 0) + needsYou.length + waitingOnClient.length
 
   const nextMove = useMemo(() => {
     if (!loaded) return null
+    if (waitingOnClient[0]) {
+      const item = waitingOnClient[0]
+      return {
+        eyebrow: 'Waiting on you',
+        title: item.next_action_label || item.title,
+        body: item.next_action_label ? item.title : 'Pinnacle cannot move this work forward until you complete the next step.',
+        to: p(nextActionHref(item.next_action_type, item.id)),
+        label: 'Open this work',
+      }
+    }
     if (needsYou[0]) {
       return {
         eyebrow: 'Waiting on you',
@@ -122,14 +150,15 @@ export default function Dashboard() {
     }
     return {
       eyebrow: 'Ready when you are',
-      title: 'Nothing needs you right now',
-      body: 'Start a request when something comes up. Your files, messages, and team stay in one place.',
+      title: 'Nothing is currently required from you.',
+      body: 'Pinnacle will update this page when something needs your attention. Start a request if something new comes up.',
       to: p('support'),
       label: 'Start a request',
     }
-  }, [loaded, needsYou, stats, nextAppointment, p])
+  }, [loaded, waitingOnClient, needsYou, stats, nextAppointment, p])
 
   const shortcutCatalog = {
+    work: { label: 'Work', to: p('matters'), icon: Gauge, note: stats?.open_matters },
     properties: { label: 'Properties', to: p('property-management'), icon: Building2, note: data?.properties.length },
     documents: { label: 'Documents', to: p('documents'), icon: FileText, note: stats?.pending_documents },
     messages: { label: 'Messages', to: p('messages'), icon: MessageSquare, note: undefined as number | undefined },
@@ -169,21 +198,39 @@ export default function Dashboard() {
           <motion.section variants={pmvFadeUp}>
             <div className="mb-3 flex items-end justify-between gap-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-slate-500">In motion</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-slate-500">Needs your attention</p>
                 <h2 className="mt-1 text-lg font-semibold text-white">{copy.workHeading}</h2>
               </div>
-              <Link to={p('support')} className="text-xs font-semibold text-gold hover:underline">View all</Link>
+              <Link to={p('matters')} className="text-xs font-semibold text-gold hover:underline">View all work</Link>
             </div>
             {!loaded ? (
               <div className="h-16 animate-pulse rounded-md border border-white/[.06] bg-white/[.02]" />
-            ) : cases.length === 0 ? (
+            ) : matters.length === 0 && cases.length === 0 ? (
               <div className="rounded-md border border-emerald-400/20 bg-emerald-400/[.04] px-3 py-2.5">
-                <p className="text-sm font-medium text-white">No open requests right now.</p>
+                <p className="text-sm font-medium text-white">Nothing is currently required from you.</p>
                 <p className="mt-1 text-xs leading-5 text-slate-400">Something come up? <Link to={p('support')} className="font-semibold text-gold hover:underline">Start a request</Link></p>
               </div>
             ) : (
               <ul className="divide-y divide-white/[.08] border-y border-white/[.08]">
-                {cases.slice(0, 4).map((item) => {
+                {[...waitingOnClient, ...pinnacleWorking, ...matters.filter((item) => !waitingOnClient.includes(item) && !pinnacleWorking.includes(item))].slice(0, 4).map((item) => {
+                  const banner = responsibilityBanner(item.responsibility_state, item.status, item.blocked_reason_client_safe)
+                  return (
+                    <li key={item.id}>
+                      <Link to={p(`matters/${item.id}`)} className="grid gap-2 py-4 sm:grid-cols-[1fr_150px] sm:items-center">
+                        <span>
+                          <strong className="block text-sm font-semibold text-white">{item.title}</strong>
+                          <span className="mt-0.5 block text-xs text-slate-500">
+                            {banner.label}{item.owner_name ? ` · ${item.owner_name}` : ''}{item.next_action_label ? ` · ${item.next_action_label}` : ''}
+                          </span>
+                        </span>
+                        <span className={`text-xs ${banner.state === 'client' ? 'font-semibold text-gold' : 'text-slate-400'}`}>
+                          {banner.state === 'client' ? 'Action needed' : banner.label}
+                        </span>
+                      </Link>
+                    </li>
+                  )
+                })}
+                {matters.length === 0 && cases.slice(0, 3).map((item) => {
                   const yours = waitingOnYou(item.waiting_on)
                   return (
                     <li key={item.id}>

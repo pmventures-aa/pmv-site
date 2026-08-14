@@ -30,12 +30,12 @@ describe('operating worlds', () => {
   })
 
   it('changes client home, login, and mobile tabs with the live service world', () => {
-    expect(clientWorkspace(['property_management']).mobilePrimary).toEqual(['dashboard', 'properties', 'support', 'documents'])
-    expect(clientWorkspace(['mobile_notary']).mobilePrimary).toEqual(['dashboard', 'documents', 'support', 'messages'])
-    expect(clientWorkspace(['funding']).mobilePrimary).toEqual(['dashboard', 'funding', 'documents', 'support'])
+    expect(clientWorkspace(['property_management']).mobilePrimary).toEqual(['dashboard', 'work', 'messages', 'documents'])
+    expect(clientWorkspace(['mobile_notary']).mobilePrimary).toEqual(['dashboard', 'work', 'messages', 'documents'])
+    expect(clientWorkspace(['funding']).mobilePrimary).toEqual(['dashboard', 'work', 'messages', 'documents'])
     expect(clientWorkspace(['property_management']).loginTitle).not.toBe(clientWorkspace(['funding']).loginTitle)
-    expect(clientMobilePrimary(['property_management'])).toEqual(['dashboard', 'properties', 'support', 'documents'])
-    expect(clientPortalNav(['property_management']).map((item) => item.key).slice(0, 3)).toEqual(['dashboard', 'properties', 'support'])
+    expect(clientMobilePrimary(['property_management'])).toEqual(['dashboard', 'work', 'messages', 'documents'])
+    expect(clientPortalNav(['property_management']).map((item) => item.key).slice(0, 3)).toEqual(['dashboard', 'work', 'properties'])
   })
 
   it('changes vendor application copy, HQ employee actions, and vendor nav by track', () => {
