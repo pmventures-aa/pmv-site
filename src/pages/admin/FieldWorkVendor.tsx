@@ -118,6 +118,7 @@ async function getPosition(): Promise<GeolocationPosition | null> {
 
 export function FieldWorkList() {
   const p = useAppPath()
+  const navigate = useNavigate()
   const { user, workspace } = useAuth()
   const copy = hqWorkspaceCopy(workspace.party_type, workspace.vendor_category, workspace.role_name)
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -125,7 +126,7 @@ export function FieldWorkList() {
   const [tab, setTab] = useState<'active' | 'completed'>('active')
 
   useEffect(() => {
-    api.get<{ assignments: Assignment[] }>('/admin/field-assignments?mine=1')
+    api.get<{ assignments: Assignment[] }>('/admin/field-assignments?view=mine')
       .then((res) => setAssignments(res.assignments))
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -133,10 +134,10 @@ export function FieldWorkList() {
 
   const mine = useMemo(() => assignments.filter((a) => a.vendor_user_id === user?.id), [assignments, user?.id])
   const list = useMemo(() => mine.filter((a) => (tab === 'active' ? a.status !== 'completed' && a.status !== 'cancelled' : a.status === 'completed')), [mine, tab])
-  const navigate = useNavigate()
+  const activeCount = useMemo(() => mine.filter((a) => a.status !== 'completed' && a.status !== 'cancelled').length, [mine])
 
   return (
-    <div>
+    <div className="vendor-field-list">
       <PageIntro
         kicker={copy.homeKicker}
         title="My assignments"
@@ -149,8 +150,8 @@ export function FieldWorkList() {
           onClick={() => setTab('active')}
           className={`min-h-11 rounded-md border px-4 py-2 text-xs font-medium ${tab === 'active' ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-300 hover:border-white/25'}`}
         >
-          Active {mine.filter((a) => a.status !== 'completed' && a.status !== 'cancelled').length > 0 && (
-            <span className="ml-1 rounded bg-black/20 px-1.5 py-0.5 text-[10px]">{mine.filter((a) => a.status !== 'completed' && a.status !== 'cancelled').length}</span>
+          Active {activeCount > 0 && (
+            <span className="ml-1 rounded bg-black/20 px-1.5 py-0.5 text-[10px]">{activeCount}</span>
           )}
         </button>
         <button
@@ -176,7 +177,7 @@ export function FieldWorkList() {
                 key={assignment.id}
                 type="button"
                 onClick={() => navigate(p(`field-work/${assignment.id}`))}
-                className="w-full rounded-md border border-white/10 bg-white/[.02] p-4 text-left transition hover:border-gold/40 hover:bg-white/[.04] active:bg-white/[.06]"
+                className="w-full rounded-md border border-white/10 bg-white/[.02] p-4 text-left transition hover:border-gold/40 hover:bg-white/[.04] active:scale-[.99]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -444,7 +445,7 @@ export default function FieldWorkDetail() {
   const done = assignment.status === 'completed'
 
   return (
-    <div>
+    <div className="vendor-field-detail pb-24 lg:pb-0">
       <button
         type="button"
         onClick={() => navigate(p('field-work/mine'))}
@@ -458,6 +459,35 @@ export default function FieldWorkDetail() {
         subtitle={siteLine(assignment)}
         action={<div className="flex items-center gap-2">{assignment.vendor_user_id !== user?.id && <button type="button" disabled={assigningSelf} onClick={() => void assignToMe()} className={`${btnOutline} disabled:opacity-50`}>{assigningSelf ? <Loader2 size={14} className="animate-spin" /> : null} Assign to me</button>}<Tag tone={tone.tone}>{tone.label}</Tag></div>}
       />
+
+      {!isRon && !done && (
+        <div className="sticky top-14 z-20 -mx-3 mb-4 border-b border-white/10 bg-navy-950/95 px-3 py-2 backdrop-blur lg:hidden">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={markDeparted}
+              disabled={busy === 'depart' || !!assignment.departed_at}
+              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition disabled:opacity-60 ${
+                assignment.departed_at ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200' : 'border-gold/40 bg-gold/10 text-gold'
+              }`}
+            >
+              {busy === 'depart' ? <Loader2 size={16} className="animate-spin" /> : <Car size={18} />}
+              {assignment.departed_at ? 'Departed' : 'Depart'}
+            </button>
+            <button
+              type="button"
+              onClick={() => markArrived('manual')}
+              disabled={busy === 'arrive' || !!assignment.arrived_at || !assignment.departed_at}
+              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition disabled:opacity-60 ${
+                assignment.arrived_at ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200' : 'border-white/15 bg-white/[.02] text-white'
+              }`}
+            >
+              {busy === 'arrive' ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={18} />}
+              {assignment.arrived_at ? 'On site' : 'Arrive'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
         {/* left column: workflow */}
@@ -634,7 +664,7 @@ export default function FieldWorkDetail() {
                   type="button"
                   onClick={complete}
                   disabled={busy === 'complete'}
-                  className={`${btnPrimary} sticky bottom-20 z-10 w-full !min-h-14 !py-3 disabled:opacity-60 lg:static lg:bottom-auto`}
+                  className={`${btnPrimary} w-full !py-3 disabled:opacity-60`}
                 >
                   {busy === 'complete' ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
                   Sign &amp; mark assignment completed

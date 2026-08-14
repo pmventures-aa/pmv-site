@@ -7,15 +7,14 @@ import { BasePathProvider, useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
 import { clientWorkspace } from '../../lib/workspace'
 import { LoadingScreen } from '../../components/LoadingScreen'
-import Login from '../auth/Login'
-import Signup from '../auth/Signup'
-import ForgotPassword from '../auth/ForgotPassword'
-import ResetPassword from '../auth/ResetPassword'
-import SetPassword from '../auth/SetPassword'
-import TrustedInvite from '../auth/TrustedInvite'
-import { ModulePage } from './ModulePage'
 import { callsConfig, tasksConfig, fundingConfig, taxConfig } from './moduleConfigs'
 
+const Login = lazy(() => import('../auth/Login'))
+const Signup = lazy(() => import('../auth/Signup'))
+const ForgotPassword = lazy(() => import('../auth/ForgotPassword'))
+const ResetPassword = lazy(() => import('../auth/ResetPassword'))
+const SetPassword = lazy(() => import('../auth/SetPassword'))
+const TrustedInvite = lazy(() => import('../auth/TrustedInvite'))
 const OnboardingWizard = lazy(() => import('./OnboardingWizard'))
 const Dashboard = lazy(() => import('./Dashboard'))
 const Services = lazy(() => import('./Services'))
@@ -31,6 +30,7 @@ const TrustedPortal = lazy(() => import('./TrustedPortal'))
 const Notifications = lazy(() => import('./Notifications'))
 const Security = lazy(() => import('./Security'))
 const ClientPortalDemo = lazy(() => import('./ClientPortalDemo'))
+const ModulePage = lazy(() => import('./ModulePage').then((m) => ({ default: m.ModulePage })))
 const CalendarPage = lazy(() => import('./CalendarPage'))
 const Properties = lazy(() => import('./Properties'))
 const PropertyProfile = lazy(() => import('./PropertyProfile'))
@@ -38,10 +38,10 @@ const Matters = lazy(() => import('./Matters'))
 const MatterDetail = lazy(() => import('./MatterDetail'))
 
 function PageFallback() {
-  return <LoadingScreen variant="orb" label="Loading…" />
+  return <LoadingScreen variant="brand" label="Loading…" />
 }
 
-function L({ children }: { children: ReactNode }) {
+function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<PageFallback />}>{children}</Suspense>
 }
 
@@ -70,42 +70,42 @@ export default function PortalApp({ basePath }: { basePath: string }) {
   return (
     <BasePathProvider base={basePath}>
       <Routes>
-        <Route path="login" element={<Login surface="client" />} />
-        <Route path="signup" element={<Signup />} />
-        <Route path="forgot-password" element={<ForgotPassword surface="client" />} />
-        <Route path="reset-password" element={<ResetPassword surface="client" />} />
-        <Route path="set-password" element={<SetPassword surface="client" />} />
-        <Route path="trusted-invite/:token" element={<TrustedInvite />} />
-        <Route path="demo" element={<L><ClientPortalDemo /></L>} />
+        <Route path="login" element={<Lazy><Login surface="client" /></Lazy>} />
+        <Route path="signup" element={<Lazy><Signup /></Lazy>} />
+        <Route path="forgot-password" element={<Lazy><ForgotPassword surface="client" /></Lazy>} />
+        <Route path="reset-password" element={<Lazy><ResetPassword surface="client" /></Lazy>} />
+        <Route path="set-password" element={<Lazy><SetPassword surface="client" /></Lazy>} />
+        <Route path="trusted-invite/:token" element={<Lazy><TrustedInvite /></Lazy>} />
+        <Route path="demo" element={<Lazy><ClientPortalDemo /></Lazy>} />
 
         <Route element={<ProtectedRoute allow={['trusted_contact']} />}>
-          <Route path="trusted" element={<L><TrustedPortal /></L>} />
+          <Route path="trusted" element={<Lazy><TrustedPortal /></Lazy>} />
         </Route>
 
         <Route element={<ProtectedRoute allow={['client']} />}>
-          <Route path="onboarding" element={<L><OnboardingWizard /></L>} />
+          <Route path="onboarding" element={<Lazy><OnboardingWizard /></Lazy>} />
           <Route element={<ClientShell />}>
-            <Route index element={<L><Dashboard /></L>} />
-            <Route path="planned-calls" element={<ModulePage config={callsConfig} />} />
-            <Route path="services" element={<L><Services /></L>} />
-            <Route path="services/:key/apply" element={<L><ServiceApplication /></L>} />
-            <Route path="matters" element={<L><Matters /></L>} />
-            <Route path="matters/:id" element={<L><MatterDetail /></L>} />
-            <Route path="tasks" element={<ModulePage config={tasksConfig} />} />
-            <Route path="documents" element={<L><Documents /></L>} />
-            <Route path="messages" element={<L><Messages /></L>} />
-            <Route path="calendar" element={<L><CalendarPage /></L>} />
-            <Route path="billing" element={<L><Billing /></L>} />
-            <Route path="funding" element={<ModulePage config={fundingConfig} />} />
-            <Route path="property-management" element={<L><Properties /></L>} />
-            <Route path="property-management/:id" element={<L><PropertyProfile /></L>} />
-            <Route path="tax-filings" element={<ModulePage config={taxConfig} />} />
-            <Route path="support" element={<L><Support /></L>} />
-            <Route path="business-profile" element={<L><BusinessProfile /></L>} />
-            <Route path="my-team" element={<L><MyTeam /></L>} />
-            <Route path="trusted-contacts" element={<L><TrustedContacts /></L>} />
-            <Route path="notifications" element={<L><Notifications /></L>} />
-            <Route path="security" element={<L><Security /></L>} />
+            <Route index element={<Lazy><Dashboard /></Lazy>} />
+            <Route path="planned-calls" element={<Lazy><ModulePage config={callsConfig} /></Lazy>} />
+            <Route path="services" element={<Lazy><Services /></Lazy>} />
+            <Route path="services/:key/apply" element={<Lazy><ServiceApplication /></Lazy>} />
+            <Route path="matters" element={<Lazy><Matters /></Lazy>} />
+            <Route path="matters/:id" element={<Lazy><MatterDetail /></Lazy>} />
+            <Route path="tasks" element={<Lazy><ModulePage config={tasksConfig} /></Lazy>} />
+            <Route path="documents" element={<Lazy><Documents /></Lazy>} />
+            <Route path="messages" element={<Lazy><Messages /></Lazy>} />
+            <Route path="calendar" element={<Lazy><CalendarPage /></Lazy>} />
+            <Route path="billing" element={<Lazy><Billing /></Lazy>} />
+            <Route path="funding" element={<Lazy><ModulePage config={fundingConfig} /></Lazy>} />
+            <Route path="property-management" element={<Lazy><Properties /></Lazy>} />
+            <Route path="property-management/:id" element={<Lazy><PropertyProfile /></Lazy>} />
+            <Route path="tax-filings" element={<Lazy><ModulePage config={taxConfig} /></Lazy>} />
+            <Route path="support" element={<Lazy><Support /></Lazy>} />
+            <Route path="business-profile" element={<Lazy><BusinessProfile /></Lazy>} />
+            <Route path="my-team" element={<Lazy><MyTeam /></Lazy>} />
+            <Route path="trusted-contacts" element={<Lazy><TrustedContacts /></Lazy>} />
+            <Route path="notifications" element={<Lazy><Notifications /></Lazy>} />
+            <Route path="security" element={<Lazy><Security /></Lazy>} />
             <Route path="calls" element={<Navigate to="../planned-calls" replace />} />
             <Route path="property" element={<Navigate to="../property-management" replace />} />
             <Route path="tax" element={<Navigate to="../tax-filings" replace />} />

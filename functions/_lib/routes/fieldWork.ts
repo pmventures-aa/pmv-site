@@ -285,11 +285,12 @@ fieldWorkRoutes.get('/field-assignments', requireStaff, async (c) => {
   const user = c.get('user')
   const status = c.req.query('status') || ''
   const kind = c.req.query('kind') || ''
-  const mine = c.req.query('mine') === '1' || c.req.query('mine') === 'true'
-  const slim = mine || c.req.query('slim') === '1'
+  const view = c.req.query('view') || ''
+  const mineOnly = view === 'mine'
   const clauses: string[] = ['1=1']
   const params: unknown[] = []
-  if (mine) {
+  if (mineOnly) {
+    // Vendor mobile queue: only rows assigned to the caller, slim projection.
     clauses.push('fa.vendor_user_id = ?')
     params.push(user.id)
   } else if (user.role !== 'admin') {
@@ -298,18 +299,18 @@ fieldWorkRoutes.get('/field-assignments', requireStaff, async (c) => {
   }
   if (status) { clauses.push('fa.status = ?'); params.push(status) }
   if (kind && KIND_VALUES.has(kind)) { clauses.push('fa.kind = ?'); params.push(kind) }
-  // Vendor mobile queue only needs list fields — skip SELECT fa.* blob.
-  const selectCols = slim
+  const selectCols = mineOnly
     ? `fa.id, fa.kind, fa.service_key, fa.client_user_id, fa.vendor_user_id, fa.assigned_by_user_id,
        fa.title, fa.site_label, fa.site_address, fa.site_city, fa.site_state, fa.site_postal_code,
        fa.site_lat, fa.site_lng, fa.scheduled_at, fa.status, fa.departed_at, fa.arrived_at,
-       fa.arrival_source, fa.completed_at, fa.notes, fa.vendor_fee_cents, fa.vendor_fee_base_cents,
-       fa.vendor_fee_adjustment_cents, fa.vendor_fee_reason,
+       fa.arrival_source, fa.completed_at, fa.notes, fa.created_at,
+       fa.vendor_fee_cents, fa.vendor_fee_base_cents, fa.vendor_fee_adjustment_cents, fa.vendor_fee_reason,
        cu.full_name AS client_name, cu.email AS client_email,
        vu.full_name AS vendor_name, vu.email AS vendor_email`
     : `fa.*,
        cu.full_name AS client_name, cu.email AS client_email,
        vu.full_name AS vendor_name, vu.email AS vendor_email`
+  const limit = mineOnly ? 100 : 200
   const res = await c.env.DB.prepare(
     `SELECT ${selectCols}
      FROM field_assignments fa
@@ -317,7 +318,7 @@ fieldWorkRoutes.get('/field-assignments', requireStaff, async (c) => {
      LEFT JOIN users vu ON vu.id = fa.vendor_user_id
      WHERE ${clauses.join(' AND ')}
      ORDER BY (fa.status = 'completed') ASC, COALESCE(fa.scheduled_at, fa.created_at) DESC
-     LIMIT ${mine ? 100 : 200}`,
+     LIMIT ${limit}`,
   ).bind(...params).all<AssignmentRow>()
   return c.json({ assignments: res.results ?? [] })
 })

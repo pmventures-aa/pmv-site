@@ -1,12 +1,6 @@
-/* HQ shell service worker — caches static assets only.
-   Never caches /api responses (authenticated). Same secure. host. */
+/* HQ shell cache only — never cache authenticated /api responses. */
 const CACHE = 'pmv-hq-shell-v1'
-const PRECACHE = [
-  '/manifest-hq.json',
-  '/favicon.png',
-  '/apple-touch-icon.png',
-  '/logo-crest.png',
-]
+const PRECACHE = ['/manifest-hq.json', '/favicon.png', '/apple-touch-icon.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -17,32 +11,35 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
+      Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))),
     ).then(() => self.clients.claim()),
   )
 })
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url)
-  if (event.request.method !== 'GET') return
+  const req = event.request
+  if (req.method !== 'GET') return
+  const url = new URL(req.url)
+  if (url.origin !== self.location.origin) return
   if (url.pathname.startsWith('/api/')) return
-  // Network-first for navigations; cache-first for hashed static assets.
-  if (event.request.mode === 'navigate') {
+
+  // Cache-first for hashed Vite assets; network-first for navigations/HTML.
+  if (url.pathname.startsWith('/assets/')) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/hq/') || caches.match(event.request)),
+      caches.open(CACHE).then(async (cache) => {
+        const hit = await cache.match(req)
+        if (hit) return hit
+        const res = await fetch(req)
+        if (res.ok) cache.put(req, res.clone())
+        return res
+      }),
     )
     return
   }
-  if (url.pathname.startsWith('/assets/') || PRECACHE.includes(url.pathname)) {
+
+  if (req.mode === 'navigate') {
     event.respondWith(
-      caches.match(event.request).then((hit) => {
-        if (hit) return hit
-        return fetch(event.request).then((res) => {
-          const copy = res.clone()
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy))
-          return res
-        })
-      }),
+      fetch(req).catch(() => caches.match(req).then((hit) => hit || caches.match('/'))),
     )
   }
 })

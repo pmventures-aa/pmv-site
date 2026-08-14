@@ -1,11 +1,11 @@
 {
-  "name": "Pinnacle HQ",
-  "short_name": "Pinnacle HQ",
-  "description": "Field assignments and Pinnacle HQ for network professionals.",
+  "name": "Pinnacle HQ Field",
+  "short_name": "PMV Field",
+  "description": "Field assignments for Pinnacle Management Ventures vendors.",
   "start_url": "/hq/field-work/mine",
   "scope": "/hq/",
   "display": "standalone",
-  "background_color": "#0B1F3A",
+  "background_color": "#071526",
   "theme_color": "#0B1F3A",
   "orientation": "portrait-primary",
   "icons": [

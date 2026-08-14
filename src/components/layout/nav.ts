@@ -77,12 +77,12 @@ export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
       : 'My assignments'
   return [
     {key:'assignments',label:assignmentLabel,to:'field-work/mine',icon:MapPinned},
-    {key:'messages',label:'Messages',to:'messages',icon:MessageSquare,section:'Work'},
+    {key:'messages',label:'Inbox',to:'messages',icon:MessageSquare,section:'Work'},
     {key:'security-center',label:'Security',to:'security-center',icon:ShieldCheck,section:'Account'},
   ]
 }
 
-/** Bottom-tab keys for field vendors on phones — mirrors portalMobilePrimary. */
+/** Bottom-tab primary destinations for field vendors on HQ mobile. */
 export const vendorMobilePrimary = ['assignments', 'messages'] as const
 
 export const vendorNav: NavItem[] = vendorNavForWorld('general')

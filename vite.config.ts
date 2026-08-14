@@ -29,15 +29,11 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return
-          if (id.includes('motion')) return 'motion'
-          if (id.includes('lucide-react')) return 'icons'
-          if (id.includes('pdf-lib')) return 'pdf'
-          if (id.includes('react-dom') || id.includes('/react/') || id.includes('\\react\\') || id.endsWith('/react') || id.endsWith('\\react')) {
-            return 'react-vendor'
-          }
-          if (id.includes('react-router')) return 'router'
-          if (id.includes('sonner') || id.includes('@radix-ui')) return 'ui-vendor'
-          if (id.includes('hono') || id.includes('jose') || id.includes('oauth4webapi')) return 'auth-vendor'
+          if (id.includes('motion')) return 'vendor-motion'
+          if (id.includes('lucide-react')) return 'vendor-icons'
+          if (id.includes('react-dom') || id.includes('/react/')) return 'vendor-react'
+          if (id.includes('pdf') || id.includes('jspdf')) return 'vendor-pdf'
+          return undefined
         },
       },
     },

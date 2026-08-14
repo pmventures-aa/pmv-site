@@ -1,7 +1,7 @@
 import type { Env } from './types'
 import { sendEmailStrict } from './email'
 import { uuid } from './crypto'
-import { hqUrl, portalUrl, wwwPortalUrl } from './appUrls'
+import { hqUrl, portalUrl } from './appUrls'
 import { renderRelationshipEvent } from './emailTemplates/relationship'
 import { renderHqEmailOrFallback } from './hqEmailTemplates'
 import { DEFAULT_INVITE_TTL_HOURS, INVITE_TTL_SETTING_KEY, formatInviteTtl, parseInviteTtlHours } from '../../shared/inviteTtl'
@@ -54,14 +54,10 @@ export async function getInviteTtlHours(env: Env): Promise<number> {
 
 const CLIENT_BASE = portalUrl()
 const HQ_BASE = hqUrl()
-const WWW_PORTAL_BASE = wwwPortalUrl()
 
 export function inviteUrl(type: InviteType, token: string): string {
   if (type === 'vendor') return `${HQ_BASE}/vendor-signup?invite=${encodeURIComponent(token)}`
-  // Trusted-contact invites remain on the www /portal mount for email clients
-  // that already bookmarked the marketing domain path during cutover; client
-  // signup and staff/vendor flows use the canonical secure host.
-  if (type === 'trusted_contact') return `${WWW_PORTAL_BASE}/trusted-invite/${encodeURIComponent(token)}`
+  if (type === 'trusted_contact') return `${CLIENT_BASE}/trusted-invite/${encodeURIComponent(token)}`
   if (type === 'client') return `${CLIENT_BASE}/signup?invite=${encodeURIComponent(token)}`
   return `${HQ_BASE}/invite/${encodeURIComponent(token)}`
 }

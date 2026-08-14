@@ -2,6 +2,9 @@
 CREATE INDEX IF NOT EXISTS idx_field_assignments_vendor_scheduled
   ON field_assignments(vendor_user_id, status, scheduled_at);
 
+CREATE INDEX IF NOT EXISTS idx_field_assignments_assigned_by
+  ON field_assignments(assigned_by_user_id, status);
+
 CREATE INDEX IF NOT EXISTS idx_field_assignments_status_updated
   ON field_assignments(status, updated_at);
 

@@ -84,6 +84,7 @@ describe('shared letterhead and hosts', () => {
   it('centralizes portal and HQ hosts on secure.', () => {
     expect(portalUrl('/billing')).toBe('https://secure.pinnaclemanagementventures.com/billing')
     expect(hqUrl('/invite/abc')).toBe('https://secure.pinnaclemanagementventures.com/hq/invite/abc')
+    expect(hqUrl('/')).toBe('https://secure.pinnaclemanagementventures.com/hq')
     expect(wwwPortalUrl('/signup')).toBe('https://www.pinnaclemanagementventures.com/portal/signup')
   })
 })

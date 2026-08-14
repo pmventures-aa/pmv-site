@@ -19,7 +19,10 @@ import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 // `badge` prop kept for callers that still pass it but no longer rendered
 // anywhere in the layout - it was showing as "STAFF CONSOLE" chrome the
 // user asked to remove.
-// `mobilePrimary` enables a portal-style bottom tab bar (vendors only today).
+//
+// `mobilePrimary` mirrors portal Shell: when set (vendors), HQ gets a
+// bottom tab bar for primary destinations so field agents are not stuck
+// hunting the hamburger for Assignments / Messages.
 export function AdminLayout({
   nav,
   badge: _badge,
@@ -27,7 +30,7 @@ export function AdminLayout({
 }: {
   nav: NavItem[]
   badge?: string
-  mobilePrimary?: readonly string[] | string[]
+  mobilePrimary?: readonly string[]
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
@@ -51,16 +54,10 @@ export function AdminLayout({
   const { count: emailUnread } = useEmailUnreadCount()
   const hideHqNav = /(^|\/)(messages|communications)(\/|$)/.test(location.pathname)
   const mailWorkspace = /(^|\/)messages(\/|$)/.test(location.pathname)
-  const showVendorTabs = Boolean(mobilePrimary && mobilePrimary.length > 0)
+  const showVendorTabs = Boolean(mobilePrimary && mobilePrimary.length > 0) && !hideHqNav
   const mobileItems = showVendorTabs
     ? nav.filter((item) => mobilePrimary!.includes(item.key))
     : []
-  // On message workspace, keep full-bleed chrome; otherwise clear the bottom tab bar.
-  const mainPad = showVendorTabs && !hideHqNav
-    ? 'flex-1 px-3 py-3 pb-24 sm:px-5 lg:px-6 lg:py-4 lg:pb-4'
-    : hideHqNav
-      ? 'flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4'
-      : 'flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4'
 
   function toggleSidebar() {
     setSidebarOpen((open) => {
@@ -136,6 +133,14 @@ export function AdminLayout({
     </>
   )
 
+  const mainPad = mailWorkspace
+    ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-0'
+    : hideHqNav
+      ? 'flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4'
+      : showVendorTabs
+        ? 'flex-1 px-3 py-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:px-5 lg:px-6 lg:py-4 lg:pb-4'
+        : 'flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4'
+
   return (
     <div className={`${hideHqNav ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-navy-950 lg:flex`}>
       <ImpersonationBanner />
@@ -151,14 +156,14 @@ export function AdminLayout({
             </NavLink>
           ) : <Logo compact />}
           <div className="flex shrink-0 items-center gap-1.5">
-            {!showVendorTabs && <span className="hidden sm:inline-flex"><SlaAlertChip /></span>}
-            {!showVendorTabs && <button onClick={() => setMobileSearchOpen((v) => !v)} className="hidden h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 sm:grid" aria-label="Search"><Search size={17} /></button>}
+            <span className="hidden sm:inline-flex"><SlaAlertChip /></span>
+            <button onClick={() => setMobileSearchOpen((v) => !v)} className="hidden h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 sm:grid" aria-label="Search"><Search size={17} /></button>
             <button onClick={refreshPage} className="hidden h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 hover:text-gold sm:grid" aria-label="Refresh page"><RotateCw size={15} /></button>
             {!hideHqNav && <MailBell />}
             <NotificationBell />
             <NotificationFeedPanel surface="admin" />
             {hideHqNav && <WhoMenu placement="down" compact canOpenSettings={canOpenSettings} />}
-            {/* Vendors use the bottom "More" tab; staff keep the header hamburger. */}
+            {/* Vendors use bottom "More"; staff keep the header hamburger. */}
             {!hideHqNav && !showVendorTabs && (
               <button onClick={() => setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-white/[.04] text-white transition hover:bg-white/[.08]" aria-label="Open navigation"><Menu size={20} /></button>
             )}
@@ -201,19 +206,26 @@ export function AdminLayout({
           </div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={mailWorkspace ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-0' : mainPad}><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={mainPad}><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
 
-      {showVendorTabs && !hideHqNav && (
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-navy-950/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl lg:hidden print:hidden" aria-label="Primary vendor destinations">
+      {showVendorTabs && (
+        <nav
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-navy-950/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl lg:hidden print:hidden"
+          aria-label="Primary field destinations"
+        >
           <div className="mx-auto grid max-w-lg grid-cols-3 gap-1">
             {mobileItems.map((item) => (
               <NavLink
                 key={item.key}
                 to={p(item.to)}
                 end={item.to === '' || item.to === 'field-work/mine'}
-                className={({ isActive }) => `flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold ${isActive ? 'text-gold' : 'text-slate-500'}`}
+                className={({ isActive }) => {
+                  const onAssignmentDetail = item.key === 'assignments' && /\/field-work\/(?!mine(?:\/|$))[^/]+/.test(location.pathname)
+                  const active = isActive || onAssignmentDetail
+                  return `flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold ${active ? 'text-gold' : 'text-slate-500'}`
+                }}
               >
                 <span className="relative">
                   <item.icon size={18} strokeWidth={1.8} />
@@ -224,7 +236,11 @@ export function AdminLayout({
                 <span className="truncate">{item.key === 'assignments' ? 'Assignments' : item.label}</span>
               </NavLink>
             ))}
-            <button type="button" onClick={() => setMobileOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold text-slate-500">
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold text-slate-500"
+            >
               <Menu size={18} strokeWidth={1.8} />
               More
             </button>

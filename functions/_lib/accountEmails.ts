@@ -39,8 +39,9 @@ interface TrackedSendInput {
   metadata?: Record<string, unknown>
 }
 
-// Canonical post-auth surfaces on secure. (portal at /, HQ at /hq).
-export const CLIENT_PORTAL_URL = `${portalUrl()}/`
+// Canonical post-login surfaces on secure. (DEPLOY.md). Legacy hq./client.
+// hosts still resolve in the SPA during cutover, but new mail always links here.
+export const CLIENT_PORTAL_URL = portalUrl('/')
 export const CLIENT_LOGIN_URL = portalUrl('/login')
 export const HQ_LOGIN_URL = hqUrl('/login')
 
