@@ -1,7 +1,7 @@
 import React from 'react'
 
 export function Card({ className = '', children }: { className?: string; children: React.ReactNode }) {
-  return <div className={`rounded-lg border border-white/10 bg-navy-900/70 p-6 ${className}`}>{children}</div>
+  return <div className={`rounded-md border border-white/10 bg-navy-900/70 p-4 ${className}`}>{children}</div>
 }
 
 export type Tone = 'gold' | 'green' | 'blue' | 'slate' | 'red'
@@ -14,7 +14,7 @@ const toneMap: Record<Tone, string> = {
 }
 
 export function StatusBadge({ children, tone = 'slate' }: { children: React.ReactNode; tone?: Tone }) {
-  return <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${toneMap[tone]}`}>{children}</span>
+  return <span className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[11px] font-medium ${toneMap[tone]}`}>{children}</span>
 }
 
 type BrandMarkVariant = 'standard' | 'spotlight' | 'quiet'
@@ -94,11 +94,11 @@ export function BrandMark3D({ size = 120, className = '', decorative = false, va
 }
 
 export function PageHeader({ eyebrow, title, subtitle, action }: { eyebrow: string; title: string; subtitle?: string; action?: React.ReactNode }) {
-  return <div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">{eyebrow}</p><h1 className="mt-1 text-2xl font-bold text-white sm:text-3xl">{title}</h1>{subtitle && <p className="mt-1 max-w-2xl text-sm text-slate-400">{subtitle}</p>}</div>{action}</div>
+  return <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">{eyebrow}</p><h1 className="mt-0.5 text-xl font-semibold text-white">{title}</h1>{subtitle && <p className="mt-0.5 max-w-2xl text-sm text-slate-400">{subtitle}</p>}</div>{action}</div>
 }
 
 export function EmptyState({ label }: { label: string }) {
-  return <div className="rounded-lg border border-dashed border-white/10 py-10 text-center"><BrandMark3D size={46} decorative variant="quiet" className="mx-auto mb-3 opacity-70"/><p className="text-sm text-slate-500">{label}</p></div>
+  return <div className="rounded-md border border-dashed border-white/10 py-5 text-center"><p className="text-sm text-slate-500">{label}</p></div>
 }
 
-export function StatCard({ label, value }: { label: string; value: React.ReactNode }) { return <Card className="p-5"><p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p><p className="mt-2 text-3xl font-bold text-white">{value}</p></Card> }
+export function StatCard({ label, value }: { label: string; value: React.ReactNode }) { return <Card className="p-3"><p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-2xl font-semibold text-white">{value}</p></Card> }

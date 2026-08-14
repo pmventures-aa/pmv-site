@@ -64,13 +64,13 @@ export default function Properties() {
       <PageHeader
         eyebrow="Addresses"
         title="Properties"
-        subtitle="Each address has its own profile: occupancy, access, open work, and files."
+        subtitle="Occupancy, access, open work, and files on each address."
         action={<button className="btn-gold" onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancel' : '+ Add property'}</button>}
       />
 
       {showForm && (
-        <Card className="mb-6">
-          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
+        <Card className="mb-4">
+          <form onSubmit={onCreate} className="grid gap-3 sm:grid-cols-2">
             <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Name</span><input className={inputCls} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Beach house, Building A…" /></label>
             <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Type</span><select className={inputCls} value={form.property_type} onChange={(e) => setForm((f) => ({ ...f, property_type: e.target.value }))}>{PROPERTY_TYPES.map((t) => <option key={t} value={t}>{propertyTypeLabel(t)}</option>)}</select></label>
             <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Street address</span><input className={inputCls} required value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} /></label>
@@ -91,12 +91,12 @@ export default function Properties() {
       {loading ? <Card><p className="text-sm text-slate-400">Loading properties…</p></Card> : items.length === 0 ? (
         <Card><EmptyState label="No properties on file yet. Add an address to give Pinnacle a place to attach work." /></Card>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-2">
           {items.map((row) => {
             const city = propertyCityLine(row)
             return (
               <li key={row.id}>
-                <Link to={p(`property-management/${row.id}`)} className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-navy-900/70 px-5 py-4 transition hover:border-gold/30">
+                <Link to={p(`property-management/${row.id}`)} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-navy-900/70 px-3 py-2.5 transition hover:border-gold/30">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <Building2 size={16} className="shrink-0 text-gold/80" />

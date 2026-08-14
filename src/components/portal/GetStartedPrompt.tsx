@@ -43,12 +43,10 @@ export function GetStartedPrompt({ className = '' }: { className?: string }) {
   }
 
   return (
-    <Card className={`flex flex-wrap items-center justify-between gap-4 !py-4 ${className}`}>
+    <Card className={`flex flex-wrap items-center justify-between gap-3 !py-2.5 ${className}`}>
       <div className="max-w-2xl">
         <p className="text-sm font-semibold text-white">Tell us what you need</p>
-        <p className="mt-1 text-xs leading-5 text-slate-400">
-          Whenever you're ready, a few guided questions help us understand what you're working on and route your request to the right service or team.
-        </p>
+        <p className="mt-0.5 text-xs text-slate-400">A few questions route the request to the right team.</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <button onClick={dismiss} className="btn-outline !px-3 !py-1.5 text-xs">

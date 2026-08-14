@@ -81,10 +81,10 @@ export default function Matters() {
 
   function list(rows: MatterRow[]) {
     return (
-      <ul className="space-y-3">
+      <ul className="space-y-2">
         {rows.map((row) => (
           <li key={row.id}>
-            <Link to={p(`matters/${row.id}`)} className="flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-navy-900/70 px-5 py-4 transition hover:border-gold/30">
+            <Link to={p(`matters/${row.id}`)} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-navy-900/70 px-3 py-2.5 transition hover:border-gold/30">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate font-semibold text-white">{row.title}</p>
@@ -110,13 +110,13 @@ export default function Matters() {
       <PageHeader
         eyebrow="Active work"
         title="Projects"
-        subtitle="Each project has a page: people, the related address, updates, and files."
+        subtitle="People, the related address, updates, and files."
         action={<button className="btn-gold" onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancel' : '+ Open project'}</button>}
       />
 
       {showForm && (
-        <Card className="mb-6">
-          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
+        <Card className="mb-4">
+          <form onSubmit={onCreate} className="grid gap-3 sm:grid-cols-2">
             <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Title</span><input className={inputCls} required value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Turnover at 14 Oak, HOA packet…" /></label>
             <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Type</span><select className={inputCls} value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>{MATTER_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select></label>
             <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Property</span><select className={inputCls} value={form.property_id} onChange={(e) => setForm((f) => ({ ...f, property_id: e.target.value }))}><option value="">Not tied to an address</option>{properties.map((prop) => <option key={prop.id} value={prop.id}>{propertyDisplayName(prop)}</option>)}</select></label>
@@ -133,7 +133,7 @@ export default function Matters() {
       {loading ? <Card><p className="text-sm text-slate-400">Loading projects…</p></Card> : items.length === 0 ? (
         <Card><EmptyState label="No projects yet. Open one when Pinnacle should track a piece of work." /></Card>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-5">
           {open.length > 0 && <section>{list(open)}</section>}
           {closed.length > 0 && (
             <section>

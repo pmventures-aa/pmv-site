@@ -97,19 +97,19 @@ export default function Services() {
 
   return (
     <div>
-      <PageHeader eyebrow="Your services" title="My Services" subtitle="Pick up where you left off, review submitted applications, and manage active services." />
+      <PageHeader eyebrow="Your services" title="My Services" subtitle="Applications, enrolled work, and what you can start next." />
 
       {applications.length > 0 && (
-        <Card className="mb-6">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <Card className="mb-4">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold text-white">Applications</h2>
-              <p className="mt-1 text-sm text-slate-400">Your submitted answers stay visible here. Internal staff documents do not.</p>
+              <h2 className="text-sm font-semibold text-white">Applications</h2>
+              <p className="mt-0.5 text-xs text-slate-400">Submitted answers stay here. Staff files do not.</p>
             </div>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {applications.map((app) => (
-              <div key={app.id} className="rounded-xl border border-white/10 bg-white/[0.025] p-4">
+              <div key={app.id} className="rounded-md border border-white/10 bg-white/[0.025] p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-white">{app.service_name}</p>
@@ -149,18 +149,18 @@ export default function Services() {
         </Card>
       )}
 
-      <Card className="mb-6">
-        <h2 className="mb-4 text-lg font-semibold text-white">Active &amp; enrolled services</h2>
+      <Card className="mb-4">
+        <h2 className="mb-3 text-sm font-semibold text-white">Active &amp; enrolled services</h2>
         {loading ? (
           <p className="text-sm text-slate-400">Loading…</p>
         ) : enrolled.length === 0 ? (
           <EmptyState label="No active services yet: start a journey below." />
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-2">
             {enrolled.map((e) => {
               const link = SERVICE_MODULE_LINKS[e.service_key]
               return (
-                <li key={e.service_key} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 px-4 py-3">
+                <li key={e.service_key} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-white/10 px-3 py-2">
                   <div>
                     <span className="block text-sm font-medium text-white">{e.name}</span>
                     {link && (
@@ -176,15 +176,15 @@ export default function Services() {
       </Card>
 
       <Card>
-        <h2 className="mb-1 text-lg font-semibold text-white">Start a new journey</h2>
-        <p className="mb-4 text-sm text-slate-400">Choose what you need help with. Your progress saves automatically if you need to come back later.</p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <h2 className="mb-1 text-sm font-semibold text-white">Start a new journey</h2>
+        <p className="mb-3 text-xs text-slate-400">Progress saves if you need to come back.</p>
+        <div className="grid gap-2 sm:grid-cols-2">
           {catalog
             .filter((c) => !enrolledKeys.has(c.key))
             .map((c) => {
               const draft = draftsByService.get(c.key)
               return (
-                <div key={c.key} className="group flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:-translate-y-0.5 hover:border-gold/25 hover:bg-white/[0.045]">
+                <div key={c.key} className="group flex items-start justify-between gap-3 rounded-md border border-white/10 bg-white/[0.03] p-3 transition hover:border-gold/25 hover:bg-white/[0.045]">
                   <div>
                     <p className="text-sm font-medium text-white">{c.name}</p>
                     <p className="mt-1 text-xs leading-relaxed text-slate-400">{c.description}</p>
