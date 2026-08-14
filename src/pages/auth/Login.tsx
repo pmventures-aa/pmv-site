@@ -91,19 +91,6 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
       {serviceKey && surface === 'client' && (
         <p className="mb-4 text-xs leading-5 text-slate-400">After you sign in, we will return you to the service you were exploring.</p>
       )}
-      {surface === 'client' && (
-        <>
-          <Auth0Providers mode="login" returnTo={returnTo} disabled={busy} onBusyChange={setOauthBusy} />
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-white/10" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase tracking-[0.18em] text-slate-500">
-              <span className="bg-navy-950 px-3">or use email</span>
-            </div>
-          </div>
-        </>
-      )}
       <form onSubmit={onSubmit} className="space-y-5">
         <Field label="Email Address">
           <input className={inputCls} type="email" autoComplete="email" inputMode="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
@@ -118,6 +105,15 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
         </Field>
         <button type="submit" disabled={busy || oauthBusy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
       </form>
+
+      <Auth0Providers
+        mode="login"
+        surface={surface}
+        returnTo={returnTo}
+        disabled={busy}
+        compact
+        onBusyChange={setOauthBusy}
+      />
 
       {surface === 'client' && (
         <div className="mt-6 rounded-xl border border-gold/15 bg-gold/[.045] p-4">

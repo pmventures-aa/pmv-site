@@ -7,6 +7,8 @@ import type { Auth0IdentityClaims } from './auth0Identities'
 const TX_TTL_SECONDS = 10 * 60
 const TX_PREFIX = 'auth0tx:'
 
+import type { Auth0Surface } from './auth0Access'
+
 export type Auth0FlowMode = 'login' | 'link'
 
 export interface Auth0Transaction {
@@ -16,6 +18,7 @@ export interface Auth0Transaction {
   returnTo: string
   connection: string
   mode: Auth0FlowMode
+  surface: Auth0Surface
   linkUserId?: string | null
   createdAt: number
 }
@@ -72,6 +75,7 @@ export async function createAuth0LoginRequest(
     connection: string
     returnTo: string
     mode: Auth0FlowMode
+    surface: Auth0Surface
     linkUserId?: string | null
   },
 ): Promise<{ authorizeUrl: string; state: string }> {
@@ -87,6 +91,7 @@ export async function createAuth0LoginRequest(
     returnTo: input.returnTo,
     connection: input.connection,
     mode: input.mode,
+    surface: input.surface,
     linkUserId: input.linkUserId ?? null,
     createdAt: Date.now(),
   }

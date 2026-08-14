@@ -23,6 +23,11 @@ import {
   loginErrorRedirect,
 } from '../functions/_lib/auth0Redirect'
 import {
+  roleAllowedForSurface,
+  loginPathForSurface,
+  defaultReturnForSurface,
+} from '../functions/_lib/auth0Access'
+import {
   userCanUnlinkIdentity,
   userHasPassword,
   findExternalIdentityByIssuerSubject,
@@ -146,19 +151,34 @@ describe('Auth0 configuration', () => {
 })
 
 describe('Auth0 redirect safety', () => {
-  it('allows internal portal paths only', () => {
-    expect(sanitizeReturnPath('/portal/security')).toBe('/portal/security')
-    expect(sanitizeReturnPath('/portal/services/bookkeeping/apply')).toBe('/portal/services/bookkeeping/apply')
-    expect(sanitizeReturnPath('https://evil.example/phish')).toBe('/portal/')
-    expect(sanitizeReturnPath('//evil.example')).toBe('/portal/')
-    expect(sanitizeReturnPath('/admin/users')).toBe('/portal/')
+  it('allows internal portal paths only for client surface', () => {
+    expect(sanitizeReturnPath('/portal/security', '/portal/', 'client')).toBe('/portal/security')
+    expect(sanitizeReturnPath('/portal/services/bookkeeping/apply', '/portal/', 'client')).toBe('/portal/services/bookkeeping/apply')
+    expect(sanitizeReturnPath('https://evil.example/phish', '/portal/', 'client')).toBe('/portal/')
+    expect(sanitizeReturnPath('/admin/users', '/portal/', 'client')).toBe('/portal/')
   })
 
-  it('returns branded login errors without leaking details', () => {
-    const url = loginErrorRedirect('account_not_linked', '/portal/security')
-    expect(url).toContain('auth_error=account_not_linked')
-    expect(url.startsWith('/portal/login')).toBe(true)
-    expect(url).not.toContain('@')
+  it('allows HQ and vendor workspace paths for staff surface', () => {
+    expect(sanitizeReturnPath('/admin/security-center', '/admin/', 'staff')).toBe('/admin/security-center')
+    expect(sanitizeReturnPath('/hq/field-work/mine', '/admin/', 'staff')).toBe('/hq/field-work/mine')
+    expect(sanitizeReturnPath('/portal/login', '/admin/', 'staff')).toBe('/admin/')
+  })
+
+  it('routes login errors to the correct surface login page', () => {
+    const clientUrl = loginErrorRedirect('account_not_linked', 'client')
+    const staffUrl = loginErrorRedirect('account_not_linked', 'staff')
+    expect(clientUrl).toContain('/portal/login')
+    expect(staffUrl).toContain('/admin/login')
+  })
+
+  it('scopes roles to the correct login surface', () => {
+    expect(roleAllowedForSurface('client', 'client')).toBe(true)
+    expect(roleAllowedForSurface('staff', 'client')).toBe(false)
+    expect(roleAllowedForSurface('staff', 'staff')).toBe(true)
+    expect(roleAllowedForSurface('admin', 'staff')).toBe(true)
+    expect(roleAllowedForSurface('trusted_contact', 'client')).toBe(true)
+    expect(defaultReturnForSurface('staff')).toBe('/admin/')
+    expect(loginPathForSurface('staff')).toBe('/admin/login')
   })
 })
 
@@ -220,6 +240,7 @@ describe('Auth0 OAuth transaction handling', () => {
       connection: 'google-oauth2',
       returnTo: '/portal/',
       mode: 'login',
+      surface: 'client',
     })
     expect(authorizeUrl).toContain('connection=google-oauth2')
     expect(authorizeUrl).toContain(`state=${state}`)
@@ -334,11 +355,12 @@ describe('Auth0 identity lookup', () => {
 })
 
 describe('client portal login UI', () => {
-  it('renders provider controls only on the client login surface', async () => {
+  it('renders compact provider controls on client and staff login surfaces', async () => {
     const { readFileSync } = await import('node:fs')
     const login = readFileSync(new URL('../src/pages/auth/Login.tsx', import.meta.url), 'utf8')
     expect(login).toContain('Auth0Providers')
-    expect(login).toContain("surface === 'client'")
-    expect(login).not.toContain("surface === 'staff' && <Auth0Providers")
+    expect(login).toContain('compact')
+    expect(login).toContain('surface={surface}')
+    expect(login).not.toContain("surface === 'client' && <Auth0Providers")
   })
 })

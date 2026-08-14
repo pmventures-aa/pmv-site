@@ -14,6 +14,14 @@ import {
   auth0LogoutUrl,
 } from '../auth0OAuth'
 import {
+  parseAuth0Surface,
+  roleAllowedForSurface,
+  defaultReturnForSurface,
+  postAuthDestination,
+  loginPathForSurface,
+  type Auth0Surface,
+} from '../auth0Access'
+import {
   deleteExternalIdentity,
   findExternalIdentityByIssuerSubject,
   insertExternalIdentity,
@@ -22,7 +30,11 @@ import {
   userCanUnlinkIdentity,
   userHasPassword,
 } from '../auth0Identities'
-import { loginErrorRedirect, portalSecurityPath, sanitizeReturnPath } from '../auth0Redirect'
+import {
+  loginErrorRedirect,
+  sanitizeReturnPath,
+  securityPathForAuth0Surface,
+} from '../auth0Redirect'
 import {
   clearCookie,
   destroySession,
@@ -33,7 +45,7 @@ import {
 import { requireUser } from '../mid'
 import { logAudit, actorIp, actorUserAgent, actorGeo } from '../auditLog'
 import { advanceInquiryLifecycle } from '../lifecycle'
-import { PUBLIC_SITE_URL } from '../appUrls'
+import { PUBLIC_SITE_URL, HQ_WWW_LOGIN } from '../appUrls'
 
 const LOGIN_MAX_PER_MINUTE = 20
 
@@ -61,6 +73,14 @@ function publicProviders(config: NonNullable<ReturnType<typeof loadAuth0Config>>
   }))
 }
 
+function canLinkIdentity(role: string): boolean {
+  return role === 'client' || role === 'trusted_contact' || role === 'staff' || role === 'admin'
+}
+
+function linkSurfaceForRole(role: string): Auth0Surface {
+  return role === 'client' || role === 'trusted_contact' ? 'client' : 'staff'
+}
+
 auth0Routes.get('/auth0/providers', (c) => {
   const config = loadAuth0Config(c.env)
   if (!config || config.providers.length === 0) {
@@ -71,6 +91,7 @@ auth0Routes.get('/auth0/providers', (c) => {
 
 auth0Routes.get('/auth0/login', async (c) => {
   const config = loadAuth0Config(c.env)
+  const surface = parseAuth0Surface(c.req.query('surface'))
   if (!config || config.providers.length === 0) {
     return c.json({ error: 'social sign-in is not available right now' }, 503)
   }
@@ -90,22 +111,27 @@ auth0Routes.get('/auth0/login', async (c) => {
   if (!provider) return c.json({ error: 'unsupported sign-in provider' }, 400)
 
   const mode = c.req.query('mode') === 'link' ? 'link' : 'login'
-  const returnTo = sanitizeReturnPath(c.req.query('returnTo'), mode === 'link' ? portalSecurityPath() : '/portal/')
+  const returnTo = sanitizeReturnPath(
+    c.req.query('returnTo'),
+    mode === 'link' ? securityPathForAuth0Surface(surface) : defaultReturnForSurface(surface),
+    surface,
+  )
   let linkUserId: string | null = null
+  let effectiveSurface = surface
 
   if (mode === 'link') {
     const user = await getUser(c.env, c.req.raw)
     if (!user) return c.json({ error: 'unauthorized' }, 401)
-    if (user.role !== 'client' && user.role !== 'trusted_contact') {
-      return c.json({ error: 'client portal accounts only' }, 403)
-    }
+    if (!canLinkIdentity(user.role)) return c.json({ error: 'this account cannot link social sign-in' }, 403)
     linkUserId = user.id
+    effectiveSurface = linkSurfaceForRole(user.role)
   }
 
   const { authorizeUrl } = await createAuth0LoginRequest(c.env, config, {
     connection: provider.connection,
     returnTo,
     mode,
+    surface: effectiveSurface,
     linkUserId,
   })
   return redirectResponse(authorizeUrl)
@@ -115,19 +141,20 @@ auth0Routes.get('/auth0/callback', async (c) => {
   const config = loadAuth0Config(c.env)
   const returnToFallback = '/portal/login'
   if (!config) {
-    return redirectResponse(loginErrorRedirect('sign_in_unavailable', returnToFallback))
+    return redirectResponse(loginErrorRedirect('sign_in_unavailable', 'client', returnToFallback))
   }
 
   const state = (c.req.query('state') || '').trim()
   if (!state) {
-    return redirectResponse(loginErrorRedirect('sign_in_failed', returnToFallback))
+    return redirectResponse(loginErrorRedirect('sign_in_failed', 'client', returnToFallback))
   }
 
   const tx = await consumeTransaction(c.env, state)
   if (!tx) {
-    return redirectResponse(loginErrorRedirect('sign_in_failed', returnToFallback))
+    return redirectResponse(loginErrorRedirect('sign_in_failed', 'client', returnToFallback))
   }
 
+  const surface = tx.surface
   const requestUrl = new URL(c.req.url)
   try {
     const { claims } = await completeAuth0Callback(c.env, config, requestUrl, tx)
@@ -136,15 +163,15 @@ auth0Routes.get('/auth0/callback', async (c) => {
       const owner = tx.linkUserId ? await c.env.DB.prepare(
         "SELECT id,email,role,full_name,first_name,last_name,status FROM users WHERE id=?",
       ).bind(tx.linkUserId).first<any>() : null
-      if (!owner || owner.status !== 'active') {
-        return redirectResponse(loginErrorRedirect('account_inactive', portalSecurityPath()))
+      if (!owner || owner.status !== 'active' || !canLinkIdentity(owner.role)) {
+        return redirectResponse(loginErrorRedirect('account_inactive', linkSurfaceForRole(owner?.role || 'client'), tx.returnTo))
       }
       if (!claims.emailVerified) {
-        return redirectResponse(loginErrorRedirect('sign_in_failed', portalSecurityPath()))
+        return redirectResponse(loginErrorRedirect('sign_in_failed', linkSurfaceForRole(owner.role), tx.returnTo))
       }
       const existing = await findExternalIdentityByIssuerSubject(c.env, claims.issuer, claims.subject)
       if (existing && existing.user_id !== owner.id) {
-        return redirectResponse(loginErrorRedirect('sign_in_failed', portalSecurityPath()))
+        return redirectResponse(loginErrorRedirect('sign_in_failed', linkSurfaceForRole(owner.role), tx.returnTo))
       }
       if (!existing) {
         await insertExternalIdentity(c.env, { userId: owner.id, claims })
@@ -159,24 +186,24 @@ auth0Routes.get('/auth0/callback', async (c) => {
         action: 'auth0_identity_linked',
         entityType: 'external_identity',
         entityId: claims.subject,
-        after: { connection: claims.connection, provider: 'auth0' },
+        after: { connection: claims.connection, provider: 'auth0', surface: linkSurfaceForRole(owner.role) },
       })
-      return redirectResponse(sanitizeReturnPath(tx.returnTo, portalSecurityPath()))
+      return redirectResponse(sanitizeReturnPath(tx.returnTo, securityPathForAuth0Surface(linkSurfaceForRole(owner.role)), linkSurfaceForRole(owner.role)))
     }
 
     const identity = await findExternalIdentityByIssuerSubject(c.env, claims.issuer, claims.subject)
     if (!identity) {
-      return redirectResponse(loginErrorRedirect('account_not_linked', tx.returnTo || returnToFallback))
+      return redirectResponse(loginErrorRedirect('account_not_linked', surface, tx.returnTo || loginPathForSurface(surface)))
     }
 
     const user = await c.env.DB.prepare(
       "SELECT id,email,role,full_name,first_name,last_name,status FROM users WHERE id=?",
     ).bind(identity.user_id).first<any>()
     if (!user || user.status !== 'active') {
-      return redirectResponse(loginErrorRedirect('account_inactive', tx.returnTo || returnToFallback))
+      return redirectResponse(loginErrorRedirect('account_inactive', surface, tx.returnTo || loginPathForSurface(surface)))
     }
-    if (user.role !== 'client' && user.role !== 'trusted_contact') {
-      return redirectResponse(loginErrorRedirect('sign_in_failed', tx.returnTo || returnToFallback))
+    if (!roleAllowedForSurface(user.role, surface)) {
+      return redirectResponse(loginErrorRedirect('sign_in_failed', surface, tx.returnTo || loginPathForSurface(surface)))
     }
 
     await touchExternalIdentityLogin(c.env, identity.id)
@@ -203,13 +230,13 @@ auth0Routes.get('/auth0/callback', async (c) => {
       actorUserAgent: actorUserAgent(c.req.raw),
       actorGeo: actorGeo(c.req.raw),
       action: 'auth0_login',
-      after: { connection: claims.connection },
+      after: { connection: claims.connection, surface },
     })
-    const destination = sanitizeReturnPath(tx.returnTo, user.role === 'trusted_contact' ? '/portal/trusted' : '/portal/')
+    const destination = postAuthDestination(user.role, surface, sanitizeReturnPath(tx.returnTo, defaultReturnForSurface(surface), surface))
     return redirectResponse(destination, sessionCookie(token))
   } catch (err) {
     console.error('[auth0] callback failed', err instanceof Error ? err.message : err)
-    return redirectResponse(loginErrorRedirect('sign_in_failed', tx.returnTo || returnToFallback))
+    return redirectResponse(loginErrorRedirect('sign_in_failed', surface, tx.returnTo || loginPathForSurface(surface)))
   }
 })
 
@@ -235,18 +262,20 @@ auth0Routes.get('/identities', requireUser, async (c) => {
 
 auth0Routes.post('/auth0/link', requireUser, async (c) => {
   const user = c.get('user')
-  if (user.role !== 'client' && user.role !== 'trusted_contact') {
-    return c.json({ error: 'client portal accounts only' }, 403)
+  if (!canLinkIdentity(user.role)) {
+    return c.json({ error: 'this account cannot link social sign-in' }, 403)
   }
   const config = loadAuth0Config(c.env)
   if (!config) return c.json({ error: 'social sign-in is not available right now' }, 503)
   const body = await c.req.json<{ provider?: string }>().catch(() => ({} as { provider?: string }))
   const provider = auth0ProviderByKey(config, body.provider || '')
   if (!provider) return c.json({ error: 'unsupported sign-in provider' }, 400)
+  const surface = linkSurfaceForRole(user.role)
   const { authorizeUrl } = await createAuth0LoginRequest(c.env, config, {
     connection: provider.connection,
-    returnTo: portalSecurityPath(),
+    returnTo: securityPathForAuth0Surface(surface),
     mode: 'link',
+    surface,
     linkUserId: user.id,
   })
   return c.json({ ok: true, authorize_url: authorizeUrl })
@@ -281,6 +310,7 @@ auth0Routes.post('/auth0/unlink', requireUser, async (c) => {
 auth0Routes.get('/auth0/logout', async (c) => {
   const config = loadAuth0Config(c.env)
   const user = await getUser(c.env, c.req.raw)
+  const surface = parseAuth0Surface(c.req.query('surface'))
   await destroySession(c.env, c.req.raw)
   if (user) {
     await logAudit(c.env, {
@@ -289,10 +319,11 @@ auth0Routes.get('/auth0/logout', async (c) => {
       actorUserAgent: actorUserAgent(c.req.raw),
       actorGeo: actorGeo(c.req.raw),
       action: 'logout',
-      after: { via: 'auth0_federated' },
+      after: { via: 'auth0_federated', surface },
     })
   }
-  const returnTo = sanitizeReturnPath(c.req.query('returnTo'), config?.logoutReturnUrl || `${PUBLIC_SITE_URL}/portal/login`)
+  const defaultLogout = surface === 'staff' ? HQ_WWW_LOGIN : `${PUBLIC_SITE_URL}/portal/login`
+  const returnTo = sanitizeReturnPath(c.req.query('returnTo'), config?.logoutReturnUrl || defaultLogout, surface)
   if (!config) {
     return redirectResponse(returnTo, clearCookie())
   }
