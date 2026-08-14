@@ -26,15 +26,6 @@ import {
 
 export const serviceApplicationRoutes = new Hono<AppEnv>()
 
-function agentDebugLog(entry: { hypothesisId: string; location: string; message: string; data: Record<string, unknown>; timestamp: number }) {
-  try {
-    const processApi = (globalThis as unknown as { process?: { getBuiltinModule?: (name: string) => { appendFileSync?: (path: string, data: string) => void } } }).process
-    processApi?.getBuiltinModule?.('fs').appendFileSync?.('/opt/cursor/logs/debug.log', `${JSON.stringify(entry)}\n`)
-  } catch {
-    // Cloudflare production has no writable host filesystem; local debugging does.
-  }
-}
-
 const MAX_FILE_BYTES = 20 * 1024 * 1024
 const MAX_FILES_PER_APPLICATION = 30
 const ALLOWED_UPLOAD_TYPES = new Set([
@@ -756,29 +747,18 @@ serviceApplicationRoutes.patch('/service-applications/:id/status', requireUser, 
 // router is mounted first. Clients never receive internal document metadata.
 serviceApplicationRoutes.get('/documents', requireUser, async (c) => {
   const user = c.get('user')
-  // #region agent log
-  agentDebugLog({ hypothesisId: 'A,B,D', location: 'serviceApplications.ts:documents:list-entry', message: 'Portal documents list entered', data: { role: user.role, legacyProcessorClient: user.id === 'processor-review-client', uploadsBound: Boolean(c.env.UPLOADS) }, timestamp: Date.now() })
-  // #endregion
   if (user.role === 'client') {
     const res = await c.env.DB.prepare(
       `SELECT * FROM client_documents
        WHERE client_user_id = ? AND visibility != 'internal'
        ORDER BY created_at DESC LIMIT 200`,
     ).bind(user.id).all()
-    const target = (res.results ?? []).find((row: any) => row.id === 'processor-review-document' || row.file_name === 'Sample engagement letter.pdf') as any
-    // #region agent log
-    agentDebugLog({ hypothesisId: 'A,B,D,E', location: 'serviceApplications.ts:documents:list-client-result', message: 'Client document list query completed', data: { resultCount: (res.results ?? []).length, targetFound: Boolean(target), targetId: target?.id ?? null, targetOwnerMatchesLegacyId: target?.client_user_id === 'processor-review-client', targetHasR2Key: Boolean(target?.r2_key), targetVisibility: target?.visibility ?? null, targetSource: target?.source ?? null, targetContentType: target?.content_type ?? null, targetSizeBytes: target?.size_bytes ?? null }, timestamp: Date.now() })
-    // #endregion
     return c.json({ documents: res.results ?? [] })
   }
   const { where, params } = await scopeFilter(c.env, user)
   const res = await c.env.DB.prepare(
     `SELECT * FROM client_documents WHERE ${where} ORDER BY created_at DESC LIMIT 200`,
   ).bind(...params).all()
-  const target = (res.results ?? []).find((row: any) => row.id === 'processor-review-document' || row.file_name === 'Sample engagement letter.pdf') as any
-  // #region agent log
-  agentDebugLog({ hypothesisId: 'A,B,D,E', location: 'serviceApplications.ts:documents:list-staff-result', message: 'Staff document list query completed', data: { resultCount: (res.results ?? []).length, targetFound: Boolean(target), targetId: target?.id ?? null, targetHasR2Key: Boolean(target?.r2_key), targetVisibility: target?.visibility ?? null, targetSource: target?.source ?? null, targetContentType: target?.content_type ?? null, targetSizeBytes: target?.size_bytes ?? null }, timestamp: Date.now() })
-  // #endregion
   return c.json({ documents: res.results ?? [] })
 })
 
@@ -786,27 +766,15 @@ serviceApplicationRoutes.get('/documents', requireUser, async (c) => {
 // client list alone is not a security boundary.
 serviceApplicationRoutes.get('/documents/:id/file', requireUser, async (c) => {
   const user = c.get('user')
-  // #region agent log
-  agentDebugLog({ hypothesisId: 'C,D', location: 'serviceApplications.ts:documents:file-entry', message: 'Document file route entered', data: { requestedId: c.req.param('id') ?? null, role: user.role, legacyProcessorClient: user.id === 'processor-review-client', uploadsBound: Boolean(c.env.UPLOADS) }, timestamp: Date.now() })
-  // #endregion
   const doc = await c.env.DB.prepare(
     `SELECT id, client_user_id, file_name, r2_key, content_type, visibility, source FROM client_documents WHERE id = ?`,
   ).bind(c.req.param('id') ?? '').first<{ id: string; client_user_id: string; file_name: string | null; r2_key: string | null; content_type: string | null; visibility: string; source: string | null }>()
-  // #region agent log
-  agentDebugLog({ hypothesisId: 'A,B,D', location: 'serviceApplications.ts:documents:file-record', message: 'Document file record lookup completed', data: { found: Boolean(doc), documentId: doc?.id ?? null, ownerMatchesLegacyId: doc?.client_user_id === 'processor-review-client', hasR2Key: Boolean(doc?.r2_key), contentType: doc?.content_type ?? null, visibility: doc?.visibility ?? null, uploadsBound: Boolean(c.env.UPLOADS) }, timestamp: Date.now() })
-  // #endregion
   if (!doc) return c.json({ error: 'file not found' }, 404)
-  let authorization = 'allowed'
   if (user.role === 'client') {
-    if (doc.client_user_id !== user.id || doc.visibility === 'internal') authorization = 'client-hidden'
+    if (doc.client_user_id !== user.id || doc.visibility === 'internal') return c.json({ error: 'file not found' }, 404)
   } else if (!(await canAccessClient(c.env, user, doc.client_user_id))) {
-    authorization = 'staff-forbidden'
+    return c.json({ error: 'forbidden' }, 403)
   }
-  // #region agent log
-  agentDebugLog({ hypothesisId: 'D', location: 'serviceApplications.ts:documents:file-authorization', message: 'Document download authorization evaluated', data: { authorization, role: user.role, legacyProcessorClient: user.id === 'processor-review-client', ownerMatchesSession: doc.client_user_id === user.id, visibility: doc.visibility }, timestamp: Date.now() })
-  // #endregion
-  if (authorization === 'client-hidden') return c.json({ error: 'file not found' }, 404)
-  if (authorization === 'staff-forbidden') return c.json({ error: 'forbidden' }, 403)
 
   const filename = safeFileName(doc.file_name || 'document')
   if (!c.env.UPLOADS) {
@@ -824,9 +792,6 @@ serviceApplicationRoutes.get('/documents/:id/file', requireUser, async (c) => {
   }
   if (!doc.r2_key) return c.json({ error: 'file not found' }, 404)
   const object = await c.env.UPLOADS.get(doc.r2_key)
-  // #region agent log
-  agentDebugLog({ hypothesisId: 'B', location: 'serviceApplications.ts:documents:file-storage', message: 'Document object storage lookup completed', data: { objectFound: Boolean(object), documentId: doc.id, contentTypeFromRecord: doc.content_type ?? null, contentTypeFromObject: object?.httpMetadata?.contentType ?? null }, timestamp: Date.now() })
-  // #endregion
   if (!object) return c.json({ error: 'file not found' }, 404)
   return new Response(object.body, {
     headers: {
