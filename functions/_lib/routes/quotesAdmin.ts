@@ -5,7 +5,7 @@ import { uuid } from '../crypto'
 import { logActivity } from '../activity'
 import { escapeHtml, notifyStaff, sendEmailStrict } from '../email'
 import { renderHqEmailOrFallback } from '../hqEmailTemplates'
-import { PUBLIC_SITE_BASE } from '../scopeFunnel'
+import { PUBLIC_SITE_URL } from '../appUrls'
 import { applyCatalogToQuoteLines, type CatalogOffering } from '../../../shared/quoteCatalog'
 import { ensureServiceOfferingsSeeded } from './serviceOfferings'
 
@@ -363,7 +363,7 @@ quoteAdminRoutes.post('/quotes/:id/send', requireStaff, async (c) => {
   if (!quote) return c.json({ error: 'quote not found' }, 404)
   if (!EDITABLE_STATUSES.has(quote.status)) return c.json({ error: `a ${quote.status} quote cannot be re-sent` }, 409)
 
-  const url = `${PUBLIC_SITE_BASE}/quote/${encodeURIComponent(quote.public_token)}`
+  const url = `${PUBLIC_SITE_URL}/quote/${encodeURIComponent(quote.public_token)}`
   const amount = `$${(Number(quote.total_cents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
   const validUntil = quote.valid_until
     ? new Date(`${String(quote.valid_until).slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })

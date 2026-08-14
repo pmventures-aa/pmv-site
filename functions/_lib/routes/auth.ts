@@ -19,6 +19,7 @@ import { notifyStaff, escapeHtml, sendEmail } from '../email'
 import { renderPinnacleEmailLayout } from '../emailTemplates/layout'
 import { renderHqEmailOrFallback } from '../hqEmailTemplates'
 import { CLIENT_PORTAL_URL, sendAccountWelcome, sendVendorApplicationReceived } from '../accountEmails'
+import { hqUrl, portalUrl } from '../appUrls'
 import { PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
 import { getCurrentProviderAgreementVersion } from '../managedTemplates'
 import { toDisplayCase } from '../../../shared/displayCase'
@@ -360,8 +361,8 @@ authRoutes.post('/forgot-password', async (c) => {
   const token = await createPasswordResetToken(c.env, user.id)
   const isStaff = user.role === 'staff' || user.role === 'admin'
   const resetUrl = isStaff
-    ? `https://www.pinnaclemanagementventures.com/admin/reset-password?token=${encodeURIComponent(token)}`
-    : `https://www.pinnaclemanagementventures.com/portal/reset-password?token=${encodeURIComponent(token)}`
+    ? hqUrl(`/reset-password?token=${encodeURIComponent(token)}`)
+    : portalUrl(`/reset-password?token=${encodeURIComponent(token)}`)
   const firstName = user.first_name || String(user.full_name || '').split(/\s+/)[0] || 'there'
   const fallbackHtml = renderPinnacleEmailLayout({
     preheader: 'Reset your Pinnacle password',

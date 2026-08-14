@@ -60,8 +60,10 @@ function prefillFromParams(params: URLSearchParams): typeof emptyForm | null {
 }
 
 function setupUrl(role: UserRow['role'] | string, token: string) {
-  const host = role === 'client' ? 'client.pinnaclemanagementventures.com' : 'hq.pinnaclemanagementventures.com'
-  return `https://${host}/set-password?token=${encodeURIComponent(token)}`
+  const hostPath = role === 'client'
+    ? 'https://secure.pinnaclemanagementventures.com'
+    : 'https://secure.pinnaclemanagementventures.com/hq'
+  return `${hostPath}/set-password?token=${encodeURIComponent(token)}`
 }
 
 function emailTone(status: string | null): 'green' | 'red' | 'gold' | 'slate' {

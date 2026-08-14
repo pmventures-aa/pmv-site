@@ -23,7 +23,7 @@ interface InviteForm {
   role_definition_id: string; lead_id: string; recipient_context: 'flexible' | 'person' | 'business'
   known_services: string[]; personal_note: string
 }
-const generalProviderUrl = 'https://hq.pinnaclemanagementventures.com/vendor-signup'
+const generalProviderUrl = 'https://secure.pinnaclemanagementventures.com/hq/vendor-signup'
 const providerServices = [
   ['mobile_notary','Commissioned notary'], ['ron','Remote Online Notary (RON)'], ['property_field','Property / field services'],
   ['document_courier','Document courier / runner'], ['merchant_technology','POS & payment technology'],
