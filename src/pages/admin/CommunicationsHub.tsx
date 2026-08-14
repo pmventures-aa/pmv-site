@@ -90,13 +90,13 @@ export default function CommunicationsHub() {
 function StatTile({ label, value, hint, icon: Icon, tone = 'slate' }: { label: string; value: string | number; hint?: string; icon: any; tone?: 'slate' | 'gold' | 'amber' | 'green' }) {
   const toneCls = tone === 'gold' ? 'text-gold' : tone === 'amber' ? 'text-amber-300' : tone === 'green' ? 'text-emerald-300' : 'text-slate-300'
   return (
-    <Panel>
+    <Panel className="!p-3 sm:!p-4">
       <div className="flex items-start justify-between gap-3">
         <span className={`grid h-9 w-9 place-items-center rounded-lg border border-white/10 bg-white/[.02] ${toneCls}`}><Icon size={16}/></span>
-        {hint && <Tag>{hint}</Tag>}
+        {hint && <span className="hidden sm:inline"><Tag>{hint}</Tag></span>}
       </div>
-      <p className="mt-4 text-[11px] font-bold uppercase tracking-[.14em] text-slate-500">{label}</p>
-      <p className="mt-2 font-display text-3xl font-extrabold text-white">{value}</p>
+      <p className="mt-3 text-[11px] font-bold uppercase tracking-[.14em] text-slate-500 sm:mt-4">{label}</p>
+      <p className="mt-1 font-display text-2xl font-extrabold text-white sm:mt-2 sm:text-3xl">{value}</p>
     </Panel>
   )
 }
@@ -127,16 +127,16 @@ export function OverviewTab({ overview, loading }: { overview: Overview | null; 
           </div>
         </div>
         <div className="mt-4 grid gap-2 md:grid-cols-3">
-          <Link to={p('messages')} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-4 transition hover:border-gold/40 hover:bg-white/[.04]">
-            <div><p className="text-sm font-bold text-white">Client & vendor threads</p><p className="mt-1 text-xs text-slate-400">Two-way conversations with clients, coworkers, and vendors.</p></div>
+          <Link to={p('messages')} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-3 transition hover:border-gold/40 hover:bg-white/[.04] sm:p-4">
+            <div><p className="text-sm font-bold text-white">Client & vendor threads</p><p className="mt-1 hidden text-xs text-slate-400 sm:block">Two-way conversations with clients, coworkers, and vendors.</p></div>
             <ArrowRight size={16} className="text-gold"/>
           </Link>
-          <Link to={p('communications/email')} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-4 transition hover:border-gold/40 hover:bg-white/[.04]">
-            <div><p className="text-sm font-bold text-white">Email Center</p><p className="mt-1 text-xs text-slate-400">Compose, schedule, template, and audience-target outbound.</p></div>
+          <Link to={p('communications/email')} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-3 transition hover:border-gold/40 hover:bg-white/[.04] sm:p-4">
+            <div><p className="text-sm font-bold text-white">Email Center</p><p className="mt-1 hidden text-xs text-slate-400 sm:block">Compose, schedule, template, and audience-target outbound.</p></div>
             <ArrowRight size={16} className="text-gold"/>
           </Link>
-          <Link to={p('cases')} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-4 transition hover:border-gold/40 hover:bg-white/[.04]">
-            <div><p className="text-sm font-bold text-white">Cases & SLA</p><p className="mt-1 text-xs text-slate-400">Live case timers when a thread escalates to a tracked request.</p></div>
+          <Link to={p('cases')} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-3 transition hover:border-gold/40 hover:bg-white/[.04] sm:p-4">
+            <div><p className="text-sm font-bold text-white">Cases & SLA</p><p className="mt-1 hidden text-xs text-slate-400 sm:block">Live case timers when a thread escalates to a tracked request.</p></div>
             <ArrowRight size={16} className="text-gold"/>
           </Link>
         </div>
@@ -171,7 +171,7 @@ export function ReportingTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-slate-500">Rolling window - inbound + outbound activity across every communication channel.</p>
         <select className={`${inputCls} max-w-[140px]`} value={range} onChange={(e) => setRange(e.target.value as any)}>
           <option value="7d">Last 7 days</option>
@@ -183,7 +183,7 @@ export function ReportingTab() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel>
           <div className="flex items-center gap-2"><MessageSquare size={16} className="text-gold"/><p className="text-sm font-extrabold text-white">Thread messages / day</p></div>
-          <div className="mt-4 flex items-end gap-1 h-40">
+          <div className="mt-4 overflow-x-auto"><div className="flex h-40 min-w-[480px] items-end gap-1 sm:min-w-0">
             {data.daily_thread_volume.length === 0 && <p className="text-xs text-slate-500">No thread traffic in this window.</p>}
             {data.daily_thread_volume.map((row) => (
               <div key={row.day} className="flex flex-1 flex-col items-center justify-end gap-1">
@@ -191,12 +191,12 @@ export function ReportingTab() {
                 <span className="text-[9px] text-slate-500">{row.day.slice(5)}</span>
               </div>
             ))}
-          </div>
+          </div></div>
         </Panel>
 
         <Panel>
           <div className="flex items-center gap-2"><Mail size={16} className="text-gold"/><p className="text-sm font-extrabold text-white">Emails delivered / day</p></div>
-          <div className="mt-4 flex items-end gap-1 h-40">
+          <div className="mt-4 overflow-x-auto"><div className="flex h-40 min-w-[480px] items-end gap-1 sm:min-w-0">
             {data.daily_email_volume.length === 0 && <p className="text-xs text-slate-500">No email volume in this window.</p>}
             {data.daily_email_volume.map((row) => (
               <div key={row.day} className="flex flex-1 flex-col items-center justify-end gap-1">
@@ -204,7 +204,7 @@ export function ReportingTab() {
                 <span className="text-[9px] text-slate-500">{row.day.slice(5)}</span>
               </div>
             ))}
-          </div>
+          </div></div>
         </Panel>
 
         <Panel>
