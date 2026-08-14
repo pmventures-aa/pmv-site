@@ -8,7 +8,7 @@ import { inspectAuth0Config, isAuth0Ready, resolveProvider, AUTH0_GENERIC_ERROR 
 import { validateReturnTo } from '../functions/_lib/auth0/returnTo'
 import { claimsGrantNoAuthorization, extractIdentityClaims } from '../functions/_lib/auth0/claims'
 import { canUnlinkIdentity, type ExternalIdentityRow, type LinkedUser } from '../functions/_lib/auth0/identities'
-import { confirmAuth0Link, resolveAuth0Login } from '../functions/_lib/auth0/resolve'
+import { confirmAuth0Link, resolveAuth0Login, unlinkIdentityForUser } from '../functions/_lib/auth0/resolve'
 import type { Env, SessionUser } from '../functions/_lib/types'
 import type { Auth0IdentityClaims } from '../functions/_lib/auth0/claims'
 import type { Auth0AppState } from '../functions/_lib/auth0/sdk'
@@ -293,8 +293,15 @@ describe('Auth0 claims', () => {
     expect(extracted?.sub).toBe('google-oauth2|abc')
     expect(extracted?.email).toBe('ada@example.com')
     expect(extracted?.emailVerified).toBe(true)
+    expect(extracted?.iss).toBe('https://pmv-test.us.auth0.com/')
     expect((extracted as unknown as { role?: string }).role).toBeUndefined()
     expect(claimsGrantNoAuthorization(user)).toEqual(['role', 'roles', 'permissions', 'org_id'])
+  })
+
+  it('rejects a mismatched or missing issuer', () => {
+    const user = { sub: 'google-oauth2|abc', iss: 'https://evil.example/', email: 'ada@example.com', email_verified: true }
+    expect(extractIdentityClaims(user, 'https://pmv-test.us.auth0.com/')).toBeNull()
+    expect(extractIdentityClaims({ sub: 'google-oauth2|abc', email: 'ada@example.com', email_verified: true }, 'https://pmv-test.us.auth0.com/')).toBeNull()
   })
 })
 
@@ -350,6 +357,23 @@ describe('Auth0 callback resolution', () => {
     expect(env.SESSIONS).toBeTruthy()
   })
 
+  it('does not link Auth0 onto a staff account', async () => {
+    const env = readyEnv()
+    addUser(env, { id: 'staff-a', email: 'staff@example.com', role: 'admin' })
+    const result = await resolveAuth0Login({
+      env,
+      request: fakeRequest(),
+      claims: claims({ email: 'staff@example.com', sub: 'google-oauth2|staff' }),
+      appState: appState({ intent: 'link', userId: 'staff-a' }),
+      provider: google,
+      authenticatedUserId: 'staff-a',
+      confirmLinkBase: 'https://www.pinnaclemanagementventures.com/api/auth/auth0/confirm-link',
+    })
+    expect(result.ok).toBe(false)
+    const db = env.DB as unknown as ReturnType<typeof createFakeDb>
+    expect(db.identities).toHaveLength(0)
+  })
+
   it('rejects an identity already linked to another user during explicit link', async () => {
     const env = readyEnv()
     addUser(env, { id: 'client-a', email: 'ada@example.com' })
@@ -383,6 +407,37 @@ describe('Auth0 callback resolution', () => {
     const db = env.DB as unknown as ReturnType<typeof createFakeDb>
     expect(db.identities).toHaveLength(1)
     expect(db.identities[0].user_id).toBe('client-a')
+  })
+
+  it('rejects staff identities from the client portal', async () => {
+    const env = readyEnv()
+    addUser(env, { id: 'staff-a', email: 'staff@example.com', role: 'admin' })
+    addIdentity(env, { id: 'eid-1', user_id: 'staff-a', issuer: 'https://pmv-test.us.auth0.com/', subject: 'google-oauth2|abc' })
+    const result = await resolveAuth0Login({
+      env,
+      request: fakeRequest(),
+      claims: claims({ email: 'staff@example.com' }),
+      appState: appState(),
+      provider: google,
+      confirmLinkBase: 'https://www.pinnaclemanagementventures.com/api/auth/auth0/confirm-link',
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  it('does not create an account from an unverified Auth0 email', async () => {
+    const env = readyEnv()
+    const result = await resolveAuth0Login({
+      env,
+      request: fakeRequest(),
+      claims: claims({ emailVerified: false }),
+      appState: appState(),
+      provider: google,
+      confirmLinkBase: 'https://www.pinnaclemanagementventures.com/api/auth/auth0/confirm-link',
+    })
+    expect(result.ok).toBe(false)
+    const db = env.DB as unknown as ReturnType<typeof createFakeDb>
+    expect(db.users).toHaveLength(0)
+    expect(db.identities).toHaveLength(0)
   })
 
   it('rejects a disabled internal user', async () => {
@@ -465,6 +520,32 @@ describe('email confirmation linking', () => {
     expect(first.ok).toBe(true)
     const replay = await confirmAuth0Link(env, fakeRequest(), 'tok')
     expect(replay.ok).toBe(false)
+  })
+})
+
+describe('safe unlinking', () => {
+  it('unlinks when another authentication method remains', async () => {
+    const env = readyEnv()
+    addUser(env, { id: 'client-a', email: 'ada@example.com', password_hash: 'hash' })
+    addIdentity(env, { id: 'eid-1', user_id: 'client-a', issuer: 'https://pmv-test.us.auth0.com/', subject: 'google-oauth2|abc' })
+    const result = await unlinkIdentityForUser(env, fakeRequest(), {
+      id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada',
+    }, 'eid-1')
+    expect(result.ok).toBe(true)
+    const db = env.DB as unknown as ReturnType<typeof createFakeDb>
+    expect(db.identities).toHaveLength(0)
+  })
+
+  it('refuses to unlink the final authentication method', async () => {
+    const env = readyEnv()
+    addUser(env, { id: 'client-a', email: 'ada@example.com', password_hash: null })
+    addIdentity(env, { id: 'eid-1', user_id: 'client-a', issuer: 'https://pmv-test.us.auth0.com/', subject: 'google-oauth2|abc' })
+    const result = await unlinkIdentityForUser(env, fakeRequest(), {
+      id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada',
+    }, 'eid-1')
+    expect(result.ok).toBe(false)
+    const db = env.DB as unknown as ReturnType<typeof createFakeDb>
+    expect(db.identities).toHaveLength(1)
   })
 })
 

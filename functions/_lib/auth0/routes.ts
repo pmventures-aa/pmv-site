@@ -9,6 +9,7 @@ import {
   inspectAuth0Config,
   isAuth0Ready,
   loginRedirectPath,
+  requestOriginIsAllowed,
   resolveCallbackUrl,
   resolveLogoutReturnUrl,
   resolveProvider,
@@ -18,7 +19,7 @@ import { validateReturnTo } from './returnTo'
 import { extractIdentityClaims } from './claims'
 import { getAuth0Sdk, MissingTransactionError, redactAuth0Error, type Auth0AppState } from './sdk'
 import { newStoreOptions } from './stores'
-import { listIdentities } from './identities'
+import { isPortalRole, listIdentities } from './identities'
 import { confirmAuth0Link, resolveAuth0Login, unlinkIdentityForUser } from './resolve'
 
 export const auth0Routes = new Hono<AppEnv>()
@@ -109,8 +110,10 @@ auth0Routes.get('/auth0/login', async (c) => {
 })
 
 auth0Routes.post('/auth0/link', requireUser, async (c) => {
+  if (!requestOriginIsAllowed(c.req.raw)) return c.json({ error: 'forbidden' }, 403)
   if (!isAuth0Ready(c.env)) return c.json({ error: AUTH0_UNAVAILABLE_ERROR }, 503)
   const user = c.get('user')
+  if (!isPortalRole(user.role)) return c.json({ error: AUTH0_UNAVAILABLE_ERROR }, 403)
   const body = await c.req.json<{ connection?: string }>().catch(() => ({ connection: '' }))
   const provider = resolveProvider(c.env, body.connection)
   if (!provider) return c.json({ error: AUTH0_UNAVAILABLE_ERROR }, 400)
@@ -217,7 +220,9 @@ auth0Routes.get('/identities', requireUser, async (c) => {
 })
 
 auth0Routes.post('/auth0/unlink', requireUser, async (c) => {
+  if (!requestOriginIsAllowed(c.req.raw)) return c.json({ error: 'forbidden' }, 403)
   const user = c.get('user')
+  if (!isPortalRole(user.role)) return c.json({ error: AUTH0_UNAVAILABLE_ERROR }, 403)
   const body = await c.req.json<{ identity_id?: string }>().catch(() => ({ identity_id: '' }))
   const identityId = typeof body.identity_id === 'string' ? body.identity_id.trim() : ''
   if (!identityId) return c.json({ error: 'identity_id is required' }, 400)

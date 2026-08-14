@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import type { AppEnv, Env } from '../functions/_lib/types'
 import { __setAuth0SdkForTests, MissingTransactionError, type Auth0Sdk } from '../functions/_lib/auth0/sdk'
 import { hashPassword } from '../functions/_lib/crypto'
+import { createSession } from '../functions/_lib/session'
 import { authRoutes } from '../functions/_lib/routes/auth'
 
 class MemoryKV {
@@ -53,6 +54,13 @@ function createFakeDb() {
             id: params[0], user_id: params[1], provider: params[2], issuer: params[3], subject: params[4],
             email: params[5], email_verified: params[6], created_at: 'now', last_login_at: 'now',
           })
+        }
+        if (/DELETE FROM external_identities/.test(text)) {
+          const before = identities.length
+          for (let i = identities.length - 1; i >= 0; i--) {
+            if (identities[i].id === params[0] && identities[i].user_id === params[1]) identities.splice(i, 1)
+          }
+          return { meta: { changes: before === identities.length ? 0 : 1 } }
         }
         return { meta: { changes: 1 } }
       },
@@ -197,6 +205,105 @@ describe('Auth0 HTTP routes', () => {
     const res = await app().request('http://localhost:8788/api/auth/auth0/callback?code=replay&state=abc', {}, env)
     expect(res.status).toBe(302)
     expect(completeInteractiveLogin).not.toHaveBeenCalled()
+  })
+
+  it('uses the Vite origin for the Auth0 callback when the API is proxied', async () => {
+    const startInteractiveLogin = vi.fn<Auth0Sdk['startInteractiveLogin']>(async () => new URL('https://pmv-test.us.auth0.com/authorize'))
+    __setAuth0SdkForTests({ startInteractiveLogin, completeInteractiveLogin: vi.fn(), getUser: vi.fn() })
+    await app().request('http://127.0.0.1:8788/api/auth/auth0/login?connection=google', {
+      headers: { Referer: 'http://localhost:5173/portal/login' },
+    }, envWithAuth0())
+    expect(startInteractiveLogin.mock.calls[0][0].authorizationParams?.redirect_uri).toBe('http://localhost:5173/api/auth/auth0/callback')
+  })
+
+  it('rejects a callback whose issuer does not match the configured tenant', async () => {
+    __setAuth0SdkForTests({
+      startInteractiveLogin: vi.fn(),
+      completeInteractiveLogin: vi.fn(async () => ({
+        appState: { intent: 'login' as const, returnTo: '/portal', connection: 'google-oauth2', provider: 'google' },
+      })),
+      getUser: vi.fn(async () => ({
+        sub: 'google-oauth2|abc',
+        iss: 'https://evil.example/',
+        email: 'ada@example.com',
+        email_verified: true,
+      })),
+    })
+    const res = await app().request('http://localhost:8788/api/auth/auth0/callback?code=forged&state=abc', {}, envWithAuth0())
+    expect(res.status).toBe(302)
+    expect(res.headers.get('Location')).toContain('auth_error=signin')
+    expect(res.headers.get('Set-Cookie') || '').not.toMatch(/pmv_session=/)
+  })
+
+  it('logs out locally without requiring Auth0 federated logout', async () => {
+    const env = envWithAuth0()
+    env.db.users.push({
+      id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada', first_name: 'Ada', last_name: 'Lovelace',
+      status: 'active', password_hash: 'hash',
+    })
+    const token = await createSession(env, { id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada' })
+    const res = await app().request('http://localhost:8788/api/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: `pmv_session=${token}` },
+    }, env)
+    expect(res.status).toBe(200)
+    expect(await env.kv.get(`sess:${token}`)).toBeNull()
+    expect(res.headers.get('Set-Cookie') || '').toMatch(/Max-Age=0/)
+  })
+
+  it('unlinks a connected method when a password remains', async () => {
+    const env = envWithAuth0()
+    env.db.users.push({
+      id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada', first_name: 'Ada', last_name: 'Lovelace',
+      status: 'active', password_hash: 'hash',
+    })
+    env.db.identities.push({
+      id: 'eid-1', user_id: 'client-a', provider: 'google-oauth2', issuer: 'https://pmv-test.us.auth0.com/',
+      subject: 'google-oauth2|abc', email: 'ada@example.com', email_verified: 1,
+    })
+    const token = await createSession(env, { id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada' })
+    const res = await app().request('http://localhost:8788/api/auth/auth0/unlink', {
+      method: 'POST',
+      headers: { Cookie: `pmv_session=${token}`, Origin: 'http://localhost:8788', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identity_id: 'eid-1' }),
+    }, env)
+    expect(res.status).toBe(200)
+    expect(env.db.identities).toHaveLength(0)
+  })
+
+  it('prevents unlinking the final authentication method over HTTP', async () => {
+    const env = envWithAuth0()
+    env.db.users.push({
+      id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada', first_name: 'Ada', last_name: 'Lovelace',
+      status: 'active', password_hash: null,
+    })
+    env.db.identities.push({
+      id: 'eid-1', user_id: 'client-a', provider: 'google-oauth2', issuer: 'https://pmv-test.us.auth0.com/',
+      subject: 'google-oauth2|abc', email: 'ada@example.com', email_verified: 1,
+    })
+    const token = await createSession(env, { id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada' })
+    const res = await app().request('http://localhost:8788/api/auth/auth0/unlink', {
+      method: 'POST',
+      headers: { Cookie: `pmv_session=${token}`, Origin: 'http://localhost:8788', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identity_id: 'eid-1' }),
+    }, env)
+    expect(res.status).toBe(400)
+    expect(env.db.identities).toHaveLength(1)
+  })
+
+  it('rejects cross-site unlink attempts', async () => {
+    const env = envWithAuth0()
+    env.db.users.push({
+      id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada', first_name: 'Ada', last_name: 'Lovelace',
+      status: 'active', password_hash: 'hash',
+    })
+    const token = await createSession(env, { id: 'client-a', email: 'ada@example.com', role: 'client', full_name: 'Ada' })
+    const res = await app().request('http://localhost:8788/api/auth/auth0/unlink', {
+      method: 'POST',
+      headers: { Cookie: `pmv_session=${token}`, Origin: 'https://evil.example', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identity_id: 'eid-1' }),
+    }, env)
+    expect(res.status).toBe(403)
   })
 
   it('keeps password login working on the same auth router', async () => {

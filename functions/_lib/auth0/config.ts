@@ -183,12 +183,38 @@ export function isAllowedLogoutUrl(url: string): boolean {
   return allowedLogoutUrls().includes(url.trim())
 }
 
+function isAllowedOrigin(origin: string): origin is typeof ALLOWED_AUTH0_ORIGINS[number] {
+  return (ALLOWED_AUTH0_ORIGINS as readonly string[]).includes(origin)
+}
+
 export function originFromRequest(request: Request): string {
-  try {
-    return new URL(request.url).origin
-  } catch {
-    return ''
+  const candidates: string[] = []
+  const headerOrigin = trim(request.headers.get('Origin'))
+  if (headerOrigin) candidates.push(headerOrigin)
+  const referer = trim(request.headers.get('Referer'))
+  if (referer) {
+    try { candidates.push(new URL(referer).origin) } catch { /* ignore */ }
   }
+  try { candidates.push(new URL(request.url).origin) } catch { /* ignore */ }
+  for (const origin of candidates) {
+    if (isAllowedOrigin(origin)) return origin
+  }
+  return candidates[0] || ''
+}
+
+/**
+ * Mutating Auth0 endpoints require an allowlisted Origin (or Referer when
+ * Origin is absent). Same-origin tests that omit both still pass when the
+ * request URL itself is allowlisted.
+ */
+export function requestOriginIsAllowed(request: Request): boolean {
+  const headerOrigin = trim(request.headers.get('Origin'))
+  if (headerOrigin) return isAllowedOrigin(headerOrigin)
+  const referer = trim(request.headers.get('Referer'))
+  if (referer) {
+    try { return isAllowedOrigin(new URL(referer).origin) } catch { return false }
+  }
+  try { return isAllowedOrigin(new URL(request.url).origin) } catch { return false }
 }
 
 export function resolveCallbackUrl(env: Env, request: Request): string | null {

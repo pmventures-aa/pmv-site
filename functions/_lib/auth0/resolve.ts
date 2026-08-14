@@ -222,7 +222,9 @@ export async function resolveAuth0Login(input: {
       return { ok: false, error: AUTH0_GENERIC_ERROR, code: 'link' }
     }
     const user = await getUserById(env, userId)
-    if (!user || user.status !== 'active') return { ok: false, error: AUTH0_GENERIC_ERROR, code: 'link' }
+    if (!user || user.status !== 'active' || !isPortalRole(user.role)) {
+      return { ok: false, error: AUTH0_GENERIC_ERROR, code: 'link' }
+    }
     if (!claims.emailVerified || !claims.email) {
       return { ok: false, error: AUTH0_GENERIC_ERROR, code: 'link' }
     }

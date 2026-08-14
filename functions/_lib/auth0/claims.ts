@@ -19,6 +19,11 @@ function asBoolean(value: unknown): boolean {
   return value === true || value === 'true' || value === 1
 }
 
+export function normalizeIssuer(value: string): string {
+  const trimmed = asString(value).replace(/^https?:\/\//i, '').replace(/\/+$/, '')
+  return trimmed ? `https://${trimmed}/` : ''
+}
+
 /**
  * Auth0 claims authenticate identity only. Roles, org membership, and custom
  * permissions are ignored and never copied onto the Pinnacle session.
@@ -27,8 +32,9 @@ export function extractIdentityClaims(user: UserClaims | undefined | null, fallb
   if (!user) return null
   const sub = asString(user.sub)
   if (!sub) return null
-  const iss = asString(user.iss) || fallbackIssuer
-  if (!iss) return null
+  const expectedIssuer = normalizeIssuer(fallbackIssuer)
+  const iss = normalizeIssuer(asString(user.iss))
+  if (!iss || !expectedIssuer || iss !== expectedIssuer) return null
   const email = asString(user.email).toLowerCase() || null
   const givenName = asString(user.given_name)
   const familyName = asString(user.family_name)
