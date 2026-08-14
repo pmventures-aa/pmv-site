@@ -1,0 +1,25 @@
+{
+  "name": "Pinnacle HQ",
+  "short_name": "Pinnacle HQ",
+  "description": "Field assignments and Pinnacle HQ for network professionals.",
+  "start_url": "/hq/field-work/mine",
+  "scope": "/hq/",
+  "display": "standalone",
+  "background_color": "#0B1F3A",
+  "theme_color": "#0B1F3A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
