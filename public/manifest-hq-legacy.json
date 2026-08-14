@@ -1,0 +1,23 @@
+{
+  "name": "Pinnacle Field Work",
+  "short_name": "PMV Field",
+  "description": "Assignments, travel, arrival, and completion for Pinnacle field vendors.",
+  "start_url": "/field-work/mine",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B1F3A",
+  "theme_color": "#0B1F3A",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    }
+  ]
+}

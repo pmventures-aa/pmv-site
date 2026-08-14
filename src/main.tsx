@@ -6,33 +6,7 @@ import './index.css'
 import './enterprise-polish.css'
 import './auth-light-fix.css'
 import './mobile-enterprise.css'
-import './public-motion.css'
-import './brand-motion.css'
-import './mail-workspace.css'
 import Home from './pages/Home'
-import ServicesOverview from './pages/public/ServicesOverview'
-import ServiceDetail from './pages/public/ServiceDetail'
-import { BusinessOperationsHub, PropertyFieldHub, MobileDocumentHub } from './pages/public/ServiceHubs'
-import ProjectGuidePage from './pages/public/ProjectGuides'
-import About from './pages/public/About'
-import HowItWorks from './pages/public/HowItWorks'
-import Resources from './pages/public/Resources'
-import ServiceArea from './pages/public/ServiceArea'
-import Contact from './pages/public/Contact'
-import Professionals from './pages/public/Professionals'
-import Terms from './pages/public/Terms'
-import Privacy from './pages/public/Privacy'
-import ElectronicCommunications from './pages/public/ElectronicCommunications'
-import Accessibility from './pages/public/Accessibility'
-import ProviderAgreement from './pages/public/ProviderAgreement'
-import VerifyDocument from './pages/public/VerifyDocument'
-import SignerExperience from './pages/public/SignerExperience'
-import SharedDocument from './pages/public/SharedDocument'
-import ScopeRequest from './pages/public/ScopeRequest'
-import ScopeConfirmation from './pages/public/ScopeConfirmation'
-import InstantQuote from './pages/public/InstantQuote'
-import QuoteView from './pages/public/QuoteView'
-import CarePlans, { CarePlansConfirmation } from './pages/public/CarePlans'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
 import { installAudioUnlock } from './lib/sound'
@@ -44,16 +18,38 @@ const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
 const MailApp = lazy(() => import('./pages/mail/MailApp'))
 
-// `orb` remains as a compatibility name for existing lazy-route calls, but
-// authenticated surfaces now use the quiet PMV crest rather than an orb.
+const ServicesOverview = lazy(() => import('./pages/public/ServicesOverview'))
+const ServiceDetail = lazy(() => import('./pages/public/ServiceDetail'))
+const BusinessOperationsHub = lazy(() => import('./pages/public/ServiceHubs').then((m) => ({ default: m.BusinessOperationsHub })))
+const PropertyFieldHub = lazy(() => import('./pages/public/ServiceHubs').then((m) => ({ default: m.PropertyFieldHub })))
+const MobileDocumentHub = lazy(() => import('./pages/public/ServiceHubs').then((m) => ({ default: m.MobileDocumentHub })))
+const ProjectGuidePage = lazy(() => import('./pages/public/ProjectGuides'))
+const About = lazy(() => import('./pages/public/About'))
+const HowItWorks = lazy(() => import('./pages/public/HowItWorks'))
+const Resources = lazy(() => import('./pages/public/Resources'))
+const ServiceArea = lazy(() => import('./pages/public/ServiceArea'))
+const Contact = lazy(() => import('./pages/public/Contact'))
+const Professionals = lazy(() => import('./pages/public/Professionals'))
+const Terms = lazy(() => import('./pages/public/Terms'))
+const Privacy = lazy(() => import('./pages/public/Privacy'))
+const ElectronicCommunications = lazy(() => import('./pages/public/ElectronicCommunications'))
+const Accessibility = lazy(() => import('./pages/public/Accessibility'))
+const ProviderAgreement = lazy(() => import('./pages/public/ProviderAgreement'))
+const VerifyDocument = lazy(() => import('./pages/public/VerifyDocument'))
+const SignerExperience = lazy(() => import('./pages/public/SignerExperience'))
+const SharedDocument = lazy(() => import('./pages/public/SharedDocument'))
+const ScopeRequest = lazy(() => import('./pages/public/ScopeRequest'))
+const ScopeConfirmation = lazy(() => import('./pages/public/ScopeConfirmation'))
+const InstantQuote = lazy(() => import('./pages/public/InstantQuote'))
+const QuoteView = lazy(() => import('./pages/public/QuoteView'))
+const CarePlans = lazy(() => import('./pages/public/CarePlans'))
+const CarePlansConfirmation = lazy(() => import('./pages/public/CarePlans').then((m) => ({ default: m.CarePlansConfirmation })))
+
 function SurfaceFallback({ variant = 'brand', label = 'Loading…' }: { variant?: 'brand' | 'orb'; label?: string }) {
   return <LoadingScreen variant={variant} label={label} />
 }
 
 const host = window.location.hostname
-// mail. is a self-contained Pinnacle communications + signing workspace
-// that shares this SPA bundle but presents a completely different shell.
-// Detected FIRST so it wins over any other subdomain routing.
 const isMailHost = host.startsWith('mail.')
 const isSecureHost = host.startsWith('secure.')
 const surface: 'admin' | 'portal' | 'public' | 'mail' = (() => {
@@ -68,6 +64,43 @@ const secureBase = isSecureHost ? (surface === 'admin' ? '/hq' : '') : ''
 document.documentElement.dataset.pmvSurface = surface
 installAudioUnlock()
 
+if (surface === 'public') {
+  void import('./public-motion.css')
+  void import('./brand-motion.css')
+} else if (surface === 'mail') {
+  void import('./mail-workspace.css')
+}
+
+function installHqPwa() {
+  const manifest = document.createElement('link')
+  manifest.rel = 'manifest'
+  manifest.href = isSecureHost ? '/manifest-hq.json' : '/manifest-hq-legacy.json'
+  document.head.appendChild(manifest)
+
+  const appleTitle = document.createElement('meta')
+  appleTitle.name = 'apple-mobile-web-app-title'
+  appleTitle.content = 'PMV Field'
+  document.head.appendChild(appleTitle)
+
+  const capable = document.createElement('meta')
+  capable.name = 'apple-mobile-web-app-capable'
+  capable.content = 'yes'
+  document.head.appendChild(capable)
+
+  const statusBar = document.createElement('meta')
+  statusBar.name = 'apple-mobile-web-app-status-bar-style'
+  statusBar.content = 'black-translucent'
+  document.head.appendChild(statusBar)
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
+    })
+  }
+}
+
+if (surface === 'admin') installHqPwa()
+
 function App() {
   if (surface === 'mail') {
     return <Suspense fallback={<SurfaceFallback variant="orb" label="Loading Mail Workspace…" />}><MailApp /></Suspense>
@@ -79,42 +112,44 @@ function App() {
     return <Suspense fallback={<SurfaceFallback variant="orb" label="Loading your portal…" />}><Routes><Route path="/*" element={<PortalApp basePath="" />} /></Routes></Suspense>
   }
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/services" element={<ServicesOverview />} />
-      <Route path="/services/business-operations" element={<BusinessOperationsHub />} />
-      <Route path="/services/property-field" element={<PropertyFieldHub />} />
-      <Route path="/services/mobile-documents" element={<MobileDocumentHub />} />
-      <Route path="/services/:slug" element={<ServiceDetail />} />
-      <Route path="/projects/:slug" element={<ProjectGuidePage />} />
-      <Route path="/scope-request" element={<ScopeRequest />} />
-      <Route path="/scope-request/confirmation" element={<ScopeConfirmation />} />
-      <Route path="/start" element={<Navigate to="/scope-request" replace />} />
-      <Route path="/start-a-request" element={<Navigate to="/scope-request" replace />} />
-      <Route path="/request-assistance" element={<Navigate to="/scope-request" replace />} />
-      <Route path="/how-it-works" element={<HowItWorks />} />
-      <Route path="/resources" element={<Resources />} />
-      <Route path="/instant-quote" element={<InstantQuote />} />
-      <Route path="/quote/:token" element={<QuoteView />} />
-      <Route path="/care-plans" element={<CarePlans />} />
-      <Route path="/care-plans/confirmation" element={<CarePlansConfirmation />} />
-      <Route path="/about" element={<About />} />
-      <Route path="/service-area" element={<ServiceArea />} />
-      <Route path="/professionals" element={<Professionals />} />
-      <Route path="/work-with-pinnacle" element={<Navigate to="/professionals" replace />} />
-      <Route path="/contact" element={<Contact />} />
-      <Route path="/terms" element={<Terms />} />
-      <Route path="/privacy" element={<Privacy />} />
-      <Route path="/electronic-communications" element={<ElectronicCommunications />} />
-      <Route path="/accessibility" element={<Accessibility />} />
-      <Route path="/provider-agreement" element={<ProviderAgreement />} />
-      <Route path="/verify" element={<VerifyDocument />} />
-      <Route path="/sign/:token" element={<SignerExperience />} />
-      <Route path="/shared/:token" element={<SharedDocument />} />
-      <Route path="/portal/*" element={<Suspense fallback={<SurfaceFallback />}><PortalApp basePath="/portal" /></Suspense>} />
-      <Route path="/admin/*" element={<Suspense fallback={<SurfaceFallback />}><AdminApp basePath="/admin" /></Suspense>} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<SurfaceFallback label="Loading…" />}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/services" element={<ServicesOverview />} />
+        <Route path="/services/business-operations" element={<BusinessOperationsHub />} />
+        <Route path="/services/property-field" element={<PropertyFieldHub />} />
+        <Route path="/services/mobile-documents" element={<MobileDocumentHub />} />
+        <Route path="/services/:slug" element={<ServiceDetail />} />
+        <Route path="/projects/:slug" element={<ProjectGuidePage />} />
+        <Route path="/scope-request" element={<ScopeRequest />} />
+        <Route path="/scope-request/confirmation" element={<ScopeConfirmation />} />
+        <Route path="/start" element={<Navigate to="/scope-request" replace />} />
+        <Route path="/start-a-request" element={<Navigate to="/scope-request" replace />} />
+        <Route path="/request-assistance" element={<Navigate to="/scope-request" replace />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/resources" element={<Resources />} />
+        <Route path="/instant-quote" element={<InstantQuote />} />
+        <Route path="/quote/:token" element={<QuoteView />} />
+        <Route path="/care-plans" element={<CarePlans />} />
+        <Route path="/care-plans/confirmation" element={<CarePlansConfirmation />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/service-area" element={<ServiceArea />} />
+        <Route path="/professionals" element={<Professionals />} />
+        <Route path="/work-with-pinnacle" element={<Navigate to="/professionals" replace />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/electronic-communications" element={<ElectronicCommunications />} />
+        <Route path="/accessibility" element={<Accessibility />} />
+        <Route path="/provider-agreement" element={<ProviderAgreement />} />
+        <Route path="/verify" element={<VerifyDocument />} />
+        <Route path="/sign/:token" element={<SignerExperience />} />
+        <Route path="/shared/:token" element={<SharedDocument />} />
+        <Route path="/portal/*" element={<Suspense fallback={<SurfaceFallback />}><PortalApp basePath="/portal" /></Suspense>} />
+        <Route path="/admin/*" element={<Suspense fallback={<SurfaceFallback />}><AdminApp basePath="/admin" /></Suspense>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }
 
