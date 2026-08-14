@@ -28,7 +28,7 @@ Built to run entirely on **Cloudflare** (Pages + Functions + D1 + KV).
 - **API:** Hono, running as Cloudflare Pages Functions at `/api/*`
 - **Database:** Cloudflare D1 (SQLite) — 18 tables, app-level access control
 - **Sessions:** Cloudflare KV
-- **Auth:** Email + password (PBKDF2-SHA256, HMAC-peppered), opaque KV-backed sessions
+- **Auth:** Email + password (PBKDF2-SHA256, HMAC-peppered), opaque KV-backed sessions; optional Auth0 Universal Login (Google/Microsoft) as an alternate identity provider for the client portal
 
 ## Run it locally
 
