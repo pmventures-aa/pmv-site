@@ -170,6 +170,6 @@ Pages deploys do not apply SQL. Confirm GitHub Action **Apply D1 migrations** su
 | File | What it does |
 |---|---|
 | `0073_dispatch_vendor_fees.sql` | Vendor fee columns on `field_assignments` (Snapdocs-style local adjustment) |
-| `0074_field_work_query_indexes.sql` | Indexes for vendor list, field map, and fee-estimate postal lookups |
+| `0074_mobile_perf_indexes.sql` | Field-work list/map/fee indexes plus email thread message index |
 
 Verify with `SELECT vendor_fee_cents FROM field_assignments LIMIT 1;` and `PRAGMA index_list('field_assignments');` in the D1 console.

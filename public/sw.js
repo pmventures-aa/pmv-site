@@ -1,7 +1,10 @@
 const CACHE = 'pmv-hq-shell-v1'
+const PRECACHE = ['/manifest-hq.json', '/favicon.png', '/apple-touch-icon.png']
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting())
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()),
+  )
 })
 
 self.addEventListener('activate', (event) => {

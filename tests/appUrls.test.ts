@@ -30,6 +30,8 @@ describe('canonical app URLs', () => {
     expect(accountSetupUrl('staff', 'tok')).toBe('https://secure.pinnaclemanagementventures.com/hq/set-password?token=tok')
     expect(portalLoginUrl()).toBe('https://secure.pinnaclemanagementventures.com/login')
     expect(hqLoginUrl()).toBe('https://secure.pinnaclemanagementventures.com/hq/login')
+    expect(hqUrl('/reset-password?token=abc')).toBe('https://secure.pinnaclemanagementventures.com/hq/reset-password?token=abc')
+    expect(portalUrl('/reset-password?token=abc')).toBe('https://secure.pinnaclemanagementventures.com/reset-password?token=abc')
     expect(vendorSignupUrl()).toBe('https://secure.pinnaclemanagementventures.com/hq/vendor-signup')
     expect(inviteUrl('vendor', 'abc')).toBe('https://secure.pinnaclemanagementventures.com/hq/vendor-signup?invite=abc')
     expect(inviteUrl('client', 'abc')).toBe('https://secure.pinnaclemanagementventures.com/signup?invite=abc')
