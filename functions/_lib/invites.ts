@@ -1,7 +1,7 @@
 import type { Env } from './types'
 import { sendEmailStrict } from './email'
 import { uuid } from './crypto'
-import { hqUrl, wwwPortalUrl } from './appUrls'
+import { hqUrl, portalUrl, vendorSignupUrl } from './appUrls'
 import { renderRelationshipEvent } from './emailTemplates/relationship'
 import { renderHqEmailOrFallback } from './hqEmailTemplates'
 import { DEFAULT_INVITE_TTL_HOURS, INVITE_TTL_SETTING_KEY, formatInviteTtl, parseInviteTtlHours } from '../../shared/inviteTtl'
@@ -52,14 +52,11 @@ export async function getInviteTtlHours(env: Env): Promise<number> {
   }
 }
 
-const CLIENT_BASE = wwwPortalUrl()
-const HQ_BASE = hqUrl()
-
 export function inviteUrl(type: InviteType, token: string): string {
-  if (type === 'vendor') return `${HQ_BASE}/vendor-signup?invite=${encodeURIComponent(token)}`
-  if (type === 'trusted_contact') return `${CLIENT_BASE}/trusted-invite/${encodeURIComponent(token)}`
-  if (type === 'client') return `${CLIENT_BASE}/signup?invite=${encodeURIComponent(token)}`
-  return `${HQ_BASE}/invite/${encodeURIComponent(token)}`
+  if (type === 'vendor') return vendorSignupUrl(token)
+  if (type === 'trusted_contact') return portalUrl(`/trusted-invite/${encodeURIComponent(token)}`)
+  if (type === 'client') return portalUrl(`/signup?invite=${encodeURIComponent(token)}`)
+  return hqUrl(`/invite/${encodeURIComponent(token)}`)
 }
 
 function hoursUntil(expiresAt: string): number {

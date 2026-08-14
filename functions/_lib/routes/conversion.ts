@@ -6,13 +6,14 @@ import { createActivationToken } from '../session'
 import { toDisplayCase } from '../../../shared/displayCase'
 import { crmInviteName, crmPersonName } from '../../../shared/crmRecord'
 import { activityInsert } from '../activity'
-import { sendAccountWelcome, CLIENT_PORTAL_URL } from '../accountEmails'
+import { sendAccountWelcome } from '../accountEmails'
+import { portalSetupUrl } from '../appUrls'
 import { logAudit, actorGeo, actorIp, actorUserAgent } from '../auditLog'
 
 export const conversionRoutes = new Hono<AppEnv>()
 
 function setupUrlFor(token: string) {
-  return `${CLIENT_PORTAL_URL.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(token)}`
+  return portalSetupUrl(token)
 }
 
 function alreadyConverted(inquiry: any) {

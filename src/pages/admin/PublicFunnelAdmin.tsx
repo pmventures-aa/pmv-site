@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api'
 import { services } from '../../data/services'
 import { useAppPath } from '../../lib/basePath'
 import ClientBannersAdmin from './ClientBannersAdmin'
+import { PUBLIC_SITE_URL } from '../../../shared/letterhead'
 
 type CaseStudy={id:string;service_key:string|null;guide_slug:string|null;audience:string|null;headline:string;outcome:string;timeline_label:string;redacted_location:string|null;image_url:string|null;image_alt:string|null;published:number;sort_order:number}
 type Rule={key:string;label:string;base_price_cents:number;per_sqft_cents:number;minimum_price_cents:number;range_low_percent:number;range_high_percent:number;active:number}
@@ -95,7 +96,7 @@ export default function PublicFunnelAdmin(){
       {tab==='estimates'&&<section className="rounded-2xl border border-white/10 bg-white/[.02] p-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div><h2 className="text-xl font-bold text-white">Starting prices</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">These are planning ranges, not a committed quote. Save each service after you change it.</p></div>
-          <a href="https://pinnaclemanagementventures.com/instant-quote" target="_blank" rel="noreferrer" className="text-xs font-bold text-gold hover:underline">View public tool</a>
+          <a href={`${PUBLIC_SITE_URL}/instant-quote`} target="_blank" rel="noreferrer" className="text-xs font-bold text-gold hover:underline">View public tool</a>
         </div>
         <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">{data.quote_rules.map(r=>{
           const advanced=!!advancedRules[r.key]

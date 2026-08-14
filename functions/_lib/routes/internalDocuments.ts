@@ -4,6 +4,7 @@ import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { requireUser } from '../mid'
 import { sendEmail, escapeHtml } from '../email'
+import { PUBLIC_SITE_URL } from '../appUrls'
 
 export const internalDocumentAdminRoutes = new Hono<AppEnv>()
 export const internalDocumentPublicRoutes = new Hono<AppEnv>()
@@ -135,7 +136,7 @@ internalDocumentAdminRoutes.post('/documents-workspace/:id/share', async (c) => 
   const raw=token(); const hash=await sha256Hex(raw); const shareId=uuid(); const expires=new Date(Date.now()+Math.max(1,Math.min(30,Number(b?.expires_days||7)))*86400000).toISOString(); const user=c.get('user')
   const version=await c.env.DB.prepare('SELECT id FROM internal_document_versions WHERE document_id=? ORDER BY version_number DESC LIMIT 1').bind(id).first<any>()
   await c.env.DB.prepare(`INSERT INTO internal_document_shares (id,document_id,version_id,recipient_email,recipient_name,message,token_hash,expires_at,created_by_user_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(shareId,id,version?.id||null,email,b?.name||null,String(b?.message||'').slice(0,1000)||null,hash,expires,user.id,now()).run()
-  const link=`https://pinnaclemanagementventures.com/shared/${encodeURIComponent(raw)}`
+  const link=`${PUBLIC_SITE_URL}/shared/${encodeURIComponent(raw)}`
   c.executionCtx.waitUntil(sendEmail(c.env,{to:email,subject:`Document from Pinnacle: ${doc.title}`,html:`<p>${b?.name?`${escapeHtml(String(b.name))},`:''}</p><p>Pinnacle Management Ventures shared <strong>${escapeHtml(doc.title)}</strong> with you.</p>${b?.message?`<p>${escapeHtml(String(b.message))}</p>`:''}<p><a href="${link}">Open secure document</a></p><p>This link expires ${new Date(expires).toLocaleDateString('en-US')}.</p>`}))
   return c.json({ok:true,share_id:shareId,expires_at:expires})
 })

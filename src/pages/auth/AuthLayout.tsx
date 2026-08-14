@@ -4,6 +4,7 @@ import { Crest } from '../../components/ui'
 import { ThemeToggle } from '../../components/ThemeToggle'
 import { AuthAtmosphere, AuthRotatingCopy, AuthRotatingLine } from '../../components/auth/AuthAtmosphere'
 import { authMomentsFor } from '../../data/authMoments'
+import { PUBLIC_SITE_URL } from '../../../shared/letterhead'
 
 interface AuthLayoutProps {
   eyebrow: string
@@ -65,7 +66,7 @@ export function AuthLayout({
       <aside className={`auth-brand-panel auth-brand-panel-${surface} hidden lg:flex`}>
         <AuthAtmosphere surface={surface} />
         <div className="relative z-10 flex h-full w-full max-w-xl flex-col justify-between py-10">
-          <a href="https://pinnaclemanagementventures.com" className="inline-flex w-fit items-center gap-4" aria-label="Pinnacle Management Ventures home">
+          <a href={PUBLIC_SITE_URL} className="inline-flex w-fit items-center gap-4" aria-label="Pinnacle Management Ventures home">
             <Crest size={72} tone="light" className="pmv-auth-crest shrink-0" />
             <span>
               <span className="block text-xs font-bold uppercase tracking-[.2em] text-gold">Pinnacle</span>
@@ -104,7 +105,7 @@ export function AuthLayout({
       <main className="auth-form-panel relative flex min-h-screen items-center justify-center px-5 py-20 sm:px-8 lg:px-12">
         <div className="w-full max-w-[520px]">
           <div className="mb-8 lg:hidden">
-            <a href="https://pinnaclemanagementventures.com" className="inline-flex items-center gap-3">
+            <a href={PUBLIC_SITE_URL} className="inline-flex items-center gap-3">
               <Crest size={54} className="pmv-auth-crest shrink-0" />
               <span>
                 <span className="block text-[10px] font-bold uppercase tracking-[.2em] text-gold">Pinnacle</span>

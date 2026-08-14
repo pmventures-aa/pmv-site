@@ -7,7 +7,8 @@ import { requireOwner, requireStaff, requireUser } from '../mid'
 import { calculateCleaningEstimate, CLIENT_PORTAL_BASE, sendScopeConfirmation, twoBusinessHoursFrom, type QuoteRule } from '../scopeFunnel'
 import { ensureServiceOfferingsSeeded } from './serviceOfferings'
 import { createActivationToken } from '../session'
-import { sendAccountWelcome, CLIENT_PORTAL_URL } from '../accountEmails'
+import { sendAccountWelcome } from '../accountEmails'
+import { portalSetupUrl } from '../appUrls'
 import { advanceInquiryLifecycle } from '../lifecycle'
 
 export const scopeFunnelPublicRoutes = new Hono<AppEnv>()
@@ -49,7 +50,7 @@ function answersPayload(raw: unknown): { json: string | null; text: string } {
 }
 
 function setupUrlFor(token: string) {
-  return `${CLIENT_PORTAL_URL.replace(/\/$/, '')}/set-password?token=${encodeURIComponent(token)}`
+  return portalSetupUrl(token)
 }
 
 async function throttled(c: any) {
