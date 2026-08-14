@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { vendorMobilePrimary, vendorNav, vendorNavForWorld } from '../src/components/layout/nav'
-import { portalMobilePrimary } from '../src/components/layout/nav'
+import { portalMobilePrimary, vendorMobilePrimary, vendorNav, vendorNavForWorld } from '../src/components/layout/nav'
+import { accountSetupUrl, hqUrl, portalUrl, vendorSignupUrl } from '../shared/appUrls'
 
 describe('vendor HQ mobile shell', () => {
   const layout = readFileSync(new URL('../src/components/admin/AdminLayout.tsx', import.meta.url), 'utf8')
@@ -40,6 +40,7 @@ describe('vendor HQ mobile shell', () => {
   it('keeps field assignment detail on large tap targets with a sticky next action', () => {
     expect(field).toContain("navigate(p(`field-work/${assignment.id}`))")
     expect(field).toContain("navigate(p('field-work/mine'))")
+    expect(field).toContain("view=mine")
     expect(field).toContain('vendor-sign-panel')
     expect(field).toContain("nextAction === 'depart'")
     expect(field).toContain("nextAction === 'arrive'")
@@ -47,5 +48,24 @@ describe('vendor HQ mobile shell', () => {
     expect(field).toContain('I have arrived')
     expect(field).toContain('min-h-12')
     expect(layout).toContain('env(safe-area-inset-bottom)')
+  })
+})
+
+describe('secure URL cutover helpers', () => {
+  it('builds post-login links on secure. with /hq for HQ paths', () => {
+    expect(portalUrl('/set-password')).toBe('https://secure.pinnaclemanagementventures.com/set-password')
+    expect(hqUrl('/login')).toBe('https://secure.pinnaclemanagementventures.com/hq/login')
+    expect(accountSetupUrl('client', 'tok')).toBe('https://secure.pinnaclemanagementventures.com/set-password?token=tok')
+    expect(vendorSignupUrl()).toBe('https://secure.pinnaclemanagementventures.com/hq/vendor-signup')
+  })
+
+  it('stops minting legacy hosts from UsersAdmin and InvitationsAdmin', () => {
+    const users = readFileSync(new URL('../src/pages/admin/UsersAdmin.tsx', import.meta.url), 'utf8')
+    const invites = readFileSync(new URL('../src/pages/admin/InvitationsAdmin.tsx', import.meta.url), 'utf8')
+    expect(users).toContain('accountSetupUrl')
+    expect(users).not.toContain('client.pinnaclemanagementventures.com')
+    expect(users).not.toContain('hq.pinnaclemanagementventures.com')
+    expect(invites).toContain('vendorSignupUrl')
+    expect(invites).not.toContain('hq.pinnaclemanagementventures.com')
   })
 })

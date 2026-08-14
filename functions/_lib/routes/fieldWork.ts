@@ -287,7 +287,10 @@ fieldWorkRoutes.get('/field-assignments', requireStaff, async (c) => {
   const kind = c.req.query('kind') || ''
   const clauses: string[] = ['1=1']
   const params: unknown[] = []
-  if (user.role !== 'admin') {
+  if (c.req.query('view') === 'mine') {
+    clauses.push('fa.vendor_user_id = ?')
+    params.push(user.id)
+  } else if (user.role !== 'admin') {
     clauses.push('(fa.vendor_user_id = ? OR fa.assigned_by_user_id = ?)')
     params.push(user.id, user.id)
   }

@@ -126,7 +126,7 @@ export function FieldWorkList() {
   const [tab, setTab] = useState<'active' | 'completed'>('active')
 
   useEffect(() => {
-    api.get<{ assignments: Assignment[] }>('/admin/field-assignments')
+    api.get<{ assignments: Assignment[] }>('/admin/field-assignments?view=mine')
       .then((res) => setAssignments(res.assignments))
       .catch(() => {})
       .finally(() => setLoading(false))
