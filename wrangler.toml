@@ -35,5 +35,7 @@ RESEND_INBOUND_DOMAIN = "ziloifaluk.resend.app"
 # --- Secrets (NOT set here — see DEPLOY.md "Environment variables" table) ---
 # Required: SESSION_SECRET, PAYMENT_ENCRYPTION_KEY
 # Optional: RESEND_API_KEY, RESEND_WEBHOOK_SECRET (HQ can also store the webhook signing secret)
+# Optional Auth0 (server-only secrets): AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET,
+#   AUTH0_CALLBACK_URL, AUTH0_LOGOUT_URL, AUTH0_AUDIENCE, AUTH0_ENABLED_CONNECTIONS
 # Local dev: copy .dev.vars.example to .dev.vars and fill in test values.
 # Deployed: `wrangler pages secret put <NAME>`, or the Cloudflare dashboard.

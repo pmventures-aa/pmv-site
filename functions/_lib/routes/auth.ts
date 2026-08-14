@@ -25,6 +25,7 @@ import { toDisplayCase } from '../../../shared/displayCase'
 import { advanceInquiryLifecycle } from '../lifecycle'
 import { getInviteByToken } from '../invites'
 import { canCompleteStagedVendorSignup, type ExistingAccount } from '../vendorStaging'
+import { defaultAuth0Bridge } from '../auth0Client'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -511,5 +512,9 @@ authRoutes.post('/logout', async (c) => {
     actorGeo: actorGeo(c.req.raw),
     action: 'logout',
   })
-  return c.json({ ok: true })
+  let federated_logout_url: string | null = null
+  if (c.req.query('federated') === '1') {
+    federated_logout_url = await defaultAuth0Bridge.federatedLogoutUrl(c.env, c.req.raw).catch(() => null)
+  }
+  return c.json({ ok: true, federated_logout_url })
 })

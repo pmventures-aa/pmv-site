@@ -5,6 +5,7 @@ import { useAuth, isApiError } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
+import { SocialSignIn } from '../../components/auth/SocialSignIn'
 import { clientWorkspaceForWorld, hqWorkspaceCopy, rememberOperatingWorld, rememberedHqParty, rememberedWorld, worldFromServiceParam } from '../../lib/workspace'
 
 export default function Login({ surface }: { surface: 'client' | 'staff' }) {
@@ -19,10 +20,19 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const auth0Flag = params.get('auth0') || ''
 
   const clientWorld = useMemo(() => worldFromServiceParam(serviceKey) || rememberedWorld() || 'general', [serviceKey])
   const clientCopy = clientWorkspaceForWorld(clientWorld)
   const hqCopy = hqWorkspaceCopy(rememberedHqParty())
+  const returnTo = surface === 'client' && serviceKey
+    ? `${p(`services/${encodeURIComponent(serviceKey)}/apply`)}${offeringId ? `?offering=${encodeURIComponent(offeringId)}` : ''}`
+    : p()
+
+  useEffect(() => {
+    if (auth0Flag === 'error') setError('We could not complete sign-in. Please try again or use your email and password.')
+    if (auth0Flag === 'sent') setError('If this sign-in can be connected to a Pinnacle account, we sent instructions to the email on file.')
+  }, [auth0Flag])
 
   useEffect(() => {
     if (surface === 'client' && clientWorld !== 'general') rememberOperatingWorld(clientWorld)
@@ -80,6 +90,11 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
       <ErrorBanner message={error} />
       {serviceKey && surface === 'client' && (
         <p className="mb-4 text-xs leading-5 text-slate-400">After you sign in, we will return you to the service you were exploring.</p>
+      )}
+      {surface === 'client' && (
+        <div className="mb-5">
+          <SocialSignIn returnTo={returnTo} disabled={busy} onBusy={setBusy} />
+        </div>
       )}
       <form onSubmit={onSubmit} className="space-y-5">
         <Field label="Email Address">

@@ -24,4 +24,11 @@ describe('migration chain regression checks', () => {
     expect(sql).toMatch(/CREATE TABLE hq_email_template_versions/i)
     expect(sql).toMatch(/slug TEXT NOT NULL UNIQUE/)
   })
+
+  it('adds external identities keyed by issuer and subject', () => {
+    const sql = readFileSync(new URL('../migrations/0072_external_identities.sql', import.meta.url), 'utf8')
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS external_identities/i)
+    expect(sql).toMatch(/UNIQUE \(issuer, subject\)/)
+    expect(sql).toMatch(/user_id\s+TEXT NOT NULL REFERENCES users\(id\) ON DELETE CASCADE/)
+  })
 })

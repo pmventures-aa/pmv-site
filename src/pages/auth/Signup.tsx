@@ -6,6 +6,7 @@ import { useAppPath } from '../../lib/basePath'
 import { services } from '../../data/services'
 import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
+import { SocialSignIn } from '../../components/auth/SocialSignIn'
 import { clientTypeForWorld, clientWorkspaceForWorld, rememberedWorld, worldFromClientType, worldFromServiceParam } from '../../lib/workspace'
 
 const MIN_PASSWORD = 10
@@ -14,12 +15,13 @@ interface InviteResponse { invite: { invite_type:string; email:string; full_name
 interface ScopeResponse { request:{contact_name:string;email:string;phone:string|null;service_key:string|null;offering_id:string|null;job_type:string;timing:string;city:string|null;state:string|null};job_label:string }
 
 export default function Signup() {
-  const { signup } = useAuth()
+  const { signup, refresh } = useAuth()
   const navigate = useNavigate()
   const p = useAppPath()
   const [params] = useSearchParams()
   const inviteToken = params.get('invite') || ''
   const scopeToken = params.get('scope') || ''
+  const auth0Pending = params.get('auth0') === 'pending'
   const directServiceKey = params.get('service') || ''
   const [scopeServiceKey,setScopeServiceKey]=useState('')
   const [scopeOfferingId,setScopeOfferingId]=useState('')
@@ -36,6 +38,7 @@ export default function Signup() {
   const [tosAccepted, setTosAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [auth0Ready, setAuth0Ready] = useState(!auth0Pending)
 
   useEffect(() => {
     if (!inviteToken) return
@@ -62,6 +65,25 @@ export default function Signup() {
     }).catch(err=>setError(err instanceof ApiError?err.message:'Could not load the request details.')).finally(()=>setScopeLoading(false))
   },[scopeToken])
 
+  useEffect(() => {
+    if (!auth0Pending) return
+    api.get<{ pending: boolean; email?: string; first_name?: string; last_name?: string }>('/auth/auth0/pending')
+      .then((response) => {
+        if (!response.pending) {
+          setError('This sign-in could not be completed. Please try again from the login page.')
+          return
+        }
+        setForm((current) => ({
+          ...current,
+          email: response.email || current.email,
+          first_name: response.first_name || current.first_name,
+          last_name: response.last_name || current.last_name,
+        }))
+      })
+      .catch(() => setError('This sign-in could not be completed. Please try again from the login page.'))
+      .finally(() => setAuth0Ready(true))
+  }, [auth0Pending])
+
   function set<K extends keyof typeof form>(key: K, value: string) { setForm((current) => ({ ...current, [key]: value })) }
   const steps: Step[] = ['contact','business','account']
   const index = steps.indexOf(step)
@@ -75,8 +97,10 @@ export default function Signup() {
     }
     if (step === 'business' && next === 'account' && !form.client_type) return 'Choose the option that best describes what brought you to Pinnacle.'
     if (step === 'account') {
-      if (form.password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters.`
-      if (form.password !== form.confirm) return 'Passwords do not match.'
+      if (!auth0Pending) {
+        if (form.password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters.`
+        if (form.password !== form.confirm) return 'Passwords do not match.'
+      }
       if (!tosAccepted) return 'Please review and accept the account terms to continue.'
     }
     return null
@@ -98,7 +122,18 @@ export default function Signup() {
     if (inviteToken && invite?.status !== 'pending') return setError('This invitation is no longer active.')
     setBusy(true)
     try {
-      await signup({ email: form.email, password: form.password, first_name: form.first_name, last_name: form.last_name, phone: form.phone, business_name: form.business_name || undefined, tos_accepted: true })
+      if (auth0Pending) {
+        await api.post<{ ok: boolean }>('/auth/auth0/register', {
+          first_name: form.first_name,
+          last_name: form.last_name,
+          phone: form.phone,
+          business_name: form.business_name || undefined,
+          tos_accepted: true,
+        })
+        await refresh()
+      } else {
+        await signup({ email: form.email, password: form.password, first_name: form.first_name, last_name: form.last_name, phone: form.phone, business_name: form.business_name || undefined, tos_accepted: true })
+      }
       if (inviteToken) await api.post(`/invite/${encodeURIComponent(inviteToken)}/complete-existing`, {}).catch(() => {})
       if (scopeToken) await api.post(`/scope-requests/${encodeURIComponent(scopeToken)}/convert`, {}).catch(() => {})
       playWelcomeSound('client')
@@ -154,11 +189,17 @@ export default function Signup() {
       {scopeToken&&!scopeLoading&&scopeLabel&&<div className="mb-5 rounded-xl border border-gold/20 bg-gold/[.05] p-4"><p className="text-sm font-bold text-white">Your request is already connected</p><p className="mt-1 text-xs leading-5 text-slate-400">We carried over your request for {scopeLabel}. This account gives you one place for updates, documents, estimates, and completion records.</p></div>}
       {requestedService && !inviteToken && <div className="mb-5 rounded-xl border border-gold/15 bg-gold/[.04] p-4"><p className="text-sm font-bold text-white">We Remember What Brought You Here</p><p className="mt-1 text-xs leading-5 text-slate-400">{requestedService.shortDescription}</p></div>}
       {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-xl border border-gold/20 bg-gold/[0.05] p-3 text-xs text-slate-400">Connected to your private Pinnacle invitation. Expires {new Date(invite.expires_at).toLocaleString()}.</div>}
+      {auth0Pending && <div className="mb-5 rounded-xl border border-gold/20 bg-gold/[0.05] p-3 text-xs text-slate-400">Finish creating your Pinnacle account to use this sign-in method. Existing client records are never attached automatically.</div>}
+      {!auth0Pending && step === 'contact' && (
+        <div className="mb-5">
+          <SocialSignIn intent="signup" returnTo={p('onboarding')} invite={inviteToken || undefined} disabled={busy} />
+        </div>
+      )}
       <ErrorBanner message={error} />
 
       {step === 'contact' && <div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2"><Field label="First Name"><input className={inputCls} autoComplete="given-name" value={form.first_name} onChange={(e)=>set('first_name',e.target.value)} placeholder="First name"/></Field><Field label="Last Name"><input className={inputCls} autoComplete="family-name" value={form.last_name} onChange={(e)=>set('last_name',e.target.value)} placeholder="Last name"/></Field></div>
-        <Field label="Email Address"><input className={inputCls} type="email" autoComplete="email" readOnly={!!inviteToken} value={form.email} onChange={(e)=>set('email',e.target.value)} placeholder="you@example.com"/></Field>
+        <Field label="Email Address"><input className={inputCls} type="email" autoComplete="email" readOnly={!!inviteToken || auth0Pending} value={form.email} onChange={(e)=>set('email',e.target.value)} placeholder="you@example.com"/></Field>
         <Field label="Mobile Phone"><input className={inputCls} type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e)=>set('phone',e.target.value)} placeholder="(555) 555-5555"/></Field>
         <button type="button" className="btn-gold min-h-12 w-full" onClick={()=>go('business')}>Continue</button>
       </div>}
@@ -172,11 +213,13 @@ export default function Signup() {
 
       {step === 'account' && <div className="space-y-5">
         <div className="rounded-xl border border-white/10 bg-white/[.025] p-4 text-xs leading-5 text-slate-400"><strong className="font-bold text-white">What happens next:</strong> we will ask a few focused questions about {requestedService ? requestedService.title : copy.badge.toLowerCase()} and request documents only when the work actually needs them.</div>
-        <Field label="Password" hint={`${MIN_PASSWORD}+ characters`}><input className={inputCls} type="password" autoComplete="new-password" value={form.password} onChange={(e)=>set('password',e.target.value)} placeholder="Create a strong password"/></Field>
-        <Field label="Confirm Password"><input className={inputCls} type="password" autoComplete="new-password" value={form.confirm} onChange={(e)=>set('confirm',e.target.value)} placeholder="Enter it again"/></Field>
+        {!auth0Pending && <>
+          <Field label="Password" hint={`${MIN_PASSWORD}+ characters`}><input className={inputCls} type="password" autoComplete="new-password" value={form.password} onChange={(e)=>set('password',e.target.value)} placeholder="Create a strong password"/></Field>
+          <Field label="Confirm Password"><input className={inputCls} type="password" autoComplete="new-password" value={form.confirm} onChange={(e)=>set('confirm',e.target.value)} placeholder="Enter it again"/></Field>
+        </>}
         <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[.018] p-3.5 text-xs leading-5 text-slate-400"><input type="checkbox" checked={tosAccepted} onChange={(e)=>setTosAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-white/[0.04] accent-gold"/><span>I agree to the <a href="https://pinnaclemanagementventures.com/terms" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Terms of Service</a>, acknowledge the <a href="https://pinnaclemanagementventures.com/privacy" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Privacy Policy</a>, and consent to the <a href="https://pinnaclemanagementventures.com/electronic-communications" target="_blank" rel="noreferrer" className="font-bold text-gold hover:text-gold-300">Electronic Communications Disclosure</a> for account and service-related communications.</span></label>
         <p className="text-[11px] leading-5 text-slate-500">Creating an account does not require consent to promotional marketing. Marketing messages, if offered, use separate opt-in and opt-out controls.</p>
-        <div className="flex gap-3"><button type="button" className="btn-outline flex-1" onClick={()=>setStep('business')}>Back</button><button type="button" disabled={busy||inviteLoading||scopeLoading|| (!!inviteToken&&invite?.status!=='pending')} className="btn-gold flex-[1.5] disabled:opacity-60" onClick={()=>void submit()}>{busy?'Creating Your Workspace…':'Create My Account'}</button></div>
+        <div className="flex gap-3"><button type="button" className="btn-outline flex-1" onClick={()=>setStep('business')}>Back</button><button type="button" disabled={busy||inviteLoading||scopeLoading||!auth0Ready|| (!!inviteToken&&invite?.status!=='pending')} className="btn-gold flex-[1.5] disabled:opacity-60" onClick={()=>void submit()}>{busy?'Creating Your Workspace…':'Create My Account'}</button></div>
       </div>}
     </AuthLayout>
   )

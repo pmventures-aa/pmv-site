@@ -39,6 +39,15 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 | `RESEND_FROM_EMAIL` | No | Var (`wrangler.toml` `[vars]`) | Verified sender identity. The code defaults to `Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>` if this is not set. |
 | `RESEND_WEBHOOK_SECRET` | No | Secret | Optional Cloudflare copy of the Svix signing secret for `POST /api/webhooks/resend`. HQ → Settings → General can create the Resend webhook and store this secret in D1 instead. |
 | `RESEND_INBOUND_DOMAIN` | No | Var (`wrangler.toml` `[vars]`) | Resend receiving domain. Defaults in wrangler to `ziloifaluk.resend.app`. Used only as Reply-To so replies can be received without changing pinnaclemanagementventures.com MX or the From address. |
+| `AUTH0_DOMAIN` | No | Secret | Auth0 tenant domain for client-portal Google/Microsoft sign-in. Social buttons stay hidden unless every required Auth0 value is set. |
+| `AUTH0_CLIENT_ID` | No | Secret | Auth0 Regular Web Application client ID. |
+| `AUTH0_CLIENT_SECRET` | No | Secret | Auth0 client secret. Server-only — never expose through frontend env vars. |
+| `AUTH0_CALLBACK_URL` | No | Secret or Var | Exact callback URL, e.g. `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback`. |
+| `AUTH0_LOGOUT_URL` | No | Secret or Var | Exact federated logout return URL, e.g. `https://www.pinnaclemanagementventures.com/portal/login`. Local logout does not require this. |
+| `AUTH0_AUDIENCE` | No | Var | Optional API audience. Auth0 claims never grant Pinnacle permissions. |
+| `AUTH0_ENABLED_CONNECTIONS` | No | Var | Comma-separated Auth0 connections. Defaults to `google-oauth2,windowslive` when Auth0 is fully configured. |
+| `AUTH0_ALLOWED_CALLBACKS` | No | Var | Extra exact callback URLs (local Vite proxy, `secure.` host). No wildcards. |
+| `AUTH0_ALLOWED_LOGOUT_URLS` | No | Var | Extra exact logout return URLs. No wildcards. |
 
 **Local dev:** copy `.dev.vars.example` to `.dev.vars` (gitignored) and fill in test values — `wrangler pages dev` reads it automatically.
 
