@@ -9,6 +9,7 @@ import { ImpersonateButton } from '../../components/kit/ImpersonateButton'
 import { Avatar } from '../../components/kit/Avatar'
 import { useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
+import { setupPasswordUrl } from '../../../functions/_lib/appUrls'
 
 const ROLE_OPTIONS = ['all', 'client', 'staff', 'admin']
 const STATUS_OPTIONS = ['all', 'active', 'suspended']
@@ -60,8 +61,7 @@ function prefillFromParams(params: URLSearchParams): typeof emptyForm | null {
 }
 
 function setupUrl(role: UserRow['role'] | string, token: string) {
-  const host = role === 'client' ? 'client.pinnaclemanagementventures.com' : 'hq.pinnaclemanagementventures.com'
-  return `https://${host}/set-password?token=${encodeURIComponent(token)}`
+  return setupPasswordUrl(role, token)
 }
 
 function emailTone(status: string | null): 'green' | 'red' | 'gold' | 'slate' {

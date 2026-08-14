@@ -12,7 +12,7 @@ import {
   type RenderedEmail,
 } from './emailTemplates/welcome'
 import { renderHqEmailOrFallback } from './hqEmailTemplates'
-import { HQ_WWW_LOGIN, PORTAL_WWW_BASE, PORTAL_WWW_LOGIN } from './appUrls'
+import { hqLoginUrl, portalLoginUrl, portalUrl } from './appUrls'
 
 export type AccountEmailKind = 'account_welcome' | 'setup_invite' | 'portal_reminder' | 'vendor_application_received' | 'vendor_approved'
 export type AccountEmailStatus = 'queued' | 'skipped' | 'sent' | 'delivered' | 'delayed' | 'bounced' | 'failed' | 'complained' | 'suppressed'
@@ -39,12 +39,11 @@ interface TrackedSendInput {
   metadata?: Record<string, unknown>
 }
 
-// Use the public site's routed application surfaces until the dedicated
-// secure. hostname finishes DNS activation. These routes are first-class app
-// entry points and keep account emails usable throughout the DNS cutover.
-export const CLIENT_PORTAL_URL = `${PORTAL_WWW_BASE}/`
-export const CLIENT_LOGIN_URL = PORTAL_WWW_LOGIN
-export const HQ_LOGIN_URL = HQ_WWW_LOGIN
+// Canonical post-login surfaces on secure. Legacy hq. / client. hosts still
+// resolve during DNS cutover, but newly generated account mail uses secure.
+export const CLIENT_PORTAL_URL = `${portalUrl()}/`
+export const CLIENT_LOGIN_URL = portalLoginUrl()
+export const HQ_LOGIN_URL = hqLoginUrl()
 
 function eventKind(kind: AccountEmailKind, status: AccountEmailStatus): string {
   if (status === 'failed' || status === 'skipped') return 'account_email_failed'

@@ -81,9 +81,9 @@ describe('shared letterhead and hosts', () => {
     expect(CREST_ABSOLUTE_URL).toContain('logo-crest-letterhead.png')
   })
 
-  it('centralizes portal and HQ hosts', () => {
-    expect(portalUrl('/billing')).toBe('https://client.pinnaclemanagementventures.com/billing')
-    expect(hqUrl('/invite/abc')).toBe('https://hq.pinnaclemanagementventures.com/invite/abc')
+  it('centralizes portal and HQ hosts on secure.', () => {
+    expect(portalUrl('/billing')).toBe('https://secure.pinnaclemanagementventures.com/billing')
+    expect(hqUrl('/invite/abc')).toBe('https://secure.pinnaclemanagementventures.com/hq/invite/abc')
     expect(wwwPortalUrl('/signup')).toBe('https://www.pinnaclemanagementventures.com/portal/signup')
   })
 })

@@ -13,7 +13,7 @@ describe('account onboarding email templates', () => {
       role: 'client',
       creationType: 'self_signup',
       actionLabel: 'Open My Client Portal',
-      actionUrl: 'https://client.pinnaclemanagementventures.com/',
+      actionUrl: 'https://secure.pinnaclemanagementventures.com/',
     })
 
     expect(email.subject).toBe('Welcome to Pinnacle, Cody')
@@ -21,12 +21,12 @@ describe('account onboarding email templates', () => {
     expect(email.html).toContain('Your Pinnacle Client Portal')
     expect(email.html).toContain('clear ownership, clear next steps, and less time spent chasing the work')
     expect(email.html).toContain('Open My Client Portal')
-    expect(email.html).toContain('https://client.pinnaclemanagementventures.com/')
+    expect(email.html).toContain('https://secure.pinnaclemanagementventures.com/')
     expect(email.text).toContain('Account security:')
   })
 
   it('includes the one-time setup link and 24-hour guidance for invited clients', () => {
-    const actionUrl = 'https://client.pinnaclemanagementventures.com/set-password?token=test-token'
+    const actionUrl = 'https://secure.pinnaclemanagementventures.com/set-password?token=test-token'
     const email = renderAccountWelcome({
       firstName: 'Jamie',
       email: 'jamie@example.com',
@@ -49,7 +49,7 @@ describe('account onboarding email templates', () => {
       role: 'staff',
       creationType: 'admin_invite',
       actionLabel: 'Set Up My HQ Account',
-      actionUrl: 'https://hq.pinnaclemanagementventures.com/set-password?token=abc',
+      actionUrl: 'https://secure.pinnaclemanagementventures.com/hq/set-password?token=abc',
     })
 
     expect(email.subject).toBe('You’ve been invited to Pinnacle HQ')
@@ -65,7 +65,7 @@ describe('account onboarding email templates', () => {
       role: 'client',
       creationType: 'self_signup',
       actionLabel: 'Open My Client Portal',
-      actionUrl: 'https://client.pinnaclemanagementventures.com/',
+      actionUrl: 'https://secure.pinnaclemanagementventures.com/',
     })
 
     expect(email.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
@@ -74,7 +74,7 @@ describe('account onboarding email templates', () => {
 
   it('keeps vendor application receipt distinct from approval', () => {
     const pending = renderVendorApplicationReceived({ firstName: 'Alex', email: 'alex@example.com' })
-    const approved = renderVendorApproved({ firstName: 'Alex', actionUrl: 'https://hq.pinnaclemanagementventures.com/login' })
+    const approved = renderVendorApproved({ firstName: 'Alex', actionUrl: 'https://secure.pinnaclemanagementventures.com/hq/login' })
 
     expect(pending.subject).toContain('received')
     expect(pending.html).toContain('pending review')

@@ -10,7 +10,7 @@ describe('provider agreement', () => {
   it('uses a versioned public agreement URL', () => {
     expect(PROVIDER_AGREEMENT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(PROVIDER_AGREEMENT_PATH).toBe('/provider-agreement')
-    expect(PROVIDER_AGREEMENT_URL).toBe('https://pinnaclemanagementventures.com/provider-agreement')
+    expect(PROVIDER_AGREEMENT_URL).toBe('https://www.pinnaclemanagementventures.com/provider-agreement')
   })
 
   it('normalizes harmless signature differences without accepting a different name', () => {

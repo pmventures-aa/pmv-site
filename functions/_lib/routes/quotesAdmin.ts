@@ -5,7 +5,7 @@ import { uuid } from '../crypto'
 import { logActivity } from '../activity'
 import { escapeHtml, notifyStaff, sendEmailStrict } from '../email'
 import { renderHqEmailOrFallback } from '../hqEmailTemplates'
-import { PUBLIC_SITE_BASE } from '../scopeFunnel'
+import { PUBLIC_SITE_BASE } from '../appUrls'
 import { applyCatalogToQuoteLines, type CatalogOffering } from '../../../shared/quoteCatalog'
 import { ensureServiceOfferingsSeeded } from './serviceOfferings'
 

@@ -1,7 +1,7 @@
 import type { Env } from './types'
 import { sendEmailStrict } from './email'
 import { uuid } from './crypto'
-import { hqUrl, wwwPortalUrl } from './appUrls'
+import { hqUrl, portalUrl } from './appUrls'
 import { renderRelationshipEvent } from './emailTemplates/relationship'
 import { renderHqEmailOrFallback } from './hqEmailTemplates'
 import { DEFAULT_INVITE_TTL_HOURS, INVITE_TTL_SETTING_KEY, formatInviteTtl, parseInviteTtlHours } from '../../shared/inviteTtl'
@@ -52,7 +52,7 @@ export async function getInviteTtlHours(env: Env): Promise<number> {
   }
 }
 
-const CLIENT_BASE = wwwPortalUrl()
+const CLIENT_BASE = portalUrl()
 const HQ_BASE = hqUrl()
 
 export function inviteUrl(type: InviteType, token: string): string {
