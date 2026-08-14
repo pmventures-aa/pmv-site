@@ -86,15 +86,45 @@ function publicShape(row: any) {
   }
 }
 
+const PUBLIC_OFFERINGS_CACHE_KEY = 'public-service-offerings:v1'
+const PUBLIC_OFFERINGS_TTL = 300
+
+async function loadCachedPublicOfferings(env: Env): Promise<ReturnType<typeof publicShape>[] | null> {
+  try {
+    const cached = await env.SESSIONS.get(PUBLIC_OFFERINGS_CACHE_KEY, 'json') as ReturnType<typeof publicShape>[] | null
+    if (Array.isArray(cached) && cached.length) return cached
+  } catch {
+    // KV misses must not block the catalog.
+  }
+  return null
+}
+
+async function storeCachedPublicOfferings(env: Env, offerings: ReturnType<typeof publicShape>[]): Promise<void> {
+  try {
+    await env.SESSIONS.put(PUBLIC_OFFERINGS_CACHE_KEY, JSON.stringify(offerings), { expirationTtl: PUBLIC_OFFERINGS_TTL })
+  } catch {
+    // Best-effort cache.
+  }
+}
+
+async function bustPublicOfferingsCache(env: Env): Promise<void> {
+  try { await env.SESSIONS.delete(PUBLIC_OFFERINGS_CACHE_KEY) } catch { /* ignore */ }
+}
+
 serviceOfferingPublicRoutes.get('/service-offerings', async (c) => {
   await ensureServiceOfferingsSeeded(c.env)
   const serviceKey = (c.req.query('service_key') || '').trim()
-  const where = serviceKey ? 'WHERE active = 1 AND service_key = ?' : 'WHERE active = 1'
-  const query = `SELECT * FROM service_offerings ${where} ORDER BY service_key, sort_order, name`
-  const res = serviceKey
-    ? await c.env.DB.prepare(query).bind(serviceKey).all<any>()
-    : await c.env.DB.prepare(query).all<any>()
-  return c.json({ offerings: (res.results ?? []).map(publicShape) })
+  let offerings = await loadCachedPublicOfferings(c.env)
+  if (!offerings) {
+    const res = await c.env.DB.prepare(
+      'SELECT * FROM service_offerings WHERE active = 1 ORDER BY service_key, sort_order, name',
+    ).all<any>()
+    offerings = (res.results ?? []).map(publicShape)
+    await storeCachedPublicOfferings(c.env, offerings)
+  }
+  const filtered = serviceKey ? offerings.filter((item) => item.serviceKey === serviceKey) : offerings
+  c.header('Cache-Control', 'public, max-age=60')
+  return c.json({ offerings: filtered })
 })
 
 serviceOfferingAdminRoutes.get('/service-offerings', requireStaff, requireCapability('can_manage_settings'), async (c) => {
@@ -131,6 +161,7 @@ serviceOfferingAdminRoutes.post('/service-offerings', requireStaff, requireCapab
       cents(body.provider_payout_min), cents(body.provider_payout_max), cleanText(body.provider_payout_notes, 1000) || null,
       arrayJson(body.required_documents), arrayJson(body.intake_prompts),
     ).run()
+  await bustPublicOfferingsCache(c.env)
   return c.json({ ok: true, id }, 201)
 })
 
@@ -158,11 +189,13 @@ serviceOfferingAdminRoutes.patch('/service-offerings/:id', requireStaff, require
   sets.push(`updated_at = datetime('now')`)
   const result = await c.env.DB.prepare(`UPDATE service_offerings SET ${sets.join(', ')} WHERE id = ?`).bind(...values, c.req.param('id') || '').run()
   if (!result.meta.changes) return c.json({ error: 'offering not found' }, 404)
+  await bustPublicOfferingsCache(c.env)
   return c.json({ ok: true })
 })
 
 serviceOfferingAdminRoutes.delete('/service-offerings/:id', requireStaff, requireCapability('can_manage_settings'), async (c) => {
   const result = await c.env.DB.prepare('DELETE FROM service_offerings WHERE id = ?').bind(c.req.param('id') || '').run()
   if (!result.meta.changes) return c.json({ error: 'offering not found' }, 404)
+  await bustPublicOfferingsCache(c.env)
   return c.json({ ok: true })
 })

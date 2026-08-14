@@ -163,3 +163,13 @@ them set on the project too, alongside the secrets from the table above.
 - Client self-signup lands on the Client Portal dashboard, not a mandatory onboarding gate.
 - HQ → Users → Create user automatically attempts the appropriate account invitation and preserves a manual setup-link fallback.
 - Resend webhook rejects requests without a valid signature.
+
+## D1 migrations to confirm after deploy
+Pages deploys do not apply SQL. Confirm GitHub Action **Apply D1 migrations** succeeded on `main`, or run `npm run db:migrate`. Recent field-work migrations:
+
+| File | What it does |
+|---|---|
+| `0073_dispatch_vendor_fees.sql` | Vendor fee columns on `field_assignments` (Snapdocs-style local adjustment) |
+| `0074_field_work_query_indexes.sql` | Indexes for vendor list, field map, and fee-estimate postal lookups |
+
+Verify with `SELECT vendor_fee_cents FROM field_assignments LIMIT 1;` and `PRAGMA index_list('field_assignments');` in the D1 console.

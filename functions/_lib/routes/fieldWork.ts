@@ -294,7 +294,13 @@ fieldWorkRoutes.get('/field-assignments', requireStaff, async (c) => {
   if (status) { clauses.push('fa.status = ?'); params.push(status) }
   if (kind && KIND_VALUES.has(kind)) { clauses.push('fa.kind = ?'); params.push(kind) }
   const res = await c.env.DB.prepare(
-    `SELECT fa.*,
+    `SELECT fa.id, fa.kind, fa.service_key, fa.client_user_id, fa.vendor_user_id, fa.assigned_by_user_id,
+       fa.title, fa.site_label, fa.site_address, fa.site_city, fa.site_state, fa.site_postal_code,
+       fa.site_lat, fa.site_lng, fa.scheduled_at, fa.status,
+       fa.departed_at, fa.arrived_at, fa.arrival_source, fa.completed_at, fa.documented_at,
+       fa.vendor_signature_type, fa.vendor_signature_name, fa.vendor_signed_at, fa.audit_email_sent_at,
+       fa.notes, fa.created_at, fa.updated_at,
+       fa.vendor_fee_base_cents, fa.vendor_fee_adjustment_cents, fa.vendor_fee_cents, fa.vendor_fee_reason,
        cu.full_name AS client_name, cu.email AS client_email,
        vu.full_name AS vendor_name, vu.email AS vendor_email
      FROM field_assignments fa
@@ -605,7 +611,7 @@ fieldWorkRoutes.get('/field-map', requireStaff, async (c) => {
               u.full_name, u.email
        FROM field_agent_locations loc
        JOIN users u ON u.id = loc.user_id
-       WHERE julianday('now') - julianday(loc.updated_at) < 1`,
+       WHERE loc.sharing_active = 1 AND julianday('now') - julianday(loc.updated_at) < 1`,
     ).all()
   } catch {
     agents = { results: [] }
