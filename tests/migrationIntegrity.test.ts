@@ -18,6 +18,13 @@ describe('migration chain regression checks', () => {
     expect(sql).toMatch(/ALTER TABLE matters ADD COLUMN property_id/i)
   })
 
+  it('adds external_identities for Auth0 without cascading user deletes', () => {
+    const sql = readFileSync(new URL('../migrations/0072_external_identities.sql', import.meta.url), 'utf8')
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS external_identities/i)
+    expect(sql).toMatch(/UNIQUE \(issuer, subject\)/)
+    expect(sql).toMatch(/ON DELETE RESTRICT/)
+  })
+
   it('adds HQ letterhead email templates once', () => {
     const sql = readFileSync(new URL('../migrations/0066_hq_email_templates.sql', import.meta.url), 'utf8')
     expect(sql).toMatch(/CREATE TABLE hq_email_templates/i)

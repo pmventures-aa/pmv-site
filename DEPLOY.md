@@ -39,6 +39,31 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 | `RESEND_FROM_EMAIL` | No | Var (`wrangler.toml` `[vars]`) | Verified sender identity. The code defaults to `Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>` if this is not set. |
 | `RESEND_WEBHOOK_SECRET` | No | Secret | Optional Cloudflare copy of the Svix signing secret for `POST /api/webhooks/resend`. HQ → Settings → General can create the Resend webhook and store this secret in D1 instead. |
 | `RESEND_INBOUND_DOMAIN` | No | Var (`wrangler.toml` `[vars]`) | Resend receiving domain. Defaults in wrangler to `ziloifaluk.resend.app`. Used only as Reply-To so replies can be received without changing pinnaclemanagementventures.com MX or the From address. |
+| `AUTH0_DOMAIN` | No | Secret | Auth0 tenant domain (`your-tenant.us.auth0.com`). When unset (or incomplete with the other Auth0 vars), Auth0 buttons stay hidden and Auth0 routes return 503. |
+| `AUTH0_CLIENT_ID` | No | Secret | Auth0 Regular Web Application client id. |
+| `AUTH0_CLIENT_SECRET` | No | Secret | Auth0 client secret — server-only; never expose via Vite/`VITE_*` frontend env. |
+| `AUTH0_AUDIENCE` | No | Secret/Var | Optional API audience if the Auth0 app requests an access token audience. |
+| `AUTH0_CALLBACK_URL` | No | Var/Secret | Exact callback URL. Production: `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback`. Local: `http://localhost:8788/api/auth/auth0/callback`. |
+| `AUTH0_LOGOUT_URL` | No | Var/Secret | Post-logout / error return. Production: `https://www.pinnaclemanagementventures.com/portal/login`. Local: `http://localhost:8788/portal/login`. |
+| `AUTH0_SESSION_SECRET` | No | Secret | Encrypts short-lived Auth0 OIDC transaction cookies. Falls back to `SESSION_SECRET` when unset. |
+| `AUTH0_CONNECTION_GOOGLE` | No | Var/Secret | Auth0 Google connection name (typically `google-oauth2`). Non-empty enables **Continue with Google**. |
+| `AUTH0_CONNECTION_MICROSOFT` | No | Var/Secret | Auth0 Microsoft connection name (typically `windowslive`). Non-empty enables **Continue with Microsoft**. |
+
+### Auth0 application settings (Regular Web Application)
+
+| Setting | Production value |
+|---|---|
+| Application type | Regular Web Application |
+| Allowed Callback URLs | `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback` |
+| Allowed Logout URLs | `https://www.pinnaclemanagementventures.com/portal/login` |
+| Allowed Web Origins | `https://www.pinnaclemanagementventures.com` |
+| Local Callback | `http://localhost:8788/api/auth/auth0/callback` |
+| Local Logout | `http://localhost:8788/portal/login` |
+| Local Web Origin | `http://localhost:8788` |
+
+Auth0 authenticates identity only. After callback validation, PMV creates the same KV-backed `pmv_session` cookie used by email/password login. Auth0 tokens are never stored in `localStorage`/`sessionStorage` and are not kept as the application session. Existing accounts are linked only when an already-signed-in client explicitly connects Google/Microsoft from Account → Security (email match alone never grants access).
+
+Auth0 Organizations are deferred — Pinnacle’s internal client/relationship records remain authoritative for multi-user business clients.
 
 **Local dev:** copy `.dev.vars.example` to `.dev.vars` (gitignored) and fill in test values — `wrangler pages dev` reads it automatically.
 

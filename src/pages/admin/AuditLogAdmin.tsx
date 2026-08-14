@@ -24,7 +24,7 @@ interface AuditEntry {
 }
 
 const PAGE_SIZE = 50
-const SECURITY_ACTIONS = new Set<string>(['login','logout','login_failed','password_changed','password_reset','permission_changed','user_created','record_archived','record_restored','record_permanently_deleted'])
+const SECURITY_ACTIONS = new Set<string>(['login','logout','login_failed','password_changed','password_reset','auth0_linked','auth0_unlinked','auth0_link_failed','permission_changed','user_created','record_archived','record_restored','record_permanently_deleted'])
 function isSecurityAction(action: string): boolean { return SECURITY_ACTIONS.has(action) || isSecurityKind(action) }
 
 function describeAction(entry: AuditEntry): string {
@@ -36,6 +36,9 @@ function describeAction(entry: AuditEntry): string {
     case 'login_failed': return `Failed sign-in attempt (${entry.actor_email || 'unknown user'})`
     case 'password_changed': return `${who} changed their password`
     case 'password_reset': return `${who} triggered a password reset`
+    case 'auth0_linked': return `${who} connected an Auth0 sign-in method`
+    case 'auth0_unlinked': return `${who} disconnected an Auth0 sign-in method`
+    case 'auth0_link_failed': return `${who} failed to connect an Auth0 sign-in method`
     case 'record_created': return `${who} created ${what}`
     case 'record_updated': return `${who} updated ${what}`
     case 'record_archived': return `${who} archived ${what}`

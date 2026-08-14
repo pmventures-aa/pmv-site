@@ -501,9 +501,14 @@ authRoutes.post('/login', async (c) => {
 })
 
 authRoutes.post('/logout', async (c) => {
+  // Local Pinnacle session invalidation is always sufficient for safe logout.
+  // Auth0 federated logout is intentionally not required — Auth0 is identity-only.
   const user = await getUser(c.env, c.req.raw)
   await destroySession(c.env, c.req.raw)
   c.header('Set-Cookie', clearCookie())
+  // Clear any leftover Auth0 transaction cookie from an abandoned OIDC attempt.
+  c.header('Set-Cookie', '__txn_auth0=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0', { append: true })
+  c.header('Set-Cookie', '__transaction_auth0=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0', { append: true })
   if (user) await logAudit(c.env, {
     actorUserId: user.id,
     actorIp: actorIp(c.req.raw),

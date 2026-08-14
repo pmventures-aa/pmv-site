@@ -5,6 +5,7 @@ import { useAuth, isApiError } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
+import { Auth0ProviderButtons, auth0ErrorMessage } from '../../components/auth/Auth0ProviderButtons'
 import { clientWorkspaceForWorld, hqWorkspaceCopy, rememberOperatingWorld, rememberedHqParty, rememberedWorld, worldFromServiceParam } from '../../lib/workspace'
 
 export default function Login({ surface }: { surface: 'client' | 'staff' }) {
@@ -17,7 +18,7 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() => auth0ErrorMessage(params.get('auth0')))
   const [busy, setBusy] = useState(false)
 
   const clientWorld = useMemo(() => worldFromServiceParam(serviceKey) || rememberedWorld() || 'general', [serviceKey])
@@ -27,6 +28,11 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   useEffect(() => {
     if (surface === 'client' && clientWorld !== 'general') rememberOperatingWorld(clientWorld)
   }, [surface, clientWorld])
+
+  useEffect(() => {
+    const message = auth0ErrorMessage(params.get('auth0'))
+    if (message) setError(message)
+  }, [params])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -64,6 +70,12 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   }
 
   const forgotQuery = `?surface=${surface}${email ? `&email=${encodeURIComponent(email)}` : ''}`
+  const relativeReturn = serviceKey
+    ? `${p(`services/${encodeURIComponent(serviceKey)}/apply`)}${offeringId ? `?offering=${encodeURIComponent(offeringId)}` : ''}`
+    : (p() || '/')
+  const auth0ReturnTo = relativeReturn.startsWith('/portal')
+    ? relativeReturn
+    : `/portal${relativeReturn === '/' ? '' : relativeReturn}`
 
   return (
     <AuthLayout
@@ -81,6 +93,13 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
       {serviceKey && surface === 'client' && (
         <p className="mb-4 text-xs leading-5 text-slate-400">After you sign in, we will return you to the service you were exploring.</p>
       )}
+
+      {surface === 'client' && (
+        <div className="mb-5">
+          <Auth0ProviderButtons returnTo={auth0ReturnTo || '/portal'} disabled={busy} />
+        </div>
+      )}
+
       <form onSubmit={onSubmit} className="space-y-5">
         <Field label="Email Address">
           <input className={inputCls} type="email" autoComplete="email" inputMode="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />

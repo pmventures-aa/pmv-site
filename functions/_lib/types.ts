@@ -19,6 +19,21 @@ export interface Env {
   RESEND_WEBHOOK_SECRET?: string
   // Resend receiving domain (*.resend.app). From still uses RESEND_FROM_EMAIL.
   RESEND_INBOUND_DOMAIN?: string
+  // Optional Auth0 Regular Web Application (server-side Authorization Code + PKCE).
+  // When unset or incomplete, Auth0 buttons stay hidden and Auth0 routes return 503.
+  AUTH0_DOMAIN?: string
+  AUTH0_CLIENT_ID?: string
+  AUTH0_CLIENT_SECRET?: string
+  AUTH0_AUDIENCE?: string
+  AUTH0_CALLBACK_URL?: string
+  AUTH0_LOGOUT_URL?: string
+  // Optional dedicated secret for Auth0 transaction-cookie encryption.
+  // Falls back to SESSION_SECRET when unset.
+  AUTH0_SESSION_SECRET?: string
+  // Auth0 connection names. Non-empty enables the matching portal button.
+  // Examples: google-oauth2, windowslive. Use "true" for the default name.
+  AUTH0_CONNECTION_GOOGLE?: string
+  AUTH0_CONNECTION_MICROSOFT?: string
 }
 
 export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
