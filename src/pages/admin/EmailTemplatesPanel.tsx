@@ -257,7 +257,7 @@ export function EmailTemplatesPanel() {
             </button>
             <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#0a1728]">{selected.name}</p>
           </div>
-          <div className="flex shrink-0 flex-nowrap items-center gap-1 overflow-x-auto border-b border-[#e4dfd4] bg-white px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:gap-2 lg:overflow-visible lg:px-4">
+          <div className="sticky top-0 z-10 flex shrink-0 flex-nowrap items-center gap-1 overflow-x-auto border-b border-[#e4dfd4] bg-white px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:static lg:flex-wrap lg:gap-2 lg:overflow-visible lg:px-4">
             <button type="button" disabled={busy} onClick={() => void save()} className="inline-flex shrink-0 items-center gap-2 rounded-md bg-[#c9a227] px-4 py-1.5 text-sm font-semibold text-[#07111f] hover:bg-[#d9b84a] disabled:opacity-50">
               {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Save
@@ -314,18 +314,18 @@ export function EmailTemplatesPanel() {
                 <FieldRow label="Button">
                   <input className={fieldInput} placeholder="Button label" value={draft.cta_label} onChange={(e) => setDraft({ ...draft, cta_label: e.target.value })} />
                 </FieldRow>
-                <div className="flex flex-wrap items-center gap-2 border-b border-[#eeeae2] bg-white px-4 py-2">
+                <div className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-[#eeeae2] bg-white px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:overflow-visible lg:px-4">
                   <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#7b8492]">Insert</span>
                   {(selected.tokens || []).map((token) => (
                     <button key={token} type="button" onClick={() => insertToken(token)} className="rounded-full border border-[#ddd6c8] bg-[#f7f4ee] px-2 py-0.5 font-mono text-[11px] text-[#0a1728] hover:border-[#c9a227]">
                       {`{{${token}}}`}
                     </button>
                   ))}
-                  <label className="ml-auto flex items-center gap-2 text-[11px] font-semibold text-[#5b6573]">
+                  <label className="ml-auto flex shrink-0 items-center gap-2 text-[11px] font-semibold text-[#5b6573]">
                     <input type="checkbox" checked={!!draft.wrap_letterhead} onChange={(e) => setDraft({ ...draft, wrap_letterhead: e.target.checked ? 1 : 0 })} />
                     Pinnacle letterhead
                   </label>
-                  <label className="flex items-center gap-2 text-[11px] font-semibold text-[#5b6573]">
+                  <label className="flex shrink-0 items-center gap-2 text-[11px] font-semibold text-[#5b6573]">
                     <input type="checkbox" checked={!!draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked ? 1 : 0 })} />
                     Active
                   </label>
@@ -360,7 +360,7 @@ export function EmailTemplatesPanel() {
               {showPreview && (
                 <div className="border-t border-[#eeeae2] bg-[#ece7dc] xl:border-l xl:border-t-0">
                   <p className="px-4 py-2 text-[10px] font-semibold uppercase tracking-[.16em] text-[#7b8492]">Preview with sample names</p>
-                  <iframe title="Email preview" className="h-[720px] w-full bg-[#07111f]" srcDoc={previewHtml || '<p style="padding:24px;font-family:sans-serif;color:#94a3b8">Saving a letter updates this preview.</p>'} />
+                  <iframe title="Email preview" className="h-[50dvh] w-full bg-[#07111f] lg:h-[720px]" srcDoc={previewHtml || '<p style="padding:24px;font-family:sans-serif;color:#94a3b8">Saving a letter updates this preview.</p>'} />
                 </div>
               )}
             </div>
@@ -375,8 +375,8 @@ const fieldInput = 'min-h-9 w-full border-0 bg-transparent px-1 font-serif text-
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 border-b border-[#eeeae2] bg-white px-4">
-      <span className="w-[5.2rem] shrink-0 text-[11px] font-semibold uppercase tracking-[.14em] text-[#7b8492]">{label}</span>
+    <div className="flex flex-col items-stretch gap-1 border-b border-[#eeeae2] bg-white px-3 py-2 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-0">
+      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[.14em] text-[#7b8492] sm:w-[5.2rem] sm:text-[11px]">{label}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   )

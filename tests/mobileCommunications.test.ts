@@ -9,6 +9,9 @@ describe('mobile communications workspace', () => {
   const emailCenter = readFileSync(new URL('../src/pages/admin/CommunicationsCRMAdmin.tsx', import.meta.url), 'utf8')
   const composer = readFileSync(new URL('../src/components/admin/RichTextComposer.tsx', import.meta.url), 'utf8')
   const composePane = readFileSync(new URL('../src/pages/admin/EmailComposePane.tsx', import.meta.url), 'utf8')
+  const clientThread = readFileSync(new URL('../src/components/kit/ThreadView.tsx', import.meta.url), 'utf8')
+  const staffDm = readFileSync(new URL('../src/pages/admin/ConversationsPanel.tsx', import.meta.url), 'utf8')
+  const pulse = readFileSync(new URL('../src/pages/admin/CommunicationsHub.tsx', import.meta.url), 'utf8')
 
   it('uses list-to-editor drill-in on narrow screens while retaining the desktop split', () => {
     expect(templates).toContain("mobileEditing ? 'hidden' : 'flex'")
@@ -65,5 +68,42 @@ describe('mobile communications workspace', () => {
     expect(composePane).toContain('lg:order-none')
     expect(composePane).toContain('w-[3.25rem]')
     expect(composePane).toContain('sm:w-[4.5rem]')
+  })
+
+  it('lands on communication lists before opening a mobile detail', () => {
+    expect(messages).toContain("matchMedia('(max-width: 767px)')")
+    expect(threads).toContain("matchMedia('(max-width: 767px)')")
+    expect(staffDm).toContain("matchMedia('(max-width: 767px)')")
+  })
+
+  it('keeps secure-message and staff-DM composers reachable above safe areas', () => {
+    expect(clientThread).toContain('sticky bottom-0')
+    expect(clientThread).toContain('env(safe-area-inset-bottom)')
+    expect(clientThread).toContain('pb-24')
+    expect(staffDm).toContain('sticky bottom-0')
+    expect(staffDm).toContain('env(safe-area-inset-bottom)')
+  })
+
+  it('turns Email Center into mobile folder, list, and detail drill-in', () => {
+    expect(emailCenter).toContain("selectedId ? 'hidden' : 'flex'")
+    expect(emailCenter).toContain("selectedId ? 'flex' : 'hidden'")
+    expect(emailCenter).toContain('xl:grid-cols-[220px_360px_minmax(0,1fr)]')
+    expect(emailCenter).toContain('Back to email list')
+    expect(emailCenter).toContain('xl:hidden')
+    expect(emailCenter).toContain('hidden overflow-x-auto rounded-md border border-white/10 xl:block')
+  })
+
+  it('splits Pulse into mobile Overview and Reporting views', () => {
+    expect(messages).toContain("section === 'overview'")
+    expect(messages).toContain("section === 'reporting'")
+    expect(messages).toContain('lg:hidden')
+    expect(pulse).toContain('min-w-[480px]')
+    expect(pulse).toContain('sm:min-w-0')
+  })
+
+  it('keeps template controls and preview compact on mobile', () => {
+    expect(templates).toContain('h-[50dvh]')
+    expect(templates).toContain('lg:h-[720px]')
+    expect(templates).toContain('sm:w-[5.2rem]')
   })
 })
