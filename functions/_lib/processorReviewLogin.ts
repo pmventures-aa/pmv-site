@@ -10,6 +10,7 @@ import {
   PROCESSOR_REVIEW_USER_ID,
   generateProcessorReviewPassword,
 } from '../../shared/processorReviewLogin'
+import { ensureProcessorReviewSampleDocument } from './processorReviewSamplePdf'
 
 const ids = {
   profile: 'processor-review-profile',
@@ -26,7 +27,6 @@ const ids = {
   matter: 'processor-review-matter',
   task: 'processor-review-task',
   documentRequest: 'processor-review-doc-request',
-  document: 'processor-review-document',
   funding: 'processor-review-funding',
   appointment: 'processor-review-appointment',
   call: 'processor-review-call',
@@ -107,6 +107,7 @@ export async function stageProcessorReviewLogin(env: Env, actorUserId: string): 
   }
 
   await seedSampleWorkspace(env, userId, actorUserId)
+  await ensureProcessorReviewSampleDocument(env, userId, actorUserId)
 
   return {
     email: PROCESSOR_REVIEW_EMAIL,
@@ -198,10 +199,6 @@ async function seedSampleWorkspace(env: Env, userId: string, actorUserId: string
       `INSERT INTO document_requests (id, client_user_id, title, signature_required, status)
        VALUES (?, ?, 'W-9 / business formation packet', 0, 'requested')`,
     ).bind(ids.documentRequest, userId),
-    env.DB.prepare(
-      `INSERT INTO client_documents (id, client_user_id, category, file_name, review_status, visibility, source)
-       VALUES (?, ?, 'agreement', 'Sample engagement letter.pdf', 'approved', 'client', 'manual')`,
-    ).bind(ids.document, userId),
     env.DB.prepare(
       `INSERT INTO funding_applications (id, client_user_id, amount_requested_cents, use_of_funds, status)
        VALUES (?, ?, 2500000, 'Working capital readiness review only. Pinnacle does not lend or approve funding.', 'submitted')`,

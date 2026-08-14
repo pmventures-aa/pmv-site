@@ -18,6 +18,11 @@ import {
 } from '../intake'
 import { renderApplicationPdf, type ApplicationPdfAnswer } from '../applicationPdf'
 import { advanceInquiryLifecycle } from '../lifecycle'
+import {
+  isProcessorReviewSampleDocument,
+  PROCESSOR_REVIEW_DOCUMENT_CONTENT_TYPE,
+  renderProcessorReviewSamplePdf,
+} from '../processorReviewSamplePdf'
 
 export const serviceApplicationRoutes = new Hono<AppEnv>()
 
@@ -785,12 +790,12 @@ serviceApplicationRoutes.get('/documents/:id/file', requireUser, async (c) => {
   agentDebugLog({ hypothesisId: 'C,D', location: 'serviceApplications.ts:documents:file-entry', message: 'Document file route entered', data: { requestedId: c.req.param('id') ?? null, role: user.role, legacyProcessorClient: user.id === 'processor-review-client', uploadsBound: Boolean(c.env.UPLOADS) }, timestamp: Date.now() })
   // #endregion
   const doc = await c.env.DB.prepare(
-    `SELECT id, client_user_id, file_name, r2_key, content_type, visibility FROM client_documents WHERE id = ?`,
-  ).bind(c.req.param('id') ?? '').first<{ id: string; client_user_id: string; file_name: string | null; r2_key: string | null; content_type: string | null; visibility: string }>()
+    `SELECT id, client_user_id, file_name, r2_key, content_type, visibility, source FROM client_documents WHERE id = ?`,
+  ).bind(c.req.param('id') ?? '').first<{ id: string; client_user_id: string; file_name: string | null; r2_key: string | null; content_type: string | null; visibility: string; source: string | null }>()
   // #region agent log
   agentDebugLog({ hypothesisId: 'A,B,D', location: 'serviceApplications.ts:documents:file-record', message: 'Document file record lookup completed', data: { found: Boolean(doc), documentId: doc?.id ?? null, ownerMatchesLegacyId: doc?.client_user_id === 'processor-review-client', hasR2Key: Boolean(doc?.r2_key), contentType: doc?.content_type ?? null, visibility: doc?.visibility ?? null, uploadsBound: Boolean(c.env.UPLOADS) }, timestamp: Date.now() })
   // #endregion
-  if (!doc || !doc.r2_key || !c.env.UPLOADS) return c.json({ error: 'file not found' }, 404)
+  if (!doc) return c.json({ error: 'file not found' }, 404)
   let authorization = 'allowed'
   if (user.role === 'client') {
     if (doc.client_user_id !== user.id || doc.visibility === 'internal') authorization = 'client-hidden'
@@ -802,12 +807,25 @@ serviceApplicationRoutes.get('/documents/:id/file', requireUser, async (c) => {
   // #endregion
   if (authorization === 'client-hidden') return c.json({ error: 'file not found' }, 404)
   if (authorization === 'staff-forbidden') return c.json({ error: 'forbidden' }, 403)
+
+  const filename = safeFileName(doc.file_name || 'document')
+  if (!c.env.UPLOADS) {
+    if (!isProcessorReviewSampleDocument(doc)) return c.json({ error: 'file not found' }, 404)
+    const bytes = await renderProcessorReviewSamplePdf()
+    return new Response(bytes, {
+      headers: {
+        'Content-Type': PROCESSOR_REVIEW_DOCUMENT_CONTENT_TYPE,
+        'Content-Disposition': `inline; filename="${filename.replace(/"/g, '')}"`,
+        'Cache-Control': 'private, no-store',
+      },
+    })
+  }
+  if (!doc.r2_key) return c.json({ error: 'file not found' }, 404)
   const object = await c.env.UPLOADS.get(doc.r2_key)
   // #region agent log
   agentDebugLog({ hypothesisId: 'B', location: 'serviceApplications.ts:documents:file-storage', message: 'Document object storage lookup completed', data: { objectFound: Boolean(object), documentId: doc.id, contentTypeFromRecord: doc.content_type ?? null, contentTypeFromObject: object?.httpMetadata?.contentType ?? null }, timestamp: Date.now() })
   // #endregion
   if (!object) return c.json({ error: 'file not found' }, 404)
-  const filename = safeFileName(doc.file_name || 'document')
   return new Response(object.body, {
     headers: {
       'Content-Type': doc.content_type || object.httpMetadata?.contentType || 'application/octet-stream',
