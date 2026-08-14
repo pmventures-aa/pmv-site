@@ -8,6 +8,7 @@ import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialo
 import { Avatar } from '../../components/kit/Avatar'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { InlineLoading } from '../../components/LoadingScreen'
+import { useAuth } from '../../lib/auth'
 
 interface Bundle {
   account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
@@ -188,6 +189,7 @@ function Section({
   clientId,
   onCreated,
   archiveEntity,
+  assignEntity,
 }: {
   title: string
   rows: any[]
@@ -200,7 +202,9 @@ function Section({
   clientId: string
   onCreated: () => void
   archiveEntity?: ArchiveEntity
+  assignEntity?: 'matter' | 'task' | 'ticket'
 }) {
+  const { user } = useAuth()
   const [adding, setAdding] = useState(false)
 
   async function archive(id: string) {
@@ -211,6 +215,17 @@ function Section({
       onCreated()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not archive this record.')
+    }
+  }
+
+  async function assignSelf(id: string) {
+    if (!assignEntity || !user) return
+    try {
+      await api.post(`/admin/work-assignments/${assignEntity}/${id}/assign-self`)
+      toast.success('Assigned to you.')
+      onCreated()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not assign this record.')
     }
   }
 
@@ -252,7 +267,7 @@ function Section({
                   </th>
                 ))}
                 {statusKey && <th className="px-5 py-2 font-medium">Status</th>}
-                {archiveEntity && <th className="px-5 py-2 font-medium"></th>}
+                {(archiveEntity || assignEntity) && <th className="px-5 py-2 font-medium"></th>}
               </tr>
             </thead>
             <tbody>
@@ -278,11 +293,16 @@ function Section({
                       </select>
                     </td>
                   )}
-                  {archiveEntity && (
+                  {(archiveEntity || assignEntity) && (
                     <td className="whitespace-nowrap px-5 py-2.5">
-                      <button onClick={() => archive(r.id)} className="text-xs font-medium text-slate-500 hover:text-rose-300">
-                        Archive
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {assignEntity && r.assigned_staff_user_id !== user?.id && (
+                          <button onClick={() => assignSelf(r.id)} className="text-xs font-medium text-gold hover:underline">Assign to me</button>
+                        )}
+                        {archiveEntity && (
+                          <button onClick={() => archive(r.id)} className="text-xs font-medium text-slate-500 hover:text-rose-300">Archive</button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -974,6 +994,7 @@ export default function ClientDetail() {
           clientId={clientId}
           onCreated={load}
           archiveEntity="matters"
+          assignEntity="matter"
           createConfig={{
             postPath: 'matters',
             fields: [
@@ -998,6 +1019,7 @@ export default function ClientDetail() {
           clientId={clientId}
           onCreated={load}
           archiveEntity="tasks"
+          assignEntity="task"
           createConfig={{
             postPath: 'tasks',
             fields: [
@@ -1022,6 +1044,7 @@ export default function ClientDetail() {
           clientId={clientId}
           onCreated={load}
           archiveEntity="tickets"
+          assignEntity="ticket"
           createConfig={{
             postPath: 'support',
             fields: [

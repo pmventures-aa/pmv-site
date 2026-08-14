@@ -198,6 +198,7 @@ export function FieldWorkList() {
 // -------------------------------------------------------------
 
 export default function FieldWorkDetail() {
+  const { user } = useAuth()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const p = useAppPath()
@@ -206,6 +207,7 @@ export default function FieldWorkDetail() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<'depart' | 'arrive' | 'complete' | null>(null)
   const [addingDoc, setAddingDoc] = useState(false)
+  const [assigningSelf, setAssigningSelf] = useState(false)
   const [signatureType, setSignatureType] = useState<'typed' | 'drawn'>('typed')
   const [signatureName, setSignatureName] = useState('')
   const [signatureAck, setSignatureAck] = useState(false)
@@ -228,6 +230,20 @@ export default function FieldWorkDetail() {
   }, [id, signatureName])
 
   useEffect(() => { void load() }, [load])
+
+  async function assignToMe() {
+    if (!assignment) return
+    setAssigningSelf(true)
+    try {
+      await api.post(`/admin/work-assignments/field_assignment/${assignment.id}/assign-self`)
+      toast.success('Field job assigned to you.')
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not assign this field job.')
+    } finally {
+      setAssigningSelf(false)
+    }
+  }
 
   async function markDeparted() {
     if (!assignment) return
@@ -427,7 +443,7 @@ export default function FieldWorkDetail() {
         kicker={isRon ? 'Remote Online Notarization' : 'Field assignment'}
         title={assignment.title || assignment.service_key.replace(/_/g, ' ')}
         subtitle={siteLine(assignment)}
-        action={<Tag tone={tone.tone}>{tone.label}</Tag>}
+        action={<div className="flex items-center gap-2">{assignment.vendor_user_id !== user?.id && <button type="button" disabled={assigningSelf} onClick={() => void assignToMe()} className={`${btnOutline} disabled:opacity-50`}>{assigningSelf ? <Loader2 size={14} className="animate-spin" /> : null} Assign to me</button>}<Tag tone={tone.tone}>{tone.label}</Tag></div>}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">

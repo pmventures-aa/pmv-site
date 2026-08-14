@@ -7,6 +7,9 @@ import { actorIp, actorUserAgent, actorGeo, logAudit } from '../auditLog'
 import { sendEmail } from '../email'
 import { renderPinnacleEmailLayout } from '../emailTemplates/layout'
 import { renderFieldAssignmentAuditEmail } from '../emailTemplates/fieldAssignmentAudit'
+import { resolveEligibleFieldProvider } from '../fieldProviders'
+import { canAccessClient } from '../scope'
+import { requireNamedPermission } from '../capabilities'
 
 export const fieldWorkRoutes = new Hono<AppEnv>()
 
@@ -119,6 +122,9 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   if (!serviceKey || !clientUserId || !vendorUserId) {
     return c.json({ error: 'service_key, client_user_id and vendor_user_id are required' }, 400)
   }
+  if (!(await canAccessClient(c.env, user, clientUserId))) return c.json({ error: 'forbidden' }, 403)
+  const eligibleProviderId = await resolveEligibleFieldProvider(c.env, vendorUserId)
+  if (!eligibleProviderId) return c.json({ error: 'provider must be an active staff or admin account' }, 400)
   const id = uuid()
   await c.env.DB.prepare(
     `INSERT INTO field_assignments (
@@ -131,7 +137,7 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
     kind,
     serviceKey,
     clientUserId,
-    vendorUserId,
+    eligibleProviderId,
     user.id,
     (body.title as string) || null,
     (body.site_label as string) || null,
@@ -149,7 +155,7 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
     actorUserId: user.id,
     clientUserId,
     kind: 'field_assignment_created',
-    detail: { id, service_key: serviceKey, kind_value: kind, vendor_user_id: vendorUserId },
+    detail: { id, service_key: serviceKey, kind_value: kind, vendor_user_id: eligibleProviderId },
   })
 
   const row = await loadAssignment(c.env, id)
@@ -331,6 +337,9 @@ fieldWorkRoutes.post('/field-assignments/:id/complete', requireStaff, async (c) 
     now,
     row.id,
   ).run()
+  await c.env.DB.prepare(
+    'UPDATE field_agent_locations SET sharing_active = 0 WHERE user_id = ? AND assignment_id = ?',
+  ).bind(row.vendor_user_id, row.id).run()
 
   const updated = await loadAssignment(c.env, row.id)
   if (updated && updated.client_email) {
@@ -372,6 +381,9 @@ fieldWorkRoutes.post('/field-assignments/:id/cancel', requireStaff, async (c) =>
   if (user.role !== 'admin' && row.assigned_by_user_id !== user.id) return c.json({ error: 'forbidden' }, 403)
   if (row.status === 'completed') return c.json({ error: 'cannot cancel completed assignment' }, 409)
   await c.env.DB.prepare(`UPDATE field_assignments SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?`).bind(row.id).run()
+  await c.env.DB.prepare(
+    'UPDATE field_agent_locations SET sharing_active = 0 WHERE user_id = ? AND assignment_id = ?',
+  ).bind(row.vendor_user_id, row.id).run()
   return c.json({ ok: true })
 })
 
@@ -383,18 +395,69 @@ fieldWorkRoutes.post('/field-assignments/:id/ping', requireStaff, async (c) => {
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
   const lat = num(body.lat)
   const lng = num(body.lng)
-  if (lat == null || lng == null) return c.json({ error: 'lat and lng are required' }, 400)
+  if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return c.json({ error: 'valid lat and lng are required' }, 400)
+  }
   await c.env.DB.prepare(
-    `INSERT INTO field_agent_locations (user_id, assignment_id, lat, lng, accuracy_m, updated_at)
-     VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `INSERT INTO field_agent_locations (user_id, assignment_id, lat, lng, accuracy_m, source, sharing_active, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'assignment', 1, datetime('now'))
      ON CONFLICT(user_id) DO UPDATE SET
        assignment_id = excluded.assignment_id,
        lat = excluded.lat,
        lng = excluded.lng,
        accuracy_m = excluded.accuracy_m,
+       source = 'assignment',
+       sharing_active = 1,
        updated_at = datetime('now')`,
   ).bind(user.id, row.id, lat, lng, num(body.accuracy_m)).run()
   return c.json({ ok: true })
+})
+
+fieldWorkRoutes.post('/location', requireStaff, async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
+  const lat = num(body.lat)
+  const lng = num(body.lng)
+  if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return c.json({ error: 'valid lat and lng are required' }, 400)
+  }
+  await c.env.DB.prepare(
+    `INSERT INTO field_agent_locations (user_id, assignment_id, lat, lng, accuracy_m, source, sharing_active, updated_at)
+     VALUES (?, NULL, ?, ?, ?, 'network', 1, datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET
+       assignment_id = NULL,
+       lat = excluded.lat,
+       lng = excluded.lng,
+       accuracy_m = excluded.accuracy_m,
+       source = 'network',
+       sharing_active = 1,
+       updated_at = datetime('now')`,
+  ).bind(user.id, lat, lng, num(body.accuracy_m)).run()
+  return c.json({ ok: true })
+})
+
+fieldWorkRoutes.post('/location/stop', requireStaff, async (c) => {
+  await c.env.DB.prepare(
+    'UPDATE field_agent_locations SET sharing_active = 0 WHERE user_id = ?',
+  ).bind(c.get('user').id).run()
+  return c.json({ ok: true })
+})
+
+fieldWorkRoutes.get('/network-map', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT u.id AS user_id, u.full_name, u.email, u.last_seen_at, u.status,
+            tm.party_type, tm.vendor_category, tm.title,
+            loc.assignment_id, loc.lat, loc.lng, loc.accuracy_m, loc.source,
+            loc.sharing_active, loc.updated_at,
+            fa.title AS assignment_title, fa.status AS assignment_status
+     FROM users u
+     LEFT JOIN team_members tm ON tm.user_id = u.id
+     LEFT JOIN field_agent_locations loc ON loc.user_id = u.id
+     LEFT JOIN field_assignments fa ON fa.id = loc.assignment_id
+     WHERE u.role IN ('staff','admin') AND u.status = 'active'
+     ORDER BY u.full_name, u.email`,
+  ).all()
+  return c.json({ people: rows.results ?? [], viewer_user_id: c.get('user').id })
 })
 
 fieldWorkRoutes.get('/field-map', requireStaff, async (c) => {

@@ -74,6 +74,7 @@ import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib
 import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
 import { geoRoutes } from '../_lib/routes/geo'
 import { loadWorkspaceContext } from '../_lib/workspaceContext'
+import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -169,6 +170,7 @@ app.route('/admin', commsRoutes)
 app.route('/admin', crmWriteRoutes)
 app.route('/admin', crmRoutes)
 app.route('/admin', fieldWorkRoutes)
+app.route('/admin', workAssignmentRoutes)
 app.route('/admin', casesRoutes)
 app.route('/admin', communicationBrandingAdminRoutes)
 app.route('/admin', presenceRoutes)
