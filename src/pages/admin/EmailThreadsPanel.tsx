@@ -415,7 +415,9 @@ function EmailThreadDetail({
                 </div>
               </div>
 
-              <WhoSection eyebrow={null} className="border-white/10" rows={messageWhoRows(m)} />
+              <div className="hidden md:block">
+                <WhoSection eyebrow={null} className="border-white/10" rows={messageWhoRows(m)} />
+              </div>
 
               {m.error && <div className="mx-3 mb-2 mt-2 rounded-lg border border-red-400/25 bg-red-400/[.06] p-2.5 text-[11px] text-red-200 md:mx-4 md:mt-2">Delivery error: {m.error}</div>}
 

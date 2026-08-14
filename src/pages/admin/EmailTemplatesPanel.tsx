@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Copy, Loader2, Plus, RotateCcw, Save, Send, Trash2 } from 'lucide-react'
+import { ChevronLeft, Copy, Loader2, Plus, RotateCcw, Save, Send, Trash2 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { toast } from '../../components/kit/toast'
 import { SessionWho } from '../../components/kit/WhoSection'
@@ -53,8 +53,9 @@ export function EmailTemplatesPanel() {
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [previewHtml, setPreviewHtml] = useState('')
-  const [showPreview, setShowPreview] = useState(true)
+  const [showPreview, setShowPreview] = useState(() => typeof window === 'undefined' || !window.matchMedia('(max-width: 1023px)').matches)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [mobileEditing, setMobileEditing] = useState(() => !!(searchParams.get('template') || searchParams.get('slug')))
 
   const selected = templates.find((row) => row.id === selectedId) || templates[0] || null
 
@@ -82,6 +83,7 @@ export function EmailTemplatesPanel() {
   function select(row: HqEmailTemplate) {
     setSelectedId(row.id)
     setDraft(toDraft(row))
+    setMobileEditing(true)
     setSearchParams((current) => {
       const next = new URLSearchParams(current)
       next.set('tab', 'templates')
@@ -127,6 +129,7 @@ export function EmailTemplatesPanel() {
       })
       toast.success('Template added')
       await load(r.template.id)
+      setMobileEditing(true)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not add a template.')
     } finally { setBusy(false) }
@@ -139,6 +142,7 @@ export function EmailTemplatesPanel() {
       const r = await api.post<{ template: HqEmailTemplate }>(`/admin/email-templates/${selected.id}/duplicate`, {})
       toast.success('Copy created')
       await load(r.template.id)
+      setMobileEditing(true)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not duplicate this template.')
     } finally { setBusy(false) }
@@ -214,7 +218,7 @@ export function EmailTemplatesPanel() {
     <div className="flex h-full min-h-0 flex-col">
       <SessionWho hint="These letters go out as Pinnacle Management Ventures. Receiving stays on the Resend inbound domain." />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-white/10 lg:flex-row">
-        <aside className="flex max-h-[40vh] w-full shrink-0 flex-col border-b border-white/10 bg-navy-950 lg:max-h-none lg:w-[280px] lg:border-b-0 lg:border-r">
+        <aside className={`${mobileEditing ? 'hidden' : 'flex'} min-h-0 w-full flex-1 shrink-0 flex-col border-b border-white/10 bg-navy-950 lg:flex lg:max-h-none lg:w-[280px] lg:flex-none lg:border-b-0 lg:border-r`}>
           <div className="flex items-center gap-2 border-b border-white/10 p-3">
             <input
               className="min-w-0 flex-1 rounded-md border border-white/10 bg-white/[.04] px-3 py-1.5 text-sm text-white outline-none placeholder:text-slate-500"
@@ -246,28 +250,34 @@ export function EmailTemplatesPanel() {
           </div>
         </aside>
 
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#f7f4ee] text-[#0a1728]">
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[#e4dfd4] bg-white px-4 py-2.5">
-            <button type="button" disabled={busy} onClick={() => void save()} className="inline-flex items-center gap-2 rounded-md bg-[#c9a227] px-4 py-1.5 text-sm font-semibold text-[#07111f] hover:bg-[#d9b84a] disabled:opacity-50">
+        <section className={`${mobileEditing ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-1 flex-col bg-[#f7f4ee] text-[#0a1728] lg:flex`}>
+          <div className="flex shrink-0 items-center gap-2 border-b border-[#e4dfd4] bg-[#f7f4ee] px-3 py-2 lg:hidden">
+            <button type="button" onClick={() => setMobileEditing(false)} className="inline-flex h-9 items-center gap-1 rounded-md border border-[#d8d0c1] bg-white px-2.5 text-sm font-semibold text-[#334155]">
+              <ChevronLeft size={16} /> Templates
+            </button>
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#0a1728]">{selected.name}</p>
+          </div>
+          <div className="flex shrink-0 flex-nowrap items-center gap-1 overflow-x-auto border-b border-[#e4dfd4] bg-white px-3 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:gap-2 lg:overflow-visible lg:px-4">
+            <button type="button" disabled={busy} onClick={() => void save()} className="inline-flex shrink-0 items-center gap-2 rounded-md bg-[#c9a227] px-4 py-1.5 text-sm font-semibold text-[#07111f] hover:bg-[#d9b84a] disabled:opacity-50">
               {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Save
             </button>
-            <button type="button" disabled={busy} onClick={() => void sendTest()} className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-[#5b6573] hover:bg-black/[.04]">
+            <button type="button" disabled={busy} onClick={() => void sendTest()} className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-[#5b6573] hover:bg-black/[.04]">
               <Send size={14} /> Test
             </button>
-            <button type="button" disabled={busy} onClick={() => void duplicate()} className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-[#5b6573] hover:bg-black/[.04]">
+            <button type="button" disabled={busy} onClick={() => void duplicate()} className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-[#5b6573] hover:bg-black/[.04]">
               <Copy size={14} /> Duplicate
             </button>
             {selected.is_system ? (
-              <button type="button" disabled={busy} onClick={() => void restore()} className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-[#5b6573] hover:bg-black/[.04]">
+              <button type="button" disabled={busy} onClick={() => void restore()} className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-[#5b6573] hover:bg-black/[.04]">
                 <RotateCcw size={14} /> Restore default
               </button>
             ) : (
-              <button type="button" disabled={busy} onClick={() => void remove()} className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-[#9a3b32] hover:bg-black/[.04]">
+              <button type="button" disabled={busy} onClick={() => void remove()} className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-[#9a3b32] hover:bg-black/[.04]">
                 <Trash2 size={14} /> Delete
               </button>
             )}
-            <label className="ml-auto flex items-center gap-2 text-[12px] font-semibold text-[#5b6573]">
+            <label className="ml-auto flex shrink-0 items-center gap-2 text-[12px] font-semibold text-[#5b6573]">
               <input type="checkbox" checked={showPreview} onChange={(e) => setShowPreview(e.target.checked)} />
               Live preview
             </label>

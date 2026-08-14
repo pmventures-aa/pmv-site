@@ -186,7 +186,7 @@ export default function MessagesAdmin() {
 
   return (
     <div className="flex h-full min-h-0 flex-col px-3 pt-2 sm:px-5 lg:px-6">
-      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10">
+      <div className="mb-2 flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-white/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
         {TABS.map((item) => (
           <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`relative shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${tab === item.id ? 'border-gold font-semibold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>
             {item.label}
@@ -195,7 +195,7 @@ export default function MessagesAdmin() {
             )}
           </button>
         ))}
-        <Link to={p('communications/email')} className="ml-auto mb-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-400 hover:text-gold">Campaigns</Link>
+        <Link to={p('communications/email')} className="mb-1 ml-0 inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-400 hover:text-gold sm:ml-auto">Campaigns</Link>
       </div>
       <div className="flex min-h-0 flex-1 flex-col pb-3">
         {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} initialThreadId={searchParams.get('inbox')} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
