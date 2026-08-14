@@ -2,6 +2,8 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import type { Env } from './types'
 import { uuid } from './crypto'
 import { renderOfficialAuditCertificate } from './auditCertificateOfficial'
+import { PUBLIC_SITE_URL } from './appUrls'
+import { shortSnapshotHash } from './auditTrailFormat'
 
 const enc = new TextEncoder()
 function b64(bytes:Uint8Array){let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s)}
@@ -53,13 +55,50 @@ export async function sealEnvelope(env:Env,envelopeId:string):Promise<SealEnvelo
     if(field.field_type==='initial'){page.drawText(value||safeText(field.recipient_name).split(/\s+/).map((v:string)=>v[0]||'').join('').slice(0,5),{x,y:y+Math.max(1,boxH*.25),size:Math.max(8,Math.min(15,boxH*.6)),font:bold,color:navy,maxWidth:boxW});continue}
     page.drawText(value,{x,y:y+Math.max(1,boxH*.25),size:Math.max(7,Math.min(11,boxH*.45)),font:regular,color:navy,maxWidth:boxW,lineHeight:11})
   }
-  pdf.setTitle(`${safeText(envelope.title,180)} - Signed`);pdf.setAuthor('Pinnacle Management Ventures');pdf.setProducer('Pinnacle Management Ventures Document Hub');pdf.setSubject(`Completed electronic signature envelope ${envelope.public_id}`);pdf.setKeywords(['Pinnacle Management Ventures','electronic signature',envelope.public_id]);pdf.setModificationDate(new Date())
-  const signedPdfBytes=await pdf.save({useObjectStreams:true}),signedPdfHash=await sha256Hex(signedPdfBytes)
+  const pageCount=pdf.getPageCount()
+  const flattenedPdfBytes=await pdf.save({useObjectStreams:true}),flattenedPdfHash=await sha256Hex(flattenedPdfBytes)
   const recipients=await env.DB.prepare(`SELECT id,name,email,role,routing_order,status,first_viewed_at,completed_at,declined_at,access_revoked_at,replacement_of_recipient_id FROM envelope_recipients WHERE envelope_id=? ORDER BY routing_order,created_at`).bind(envelopeId).all() as any
   const events=await env.DB.prepare(`SELECT id,recipient_id,actor_type,actor_id,event_type,occurred_at_utc,ip_address,geo_city,geo_region,geo_country,geo_lat_approx,geo_lon_approx,user_agent,browser_family,os_family,device_class,device_fingerprint_hash,request_id,metadata_json,prev_event_hash,event_hash FROM envelope_events WHERE envelope_id=? ORDER BY occurred_at_utc,id`).bind(envelopeId).all() as any
+  const owner=await env.DB.prepare(`SELECT u.full_name,u.email FROM users u WHERE u.id = COALESCE(?, ?)`).bind(envelope.owner_user_id, envelope.created_by_user_id).first<{full_name?:string;email?:string}>()
+  const sentEvent=(events.results||[]).find((ev:any)=>ev.event_type==='envelope.sent')
   const chainHead=String((events.results||[]).at(-1)?.event_hash||'GENESIS'),sealedAt=new Date().toISOString()
-  const certificate=await renderOfficialAuditCertificate(env,envelope,recipients.results||[],events.results||[],signedPdfHash,chainHead,sealedAt)
+  const certificate=await renderOfficialAuditCertificate(
+    env,
+    envelope,
+    recipients.results||[],
+    fields.results||[],
+    events.results||[],
+    flattenedPdfHash,
+    chainHead,
+    sealedAt,
+    {
+      ownerName: owner?.full_name || 'Pinnacle Management Ventures',
+      ownerEmail: owner?.email || '',
+      verifyUrl: `${PUBLIC_SITE_URL}/verify?envelope=${encodeURIComponent(envelope.public_id)}`,
+      pageCount,
+      initializedAt: envelope.sent_at || sentEvent?.occurred_at_utc || envelope.created_at || null,
+      initializedSnapshot: shortSnapshotHash(sentEvent?.event_hash || chainHead),
+      finalizedSnapshot: shortSnapshotHash(flattenedPdfHash),
+      sourceFileName: envelope.source_name || envelope.title,
+    },
+  )
   const auditPdfBytes=certificate.bytes,auditPdfHash=certificate.sha256
+
+  const auditSource=await PDFDocument.load(auditPdfBytes)
+  const auditPages=await pdf.copyPages(auditSource, auditSource.getPageIndices())
+  for (const auditPage of auditPages) pdf.addPage(auditPage)
+  const combinedPageCount=pdf.getPageCount()
+  for (const [index,page] of pdf.getPages().entries()){
+    const footer=`Document ID: ${envelope.public_id}   |   Page ${index+1} of ${combinedPageCount}`
+    page.drawText(footer,{x:42,y:18,size:6.5,font:regular,color:rgb(.35,.38,.42),maxWidth:528})
+  }
+  pdf.setTitle(`${safeText(envelope.title,180)} - Signed`)
+  pdf.setAuthor('Pinnacle Management Ventures')
+  pdf.setProducer('Pinnacle Management Ventures Document Hub')
+  pdf.setSubject(`Completed electronic signature envelope ${envelope.public_id}`)
+  pdf.setKeywords(['Pinnacle Management Ventures','electronic signature',envelope.public_id])
+  pdf.setModificationDate(new Date())
+  const signedPdfBytes=await pdf.save({useObjectStreams:true}),signedPdfHash=await sha256Hex(signedPdfBytes)
   const manifestObject={version:3,issuer:'Pinnacle Management Ventures',certificate_type:'Certificate of Completion + Audit Trail',envelope_id:envelope.id,public_id:envelope.public_id,title:envelope.title,completed_at_utc:envelope.completed_at||sealedAt,sealed_at_utc:sealedAt,packet:{document_count:packet.packetManifest.length,documents:packet.packetManifest},artifacts:{signed_pdf_sha256:signedPdfHash,audit_certificate_sha256:auditPdfHash},event_chain:{algorithm:'SHA-256',head_hash:chainHead,event_count:(events.results||[]).length},recipients:(recipients.results||[]).map((r:any)=>({id:r.id,role:r.role,name:r.name,email:r.email,status:r.status,completed_at:r.completed_at,access_revoked_at:r.access_revoked_at,replacement_of_recipient_id:r.replacement_of_recipient_id})),events:(events.results||[]).map((ev:any)=>({id:ev.id,recipient_id:ev.recipient_id,event_type:ev.event_type,occurred_at_utc:ev.occurred_at_utc,request_id:ev.request_id,prev_event_hash:ev.prev_event_hash,event_hash:ev.event_hash}))}
   const manifestBytes=enc.encode(JSON.stringify(manifestObject,null,2)),manifestHash=await sha256Hex(manifestBytes)
   const binding=JSON.stringify({envelope_id:envelope.id,public_id:envelope.public_id,signed_pdf_sha256:signedPdfHash,audit_pdf_sha256:auditPdfHash,manifest_sha256:manifestHash,event_chain_head_hash:chainHead,packet_document_count:packet.packetManifest.length,sealed_at:sealedAt})
