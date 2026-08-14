@@ -3,9 +3,12 @@ import { uuid } from './crypto'
 import { sendEmail, sendEmailStrict } from './email'
 import { renderRelationshipEvent } from './emailTemplates/relationship'
 
+import { PUBLIC_SITE_URL } from '../../shared/letterhead'
 import { portalUrl } from './appUrls'
 
-export const PUBLIC_SITE_BASE = 'https://pinnaclemanagementventures.com'
+export { PUBLIC_SITE_URL }
+
+export const PUBLIC_SITE_BASE = PUBLIC_SITE_URL
 export const CLIENT_PORTAL_BASE = portalUrl()
 
 export const SCOPE_FOLLOWUP_STEPS = [

@@ -8,6 +8,7 @@ import { Building2, Copy, ExternalLink, MailPlus, UserRound } from 'lucide-react
 import { vendorApplicationCopy } from '../../lib/workspace'
 import { useAppPath } from '../../lib/basePath'
 import { formatInviteTtl, INVITE_TTL_PRESETS, parseInviteTtlHours } from '../../../shared/inviteTtl'
+import { hqUrl } from '../../../shared/appUrls'
 
 interface Invite {
   id: string; invite_type: string; email: string; full_name: string | null; status: string
@@ -23,7 +24,7 @@ interface InviteForm {
   role_definition_id: string; lead_id: string; recipient_context: 'flexible' | 'person' | 'business'
   known_services: string[]; personal_note: string
 }
-const generalProviderUrl = 'https://hq.pinnaclemanagementventures.com/vendor-signup'
+const generalProviderUrl = hqUrl('/vendor-signup')
 const providerServices = [
   ['mobile_notary','Commissioned notary'], ['ron','Remote Online Notary (RON)'], ['property_field','Property / field services'],
   ['document_courier','Document courier / runner'], ['merchant_technology','POS & payment technology'],

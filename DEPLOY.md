@@ -21,6 +21,12 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 4. Update Resend + application email templates to link to `https://secure.pinnaclemanagementventures.com/…` (portal home = `/`, HQ home = `/hq`).
 5. Keep the legacy `hq.` and `client.` hosts pointed at the same Pages project during the cutover; they still work. Retire them after 30 days of low traffic.
 
+Application-generated post-login links (invites, setup emails, vendor approval, invoice/portal CTAs) are built in `shared/appUrls.ts` and always use `secure.`. Public marketing, quote, and unsubscribe links use `PUBLIC_SITE_URL` (`www.`). Legacy `hq.` / `client.` hosts still route in `src/main.tsx` but are not written into new mail.
+
+### Notable D1 migrations
+- `0073_dispatch_vendor_fees.sql` — Snapdocs-style local vendor fee adjustment columns and settings. Applied by the usual `db-migrate` workflow on `main`.
+- `0074_field_work_list_indexes.sql` — extra indexes for HQ field-assignment lists, maps, and fee estimates.
+
 
 ## What this is
 - **Frontend:** React SPA (Vite) → Cloudflare **Pages**
