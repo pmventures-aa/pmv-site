@@ -6,7 +6,16 @@ import { resolveClientId, loadScopedRow, scopeFilter, ScopeError } from '../scop
 import { activityInsert, logActivity } from '../activity'
 import { sendEmail, escapeHtml } from '../email'
 import { calendarFeedUrls, signCalendarFeedToken } from '../calendarFeed'
-import { isMatterStatus } from '../../../shared/matterWorkspace'
+import {
+  defaultMilestonesForType,
+  inferMilestoneStatus,
+  isClientStage,
+  isMatterStatus,
+  isMilestoneStatus,
+  isResponsibilityState,
+  resolveClientStage,
+  resolveResponsibility,
+} from '../../../shared/matterWorkspace'
 import {
   isPropertyOccupancy, isPropertyStatus, optionalInt, trimPropertyField,
 } from '../../../shared/propertyProfile'
@@ -47,7 +56,8 @@ portalRoutes.get('/dashboard', async (c) => {
   const { where, params } = await scopeFilter(c.env, user)
   const p2 = () => [...params]
 
-  const [matters, tasks, docs, invoices, tickets, calls, appts, msgs, services, properties, activeCases, pendingQuotes] = await Promise.all([
+  const matterWhere = where.replace(/client_user_id/g, 'm.client_user_id')
+  const [matters, tasks, docs, invoices, tickets, calls, appts, msgs, services, properties, activeCases, pendingQuotes, activeMatters] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${where} AND status != 'closed'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${where} AND status != 'done'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM document_requests WHERE ${where} AND status = 'requested'`).bind(...p2()).first<{ n: number }>(),
@@ -60,6 +70,14 @@ portalRoutes.get('/dashboard', async (c) => {
     c.env.DB.prepare(`SELECT id, name, address, city, state, postal_code, property_type, occupancy, status FROM properties WHERE ${where} ORDER BY created_at DESC LIMIT 6`).bind(...p2()).all(),
     c.env.DB.prepare(`SELECT id, subject, category, priority, status, service_key, property_id, response_due_at, resolution_due_at, waiting_on, created_at FROM support_tickets WHERE ${where} AND status != 'closed' ORDER BY created_at DESC LIMIT 5`).bind(...p2()).all(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM service_quotes WHERE status IN ('sent','viewed') AND (client_user_id = ? OR lower(recipient_email) = lower(?))`).bind(user.id, user.email).first<{ n: number }>(),
+    c.env.DB.prepare(
+      `SELECT m.id, m.title, m.status, m.client_stage, m.responsibility_state, m.next_action_type, m.next_action_label, m.next_action_due_at, m.due_date, m.blocked_reason_client_safe, m.last_client_update_at, u.full_name AS owner_name
+       FROM matters m
+       LEFT JOIN users u ON u.id = m.assigned_staff_user_id
+       WHERE ${matterWhere} AND m.status != 'closed'
+       ORDER BY CASE m.responsibility_state WHEN 'client' THEN 0 WHEN 'third_party' THEN 1 ELSE 2 END, m.created_at DESC
+       LIMIT 8`,
+    ).bind(...p2()).all(),
   ])
 
   return c.json({
@@ -77,6 +95,7 @@ portalRoutes.get('/dashboard', async (c) => {
     enabled_services: services.results ?? [],
     properties: properties.results ?? [],
     active_cases: activeCases.results ?? [],
+    active_matters: activeMatters.results ?? [],
   })
 })
 
@@ -129,9 +148,10 @@ portalRoutes.get('/matters', async (c) => {
   const user = c.get('user')
   const { where, params } = await scopeFilter(c.env, user)
   const res = await c.env.DB.prepare(
-    `SELECT m.*, p.address AS property_address, p.name AS property_name
+    `SELECT m.*, p.address AS property_address, p.name AS property_name, u.full_name AS owner_name
      FROM matters m
      LEFT JOIN properties p ON p.id = m.property_id
+     LEFT JOIN users u ON u.id = m.assigned_staff_user_id
      WHERE ${where.replace(/client_user_id/g, 'm.client_user_id')}
      ORDER BY m.created_at DESC LIMIT 200`,
   ).bind(...params).all()
@@ -141,7 +161,7 @@ portalRoutes.get('/matters', async (c) => {
 portalRoutes.get('/matters/:id', async (c) => {
   const user = c.get('user')
   const matter = await loadScopedRow<any>(c.env, user, 'matters', c.req.param('id'))
-  const [property, tasks, documents, updates, parties, tickets] = await Promise.all([
+  const [property, tasks, documents, updates, parties, tickets, milestones, owner, documentRequests] = await Promise.all([
     matter.property_id
       ? c.env.DB.prepare('SELECT id, name, address, city, state, postal_code, property_type, occupancy, status FROM properties WHERE id = ? AND client_user_id = ?')
         .bind(matter.property_id, matter.client_user_id).first()
@@ -165,15 +185,45 @@ portalRoutes.get('/matters/:id', async (c) => {
        WHERE client_user_id = ? AND (property_id = ? OR subject LIKE ?)
        ORDER BY created_at DESC LIMIT 20`,
     ).bind(matter.client_user_id, matter.property_id || '__none__', `%${String(matter.title || '').slice(0, 40)}%`).all(),
+    c.env.DB.prepare(
+      'SELECT id, name, sequence, status, started_at, completed_at, target_at, responsible_party FROM matter_milestones WHERE matter_id = ? AND client_visible = 1 ORDER BY sequence, created_at',
+    ).bind(matter.id).all(),
+    matter.assigned_staff_user_id
+      ? c.env.DB.prepare('SELECT full_name, email FROM users WHERE id = ?').bind(matter.assigned_staff_user_id).first<{ full_name: string | null; email: string }>()
+      : Promise.resolve(null),
+    c.env.DB.prepare(
+      'SELECT id, title, status, signature_required, created_at FROM document_requests WHERE client_user_id = ? AND matter_id = ? ORDER BY created_at DESC',
+    ).bind(matter.client_user_id, matter.id).all(),
   ])
+  const storedMilestones = milestones.results ?? []
+  const presentedMilestones = storedMilestones.length
+    ? storedMilestones
+    : defaultMilestonesForType(matter.type).map((item, index, list) => ({
+      id: `derived-${item.sequence}`,
+      name: item.name,
+      sequence: item.sequence,
+      status: inferMilestoneStatus(matter.status, index, list.length),
+      started_at: null,
+      completed_at: null,
+      target_at: null,
+      responsible_party: null,
+      derived: true,
+    }))
   return c.json({
-    matter,
+    matter: {
+      ...matter,
+      owner_name: owner?.full_name || owner?.email || null,
+      client_stage: resolveClientStage(matter.client_stage, matter.status),
+      responsibility_state: resolveResponsibility(matter.responsibility_state, matter.status),
+    },
     property,
     tasks: tasks.results ?? [],
     documents: documents.results ?? [],
     updates: updates.results ?? [],
     parties: parties.results ?? [],
     tickets: tickets.results ?? [],
+    milestones: presentedMilestones,
+    document_requests: documentRequests.results ?? [],
   })
 })
 
@@ -190,6 +240,7 @@ portalRoutes.post('/matters/:id/updates', async (c) => {
     c.env.DB.prepare(
       'INSERT INTO matter_updates (id, matter_id, client_user_id, author_user_id, body) VALUES (?, ?, ?, ?, ?)',
     ).bind(id, matter.id, matter.client_user_id, user.id, text.slice(0, 4000)),
+    c.env.DB.prepare("UPDATE matters SET last_client_update_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").bind(matter.id),
     activityInsert(c.env, { actorUserId: user.id, clientUserId: matter.client_user_id, kind: 'matter_update', detail: { title: matter.title } }),
   ])
   return c.json({ ok: true, id }, 201)
@@ -197,7 +248,7 @@ portalRoutes.post('/matters/:id/updates', async (c) => {
 
 portalRoutes.post('/matters', async (c) => {
   const user = c.get('user')
-  const body = await c.req.json<{ title: string; type?: string; due_date?: string; summary?: string; property_id?: string; client_user_id?: string; assigned_staff_user_id?: string }>().catch(() => null)
+  const body = await c.req.json<{ title: string; type?: string; due_date?: string; summary?: string; property_id?: string; client_user_id?: string; assigned_staff_user_id?: string; next_action_label?: string }>().catch(() => null)
   if (!body?.title) return c.json({ error: 'title is required' }, 400)
   const clientId = await resolveClientId(c.env, user, body.client_user_id)
   const assigneeId = await resolveAssignee(c.env, user, body.assigned_staff_user_id)
@@ -209,10 +260,17 @@ portalRoutes.post('/matters', async (c) => {
   const id = uuid()
   const title = body.title.trim().slice(0, 300)
   const summary = trimPropertyField(body.summary, 2000)
+  const type = body.type ?? null
+  const milestoneInserts = defaultMilestonesForType(type).map((item, index) =>
+    c.env.DB.prepare(
+      'INSERT INTO matter_milestones (id, matter_id, name, sequence, status, client_visible) VALUES (?, ?, ?, ?, ?, 1)',
+    ).bind(uuid(), id, item.name, item.sequence, inferMilestoneStatus('open', index, defaultMilestonesForType(type).length)),
+  )
   await c.env.DB.batch([
     c.env.DB.prepare(
-      `INSERT INTO matters (id, client_user_id, title, type, due_date, summary, property_id, status, assigned_staff_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
-    ).bind(id, clientId, title, body.type ?? null, body.due_date ?? null, summary, propertyId, assigneeId),
+      `INSERT INTO matters (id, client_user_id, title, type, due_date, summary, property_id, status, assigned_staff_user_id, client_stage, responsibility_state, next_action_label, last_client_update_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, 'received', 'pinnacle', ?, datetime('now'))`,
+    ).bind(id, clientId, title, type, body.due_date ?? null, summary, propertyId, assigneeId, trimPropertyField(body.next_action_label, 200)),
+    ...milestoneInserts,
     activityInsert(c.env, { actorUserId: user.id, clientUserId: clientId, kind: 'matter_created', detail: { title } }),
   ])
   return c.json({ ok: true, id }, 201)
@@ -222,16 +280,64 @@ portalRoutes.patch('/matters/:id', async (c) => {
   const user = c.get('user')
   if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
   const row = await loadScopedRow<any>(c.env, user, 'matters', c.req.param('id'))
-  const body = await c.req.json<{ status?: string; assigned_staff_user_id?: string | null; summary?: string; property_id?: string | null }>().catch(() => ({}) as { status?: string; assigned_staff_user_id?: string | null; summary?: string; property_id?: string | null })
-  const status = isMatterStatus(body.status ?? '') ? body.status : undefined
+  type MatterPatch = {
+    status?: string
+    assigned_staff_user_id?: string | null
+    summary?: string
+    property_id?: string | null
+    client_stage?: string
+    responsibility_state?: string
+    next_action_type?: string | null
+    next_action_label?: string | null
+    next_action_due_at?: string | null
+    target_date?: string | null
+    blocked_reason_client_safe?: string | null
+    completion_summary?: string | null
+  }
+  const body = await c.req.json<MatterPatch>().catch(() => ({} as MatterPatch))
+  const status = isMatterStatus(String(body.status || '')) ? String(body.status) : undefined
+  const responsibility = isResponsibilityState(String(body.responsibility_state || '')) ? String(body.responsibility_state) : undefined
+  const nextStatus = status || row.status
+  const nextResponsibility = responsibility || resolveResponsibility(row.responsibility_state, nextStatus)
+  const blockedReason = body.blocked_reason_client_safe !== undefined
+    ? trimPropertyField(String(body.blocked_reason_client_safe || ''), 500)
+    : row.blocked_reason_client_safe
+  if ((nextStatus === 'blocked' || nextResponsibility === 'third_party') && !String(blockedReason || '').trim()) {
+    return c.json({ error: 'Add a client-safe explanation before marking this waiting on a third party.' }, 400)
+  }
   if (status) {
-    await c.env.DB.prepare("UPDATE matters SET status = ?, updated_at = datetime('now') WHERE id = ?").bind(status, row.id).run()
+    const stage = nextStatus === 'closed' ? 'complete' : nextStatus === 'blocked' ? 'waiting' : isClientStage(String(body.client_stage || '')) ? String(body.client_stage) : resolveClientStage(row.client_stage, nextStatus)
+    const resolvedResponsibility = nextStatus === 'closed' ? 'none' : nextStatus === 'blocked' ? 'third_party' : nextResponsibility
+    await c.env.DB.prepare(
+      "UPDATE matters SET status = ?, client_stage = ?, responsibility_state = ?, blocked_reason_client_safe = ?, updated_at = datetime('now') WHERE id = ?",
+    ).bind(status, stage, resolvedResponsibility, nextStatus === 'blocked' || resolvedResponsibility === 'third_party' ? blockedReason : null, row.id).run()
     if (status !== row.status) {
       await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'matter_status_changed', detail: { title: row.title, from: row.status, to: status } })
     }
+  } else if (responsibility || body.client_stage !== undefined || body.blocked_reason_client_safe !== undefined) {
+    const stage = isClientStage(String(body.client_stage || '')) ? String(body.client_stage) : row.client_stage
+    await c.env.DB.prepare(
+      "UPDATE matters SET client_stage = ?, responsibility_state = ?, blocked_reason_client_safe = ?, updated_at = datetime('now') WHERE id = ?",
+    ).bind(stage ?? resolveClientStage(null, row.status), nextResponsibility, nextResponsibility === 'third_party' ? blockedReason : row.blocked_reason_client_safe, row.id).run()
   }
   if (body.summary !== undefined) {
     await c.env.DB.prepare("UPDATE matters SET summary = ?, updated_at = datetime('now') WHERE id = ?").bind(trimPropertyField(body.summary, 2000), row.id).run()
+  }
+  if (body.next_action_label !== undefined || body.next_action_type !== undefined || body.next_action_due_at !== undefined) {
+    await c.env.DB.prepare(
+      "UPDATE matters SET next_action_label = ?, next_action_type = ?, next_action_due_at = ?, updated_at = datetime('now') WHERE id = ?",
+    ).bind(
+      body.next_action_label !== undefined ? trimPropertyField(String(body.next_action_label || ''), 200) : row.next_action_label,
+      body.next_action_type !== undefined ? trimPropertyField(String(body.next_action_type || ''), 40) : row.next_action_type,
+      body.next_action_due_at !== undefined ? (body.next_action_due_at || null) : row.next_action_due_at,
+      row.id,
+    ).run()
+  }
+  if (body.target_date !== undefined) {
+    await c.env.DB.prepare("UPDATE matters SET target_date = ?, updated_at = datetime('now') WHERE id = ?").bind(body.target_date || null, row.id).run()
+  }
+  if (body.completion_summary !== undefined) {
+    await c.env.DB.prepare("UPDATE matters SET completion_summary = ?, updated_at = datetime('now') WHERE id = ?").bind(trimPropertyField(String(body.completion_summary || ''), 2000), row.id).run()
   }
   if (body.property_id !== undefined) {
     let propertyId: string | null = null
@@ -247,6 +353,31 @@ portalRoutes.patch('/matters/:id', async (c) => {
     if (assigneeId !== row.assigned_staff_user_id) {
       await logActivity(c.env, { actorUserId: user.id, clientUserId: row.client_user_id, kind: 'matter_assigned', detail: { title: row.title, assigned_staff_user_id: assigneeId } })
     }
+  }
+  return c.json({ ok: true })
+})
+
+portalRoutes.patch('/matters/:id/milestones/:milestoneId', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'client') return c.json({ error: 'forbidden' }, 403)
+  const matter = await loadScopedRow<any>(c.env, user, 'matters', c.req.param('id'))
+  const milestoneId = c.req.param('milestoneId')
+  const row = await c.env.DB.prepare('SELECT id FROM matter_milestones WHERE id = ? AND matter_id = ?').bind(milestoneId, matter.id).first()
+  if (!row) return c.json({ error: 'Milestone not found.' }, 404)
+  const body = await c.req.json<{ status?: string; name?: string; target_at?: string | null }>().catch(() => ({} as { status?: string; name?: string; target_at?: string | null }))
+  if (body.status && !isMilestoneStatus(body.status)) return c.json({ error: 'Invalid milestone status.' }, 400)
+  if (body.status) {
+    const completed = body.status === 'completed' ? new Date().toISOString() : null
+    const started = body.status === 'current' || body.status === 'completed' ? new Date().toISOString() : null
+    await c.env.DB.prepare(
+      "UPDATE matter_milestones SET status = ?, completed_at = COALESCE(?, completed_at), started_at = COALESCE(?, started_at) WHERE id = ?",
+    ).bind(body.status, completed, started, milestoneId).run()
+  }
+  if (body.name !== undefined) {
+    await c.env.DB.prepare('UPDATE matter_milestones SET name = ? WHERE id = ?').bind(trimPropertyField(body.name, 120), milestoneId).run()
+  }
+  if (body.target_at !== undefined) {
+    await c.env.DB.prepare('UPDATE matter_milestones SET target_at = ? WHERE id = ?').bind(body.target_at || null, milestoneId).run()
   }
   return c.json({ ok: true })
 })

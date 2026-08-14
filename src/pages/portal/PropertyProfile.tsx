@@ -143,10 +143,10 @@ export default function PropertyProfile() {
         <aside className="space-y-3">
           <Card className="!p-0">
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><Wrench size={13} /> Projects</p>
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><Wrench size={13} /> Work</p>
               <Link to={`${p('matters')}?property=${property.id}`} className="text-xs font-semibold text-gold hover:underline">New</Link>
             </div>
-            {matters.length === 0 ? <div className="p-3"><EmptyState label="No projects on this address yet." /></div> : (
+            {matters.length === 0 ? <div className="p-3"><EmptyState label="No work on this address yet." /></div> : (
               <ul className="divide-y divide-white/10">
                 {matters.map((m) => (
                   <li key={m.id}><Link to={p(`matters/${m.id}`)} className="block px-3 py-2 hover:bg-white/[.03]"><p className="text-sm font-medium text-white">{m.title}</p><p className="mt-0.5 text-xs text-slate-500">{matterStatusLabel(m.status)}</p></Link></li>

@@ -5,7 +5,7 @@ import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { Card, EmptyState, PageHeader, StatusBadge } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
-import { MATTER_TYPES, matterStatusLabel, matterTypeLabel } from '../../../shared/matterWorkspace'
+import { MATTER_TYPES, matterTypeLabel, responsibilityBanner, responsibilityRank } from '../../../shared/matterWorkspace'
 import { propertyDisplayName } from '../../../shared/propertyProfile'
 
 interface MatterRow {
@@ -19,6 +19,12 @@ interface MatterRow {
   property_address: string | null
   property_name: string | null
   created_at: string
+  owner_name?: string | null
+  client_stage?: string | null
+  responsibility_state?: string | null
+  next_action_label?: string | null
+  next_action_due_at?: string | null
+  blocked_reason_client_safe?: string | null
 }
 
 interface PropertyOpt { id: string; name: string | null; address: string }
@@ -49,7 +55,14 @@ export default function Matters() {
   }, [])
   useEffect(() => { void load() }, [load])
 
-  const open = useMemo(() => items.filter((row) => row.status !== 'closed'), [items])
+  const open = useMemo(
+    () => items.filter((row) => row.status !== 'closed').sort((a, b) => {
+      const rank = responsibilityRank(a.responsibility_state, a.status) - responsibilityRank(b.responsibility_state, b.status)
+      if (rank !== 0) return rank
+      return String(a.next_action_due_at || a.due_date || '').localeCompare(String(b.next_action_due_at || b.due_date || ''))
+    }),
+    [items],
+  )
   const closed = useMemo(() => items.filter((row) => row.status === 'closed'), [items])
 
   async function onCreate(e: React.FormEvent) {
@@ -72,11 +85,12 @@ export default function Matters() {
     } finally { setBusy(false) }
   }
 
-  function tone(status: string) {
-    if (status === 'closed') return 'green' as const
-    if (status === 'blocked') return 'red' as const
-    if (status === 'in_progress') return 'blue' as const
-    return 'gold' as const
+  function tone(status: string, responsibility?: string | null) {
+    const banner = responsibilityBanner(responsibility, status)
+    if (banner.state === 'none') return 'green' as const
+    if (banner.state === 'client') return 'gold' as const
+    if (banner.state === 'third_party') return 'red' as const
+    return 'blue' as const
   }
 
   function list(rows: MatterRow[]) {
@@ -88,12 +102,13 @@ export default function Matters() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate font-semibold text-white">{row.title}</p>
-                  <StatusBadge tone={tone(row.status)}>{matterStatusLabel(row.status)}</StatusBadge>
+                  <StatusBadge tone={tone(row.status, row.responsibility_state)}>{responsibilityBanner(row.responsibility_state, row.status).label}</StatusBadge>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {matterTypeLabel(row.type)}
+                  {row.owner_name ? ` · ${row.owner_name}` : ''}
                   {row.property_address || row.property_name ? ` · ${propertyDisplayName({ name: row.property_name, address: row.property_address })}` : ''}
-                  {row.due_date ? ` · due ${new Date(`${row.due_date}T12:00:00`).toLocaleDateString()}` : ''}
+                  {row.next_action_label ? ` · ${row.next_action_label}` : row.due_date ? ` · due ${new Date(`${row.due_date}T12:00:00`).toLocaleDateString()}` : ''}
                 </p>
                 {row.summary && <p className="mt-2 line-clamp-2 text-sm text-slate-400">{row.summary}</p>}
               </div>
@@ -109,9 +124,9 @@ export default function Matters() {
     <div>
       <PageHeader
         eyebrow="Active work"
-        title="Projects"
-        subtitle="People, the related address, updates, and files."
-        action={<button className="btn-gold" onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancel' : '+ Open project'}</button>}
+        title="Work"
+        subtitle="Each item has a page: who owns it, what happens next, and whether anything is needed from you."
+        action={<button className="btn-gold" onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancel' : '+ Open work'}</button>}
       />
 
       {showForm && (
@@ -123,15 +138,15 @@ export default function Matters() {
             <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Due</span><input className={inputCls} type="date" value={form.due_date} onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))} /></label>
             <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">What needs to happen</span><textarea className={`${inputCls} min-h-[80px]`} value={form.summary} onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))} /></label>
             <div className="flex items-center gap-3 sm:col-span-2">
-              <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">{busy ? 'Opening…' : 'Open project'}</button>
+              <button type="submit" disabled={busy} className="btn-gold disabled:opacity-60">{busy ? 'Opening…' : 'Open work'}</button>
               {error && <span className="text-sm text-rose-300">{error}</span>}
             </div>
           </form>
         </Card>
       )}
 
-      {loading ? <Card><p className="text-sm text-slate-400">Loading projects…</p></Card> : items.length === 0 ? (
-        <Card><EmptyState label="No projects yet. Open one when Pinnacle should track a piece of work." /></Card>
+      {loading ? <Card><p className="text-sm text-slate-400">Loading work…</p></Card> : items.length === 0 ? (
+        <Card><EmptyState label="No work yet. Open an item when Pinnacle should track it." /></Card>
       ) : (
         <div className="space-y-5">
           {open.length > 0 && <section>{list(open)}</section>}
