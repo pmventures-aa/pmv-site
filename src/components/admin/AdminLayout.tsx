@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Menu, X, Search, RotateCw, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react'
 import { Logo } from '../ui'
 import { useAppPath } from '../../lib/basePath'
-import type { NavItem } from '../layout/nav'
+import { vendorMobilePrimary, type NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
 import { NotificationFeedPanel } from '../kit/NotificationFeedPanel'
 import { ImpersonationBanner } from '../kit/ImpersonationBanner'
@@ -19,7 +19,7 @@ import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 // `badge` prop kept for callers that still pass it but no longer rendered
 // anywhere in the layout - it was showing as "STAFF CONSOLE" chrome the
 // user asked to remove.
-export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: string }) {
+export function AdminLayout({ nav, badge: _badge, variant = 'staff' }: { nav: NavItem[]; badge?: string; variant?: 'staff' | 'vendor' }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -38,10 +38,14 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   })
   const p = useAppPath()
   const location = useLocation()
+  const isVendorShell = variant === 'vendor'
   const canOpenSettings = nav.some((item) => item.key === 'settings')
   const { count: emailUnread } = useEmailUnreadCount()
-  const hideHqNav = /(^|\/)(messages|communications)(\/|$)/.test(location.pathname)
+  // Vendors keep header + bottom tabs on Messages; staff still get the
+  // full-screen communications workspace without HQ chrome.
+  const hideHqNav = !isVendorShell && /(^|\/)(messages|communications)(\/|$)/.test(location.pathname)
   const mailWorkspace = /(^|\/)messages(\/|$)/.test(location.pathname)
+  const vendorTabs = nav.filter((item) => (vendorMobilePrimary as readonly string[]).includes(item.key))
 
   function toggleSidebar() {
     setSidebarOpen((open) => {
@@ -139,7 +143,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             <NotificationBell />
             <NotificationFeedPanel surface="admin" />
             {hideHqNav && <WhoMenu placement="down" compact canOpenSettings={canOpenSettings} />}
-            {!hideHqNav && <button onClick={() => setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-white/[.04] text-white transition hover:bg-white/[.08]" aria-label="Open navigation"><Menu size={20} /></button>}
+            {!hideHqNav && !isVendorShell && <button onClick={() => setMobileOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg border border-white/15 bg-white/[.04] text-white transition hover:bg-white/[.08]" aria-label="Open navigation"><Menu size={20} /></button>}
           </div>
         </div>
         <AnimatePresence initial={false}>{mobileSearchOpen && <motion.div initial={{opacity:0,y:-5}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-5}} transition={pmvMotion.ui} className="border-t border-white/10 px-4 py-3"><GlobalSearch /></motion.div>}</AnimatePresence>
@@ -179,9 +183,36 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
           </div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={mailWorkspace ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-0' : hideHqNav ? 'flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4' : 'flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4'}><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={mailWorkspace ? `flex min-h-0 flex-1 flex-col overflow-hidden p-0 ${isVendorShell ? 'pb-[4.75rem] lg:pb-0' : ''}` : hideHqNav ? 'flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4' : `flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4 ${isVendorShell ? 'pb-24 lg:pb-4' : ''}`}><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
+
+      {isVendorShell && (
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-navy-950/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl lg:hidden print:hidden" aria-label="Primary vendor destinations">
+          <div className="grid grid-cols-3 gap-1">
+            {vendorTabs.map((item) => (
+              <NavLink
+                key={item.key}
+                to={p(item.to)}
+                end={item.to === 'field-work/mine' ? false : item.to === ''}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) => {
+                  const assignmentActive = item.key === 'assignments' && /(^|\/)field-work(\/|$)/.test(location.pathname)
+                  const active = item.key === 'assignments' ? assignmentActive : isActive
+                  return `flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold ${active ? 'text-gold' : 'text-slate-500'}`
+                }}
+              >
+                <item.icon size={18} strokeWidth={1.8} />
+                <span className="truncate">{item.key === 'assignments' ? 'Assignments' : item.key === 'messages' ? 'Messages' : item.label}</span>
+              </NavLink>
+            ))}
+            <button type="button" onClick={() => setMobileOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold text-slate-500">
+              <Menu size={18} strokeWidth={1.8} />
+              More
+            </button>
+          </div>
+        </nav>
+      )}
     </div>
   )
 }

@@ -69,6 +69,8 @@ export const adminNav: NavItem[] = [
   {key:'settings',label:'Settings',to:'settings',icon:Settings,section:'Administration'},
 ]
 
+export const vendorMobilePrimary = ['assignments', 'messages'] as const
+
 export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
   const assignmentLabel = world === 'property'
     ? 'Field assignments'

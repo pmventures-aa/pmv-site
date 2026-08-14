@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Car,
   MapPin,
@@ -119,17 +119,18 @@ async function getPosition(): Promise<GeolocationPosition | null> {
 export function FieldWorkList() {
   const p = useAppPath()
   const { user, workspace } = useAuth()
+  const isVendor = workspace.party_type === 'vendor'
   const copy = hqWorkspaceCopy(workspace.party_type, workspace.vendor_category, workspace.role_name)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'active' | 'completed'>('active')
 
   useEffect(() => {
-    api.get<{ assignments: Assignment[] }>('/admin/field-assignments')
+    api.get<{ assignments: Assignment[] }>(`/admin/field-assignments${isVendor ? '?mine=1' : ''}`)
       .then((res) => setAssignments(res.assignments))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [isVendor])
 
   const mine = useMemo(() => assignments.filter((a) => a.vendor_user_id === user?.id), [assignments, user?.id])
   const list = useMemo(() => mine.filter((a) => (tab === 'active' ? a.status !== 'completed' && a.status !== 'cancelled' : a.status === 'completed')), [mine, tab])
@@ -171,12 +172,10 @@ export function FieldWorkList() {
           {list.map((assignment) => {
             const tone = statusTone(assignment.status)
             return (
-              <button
+              <Link
                 key={assignment.id}
-                type="button"
-                onClick={() => p(`field-work/${assignment.id}`)}
-                onMouseUp={(e) => { e.preventDefault(); window.location.href = p(`field-work/${assignment.id}`) }}
-                className="w-full rounded-md border border-white/10 bg-white/[.02] p-4 text-left transition hover:border-gold/40 hover:bg-white/[.04]"
+                to={p(`field-work/${assignment.id}`)}
+                className="block w-full rounded-md border border-white/10 bg-white/[.02] p-4 text-left transition hover:border-gold/40 hover:bg-white/[.04]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -197,7 +196,7 @@ export function FieldWorkList() {
                     ) : null}
                   </div>
                 </div>
-              </button>
+              </Link>
             )
           })}
         </div>
@@ -211,10 +210,11 @@ export function FieldWorkList() {
 // -------------------------------------------------------------
 
 export default function FieldWorkDetail() {
-  const { user } = useAuth()
+  const { user, workspace } = useAuth()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const p = useAppPath()
+  const listPath = workspace.party_type === 'vendor' ? 'field-work/mine' : 'field-work'
   const [assignment, setAssignment] = useState<Assignment | null>(null)
   const [documents, setDocuments] = useState<DocumentRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -444,11 +444,11 @@ export default function FieldWorkDetail() {
   const done = assignment.status === 'completed'
 
   return (
-    <div>
+    <div className="vendor-assignment-detail">
       <button
         type="button"
-        onClick={() => navigate(p('field-work'))}
-        className="mb-3 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-white"
+        onClick={() => navigate(p(listPath))}
+        className="mb-3 inline-flex min-h-11 items-center gap-1 text-xs text-slate-400 hover:text-white"
       >
         <ChevronLeft size={14} /> Back to my assignments
       </button>
@@ -465,7 +465,7 @@ export default function FieldWorkDetail() {
           {!isRon && (
             <Panel>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">1. Travel</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 vendor-assignment-actions">
                 <button
                   type="button"
                   onClick={markDeparted}
@@ -634,7 +634,7 @@ export default function FieldWorkDetail() {
                   type="button"
                   onClick={complete}
                   disabled={busy === 'complete'}
-                  className={`${btnPrimary} w-full !py-3 disabled:opacity-60`}
+                  className={`${btnPrimary} vendor-assignment-actions w-full min-h-12 !py-3 disabled:opacity-60`}
                 >
                   {busy === 'complete' ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
                   Sign &amp; mark assignment completed

@@ -167,6 +167,13 @@ body { -webkit-text-size-adjust: 100%; }
   }
   .pmv-tab-strip::-webkit-scrollbar { display: none; }
   .pmv-tab-strip > * { flex: 0 0 auto; }
+
+  /* Vendor field-work: keep depart/arrive/sign reachable above the bottom tab bar */
+  .vendor-assignment-actions {
+    position: sticky;
+    bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    z-index: 20;
+  }
 }
 
 @media (max-width: 420px) {
