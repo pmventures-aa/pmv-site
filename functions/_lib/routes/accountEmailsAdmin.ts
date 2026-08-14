@@ -21,8 +21,8 @@ function firstName(row: { first_name?: string | null; full_name?: string | null 
 }
 
 function setupUrl(role: string, token: string): string {
-  const origin = role === 'client' ? portalUrl() : hqUrl()
-  return `${origin}/set-password?token=${encodeURIComponent(token)}`
+  const path = `/set-password?token=${encodeURIComponent(token)}`
+  return role === 'client' ? portalUrl(path) : hqUrl(path)
 }
 
 async function canManageUsers(c: any): Promise<boolean> {
