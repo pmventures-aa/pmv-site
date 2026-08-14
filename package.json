@@ -14,6 +14,8 @@
     "db:migrate": "npx wrangler d1 migrations apply pmv --remote"
   },
   "dependencies": {
+    "@auth0/auth0-auth-js": "^1.12.1",
+    "@auth0/auth0-server-js": "^1.12.1",
     "@radix-ui/react-alert-dialog": "^1.1.23",
     "@radix-ui/react-dialog": "^1.1.23",
     "hono": "^4.13.1",

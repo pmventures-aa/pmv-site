@@ -198,6 +198,18 @@ selfRoutes.post('/change-password', requireClient, async (c) => {
   return c.json({ ok: true })
 })
 
+selfRoutes.post('/set-initial-password', requireClient, async (c) => {
+  const user = c.get('user')
+  const { new_password } = await c.req.json<{ new_password?: string }>().catch(() => ({ new_password: '' }))
+  const password = String(new_password || '')
+  if (password.length < MIN_PASSWORD) return c.json({ error: `password must be at least ${MIN_PASSWORD} characters` }, 400)
+  const row = await c.env.DB.prepare('SELECT password_hash FROM users WHERE id = ?').bind(user.id).first<{ password_hash: string | null }>()
+  if (row?.password_hash) return c.json({ error: 'a password is already set on this account' }, 409)
+  const hash = await hashPassword(password, c.env.SESSION_SECRET)
+  await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, user.id).run()
+  return c.json({ ok: true })
+})
+
 // ---------- my team: staff assigned to this client ----------
 selfRoutes.get('/team', requireClient, async (c) => {
   const user = c.get('user')

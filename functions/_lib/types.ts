@@ -4,6 +4,15 @@ export interface Env {
   // Optional: profile picture and private document storage.
   UPLOADS?: R2Bucket
   SESSION_SECRET: string
+  AUTH0_DOMAIN?: string
+  AUTH0_CLIENT_ID?: string
+  AUTH0_CLIENT_SECRET?: string
+  AUTH0_AUDIENCE?: string
+  AUTH0_CALLBACK_URL?: string
+  AUTH0_LOGOUT_URL?: string
+  AUTH0_CONNECTIONS?: string
+  AUTH0_ENABLED?: string
+  AUTH0_DISABLED?: string
   // Shared secret used only by trusted scheduled automation callers.
   AUTOMATION_CRON_SECRET1?: string
   // Encrypts ACH routing/account numbers at rest.

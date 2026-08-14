@@ -22,6 +22,9 @@ const SECURITY_KINDS = new Set<string>([
   'login_failed',
   'password_changed',
   'password_reset',
+  'identity_linked',
+  'identity_unlinked',
+  'identity_link_failed',
   'permission_changed',
   'staff_profile_updated',
   'user_status_changed',
@@ -159,6 +162,9 @@ export function describeActivity(e: ActivityEvent): string {
     case 'login_failed': return `Failed sign-in attempt for ${d.email || 'a user'}${d.ip ? ` from ${d.ip}` : ''}`
     case 'password_changed': return `${actor} changed their password`
     case 'password_reset': return `${actor} reset the password for ${d.email || 'a user'}`
+    case 'identity_linked': return `${actor} connected a sign-in method`
+    case 'identity_unlinked': return `${actor} removed a sign-in method`
+    case 'identity_link_failed': return 'A sign-in method could not be connected'
     case 'permission_changed': return `${actor} changed permissions${d.target_name ? ` for ${d.target_name}` : ''}`
     case 'field_assignment_created': return `${actor} created a field assignment for ${client}${d.kind_value === 'ron' ? ' (RON)' : ''}`
     case 'field_assignment_completed': return `${actor} completed a field assignment for ${client}${typeof d.documents === 'number' ? `: ${d.documents} document${d.documents === 1 ? '' : 's'}` : ''}`

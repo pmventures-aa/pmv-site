@@ -33,7 +33,15 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 
 | Name | Required | Scope | Purpose |
 |---|---|---|---|
-| `SESSION_SECRET` | **Yes** | Secret | Session cookie signing + password-hashing pepper (`functions/_lib/crypto.ts`). Must be set in every environment, not just prod — auth won't work without it. |
+| `SESSION_SECRET` | **Yes** | Secret | Session cookie signing + password-hashing pepper (`functions/_lib/crypto.ts`). Must be set in every environment, not just prod — auth won't work without it. Also encrypts the short-lived Auth0 login transaction cookie. |
+| `AUTH0_DOMAIN` | No | Secret/Var | Auth0 tenant domain for client-portal Google/Microsoft sign-in. Required together with `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and `AUTH0_CALLBACK_URL` to enable the buttons. |
+| `AUTH0_CLIENT_ID` | No | Var | Auth0 Regular Web Application client ID. Safe to store as a Pages var; still server-only. |
+| `AUTH0_CLIENT_SECRET` | No | Secret | Auth0 confidential-client secret. Never expose through frontend/`VITE_` variables. |
+| `AUTH0_CALLBACK_URL` | No | Var | Exact callback URL. Production: `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback`. Local: `http://localhost:8788/api/auth/auth0/callback`. |
+| `AUTH0_LOGOUT_URL` | No | Var | Optional federated logout return. Production: `https://www.pinnaclemanagementventures.com/portal/login`. Local logout always clears the Pinnacle session first. |
+| `AUTH0_CONNECTIONS` | No | Var | Comma-separated Auth0 connections to offer. Defaults to `google-oauth2,windowslive`. |
+| `AUTH0_AUDIENCE` | No | Var | Unused for portal identity login. Reserved if an Auth0 API audience is added later. |
+| `AUTH0_DISABLED` | No | Var | Set `true` to hide Auth0 buttons even when other Auth0 values are present (useful in tests). |
 | `PAYMENT_ENCRYPTION_KEY` | **Yes** | Secret | Encrypts ACH routing/account numbers at rest (`functions/_lib/crypto.ts`). Use a long random value, separate from `SESSION_SECRET`. The banking-info step of a service application 500s without it. |
 | `RESEND_API_KEY` | No | Secret | Enables real email delivery via Resend for notifications, Communications, account welcomes/invitations, vendor notices, and access reminders. Unset ordinary notification email no-ops; tracked account-email attempts are recorded as `skipped` in HQ instead of breaking account creation. |
 | `RESEND_FROM_EMAIL` | No | Var (`wrangler.toml` `[vars]`) | Verified sender identity. The code defaults to `Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>` if this is not set. |
@@ -45,6 +53,24 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 **Deployed (CLI):** `npx wrangler pages secret put <NAME>` for each secret.
 
 **Deployed (dashboard):** Pages project → Settings → Functions → add each secret, plus the `RESEND_FROM_EMAIL` var if overriding the built-in sender.
+
+## Auth0 client-portal sign-in
+
+Auth0 authenticates identity only. Pinnacle sessions, roles, trusted-contact grants, and every resource query stay authoritative.
+
+Create a **Regular Web Application** (confidential backend, Authorization Code Flow). Allowed URLs:
+
+| Setting | Production | Local (`wrangler pages dev`) |
+|---|---|---|
+| Application type | Regular Web Application | same |
+| Allowed Callback URLs | `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback` and `https://secure.pinnaclemanagementventures.com/api/auth/auth0/callback` | `http://localhost:8788/api/auth/auth0/callback` |
+| Allowed Logout URLs | `https://www.pinnaclemanagementventures.com/portal/login` and `https://secure.pinnaclemanagementventures.com/login` | `http://localhost:8788/portal/login` |
+| Allowed Web Origins | `https://www.pinnaclemanagementventures.com` and `https://secure.pinnaclemanagementventures.com` | `http://localhost:8788`, `http://localhost:5173` |
+| Connections | Google (`google-oauth2`) and Microsoft (`windowslive`) | same |
+
+Do not use wildcard production callback URLs. Enable only the connections listed in `AUTH0_CONNECTIONS`. Incomplete Auth0 env vars keep the buttons hidden instead of showing a broken control.
+
+Auth0 Organizations are not used. Pinnacle already stores businesses and relationships internally. A later integration can attach Organizations only to genuine multi-user business clients without mapping Auth0 org roles onto Pinnacle permissions.
 
 ## One-time setup (Cloudflare dashboard + CLI)
 1. `npx wrangler login`

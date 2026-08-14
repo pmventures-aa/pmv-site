@@ -25,6 +25,9 @@ import { toDisplayCase } from '../../../shared/displayCase'
 import { advanceInquiryLifecycle } from '../lifecycle'
 import { getInviteByToken } from '../invites'
 import { canCompleteStagedVendorSignup, type ExistingAccount } from '../vendorStaging'
+import { auth0Routes } from '../auth0/routes'
+import { readAuth0Config, resolveAuth0LogoutUrl } from '../auth0/config'
+import { getAuth0Flow } from '../auth0/flow'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -66,6 +69,7 @@ async function resetThrottled(env: AppEnv['Bindings'], email: string, ip: string
 }
 
 export const authRoutes = new Hono<AppEnv>()
+authRoutes.route('/', auth0Routes)
 
 authRoutes.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
 
@@ -511,5 +515,10 @@ authRoutes.post('/logout', async (c) => {
     actorGeo: actorGeo(c.req.raw),
     action: 'logout',
   })
-  return c.json({ ok: true })
+  const config = readAuth0Config(c.env)
+  let auth0LogoutUrl: string | undefined
+  if (config.enabled) {
+    try { auth0LogoutUrl = getAuth0Flow(config, c.env).buildLogoutUrl(resolveAuth0LogoutUrl(config, c.req.url)) } catch { /* local logout still succeeds */ }
+  }
+  return c.json({ ok: true, auth0_logout_url: auth0LogoutUrl || null })
 })

@@ -2,10 +2,17 @@ import { Eye, EyeOff, LockKeyhole } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth, isApiError } from '../../lib/auth'
+import { api } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
+import { GoogleMark, MicrosoftMark } from '../../components/auth/ProviderMarks'
 import { clientWorkspaceForWorld, hqWorkspaceCopy, rememberOperatingWorld, rememberedHqParty, rememberedWorld, worldFromServiceParam } from '../../lib/workspace'
+
+interface Auth0Providers {
+  enabled: boolean
+  connections: Array<{ id: string; label: string }>
+}
 
 export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const { login, logout } = useAuth()
@@ -19,6 +26,8 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [socialBusy, setSocialBusy] = useState<string | null>(null)
+  const [providers, setProviders] = useState<Auth0Providers>({ enabled: false, connections: [] })
 
   const clientWorld = useMemo(() => worldFromServiceParam(serviceKey) || rememberedWorld() || 'general', [serviceKey])
   const clientCopy = clientWorkspaceForWorld(clientWorld)
@@ -28,8 +37,22 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
     if (surface === 'client' && clientWorld !== 'general') rememberOperatingWorld(clientWorld)
   }, [surface, clientWorld])
 
+  useEffect(() => {
+    if (params.get('auth_error') === 'signin') {
+      setError('We could not complete that sign-in. Try again or use your email and password.')
+    }
+  }, [params])
+
+  useEffect(() => {
+    if (surface !== 'client') return
+    api.get<Auth0Providers>('/auth/auth0/providers')
+      .then((data) => setProviders(data.enabled ? data : { enabled: false, connections: [] }))
+      .catch(() => setProviders({ enabled: false, connections: [] }))
+  }, [surface])
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (busy || socialBusy) return
     primeAudio()
     setError(null)
     setBusy(true)
@@ -64,6 +87,17 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   }
 
   const forgotQuery = `?surface=${surface}${email ? `&email=${encodeURIComponent(email)}` : ''}`
+  const showProviders = surface === 'client' && providers.enabled && providers.connections.length > 0
+  const returnTo = serviceKey
+    ? `${p(`services/${encodeURIComponent(serviceKey)}/apply`)}${offeringId ? `?offering=${encodeURIComponent(offeringId)}` : ''}`
+    : p()
+
+  function startProvider(connection: string) {
+    if (busy || socialBusy) return
+    setSocialBusy(connection)
+    const qs = new URLSearchParams({ connection, surface, returnTo })
+    window.location.assign(`/api/auth/auth0/login?${qs.toString()}`)
+  }
 
   return (
     <AuthLayout
@@ -81,9 +115,36 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
       {serviceKey && surface === 'client' && (
         <p className="mb-4 text-xs leading-5 text-slate-400">After you sign in, we will return you to the service you were exploring.</p>
       )}
+
+      {showProviders && (
+        <div className="mb-6 space-y-3">
+          {providers.connections.map((connection) => (
+            <button
+              key={connection.id}
+              type="button"
+              disabled={!!socialBusy || busy}
+              onClick={() => startProvider(connection.id)}
+              className="btn-outline min-h-12 w-full text-[15px] disabled:opacity-60"
+              aria-label={`Continue with ${connection.label}`}
+            >
+              {connection.id === 'windowslive' ? <MicrosoftMark /> : <GoogleMark />}
+              {socialBusy === connection.id ? 'Continuing…' : `Continue with ${connection.label}`}
+            </button>
+          ))}
+          <div className="flex items-center gap-3 py-1">
+            <span className="h-px flex-1 bg-white/10" />
+            <span className="text-xs font-semibold uppercase tracking-[.14em] text-slate-500">or use email</span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+          <p className="text-center text-[11px] leading-5 text-slate-500">
+            By continuing with Google or Microsoft, you agree to the <a href="/terms" className="font-semibold text-gold hover:text-gold-300">Terms of Service</a> and <a href="/privacy" className="font-semibold text-gold hover:text-gold-300">Privacy Policy</a>.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={onSubmit} className="space-y-5">
         <Field label="Email Address">
-          <input className={inputCls} type="email" autoComplete="email" inputMode="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+          <input className={inputCls} type="email" autoComplete="email" inputMode="email" required autoFocus={!showProviders} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
         </Field>
         <Field label="Password" hint={<Link to={`../forgot-password${forgotQuery}`} className="font-semibold text-gold hover:text-gold-300">Forgot password?</Link>}>
           <div className="relative">
@@ -93,7 +154,7 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
             </button>
           </div>
         </Field>
-        <button type="submit" disabled={busy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
+        <button type="submit" disabled={busy || !!socialBusy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
       </form>
 
       {surface === 'client' && (
