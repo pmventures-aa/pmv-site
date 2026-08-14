@@ -147,7 +147,8 @@ conversionRoutes.post('/inquiries/:id/convert', requireStaff, async (c) => {
       }).catch((err) => console.error('[account-email] converted lead invite failed', err)),
     )
   }
-  return c.json({ ok: true, client_user_id: clientId, setup_token: setupToken, conversion_id: conversionId, linked_existing: preview.link_existing }, 201)
+  const client = await c.env.DB.prepare('SELECT public_ref FROM users WHERE id = ?').bind(clientId).first<{ public_ref: string | null }>()
+  return c.json({ ok: true, client_user_id: clientId, client_public_ref: client?.public_ref || null, setup_token: setupToken, conversion_id: conversionId, linked_existing: preview.link_existing }, 201)
 })
 
 conversionRoutes.get('/inquiries/:id/conversion', requireStaff, async (c) => {

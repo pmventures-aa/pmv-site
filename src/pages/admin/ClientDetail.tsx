@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAppPath } from '../../lib/basePath'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, StatCard } from '../../components/admin/ui'
@@ -12,7 +12,7 @@ import { useAuth } from '../../lib/auth'
 import { MILESTONE_STATUSES, RESPONSIBILITY_STATES, milestoneStatusLabel } from '../../../shared/matterWorkspace'
 
 interface Bundle {
-  account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
+  account: { id: string; public_ref: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
   profile: { business_name: string | null; entity_type: string | null; ein: string | null; state: string | null; onboarding_completed: number } | null
   assigned_staff: { id: string; full_name: string | null; email: string }[]
   recent_activity: ActivityEvent[]
@@ -207,6 +207,7 @@ function Section({
 }) {
   const { user } = useAuth()
   const [adding, setAdding] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   async function archive(id: string) {
     if (!archiveEntity) return
@@ -233,15 +234,19 @@ function Section({
   return (
     <Panel className="!p-0">
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <button type="button" onClick={() => setExpanded((value) => !value)} className="flex min-w-0 items-center gap-2 text-left">
+          <span className="text-sm font-semibold text-white">{title}</span>
+          <span className="rounded-full bg-white/[.06] px-2 py-0.5 text-[10px] tabular-nums text-slate-400">{rows.length}</span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{expanded ? 'Collapse' : 'Open'}</span>
+        </button>
         {createConfig && (
-          <button onClick={() => setAdding((a) => !a)} className="text-xs font-medium text-gold hover:underline">
+          <button onClick={() => { setExpanded(true); setAdding((a) => !a) }} className="text-xs font-medium text-gold hover:underline">
             {adding ? 'Cancel' : '+ Add'}
           </button>
         )}
       </div>
 
-      {adding && createConfig && (
+      {expanded && adding && createConfig && (
         <CreateForm
           config={createConfig}
           clientId={clientId}
@@ -253,7 +258,7 @@ function Section({
         />
       )}
 
-      {rows.length === 0 ? (
+      {expanded && (rows.length === 0 ? (
         <div className="p-5">
           <EmptyState label={emptyLabel} />
         </div>
@@ -311,7 +316,7 @@ function Section({
             </tbody>
           </table>
         </div>
-      )}
+      ))}
     </Panel>
   )
 }
@@ -986,14 +991,16 @@ type ClientTab = 'dashboard' | 'profile' | 'records'
 const TABS: { key: ClientTab; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'profile', label: 'Profile' },
-  { key: 'records', label: 'Records' },
+  { key: 'records', label: 'Operations' },
 ]
 
 export default function ClientDetail() {
   const p = useAppPath()
+  const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [tab, setTab] = useState<ClientTab>('dashboard')
   // Bumped whenever `id` changes so a slow response for a previously-viewed
@@ -1012,7 +1019,15 @@ export default function ClientDetail() {
     const thisRequest = ++requestId.current
     try {
       const res = await api.get<Bundle>(`/admin/clients/${id}`)
-      if (requestId.current === thisRequest) setData(res)
+      if (requestId.current === thisRequest) {
+        setData(res)
+        setLoadError('')
+      }
+    } catch (err) {
+      if (requestId.current === thisRequest) {
+        setData(null)
+        setLoadError(err instanceof ApiError && err.status === 404 ? 'This client workspace was not found.' : 'This client workspace could not be loaded.')
+      }
     } finally {
       if (requestId.current === thisRequest) setLoading(false)
     }
@@ -1023,6 +1038,11 @@ export default function ClientDetail() {
     setTab('dashboard')
     load()
   }, [load])
+
+  useEffect(() => {
+    const publicRef = data?.account.public_ref
+    if (publicRef && id && id !== publicRef) navigate(p(`clients/${publicRef}/manage`), { replace: true })
+  }, [data?.account.public_ref, id, navigate, p])
 
   async function setStatus(module: string, itemId: string, status: string) {
     try {
@@ -1042,9 +1062,8 @@ export default function ClientDetail() {
     }
   }
 
-  if (loading || !data) {
-    return <InlineLoading />
-  }
+  if (loading) return <InlineLoading />
+  if (!data) return <Panel><EmptyState label={loadError || 'This client workspace was not found.'} /></Panel>
 
   const clientId = data.account.id
 
@@ -1063,7 +1082,7 @@ export default function ClientDetail() {
             name={data.account.full_name}
             size={56}
             editable
-            uploadPath={`/admin/clients/${clientId}/avatar`}
+            uploadPath={`/admin/clients/${data.account.public_ref}/avatar`}
           />
         }
         action={
@@ -1103,7 +1122,13 @@ export default function ClientDetail() {
       )}
 
       {tab === 'records' && (
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div>
+        <div className="mb-5 border-y border-white/10 py-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-gold/80">Operational workspace</p>
+          <h2 className="mt-1 text-lg font-semibold text-white">Open only the record set you need</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">Create, assign, update, or archive without loading eleven expanded tables at once. Each section keeps its count visible and opens in place.</p>
+        </div>
+      <div className="grid gap-3 lg:grid-cols-2">
         <Section
           title="Matters"
           statusOptionsKey="matters"
@@ -1330,6 +1355,7 @@ export default function ClientDetail() {
             toBody: (v) => ({ title: v.title, starts_at: v.starts_at ? new Date(v.starts_at).toISOString() : undefined }),
           }}
         />
+      </div>
       </div>
       )}
     </div>

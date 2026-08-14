@@ -18,6 +18,11 @@ import {
 } from '../intake'
 import { renderApplicationPdf, type ApplicationPdfAnswer } from '../applicationPdf'
 import { advanceInquiryLifecycle } from '../lifecycle'
+import {
+  isProcessorReviewSampleDocument,
+  PROCESSOR_REVIEW_DOCUMENT_CONTENT_TYPE,
+  renderProcessorReviewSamplePdf,
+} from '../processorReviewSamplePdf'
 
 export const serviceApplicationRoutes = new Hono<AppEnv>()
 
@@ -762,17 +767,32 @@ serviceApplicationRoutes.get('/documents', requireUser, async (c) => {
 serviceApplicationRoutes.get('/documents/:id/file', requireUser, async (c) => {
   const user = c.get('user')
   const doc = await c.env.DB.prepare(
-    `SELECT id, client_user_id, file_name, r2_key, content_type, visibility FROM client_documents WHERE id = ?`,
-  ).bind(c.req.param('id') ?? '').first<{ id: string; client_user_id: string; file_name: string | null; r2_key: string | null; content_type: string | null; visibility: string }>()
-  if (!doc || !doc.r2_key || !c.env.UPLOADS) return c.json({ error: 'file not found' }, 404)
+    `SELECT id, client_user_id, file_name, r2_key, content_type, visibility, source FROM client_documents WHERE id = ?`,
+  ).bind(c.req.param('id') ?? '').first<{ id: string; client_user_id: string; file_name: string | null; r2_key: string | null; content_type: string | null; visibility: string; source: string | null }>()
+  if (!doc) return c.json({ error: 'file not found' }, 404)
   if (user.role === 'client') {
     if (doc.client_user_id !== user.id || doc.visibility === 'internal') return c.json({ error: 'file not found' }, 404)
   } else if (!(await canAccessClient(c.env, user, doc.client_user_id))) {
     return c.json({ error: 'forbidden' }, 403)
   }
+
+  const filename = safeFileName(doc.file_name || 'document')
+  if (!c.env.UPLOADS) {
+    if (!isProcessorReviewSampleDocument(doc)) return c.json({ error: 'file not found' }, 404)
+    const bytes = await renderProcessorReviewSamplePdf()
+    const body = new ArrayBuffer(bytes.byteLength)
+    new Uint8Array(body).set(bytes)
+    return new Response(body, {
+      headers: {
+        'Content-Type': PROCESSOR_REVIEW_DOCUMENT_CONTENT_TYPE,
+        'Content-Disposition': `inline; filename="${filename.replace(/"/g, '')}"`,
+        'Cache-Control': 'private, no-store',
+      },
+    })
+  }
+  if (!doc.r2_key) return c.json({ error: 'file not found' }, 404)
   const object = await c.env.UPLOADS.get(doc.r2_key)
   if (!object) return c.json({ error: 'file not found' }, 404)
-  const filename = safeFileName(doc.file_name || 'document')
   return new Response(object.body, {
     headers: {
       'Content-Type': doc.content_type || object.httpMetadata?.contentType || 'application/octet-stream',

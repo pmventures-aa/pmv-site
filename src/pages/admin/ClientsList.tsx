@@ -10,6 +10,7 @@ import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../compone
 
 interface ClientRow {
   id: string
+  public_ref: string
   email: string
   full_name: string | null
   business_name: string | null
@@ -101,7 +102,7 @@ export default function ClientsList() {
                     <div className="flex items-center gap-3">
                       <Avatar userId={c.id} name={c.full_name || c.email} size={36} />
                       <div>
-                        <Link to={p(`clients/${c.id}/overview`)} className="font-medium text-white hover:text-gold">
+                        <Link to={p(`clients/${c.public_ref}/overview`)} className="font-medium text-white hover:text-gold">
                           {c.full_name || c.email}
                         </Link>
                         <p className="text-xs text-slate-500">{c.email}</p>

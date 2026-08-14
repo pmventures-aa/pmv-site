@@ -39,11 +39,12 @@ interface CaseRow {
   updated_at: string | null
   client_name: string | null
   client_email: string | null
+  client_public_ref: string | null
   assignee_name: string | null
   assignee_email: string | null
 }
 
-const BASE_SELECT = `SELECT st.*, cu.full_name AS client_name, cu.email AS client_email,
+const BASE_SELECT = `SELECT st.*, cu.full_name AS client_name, cu.email AS client_email, cu.public_ref AS client_public_ref,
                             au.full_name AS assignee_name, au.email AS assignee_email
                             ,(SELECT COUNT(*) FROM support_ticket_conversions tc WHERE tc.ticket_id = st.id) AS conversion_count
                      FROM support_tickets st
@@ -131,7 +132,7 @@ casesRoutes.post('/cases/:id/convert', requireStaff, async (c) => {
   const notes = String(body.notes || ticket.details || '').trim().slice(0, 4000) || null
   const dueDate = typeof body.due_date === 'string' && body.due_date ? body.due_date : null
   const statements = []
-  let href = `clients/${ticket.client_user_id}/manage`
+  let href = `clients/${ticket.client_public_ref || ticket.client_user_id}/manage`
 
   if (targetType === 'matter') {
     statements.push(c.env.DB.prepare(

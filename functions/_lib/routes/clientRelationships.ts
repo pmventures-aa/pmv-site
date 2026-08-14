@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
-import { canAccessClient } from '../scope'
 import { uuid } from '../crypto'
 import { toDisplayCase } from '../../../shared/displayCase'
 import { requireNamedPermission } from '../capabilities'
+import { loadStaffClientReference } from '../clientRef'
 
 export const clientRelationshipRoutes = new Hono<AppEnv>()
 
@@ -16,9 +16,9 @@ function text(value: unknown, max = 300): string {
 function email(value: unknown): string { return text(value, 254).toLowerCase() }
 
 async function requireClientAccess(c: any): Promise<string | Response> {
-  const clientId = c.req.param('id') || ''
-  if (!(await canAccessClient(c.env, c.get('user'), clientId))) return c.json({ error: 'forbidden' }, 403)
-  return clientId
+  const client = await loadStaffClientReference(c.env, c.get('user'), c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  return client.id
 }
 
 async function ensurePrimaryPerson(c: any, clientId: string): Promise<string> {

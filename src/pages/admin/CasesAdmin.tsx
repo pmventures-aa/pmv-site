@@ -28,6 +28,7 @@ interface CaseRow {
   created_at: string
   client_name: string | null
   client_email: string | null
+  client_public_ref: string | null
   assignee_name: string | null
   assignee_email: string | null
   details?: string | null
@@ -262,7 +263,7 @@ function CaseRows({
               </div>
               <p className="mt-2 text-sm font-semibold text-white">{row.subject}</p>
               <p className="mt-1 text-xs text-slate-400">
-                <Link to={p(`clients/${row.client_user_id}`)} className="text-slate-300 hover:text-gold hover:underline">
+                <Link to={p(`clients/${row.client_public_ref || row.client_user_id}`)} className="text-slate-300 hover:text-gold hover:underline">
                   {row.client_name || row.client_email || 'Unknown client'}
                 </Link>
                 {' · '}

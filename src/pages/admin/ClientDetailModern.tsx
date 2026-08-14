@@ -20,7 +20,7 @@ interface NoteRow {
 }
 
 interface Bundle {
-  account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
+  account: { id: string; public_ref: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
   profile: { business_name: string | null; entity_type: string | null; ein: string | null; state: string | null; onboarding_completed: number } | null
   assigned_staff: { id: string; full_name: string | null; email: string }[]
   recent_activity: ActivityEvent[]
@@ -125,6 +125,7 @@ export default function ClientDetailModern() {
   const p = useAppPath()
   const navigate = useNavigate()
   const [data, setData] = useState<Bundle | null>(null)
+  const [loadError, setLoadError] = useState('')
   const tab:Tab = (['overview','activity','services','work','documents','billing','relationships','details'] as Tab[]).includes(section as Tab) ? section as Tab : 'overview'
   const [note, setNote] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
@@ -136,6 +137,7 @@ export default function ClientDetailModern() {
     if (!id) return
     if (!force && loadedTabs.has(section)) return
     const result = await api.get<Partial<Bundle>>(`/admin/clients/${id}?section=${section}`)
+    setLoadError('')
     setData((current) => ({
       account: result.account ?? current?.account,
       profile: result.profile === undefined ? current?.profile ?? null : result.profile,
@@ -145,8 +147,17 @@ export default function ClientDetailModern() {
     setLoadedTabs((current) => new Set(current).add(section))
   }, [id, loadedTabs, tab])
 
-  useEffect(() => { load(tab).catch(() => setData(null)) }, [tab])
+  useEffect(() => {
+    load(tab).catch((err) => {
+      setData(null)
+      setLoadError(err instanceof ApiError && err.status === 404 ? 'This client workspace was not found.' : 'This client workspace could not be loaded.')
+    })
+  }, [tab])
   useEffect(() => { if(id&&!section)navigate(p(`clients/${id}/overview`),{replace:true}) },[id,section,navigate,p])
+  useEffect(() => {
+    const publicRef = data?.account.public_ref
+    if (publicRef && id && id !== publicRef) navigate(p(`clients/${publicRef}/${tab}`), { replace: true })
+  }, [data?.account.public_ref, id, navigate, p, tab])
 
   const timeline = useMemo(() => {
     if (!data) return []
@@ -213,7 +224,7 @@ export default function ClientDetailModern() {
     } finally { setNoteBusy(false) }
   }
 
-  if (!data) return <InlineLoading />
+  if (!data) return loadError ? <div className="mx-auto max-w-3xl py-16"><EmptyState label={loadError} /></div> : <InlineLoading />
   const { account, profile } = data
   const clientName = account.full_name || account.email
   const activeServices = data.services.filter((s) => ['active', 'submitted', 'requested'].includes(s.status))
@@ -230,7 +241,7 @@ export default function ClientDetailModern() {
     <header className="border-b border-white/10 pb-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <Avatar userId={account.id} name={account.full_name} size={60} editable uploadPath={`/admin/clients/${account.id}/avatar`} />
+          <Avatar userId={account.id} name={account.full_name} size={60} editable uploadPath={`/admin/clients/${account.public_ref}/avatar`} />
           <div className="min-w-0">
             <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className="uppercase tracking-[0.16em]">Client</span>{profile?.business_name && <><span>·</span><span>{profile.business_name}</span></>}</div>
             <h1 className="truncate font-display text-3xl font-medium text-white sm:text-4xl">{clientName}</h1>
@@ -240,8 +251,8 @@ export default function ClientDetailModern() {
         <div className="flex flex-wrap gap-2">
           <Link to={clientEmailHref(p, { id: account.id, email: account.email, name: account.full_name })} className={btnPrimary}>Email client</Link>
           <Link to={clientInboxHref(p, account.id)} className={btnOutline}>Messages</Link>
-          <Link to={p(`clients/${account.id}/activity`)} className={btnOutline}>Add note</Link>
-          <Link to={p(`clients/${account.id}/manage`)} className={btnOutline}>Manage records</Link>
+          <Link to={p(`clients/${account.public_ref}/activity`)} className={btnOutline}>Add note</Link>
+          <Link to={p(`clients/${account.public_ref}/manage`)} className={btnOutline}>Manage records</Link>
         </div>
       </div>
       <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-500">
@@ -254,7 +265,7 @@ export default function ClientDetailModern() {
     </header>
 
     <nav className="mt-5 flex gap-6 overflow-x-auto border-b border-white/10" aria-label="Client profile sections">
-      {([['overview','Overview'],['activity','Activity & Notes'],['services','Services'],['work','Work'],['documents','Documents'],['billing','Billing'],['relationships','People & Businesses'],['details','Profile']] as const).map(([key, label]) => <Link key={key} to={p(`clients/${account.id}/${key}`)} className={`shrink-0 border-b-2 pb-3 text-sm font-medium transition ${tab === key ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{label}</Link>)}
+      {([['overview','Overview'],['activity','Activity & Notes'],['services','Services'],['work','Work'],['documents','Documents'],['billing','Billing'],['relationships','People & Businesses'],['details','Profile']] as const).map(([key, label]) => <Link key={key} to={p(`clients/${account.public_ref}/${key}`)} className={`shrink-0 border-b-2 pb-3 text-sm font-medium transition ${tab === key ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{label}</Link>)}
     </nav>
 
     {tab === 'overview' && <div className="mt-7 grid gap-9 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -269,7 +280,7 @@ export default function ClientDetailModern() {
         </dl>}
 
         <div className="mt-9">
-          <SectionTitle eyebrow="Current work" title="Services & next steps" action={<Link to={p(`clients/${account.id}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage →</Link>} />
+          <SectionTitle eyebrow="Current work" title="Services & next steps" action={<Link to={p(`clients/${account.public_ref}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage →</Link>} />
           {!data.services.length ? <EmptyState label="No services are attached to this client." /> : <div className="border-y border-white/10">{data.services.slice(0, 8).map((s) => <div key={s.id} className="flex items-center justify-between gap-4 border-t border-white/5 py-3.5 first:border-t-0"><div><p className="text-sm font-medium text-white">{s.name}</p><p className="mt-0.5 text-xs text-slate-500">{humanizeLabel(s.service_key)}</p></div><Tag tone={statusTone(s.status)}>{humanizeLabel(s.status)}</Tag></div>)}</div>}
         </div>
 
@@ -277,7 +288,7 @@ export default function ClientDetailModern() {
       </main>
 
       <aside className="xl:border-l xl:border-white/10 xl:pl-7">
-        <SectionTitle eyebrow="Relationship history" title="Latest activity" action={<Link to={p(`clients/${account.id}/activity`)} className="text-xs font-medium text-gold hover:underline">View all</Link>} />
+        <SectionTitle eyebrow="Relationship history" title="Latest activity" action={<Link to={p(`clients/${account.public_ref}/activity`)} className="text-xs font-medium text-gold hover:underline">View all</Link>} />
         <Timeline rows={timeline.slice(0, 8)} />
         <div className="mt-8 border-t border-white/10 pt-6"><p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">Next appointment</p>{nextAppointment ? <div className="mt-3"><p className="text-sm font-medium text-white">{nextAppointment.title || 'Appointment'}</p><p className="mt-1 text-xs text-slate-400">{displayDate(nextAppointment.starts_at)}</p></div> : <p className="mt-3 text-sm text-slate-500">Nothing scheduled.</p>}</div>
         <div className="mt-6 border-t border-white/10 pt-6"><p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">Open balance</p><p className="mt-2 font-display text-2xl text-white">{money(openBalance)}</p><p className="mt-1 text-xs text-slate-500">Across {openInvoices.length} open invoice{openInvoices.length === 1 ? '' : 's'}</p></div>
@@ -316,14 +327,14 @@ export default function ClientDetailModern() {
         )}
       </section>
       <section>
-        <SectionTitle eyebrow="Engagement" title="Services & applications" action={<Link to={p(`clients/${account.id}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage service records →</Link>} />
+        <SectionTitle eyebrow="Engagement" title="Services & applications" action={<Link to={p(`clients/${account.public_ref}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage service records →</Link>} />
         {!data.services.length ? <EmptyState label="No services yet." /> : <div className="divide-y divide-white/5 border-y border-white/10">{data.services.map((service) => { const answers = data.application_answers.filter((a) => a.service_key === service.service_key); return <div key={service.id} className="py-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold text-white">{service.name}</h3><p className="mt-1 text-xs text-slate-500">{humanizeLabel(service.service_key)}</p></div><Tag tone={statusTone(service.status)}>{humanizeLabel(service.status)}</Tag></div>{answers.length > 0 && <dl className="mt-4 grid gap-x-8 md:grid-cols-2">{answers.slice(0, 12).map((answer) => <DetailRow key={`${service.id}-${answer.question_key}`} label={answer.label || answer.question_key.replace(/_/g, ' ')} value={answer.value} />)}</dl>}</div>})}</div>}
       </section>
     </div>}
 
-    {tab === 'work' && <div className="mt-7 space-y-9"><section><SectionTitle eyebrow="Execution" title="Tasks" action={<Link to={p(`clients/${account.id}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage work →</Link>} /><SimpleTable rows={data.tasks} empty="No tasks." columns={[{ key: 'title', label: 'Task' }, { key: 'due_date', label: 'Due', render: (r) => r.due_date ? new Date(r.due_date).toLocaleDateString() : 'Not provided' }, { key: 'status', label: 'Status', render: (r) => <Tag tone={statusTone(r.status)}>{r.status?.replace(/_/g, ' ')}</Tag> }]} /></section><section><SectionTitle title="Projects & matters" /><SimpleTable rows={data.matters} empty="No projects or matters." columns={[{ key: 'title', label: 'Matter' }, { key: 'type', label: 'Type' }, { key: 'due_date', label: 'Due' }, { key: 'status', label: 'Status', render: (r) => <Tag tone={statusTone(r.status)}>{r.status?.replace(/_/g, ' ')}</Tag> }]} /></section><section><SectionTitle title="Calls & appointments" /><SimpleTable rows={[...data.calls.map((x) => ({ ...x, row_type: 'Call', when: x.scheduled_at })), ...data.appointments.map((x) => ({ ...x, row_type: 'Appointment', when: x.starts_at }))].sort((a, b) => new Date(b.when || 0).getTime() - new Date(a.when || 0).getTime())} empty="No calls or appointments." columns={[{ key: 'row_type', label: 'Type' }, { key: 'title', label: 'Topic', render: (r) => r.title || r.topic || 'Not provided' }, { key: 'when', label: 'When', render: (r) => displayDate(r.when) }, { key: 'status', label: 'Status', render: (r) => r.status ? <Tag tone={statusTone(r.status)}>{r.status.replace(/_/g, ' ')}</Tag> : 'Not provided' }]} /></section></div>}
+    {tab === 'work' && <div className="mt-7 space-y-9"><section><SectionTitle eyebrow="Execution" title="Tasks" action={<Link to={p(`clients/${account.public_ref}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage work →</Link>} /><SimpleTable rows={data.tasks} empty="No tasks." columns={[{ key: 'title', label: 'Task' }, { key: 'due_date', label: 'Due', render: (r) => r.due_date ? new Date(r.due_date).toLocaleDateString() : 'Not provided' }, { key: 'status', label: 'Status', render: (r) => <Tag tone={statusTone(r.status)}>{r.status?.replace(/_/g, ' ')}</Tag> }]} /></section><section><SectionTitle title="Projects & matters" /><SimpleTable rows={data.matters} empty="No projects or matters." columns={[{ key: 'title', label: 'Matter' }, { key: 'type', label: 'Type' }, { key: 'due_date', label: 'Due' }, { key: 'status', label: 'Status', render: (r) => <Tag tone={statusTone(r.status)}>{r.status?.replace(/_/g, ' ')}</Tag> }]} /></section><section><SectionTitle title="Calls & appointments" /><SimpleTable rows={[...data.calls.map((x) => ({ ...x, row_type: 'Call', when: x.scheduled_at })), ...data.appointments.map((x) => ({ ...x, row_type: 'Appointment', when: x.starts_at }))].sort((a, b) => new Date(b.when || 0).getTime() - new Date(a.when || 0).getTime())} empty="No calls or appointments." columns={[{ key: 'row_type', label: 'Type' }, { key: 'title', label: 'Topic', render: (r) => r.title || r.topic || 'Not provided' }, { key: 'when', label: 'When', render: (r) => displayDate(r.when) }, { key: 'status', label: 'Status', render: (r) => r.status ? <Tag tone={statusTone(r.status)}>{r.status.replace(/_/g, ' ')}</Tag> : 'Not provided' }]} /></section></div>}
 
-    {tab === 'documents' && <div className="mt-7"><SectionTitle eyebrow="Files" title="Documents" action={<Link to={p(`clients/${account.id}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage documents →</Link>} /><SimpleTable rows={data.documents} empty="No documents." columns={[{ key: 'file_name', label: 'Document', render: (r) => r.file_name || r.category || 'Document' }, { key: 'category', label: 'Category' }, { key: 'review_status', label: 'Review status', render: (r) => r.review_status ? <Tag tone={statusTone(r.review_status)}>{r.review_status.replace(/_/g, ' ')}</Tag> : 'Not provided' }, { key: 'created_at', label: 'Added', render: (r) => displayDate(r.created_at) }]} /></div>}
+    {tab === 'documents' && <div className="mt-7"><SectionTitle eyebrow="Files" title="Documents" action={<Link to={p(`clients/${account.public_ref}/manage`)} className="text-sm font-medium text-gold hover:underline">Manage documents →</Link>} /><SimpleTable rows={data.documents} empty="No documents." columns={[{ key: 'file_name', label: 'Document', render: (r) => r.file_name || r.category || 'Document' }, { key: 'category', label: 'Category' }, { key: 'review_status', label: 'Review status', render: (r) => r.review_status ? <Tag tone={statusTone(r.review_status)}>{r.review_status.replace(/_/g, ' ')}</Tag> : 'Not provided' }, { key: 'created_at', label: 'Added', render: (r) => displayDate(r.created_at) }]} /></div>}
 
     {tab === 'billing' && <div className="mt-7 space-y-9">
       <section>
@@ -348,7 +359,7 @@ export default function ClientDetailModern() {
       <section><SectionTitle title="ACH methods on file" /><div className="border-y border-white/10">{data.payment_methods.length ? data.payment_methods.map((method) => <div key={method.id} className="flex items-center justify-between gap-4 border-t border-white/5 py-4 first:border-t-0"><div><p className="text-sm font-medium text-white">{method.account_holder_name}</p><p className="mt-1 text-xs text-slate-500">{method.bank_name || 'Bank'} · {method.account_type || 'account'} ending {method.account_last4}</p></div><span className="text-xs text-slate-600">Sensitive details available in Manage records</span></div>) : <p className="py-5 text-sm text-slate-500">No ACH payment methods on file.</p>}</div></section>
     </div>}
 
-    {tab === 'relationships' && <div className="mt-7"><ClientRelationships clientId={account.id}/></div>}
+    {tab === 'relationships' && <div className="mt-7"><ClientRelationships clientId={account.public_ref}/></div>}
 
     {tab === 'details' && <div className="mt-7 max-w-5xl"><SectionTitle eyebrow="Account" title="Client & business details" action={<button className="text-sm font-medium text-gold hover:underline" onClick={() => setEditing((v) => !v)}>{editing ? 'Cancel' : 'Edit'}</button>} />{editing ? <ProfileEditor account={account} profile={profile} onSaved={async () => { setEditing(false); await load() }} /> : <dl className="border-y border-white/10"><DetailRow label="Full name" value={account.full_name || 'Not provided'} /><DetailRow label="Email" value={account.email} /><DetailRow label="Phone" value={account.phone || 'Not provided'} /><DetailRow label="Business name" value={profile?.business_name || 'Not provided'} /><DetailRow label="Entity type" value={profile?.entity_type || 'Not provided'} /><DetailRow label="EIN" value={profile?.ein || 'Not provided'} /><DetailRow label="State" value={profile?.state || 'Not provided'} /><DetailRow label="Account created" value={displayDate(account.created_at)} /><DetailRow label="Last login" value={displayDate(account.last_login_at)} /><DetailRow label="Assigned team" value={data.assigned_staff.map((s) => s.full_name || s.email).join(', ') || 'Unassigned'} /></dl>}</div>}
   </div>
