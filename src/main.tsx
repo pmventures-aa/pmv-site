@@ -44,10 +44,6 @@ const QuoteView = lazy(() => import('./pages/public/QuoteView'))
 const CarePlans = lazy(() => import('./pages/public/CarePlans'))
 const CarePlansConfirmation = lazy(() => import('./pages/public/CarePlans').then((m) => ({ default: m.CarePlansConfirmation })))
 
-const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
-const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
-const MailApp = lazy(() => import('./pages/mail/MailApp'))
-
 // `orb` remains as a compatibility name for existing lazy-route calls, but
 // authenticated surfaces now use the quiet PMV crest rather than an orb.
 function SurfaceFallback({ variant = 'brand', label = 'Loading…' }: { variant?: 'brand' | 'orb'; label?: string }) {
