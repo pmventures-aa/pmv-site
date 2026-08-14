@@ -281,22 +281,32 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   return c.json({ assignment: row })
 })
 
+const ASSIGNMENT_LIST_COLUMNS = `fa.id, fa.kind, fa.service_key, fa.client_user_id, fa.vendor_user_id, fa.assigned_by_user_id,
+       fa.title, fa.site_label, fa.site_address, fa.site_city, fa.site_state, fa.site_postal_code,
+       fa.site_lat, fa.site_lng, fa.scheduled_at, fa.status, fa.departed_at, fa.arrived_at, fa.arrival_source,
+       fa.completed_at, fa.audit_email_sent_at, fa.notes,
+       fa.vendor_fee_cents, fa.vendor_fee_base_cents, fa.vendor_fee_adjustment_cents, fa.vendor_fee_reason,
+       cu.full_name AS client_name, cu.email AS client_email,
+       vu.full_name AS vendor_name, vu.email AS vendor_email`
+
 fieldWorkRoutes.get('/field-assignments', requireStaff, async (c) => {
   const user = c.get('user')
   const status = c.req.query('status') || ''
   const kind = c.req.query('kind') || ''
+  const mine = c.req.query('mine') === '1'
   const clauses: string[] = ['1=1']
   const params: unknown[] = []
-  if (user.role !== 'admin') {
+  if (mine) {
+    clauses.push('fa.vendor_user_id = ?')
+    params.push(user.id)
+  } else if (user.role !== 'admin') {
     clauses.push('(fa.vendor_user_id = ? OR fa.assigned_by_user_id = ?)')
     params.push(user.id, user.id)
   }
   if (status) { clauses.push('fa.status = ?'); params.push(status) }
   if (kind && KIND_VALUES.has(kind)) { clauses.push('fa.kind = ?'); params.push(kind) }
   const res = await c.env.DB.prepare(
-    `SELECT fa.*,
-       cu.full_name AS client_name, cu.email AS client_email,
-       vu.full_name AS vendor_name, vu.email AS vendor_email
+    `SELECT ${ASSIGNMENT_LIST_COLUMNS}
      FROM field_assignments fa
      LEFT JOIN users cu ON cu.id = fa.client_user_id
      LEFT JOIN users vu ON vu.id = fa.vendor_user_id
@@ -598,19 +608,34 @@ fieldWorkRoutes.get('/field-map', requireStaff, async (c) => {
      ORDER BY fa.updated_at DESC
      LIMIT 200`,
   ).bind(...params).all()
+  const assignmentRows = assignments.results ?? []
   let agents: { results?: Array<{ user_id: string; assignment_id: string | null; lat: number; lng: number; accuracy_m: number | null; updated_at: string; full_name: string | null; email: string }> } = { results: [] }
   try {
-    agents = await c.env.DB.prepare(
-      `SELECT loc.user_id, loc.assignment_id, loc.lat, loc.lng, loc.accuracy_m, loc.updated_at,
-              u.full_name, u.email
-       FROM field_agent_locations loc
-       JOIN users u ON u.id = loc.user_id
-       WHERE julianday('now') - julianday(loc.updated_at) < 1`,
-    ).all()
+    const vendorIds = [...new Set(assignmentRows.map((row) => String((row as { vendor_user_id?: string }).vendor_user_id || '')).filter(Boolean))]
+    if (user.role === 'admin') {
+      agents = await c.env.DB.prepare(
+        `SELECT loc.user_id, loc.assignment_id, loc.lat, loc.lng, loc.accuracy_m, loc.updated_at,
+                u.full_name, u.email
+         FROM field_agent_locations loc
+         JOIN users u ON u.id = loc.user_id
+         WHERE loc.sharing_active = 1 AND julianday('now') - julianday(loc.updated_at) < 1`,
+      ).all()
+    } else if (vendorIds.length) {
+      const placeholders = vendorIds.map(() => '?').join(',')
+      agents = await c.env.DB.prepare(
+        `SELECT loc.user_id, loc.assignment_id, loc.lat, loc.lng, loc.accuracy_m, loc.updated_at,
+                u.full_name, u.email
+         FROM field_agent_locations loc
+         JOIN users u ON u.id = loc.user_id
+         WHERE loc.sharing_active = 1
+           AND loc.user_id IN (${placeholders})
+           AND julianday('now') - julianday(loc.updated_at) < 1`,
+      ).bind(...vendorIds).all()
+    }
   } catch {
     agents = { results: [] }
   }
-  return c.json({ assignments: assignments.results ?? [], agents: agents.results ?? [] })
+  return c.json({ assignments: assignmentRows, agents: agents.results ?? [] })
 })
 
 // Suppress unused import warnings for helpers we intentionally re-export

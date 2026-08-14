@@ -24,4 +24,11 @@ describe('migration chain regression checks', () => {
     expect(sql).toMatch(/CREATE TABLE hq_email_template_versions/i)
     expect(sql).toMatch(/slug TEXT NOT NULL UNIQUE/)
   })
+
+  it('adds field-work list indexes without rewriting assignment rows', () => {
+    const sql = readFileSync(new URL('../migrations/0074_field_work_list_indexes.sql', import.meta.url), 'utf8')
+    expect(sql).toMatch(/idx_field_assignments_assigned_by/)
+    expect(sql).toMatch(/idx_field_assignments_fee_market/)
+    expect(sql).not.toMatch(/ALTER TABLE field_assignments/i)
+  })
 })

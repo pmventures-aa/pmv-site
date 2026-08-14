@@ -26,6 +26,41 @@ type OfferingBody = {
   intake_prompts?: string[]
 }
 
+const OFFERINGS_CACHE_PREFIX = 'public-service-offerings:v1:'
+const OFFERINGS_CACHE_TTL = 120
+
+function offeringsCacheKey(serviceKey = ''): string {
+  return `${OFFERINGS_CACHE_PREFIX}${serviceKey || 'all'}`
+}
+
+async function readOfferingsCache(env: Env, serviceKey: string): Promise<{ offerings: unknown[] } | null> {
+  try {
+    const cached = await env.SESSIONS.get(offeringsCacheKey(serviceKey), 'json') as { offerings: unknown[] } | null
+    if (cached && Array.isArray(cached.offerings)) return cached
+  } catch {
+    // KV misses should not block the catalog.
+  }
+  return null
+}
+
+async function writeOfferingsCache(env: Env, serviceKey: string, payload: { offerings: unknown[] }): Promise<void> {
+  try {
+    await env.SESSIONS.put(offeringsCacheKey(serviceKey), JSON.stringify(payload), { expirationTtl: OFFERINGS_CACHE_TTL })
+  } catch {
+    // Cache write failures are non-fatal.
+  }
+}
+
+async function bustOfferingsCache(env: Env): Promise<void> {
+  try {
+    await Promise.all([
+      env.SESSIONS.delete(offeringsCacheKey('')),
+    ])
+  } catch {
+    // Ignore
+  }
+}
+
 const cleanId = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 100)
 const cleanText = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : ''
 const cents = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value * 100) : null
@@ -87,14 +122,22 @@ function publicShape(row: any) {
 }
 
 serviceOfferingPublicRoutes.get('/service-offerings', async (c) => {
-  await ensureServiceOfferingsSeeded(c.env)
   const serviceKey = (c.req.query('service_key') || '').trim()
+  const cached = await readOfferingsCache(c.env, serviceKey)
+  if (cached) {
+    c.header('Cache-Control', 'public, max-age=60')
+    return c.json(cached)
+  }
+  await ensureServiceOfferingsSeeded(c.env)
   const where = serviceKey ? 'WHERE active = 1 AND service_key = ?' : 'WHERE active = 1'
   const query = `SELECT * FROM service_offerings ${where} ORDER BY service_key, sort_order, name`
   const res = serviceKey
     ? await c.env.DB.prepare(query).bind(serviceKey).all<any>()
     : await c.env.DB.prepare(query).all<any>()
-  return c.json({ offerings: (res.results ?? []).map(publicShape) })
+  const payload = { offerings: (res.results ?? []).map(publicShape) }
+  await writeOfferingsCache(c.env, serviceKey, payload)
+  c.header('Cache-Control', 'public, max-age=60')
+  return c.json(payload)
 })
 
 serviceOfferingAdminRoutes.get('/service-offerings', requireStaff, requireCapability('can_manage_settings'), async (c) => {
@@ -131,6 +174,7 @@ serviceOfferingAdminRoutes.post('/service-offerings', requireStaff, requireCapab
       cents(body.provider_payout_min), cents(body.provider_payout_max), cleanText(body.provider_payout_notes, 1000) || null,
       arrayJson(body.required_documents), arrayJson(body.intake_prompts),
     ).run()
+  await bustOfferingsCache(c.env)
   return c.json({ ok: true, id }, 201)
 })
 
@@ -158,11 +202,13 @@ serviceOfferingAdminRoutes.patch('/service-offerings/:id', requireStaff, require
   sets.push(`updated_at = datetime('now')`)
   const result = await c.env.DB.prepare(`UPDATE service_offerings SET ${sets.join(', ')} WHERE id = ?`).bind(...values, c.req.param('id') || '').run()
   if (!result.meta.changes) return c.json({ error: 'offering not found' }, 404)
+  await bustOfferingsCache(c.env)
   return c.json({ ok: true })
 })
 
 serviceOfferingAdminRoutes.delete('/service-offerings/:id', requireStaff, requireCapability('can_manage_settings'), async (c) => {
   const result = await c.env.DB.prepare('DELETE FROM service_offerings WHERE id = ?').bind(c.req.param('id') || '').run()
   if (!result.meta.changes) return c.json({ error: 'offering not found' }, 404)
+  await bustOfferingsCache(c.env)
   return c.json({ ok: true })
 })
