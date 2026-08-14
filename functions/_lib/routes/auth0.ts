@@ -253,7 +253,7 @@ auth0Routes.post('/auth0/link', requireUser, async (c) => {
     return c.json({ error: 'external sign-in is available for client portal accounts' }, 403)
   }
 
-  const body = await c.req.json<{ connection?: string; returnTo?: string }>().catch(() => ({} as { connection?: string }))
+  const body = await c.req.json<{ connection?: string; returnTo?: string }>().catch(() => ({} as { connection?: string; returnTo?: string }))
   const connection = (body.connection || '').trim()
   if (!isAllowedAuth0Connection(c.env, connection)) {
     return c.json({ error: 'that sign-in method is not available' }, 400)
