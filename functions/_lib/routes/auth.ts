@@ -25,6 +25,9 @@ import { toDisplayCase } from '../../../shared/displayCase'
 import { advanceInquiryLifecycle } from '../lifecycle'
 import { getInviteByToken } from '../invites'
 import { canCompleteStagedVendorSignup, type ExistingAccount } from '../vendorStaging'
+import { requireUser } from '../mid'
+import { listIdentitiesForUser, countAuthMethods } from '../externalIdentities'
+import { getAuth0Config } from '../auth0Config'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -501,6 +504,9 @@ authRoutes.post('/login', async (c) => {
 })
 
 authRoutes.post('/logout', async (c) => {
+  // Local Pinnacle session is authoritative. Invalidate it first.
+  // Auth0 federated logout is optional and available separately at
+  // GET /api/auth/auth0/federated-logout — it is never required for safe logout.
   const user = await getUser(c.env, c.req.raw)
   await destroySession(c.env, c.req.raw)
   c.header('Set-Cookie', clearCookie())
@@ -510,6 +516,30 @@ authRoutes.post('/logout', async (c) => {
     actorUserAgent: actorUserAgent(c.req.raw),
     actorGeo: actorGeo(c.req.raw),
     action: 'logout',
+    after: { method: 'local' },
   })
   return c.json({ ok: true })
+})
+
+/** Connected external sign-in methods for the signed-in user. */
+authRoutes.get('/identities', requireUser, async (c) => {
+  const user = c.get('user')
+  const identities = await listIdentitiesForUser(c.env, user.id)
+  const methods = await countAuthMethods(c.env, user.id)
+  const config = getAuth0Config(c.env)
+  return c.json({
+    ok: true,
+    auth0_enabled: Boolean(config),
+    has_password: methods.passwords > 0,
+    can_unlink: methods.total > 1,
+    providers: config?.providers || [],
+    identities: identities.map((row) => ({
+      id: row.id,
+      provider: row.provider,
+      provider_email: row.provider_email,
+      email_verified: row.email_verified === 1,
+      created_at: row.created_at,
+      last_login_at: row.last_login_at,
+    })),
+  })
 })

@@ -39,6 +39,16 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 | `RESEND_FROM_EMAIL` | No | Var (`wrangler.toml` `[vars]`) | Verified sender identity. The code defaults to `Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>` if this is not set. |
 | `RESEND_WEBHOOK_SECRET` | No | Secret | Optional Cloudflare copy of the Svix signing secret for `POST /api/webhooks/resend`. HQ → Settings → General can create the Resend webhook and store this secret in D1 instead. |
 | `RESEND_INBOUND_DOMAIN` | No | Var (`wrangler.toml` `[vars]`) | Resend receiving domain. Defaults in wrangler to `ziloifaluk.resend.app`. Used only as Reply-To so replies can be received without changing pinnaclemanagementventures.com MX or the From address. |
+| `AUTH0_DOMAIN` | No* | Secret | Auth0 tenant domain (`your-tenant.auth0.com`). Required together with the other Auth0 fields below to enable Google/Microsoft client-portal sign-in. |
+| `AUTH0_CLIENT_ID` | No* | Secret | Auth0 Regular Web Application client ID. |
+| `AUTH0_CLIENT_SECRET` | No* | Secret | Auth0 client secret — server-only; never expose to the frontend. |
+| `AUTH0_CALLBACK_URL` | No* | Secret/Var | Exact callback URL, e.g. `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback` (local: `http://localhost:8788/api/auth/auth0/callback`). |
+| `AUTH0_LOGOUT_URL` | No | Secret/Var | Auth0 Allowed Logout URL, default `https://www.pinnaclemanagementventures.com/portal/login`. |
+| `AUTH0_AUDIENCE` | No | Secret/Var | Optional API audience when Auth0 APIs are configured. |
+| `AUTH0_CONNECTIONS` | No | Var | Comma-separated enabled connections (default `google-oauth2,windowslive`). |
+| `AUTH0_ENABLED` | No | Var | Set to `false` to force-disable Auth0 even if other values are present. |
+
+\* Auth0 sign-in is enabled only when `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and `AUTH0_CALLBACK_URL` are all set. Partial configuration keeps provider buttons hidden.
 
 **Local dev:** copy `.dev.vars.example` to `.dev.vars` (gitignored) and fill in test values — `wrangler pages dev` reads it automatically.
 
@@ -152,6 +162,33 @@ them set on the project too, alongside the secrets from the table above.
 ## Verify
 - `GET /api/health` → `{ ok: true }`
 - Auth flow: `POST /api/auth/signup` (or `/api/auth/login`) → `GET /api/me`
+- Optional Auth0: `GET /api/auth/auth0/providers` → `{ enabled: true, providers: [...] }` when Auth0 secrets are configured
 - Client self-signup lands on the Client Portal dashboard, not a mandatory onboarding gate.
 - HQ → Users → Create user automatically attempts the appropriate account invitation and preserves a manual setup-link fallback.
 - Resend webhook rejects requests without a valid signature.
+
+## Auth0 (client portal)
+
+Auth0 is a Regular Web Application using Authorization Code Flow via `@auth0/auth0-server-js`.
+Identity only — authorization stays in Pinnacle sessions, relationships, and grants.
+
+Production Auth0 application URLs (exact match, no wildcards):
+
+| Setting | Value |
+|---|---|
+| Allowed Callback URLs | `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback` |
+| Allowed Logout URLs | `https://www.pinnaclemanagementventures.com/portal/login` |
+| Allowed Web Origins | `https://www.pinnaclemanagementventures.com` |
+
+Local (`wrangler pages dev` on port 8788):
+
+| Setting | Value |
+|---|---|
+| Allowed Callback URLs | `http://localhost:8788/api/auth/auth0/callback` |
+| Allowed Logout URLs | `http://localhost:8788/portal/login` |
+| Allowed Web Origins | `http://localhost:8788` |
+
+If Vite (`:5173`) proxies `/api` to `:8788`, also register the `localhost:5173` callback/logout variants when Auth0 redirects through the frontend origin.
+
+Enable Google (`google-oauth2`) and Microsoft (`windowslive`) connections in the Auth0 dashboard. Existing accounts are never auto-linked by email — clients connect providers from Portal → Security after password sign-in.
+

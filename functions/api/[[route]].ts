@@ -4,6 +4,7 @@ import type { AppEnv } from '../_lib/types'
 import { getUser } from '../_lib/session'
 import { requireUser } from '../_lib/mid'
 import { authRoutes } from '../_lib/routes/auth'
+import { auth0Routes } from '../_lib/routes/auth0'
 import { selfRoutes } from '../_lib/routes/self'
 import { portalRoutes } from '../_lib/routes/portal'
 import { messageRoutes } from '../_lib/routes/messages'
@@ -86,6 +87,7 @@ app.use('*', denyDuringImpersonation)
 app.use('*', impersonationGuard)
 
 app.route('/auth', authRoutes)
+app.route('/auth/auth0', auth0Routes)
 app.route('/', publicRoutes)
 app.route('/', serviceOfferingPublicRoutes)
 app.route('/', uploadRoutes)
