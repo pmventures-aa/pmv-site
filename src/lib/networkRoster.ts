@@ -39,6 +39,10 @@ export function isProvider(person: NetworkPerson): boolean {
   return person.party_type === 'vendor'
 }
 
+export function canDispatchPerson(person: NetworkPerson): boolean {
+  return person.status === 'active'
+}
+
 export function openLoad(person: NetworkPerson): number {
   if (typeof person.dispatch_open === 'number') return Math.max(0, person.dispatch_open)
   return Math.max(0, Number(person.tasks_assigned || 0) - Number(person.tasks_completed || 0))

@@ -11,6 +11,7 @@ import { FieldLiveMap, type FieldMapPin } from '../../components/admin/FieldLive
 import { ScopeIntakePicker } from '../../components/admin/ScopeIntakePicker'
 import { fieldPrefillFromScope } from '../../../shared/scopeIntakePrefill'
 import { composeAddressQuery, isUsefulGeoQuery, type GeoHit } from '../../../shared/geocode'
+import { useAuth } from '../../lib/auth'
 
 interface StaffOption { id: string; full_name: string | null; email: string; party_type: string | null; vendor_category: string | null }
 interface ClientOption { id: string; full_name: string | null; email: string; business_name: string | null }
@@ -223,6 +224,7 @@ export default function FieldWorkAdmin() {
 }
 
 function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated: () => void; onCancel: () => void; initialVendorId?: string }) {
+  const { user } = useAuth()
   const [clients, setClients] = useState<ClientOption[]>([])
   const [vendors, setVendors] = useState<StaffOption[]>([])
   const [clientMode, setClientMode] = useState<'existing' | 'new'>('existing')
@@ -262,13 +264,13 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
   }, [initialVendorId])
 
   const availableVendors = useMemo(() => {
-    const list = vendors.filter((v) => v.party_type === 'vendor')
+    const list = vendors.filter((v) => v.party_type === 'vendor' || v.id === user?.id)
     if (initialVendorId && !list.some((v) => v.id === initialVendorId)) {
       const extra = vendors.find((v) => v.id === initialVendorId)
       if (extra) return [extra, ...list]
     }
     return list
-  }, [vendors, initialVendorId])
+  }, [vendors, initialVendorId, user?.id])
 
   useEffect(() => {
     if (form.kind !== 'field') return
@@ -435,7 +437,16 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
             </div>
           )}
         </div>
-        <label><span className="mb-1 block text-xs text-slate-400">Provider</span><select className={inputCls} value={form.vendor_user_id} onChange={(e) => setForm({ ...form, vendor_user_id: e.target.value })}><option value="">Choose a provider…</option>{availableVendors.map((v) => <option key={v.id} value={v.id}>{v.full_name || v.email}{v.vendor_category ? `: ${v.vendor_category}` : ''}</option>)}</select></label>
+        <label>
+          <span className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-400">
+            <span>Provider</span>
+            {user && <button type="button" onClick={() => setForm({ ...form, vendor_user_id: user.id })} className="font-semibold text-gold hover:underline">Assign to me</button>}
+          </span>
+          <select className={inputCls} value={form.vendor_user_id} onChange={(e) => setForm({ ...form, vendor_user_id: e.target.value })}>
+            <option value="">Choose a provider…</option>
+            {availableVendors.map((v) => <option key={v.id} value={v.id}>{v.full_name || v.email}{v.id === user?.id ? ' (me)' : v.vendor_category ? `: ${v.vendor_category}` : ''}</option>)}
+          </select>
+        </label>
         <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Title</span><input className={inputCls} placeholder='e.g. "Loan signing: Boca Raton office"' value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Scheduled for</span><input className={inputCls} type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Site label (optional)</span><input className={inputCls} placeholder="Client home, conference room…" value={form.site_label} onChange={(e) => setForm({ ...form, site_label: e.target.value })}/></label>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
+  canDispatchPerson,
   groupNetworkPeople,
   matchesNetworkFilter,
   matchesNetworkQuery,
@@ -65,6 +66,11 @@ describe('network roster matching', () => {
   it('uses dispatch_open when present for load', () => {
     expect(openLoad(person({ dispatch_open: 5, tasks_assigned: 1, tasks_completed: 0 }))).toBe(5)
     expect(openLoad(person({ tasks_assigned: 4, tasks_completed: 1 }))).toBe(3)
+  })
+
+  it('allows active internal staff as dispatch providers', () => {
+    expect(canDispatchPerson(person({ party_type: 'employee', status: 'active' }))).toBe(true)
+    expect(canDispatchPerson(person({ status: 'suspended' }))).toBe(false)
   })
 })
 

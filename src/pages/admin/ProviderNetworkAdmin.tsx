@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BriefcaseBusiness, LayoutGrid, MailPlus, MapPinned, Search, ShieldCheck, Star, UserRoundCheck } from 'lucide-react'
+import { BriefcaseBusiness, LayoutGrid, LocateFixed, MailPlus, MapPinned, Search, ShieldCheck, Star, UserRoundCheck } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnOutline, type Tone } from '../../components/admin/ui'
 import { Avatar } from '../../components/kit/Avatar'
@@ -11,6 +11,7 @@ import { useLiveRefresh } from '../../lib/liveRefresh'
 import { usePresence } from '../../lib/presence'
 import {
   NETWORK_FILTERS,
+  canDispatchPerson,
   coverageOf,
   groupNetworkPeople,
   isProvider,
@@ -27,6 +28,28 @@ import {
   type NetworkSort,
   type NetworkView,
 } from '../../lib/networkRoster'
+import { FieldLiveMap, type FieldMapPin } from '../../components/admin/FieldLiveMap'
+import { useAuth } from '../../lib/auth'
+import { locationAgeLabel, locationFreshness } from '../../../shared/operations'
+
+type NetworkMapPerson = {
+  user_id: string
+  full_name: string | null
+  email: string
+  party_type: string | null
+  vendor_category: string | null
+  title: string | null
+  assignment_id: string | null
+  assignment_title: string | null
+  assignment_status: string | null
+  lat: number | null
+  lng: number | null
+  accuracy_m: number | null
+  source: string | null
+  sharing_active: number | null
+  updated_at: string | null
+  last_seen_at: string | null
+}
 
 function statusTone(status?: string | null): Tone {
   if (status === 'active' || status === 'available') return 'green'
@@ -36,6 +59,7 @@ function statusTone(status?: string | null): Tone {
 }
 
 export default function ProviderNetworkAdmin() {
+  const { user } = useAuth()
   const p = useAppPath()
   const [rows, setRows] = useState<NetworkPerson[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,12 +71,22 @@ export default function ProviderNetworkAdmin() {
   const [sort, setSort] = useState<NetworkSort>('name')
   const [view, setView] = useState<NetworkView>('roster')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [mapPeople, setMapPeople] = useState<NetworkMapPerson[]>([])
+  const [viewerUserId, setViewerUserId] = useState('')
+  const [sharing, setSharing] = useState<'idle' | 'starting' | 'live' | 'error'>('idle')
+  const watchId = useRef<number | null>(null)
+  const lastLocationSend = useRef(0)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await api.get<{ employees: NetworkPerson[] }>('/admin/employees')
+      const [r, map] = await Promise.all([
+        api.get<{ employees: NetworkPerson[] }>('/admin/employees'),
+        api.get<{ people: NetworkMapPerson[]; viewer_user_id: string }>('/admin/network-map'),
+      ])
       setRows(r.employees || [])
+      setMapPeople(map.people || [])
+      setViewerUserId(map.viewer_user_id || '')
       setError('')
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'The provider network could not load.')
@@ -81,6 +115,76 @@ export default function ProviderNetworkAdmin() {
   const presence = usePresence(filtered.map((row) => row.id), 'admin')
   const providers = rows.filter(isProvider)
   const groups = view === 'roster' ? null : groupNetworkPeople(filtered, view === 'specialty' ? 'specialty' : 'coverage')
+  const visibleIds = useMemo(() => new Set(filtered.map((row) => row.id)), [filtered])
+  const mapPins = useMemo<FieldMapPin[]>(() => mapPeople.flatMap((person) => {
+    if (!visibleIds.has(person.user_id) || person.lat == null || person.lng == null) return []
+    const freshness = locationFreshness(person.updated_at, person.sharing_active)
+    const isMe = person.user_id === (viewerUserId || user?.id)
+    return [{
+      id: `network-${person.user_id}`,
+      kind: isMe ? 'me' : person.party_type === 'vendor' ? 'vendor' : 'staff',
+      label: `${person.full_name || person.email}${isMe ? ' (me)' : ''}`,
+      sublabel: `${freshness === 'live' ? 'Live' : locationAgeLabel(person.updated_at)}${person.assignment_title ? ` · ${person.assignment_title}` : ''}`,
+      lat: person.lat,
+      lng: person.lng,
+      href: person.assignment_id ? `field-work/${person.assignment_id}` : `network/${person.user_id}/profile`,
+      stale: freshness !== 'live',
+    }]
+  }), [mapPeople, user?.id, viewerUserId, visibleIds])
+  const noLocationCount = useMemo(
+    () => filtered.filter((row) => !mapPeople.some((person) => person.user_id === row.id && person.lat != null && person.lng != null)).length,
+    [filtered, mapPeople],
+  )
+
+  function startLocationSharing() {
+    if (!navigator.geolocation) {
+      setSharing('error')
+      toast.error('This browser does not support location sharing.')
+      return
+    }
+    if (watchId.current != null) return
+    setSharing('starting')
+    watchId.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const now = Date.now()
+        if (now - lastLocationSend.current < 20_000) return
+        lastLocationSend.current = now
+        void api.post('/admin/location', {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy_m: position.coords.accuracy,
+        }).then(() => {
+          setSharing('live')
+          void load()
+        }).catch((err) => {
+          setSharing('error')
+          toast.error(err instanceof ApiError ? err.message : 'Could not share this location.')
+        })
+      },
+      (error) => {
+        setSharing('error')
+        toast.error(error.message || 'Location permission was not granted.')
+      },
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 20_000 },
+    )
+  }
+
+  async function stopLocationSharing() {
+    if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
+    watchId.current = null
+    lastLocationSend.current = 0
+    try {
+      await api.post('/admin/location/stop')
+      setSharing('idle')
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not stop location sharing.')
+    }
+  }
+
+  useEffect(() => () => {
+    if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
+  }, [])
 
   async function patchRow(row: NetworkPerson, patch: Partial<Pick<NetworkPerson, 'availability_status' | 'is_preferred_provider'>>) {
     setBusyId(row.id)
@@ -107,6 +211,11 @@ export default function ProviderNetworkAdmin() {
         subtitle="Find the right notary, field pro, or internal contact by specialty, coverage, availability, and current load, then dispatch or email without leaving HQ."
         action={
           <div className="flex flex-wrap gap-2">
+            {sharing === 'live' ? (
+              <button type="button" onClick={() => void stopLocationSharing()} className={btnOutline}><LocateFixed size={14} /> Stop my live location</button>
+            ) : (
+              <button type="button" disabled={sharing === 'starting'} onClick={startLocationSharing} className={`${btnOutline} disabled:opacity-50`}><LocateFixed size={14} /> {sharing === 'starting' ? 'Locating me…' : 'Share my live location'}</button>
+            )}
             <Link to={p('field-work')} className={btnOutline}><MapPinned size={14} /> Dispatch board</Link>
             <Link to={p('invitations')} className="btn-gold"><MailPlus size={15} /> Invite provider</Link>
           </div>
@@ -119,6 +228,16 @@ export default function ProviderNetworkAdmin() {
         <Metric icon={ShieldCheck} label="In vetting" value={providers.filter((r) => r.network_status === 'vetting' || r.status === 'pending').length} />
         <Metric icon={MapPinned} label="Open dispatch" value={providers.reduce((n, r) => n + openLoad(r), 0)} />
       </div>
+
+      <FieldLiveMap
+        pins={mapPins}
+        className="mb-2"
+        title="Team live and last-known map"
+        emptyLabel="No one has shared a location yet. Use Share my live location here, or have an agent or provider open an active assignment to establish their last-known pin."
+      />
+      <p className="mb-4 text-[11px] text-slate-500">
+        Live means a location was actively shared within five minutes. Older pins are labeled last active. {noLocationCount} visible contact{noLocationCount === 1 ? '' : 's'} have no saved location.
+      </p>
 
       <Panel className="mb-4 !p-4">
         <div className="flex items-center gap-2">
@@ -331,7 +450,7 @@ function PersonActions({
 }) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 xl:mt-0">
-      {isProvider(row) && (
+      {canDispatchPerson(row) && (
         <Link to={networkDispatchHref(p, row.id)} className="text-xs font-semibold text-gold hover:underline">Dispatch</Link>
       )}
       <Link to={networkEmailHref(p, { email: row.email, name: row.full_name })} className="text-xs font-semibold text-slate-400 hover:text-gold hover:underline">Email</Link>
