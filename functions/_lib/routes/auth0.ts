@@ -19,6 +19,7 @@ import {
   defaultReturnForSurface,
   postAuthDestination,
   loginPathForSurface,
+  isOwnerAccount,
   type Auth0Surface,
 } from '../auth0Access'
 import {
@@ -123,6 +124,9 @@ auth0Routes.get('/auth0/login', async (c) => {
     const user = await getUser(c.env, c.req.raw)
     if (!user) return c.json({ error: 'unauthorized' }, 401)
     if (!canLinkIdentity(user.role)) return c.json({ error: 'this account cannot link social sign-in' }, 403)
+    if (await isOwnerAccount(c.env, user.id)) {
+      return c.json({ error: 'owner accounts must sign in with email and password' }, 403)
+    }
     linkUserId = user.id
     effectiveSurface = linkSurfaceForRole(user.role)
   }
@@ -166,6 +170,9 @@ auth0Routes.get('/auth0/callback', async (c) => {
       if (!owner || owner.status !== 'active' || !canLinkIdentity(owner.role)) {
         return redirectResponse(loginErrorRedirect('account_inactive', linkSurfaceForRole(owner?.role || 'client'), tx.returnTo))
       }
+      if (await isOwnerAccount(c.env, owner.id)) {
+        return redirectResponse(loginErrorRedirect('sign_in_failed', linkSurfaceForRole(owner.role), tx.returnTo))
+      }
       if (!claims.emailVerified) {
         return redirectResponse(loginErrorRedirect('sign_in_failed', linkSurfaceForRole(owner.role), tx.returnTo))
       }
@@ -205,6 +212,9 @@ auth0Routes.get('/auth0/callback', async (c) => {
     if (!roleAllowedForSurface(user.role, surface)) {
       return redirectResponse(loginErrorRedirect('sign_in_failed', surface, tx.returnTo || loginPathForSurface(surface)))
     }
+    if (await isOwnerAccount(c.env, user.id)) {
+      return redirectResponse(loginErrorRedirect('sign_in_failed', surface, tx.returnTo || loginPathForSurface(surface)))
+    }
 
     await touchExternalIdentityLogin(c.env, identity.id)
     await c.env.DB.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").bind(user.id).run()
@@ -242,9 +252,11 @@ auth0Routes.get('/auth0/callback', async (c) => {
 
 auth0Routes.get('/identities', requireUser, async (c) => {
   const user = c.get('user')
-  const identities = await listExternalIdentities(c.env, user.id)
+  const ownerAccount = await isOwnerAccount(c.env, user.id)
+  const identities = ownerAccount ? [] : await listExternalIdentities(c.env, user.id)
   const hasPassword = await userHasPassword(c.env, user.id)
   return c.json({
+    social_sign_in_allowed: !ownerAccount,
     identities: identities.map((identity) => ({
       id: identity.id,
       provider: identity.provider,
@@ -265,6 +277,9 @@ auth0Routes.post('/auth0/link', requireUser, async (c) => {
   if (!canLinkIdentity(user.role)) {
     return c.json({ error: 'this account cannot link social sign-in' }, 403)
   }
+  if (await isOwnerAccount(c.env, user.id)) {
+    return c.json({ error: 'owner accounts must sign in with email and password' }, 403)
+  }
   const config = loadAuth0Config(c.env)
   if (!config) return c.json({ error: 'social sign-in is not available right now' }, 503)
   const body = await c.req.json<{ provider?: string }>().catch(() => ({} as { provider?: string }))
@@ -283,6 +298,9 @@ auth0Routes.post('/auth0/link', requireUser, async (c) => {
 
 auth0Routes.post('/auth0/unlink', requireUser, async (c) => {
   const user = c.get('user')
+  if (await isOwnerAccount(c.env, user.id)) {
+    return c.json({ error: 'owner accounts must sign in with email and password' }, 403)
+  }
   const body = await c.req.json<{ identity_id?: string }>().catch(() => ({} as { identity_id?: string }))
   const identityId = (body.identity_id || '').trim()
   if (!identityId) return c.json({ error: 'identity_id is required' }, 400)

@@ -18,6 +18,7 @@ interface IdentitiesResponse {
   identities: ExternalIdentity[]
   has_password: boolean
   auth0_enabled: boolean
+  social_sign_in_allowed?: boolean
 }
 
 export function ConnectedSignInMethods({
@@ -30,6 +31,7 @@ export function ConnectedSignInMethods({
   const [identities, setIdentities] = useState<ExternalIdentity[]>([])
   const [hasPassword, setHasPassword] = useState(true)
   const [auth0Enabled, setAuth0Enabled] = useState(false)
+  const [socialAllowed, setSocialAllowed] = useState(true)
   const [unlinkingId, setUnlinkingId] = useState<string | null>(null)
   const [oauthBusy, setOauthBusy] = useState(false)
 
@@ -39,6 +41,7 @@ export function ConnectedSignInMethods({
       setIdentities(data.identities || [])
       setHasPassword(!!data.has_password)
       setAuth0Enabled(!!data.auth0_enabled)
+      setSocialAllowed(data.social_sign_in_allowed !== false)
     } catch {
       setIdentities([])
     }
@@ -65,6 +68,8 @@ export function ConnectedSignInMethods({
   const copy = description || (tone === 'hq'
     ? 'Link Google or Microsoft after signing in with your Pinnacle email and password. HQ and provider access still follow your role and permissions.'
     : 'Link Google or Microsoft after you are signed in with your Pinnacle email and password. Pinnacle still controls what you can access.')
+
+  if (!socialAllowed) return null
 
   return (
     <div>

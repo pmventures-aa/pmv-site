@@ -26,6 +26,7 @@ import {
   roleAllowedForSurface,
   loginPathForSurface,
   defaultReturnForSurface,
+  isOwnerAccount,
 } from '../functions/_lib/auth0Access'
 import {
   userCanUnlinkIdentity,
@@ -179,6 +180,25 @@ describe('Auth0 redirect safety', () => {
     expect(roleAllowedForSurface('trusted_contact', 'client')).toBe(true)
     expect(defaultReturnForSurface('staff')).toBe('/admin/')
     expect(loginPathForSurface('staff')).toBe('/admin/login')
+  })
+
+  it('treats team owner flag as exempt from social sign-in', async () => {
+    const ownerDb = {
+      prepare: vi.fn(() => ({
+        bind: () => ({
+          first: vi.fn(async () => ({ is_owner: 1 })),
+        }),
+      })),
+    } as unknown as Env['DB']
+    const staffDb = {
+      prepare: vi.fn(() => ({
+        bind: () => ({
+          first: vi.fn(async () => ({ is_owner: 0 })),
+        }),
+      })),
+    } as unknown as Env['DB']
+    expect(await isOwnerAccount({ DB: ownerDb } as Env, 'owner-1')).toBe(true)
+    expect(await isOwnerAccount({ DB: staffDb } as Env, 'staff-1')).toBe(false)
   })
 })
 

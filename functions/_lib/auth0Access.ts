@@ -1,4 +1,14 @@
+import type { Env } from './types'
+
 export type Auth0Surface = 'client' | 'staff'
+
+/** Owner accounts always sign in with email/password — never Auth0 social. */
+export async function isOwnerAccount(env: Env, userId: string): Promise<boolean> {
+  const row = await env.DB.prepare(
+    'SELECT is_owner FROM team_members WHERE user_id = ?',
+  ).bind(userId).first<{ is_owner: number }>()
+  return !!row?.is_owner
+}
 
 export function parseAuth0Surface(raw: string | null | undefined): Auth0Surface {
   return raw === 'staff' ? 'staff' : 'client'
