@@ -69,6 +69,8 @@ export const adminNav: NavItem[] = [
   {key:'settings',label:'Settings',to:'settings',icon:Settings,section:'Administration'},
 ]
 
+export const vendorMobilePrimary = ['assignments', 'messages'] as const
+
 export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
   const assignmentLabel = world === 'property'
     ? 'Field assignments'
@@ -80,6 +82,12 @@ export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
     {key:'messages',label:'Inbox',to:'messages',icon:MessageSquare,section:'Work'},
     {key:'security-center',label:'Security',to:'security-center',icon:ShieldCheck,section:'Account'},
   ]
+}
+
+export function vendorMobileTabLabel(item: NavItem): string {
+  if (item.key === 'assignments') return 'Assignments'
+  if (item.key === 'messages') return 'Messages'
+  return item.label
 }
 
 export const vendorNav: NavItem[] = vendorNavForWorld('general')

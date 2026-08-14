@@ -46,5 +46,6 @@ describe('operating worlds', () => {
     expect(hqEmployeeExperience('Document Specialist').quickActions[0].to).toBe('document-center')
     expect(vendorNavForWorld('property')[0].label).toBe('Field assignments')
     expect(vendorNavForWorld('documents')[0].label).toBe('Signing assignments')
+    expect(vendorNavForWorld('property').map((item) => item.key)).toEqual(['assignments', 'messages', 'security-center'])
   })
 })

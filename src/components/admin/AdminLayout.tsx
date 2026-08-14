@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Menu, X, Search, RotateCw, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react'
 import { Logo } from '../ui'
 import { useAppPath } from '../../lib/basePath'
-import type { NavItem } from '../layout/nav'
+import { vendorMobilePrimary, vendorMobileTabLabel, type NavItem } from '../layout/nav'
 import { NotificationBell } from './NotificationBell'
 import { NotificationFeedPanel } from '../kit/NotificationFeedPanel'
 import { ImpersonationBanner } from '../kit/ImpersonationBanner'
@@ -16,10 +16,14 @@ import { WhoMenu } from './WhoMenu'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 
+function PageFallback() {
+  return <p className="px-1 py-8 text-sm text-slate-400">Loading…</p>
+}
+
 // `badge` prop kept for callers that still pass it but no longer rendered
 // anywhere in the layout - it was showing as "STAFF CONSOLE" chrome the
 // user asked to remove.
-export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: string }) {
+export function AdminLayout({ nav, badge: _badge, vendorMobile = false }: { nav: NavItem[]; badge?: string; vendorMobile?: boolean }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -42,6 +46,9 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   const { count: emailUnread } = useEmailUnreadCount()
   const hideHqNav = /(^|\/)(messages|communications)(\/|$)/.test(location.pathname)
   const mailWorkspace = /(^|\/)messages(\/|$)/.test(location.pathname)
+  const vendorTabs = nav.filter((item) => (vendorMobilePrimary as readonly string[]).includes(item.key))
+  const vendorHome = 'field-work/mine'
+  const vendorShellPad = vendorMobile ? 'pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-0' : ''
 
   function toggleSidebar() {
     setSidebarOpen((open) => {
@@ -127,8 +134,8 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
       <header className="sticky top-0 z-30 border-b border-white/10 bg-navy-900/95 backdrop-blur lg:hidden print:hidden">
         <div className="flex items-center justify-between gap-2 px-3 py-2.5">
           {hideHqNav ? (
-            <NavLink to={p()} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:border-gold/40 hover:text-gold">
-              <ArrowLeft size={14} />Back to HQ
+            <NavLink to={p(vendorMobile ? vendorHome : '')} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:border-gold/40 hover:text-gold">
+              <ArrowLeft size={14} />{vendorMobile ? 'Assignments' : 'Back to HQ'}
             </NavLink>
           ) : <Logo compact />}
           <div className="flex shrink-0 items-center gap-1.5">
@@ -161,8 +168,8 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
         <div className="hidden h-14 items-center justify-between gap-4 border-b border-white/10 bg-navy-900/70 px-6 backdrop-blur lg:flex print:hidden">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {hideHqNav ? (
-              <NavLink to={p()} className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[.03] px-3 py-1.5 text-sm font-semibold text-white transition hover:border-gold/40 hover:text-gold">
-                <ArrowLeft size={15} />Back to HQ
+              <NavLink to={p(vendorMobile ? vendorHome : '')} className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[.03] px-3 py-1.5 text-sm font-semibold text-white transition hover:border-gold/40 hover:text-gold">
+                <ArrowLeft size={15} />{vendorMobile ? 'Assignments' : 'Back to HQ'}
               </NavLink>
             ) : (
               <button onClick={toggleSidebar} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white" aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>{sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}</button>
@@ -179,9 +186,37 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
           </div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={mailWorkspace ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-0' : hideHqNav ? 'flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4' : 'flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4'}><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={mailWorkspace ? `flex min-h-0 flex-1 flex-col overflow-hidden p-0 ${vendorShellPad}` : hideHqNav ? `flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4 ${vendorShellPad}` : `flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4 ${vendorShellPad}`}><AdminPageBoundary><Suspense fallback={<PageFallback />}><Outlet /></Suspense></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
+
+      {vendorMobile && (
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-navy-950/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl lg:hidden print:hidden" aria-label="Primary field destinations">
+          <div className="grid grid-cols-3 gap-1">
+            {vendorTabs.map((item) => (
+              <NavLink
+                key={item.key}
+                to={p(item.to)}
+                className={({ isActive }) => {
+                  const onAssignments = item.key === 'assignments' && /(^|\/)field-work(\/|$)/.test(location.pathname)
+                  const active = isActive || onAssignments
+                  return `relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold ${active ? 'text-gold' : 'text-slate-500'}`
+                }}
+              >
+                <item.icon size={18} strokeWidth={1.8} />
+                <span className="truncate">{vendorMobileTabLabel(item)}</span>
+                {item.key === 'messages' && emailUnread > 0 && (
+                  <span className="absolute right-3 top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">{emailUnread > 99 ? '99+' : emailUnread}</span>
+                )}
+              </NavLink>
+            ))}
+            <button type="button" onClick={() => setMobileOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold text-slate-500">
+              <Menu size={18} strokeWidth={1.8} />
+              More
+            </button>
+          </div>
+        </nav>
+      )}
     </div>
   )
 }

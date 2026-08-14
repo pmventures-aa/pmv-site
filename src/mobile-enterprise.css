@@ -198,3 +198,10 @@ body { -webkit-text-size-adjust: 100%; }
     min-height: 0 !important;
   }
 }
+
+/* Vendor HQ bottom tabs: keep primary field actions above the home indicator */
+@media (max-width: 1023px) {
+  [data-pmv-surface='admin'] nav[aria-label='Primary field destinations'] {
+    padding-bottom: max(0.4rem, env(safe-area-inset-bottom));
+  }
+}

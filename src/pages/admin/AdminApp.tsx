@@ -1,3 +1,4 @@
+import { lazy } from 'react'
 import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { AdminLayout } from '../../components/admin/AdminLayout'
@@ -13,42 +14,44 @@ import ResetPassword from '../auth/ResetPassword'
 import SetPassword from '../auth/SetPassword'
 import VendorSignup from '../auth/VendorSignup'
 import StaffInvite from '../auth/StaffInvite'
-import AdminDashboard from './AdminDashboard'
-import ClientsList from './ClientsList'
-import ClientDetail from './ClientDetail'
-import ClientDetailModern from './ClientDetailModern'
-import UsersAdmin from './UsersAdmin'
-import AssignmentsAdmin from './AssignmentsAdmin'
-import SettingsAdmin from './SettingsAdmin'
-import CRMRecordsAdmin from './CRMRecordsAdmin'
-import LeadCreate from './LeadCreate'
-import LeadDetail from './LeadDetail'
-import MessagesAdmin from './MessagesAdmin'
-import ActivityAdmin from './ActivityAdmin'
-import OpenItemsAdmin from './OpenItemsAdmin'
-import PipelinesAdmin from './PipelinesAdmin'
-import AuditLogAdmin from './AuditLogAdmin'
-import ProviderNetworkAdmin from './ProviderNetworkAdmin'
-import ProviderProfile from './ProviderProfile'
-import ReportingCenter from './ReportingCenter'
-import ManagementCenter from './ManagementCenter'
-import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
-import ClientBannersAdmin from './ClientBannersAdmin'
-import AutomationCenter from './AutomationCenter'
-import SecurityCenter from './SecurityCenter'
-import InvoicesAdmin from './InvoicesAdmin'
-import ServiceAssignmentsAdmin from './ServiceAssignmentsAdmin'
-import InvitationsAdmin from './InvitationsAdmin'
-import RolesPermissionsAdmin from './RolesPermissionsAdmin'
-import DocumentOperationsDashboard from './DocumentOperationsDashboard'
-import CommunityDocuments from './CommunityDocuments'
-import EnvelopeWorkspaceEnterprise from './EnvelopeWorkspaceEnterprise'
-import ESignPlatformAdmin from './ESignPlatformAdmin'
-import FieldWorkAdmin from './FieldWorkAdmin'
-import FieldWorkDetail, { FieldWorkList } from './FieldWorkVendor'
-import CasesAdmin from './CasesAdmin'
-import PublicFunnelAdmin from './PublicFunnelAdmin'
-import QuotesAdmin from './QuotesAdmin'
+
+const AdminDashboard = lazy(() => import('./AdminDashboard'))
+const ClientsList = lazy(() => import('./ClientsList'))
+const ClientDetail = lazy(() => import('./ClientDetail'))
+const ClientDetailModern = lazy(() => import('./ClientDetailModern'))
+const UsersAdmin = lazy(() => import('./UsersAdmin'))
+const AssignmentsAdmin = lazy(() => import('./AssignmentsAdmin'))
+const SettingsAdmin = lazy(() => import('./SettingsAdmin'))
+const CRMRecordsAdmin = lazy(() => import('./CRMRecordsAdmin'))
+const LeadCreate = lazy(() => import('./LeadCreate'))
+const LeadDetail = lazy(() => import('./LeadDetail'))
+const MessagesAdmin = lazy(() => import('./MessagesAdmin'))
+const ActivityAdmin = lazy(() => import('./ActivityAdmin'))
+const OpenItemsAdmin = lazy(() => import('./OpenItemsAdmin'))
+const PipelinesAdmin = lazy(() => import('./PipelinesAdmin'))
+const AuditLogAdmin = lazy(() => import('./AuditLogAdmin'))
+const ProviderNetworkAdmin = lazy(() => import('./ProviderNetworkAdmin'))
+const ProviderProfile = lazy(() => import('./ProviderProfile'))
+const ReportingCenter = lazy(() => import('./ReportingCenter'))
+const ManagementCenter = lazy(() => import('./ManagementCenter'))
+const CommunicationsCRMAdmin = lazy(() => import('./CommunicationsCRMAdmin'))
+const ClientBannersAdmin = lazy(() => import('./ClientBannersAdmin'))
+const AutomationCenter = lazy(() => import('./AutomationCenter'))
+const SecurityCenter = lazy(() => import('./SecurityCenter'))
+const InvoicesAdmin = lazy(() => import('./InvoicesAdmin'))
+const ServiceAssignmentsAdmin = lazy(() => import('./ServiceAssignmentsAdmin'))
+const InvitationsAdmin = lazy(() => import('./InvitationsAdmin'))
+const RolesPermissionsAdmin = lazy(() => import('./RolesPermissionsAdmin'))
+const DocumentOperationsDashboard = lazy(() => import('./DocumentOperationsDashboard'))
+const CommunityDocuments = lazy(() => import('./CommunityDocuments'))
+const EnvelopeWorkspaceEnterprise = lazy(() => import('./EnvelopeWorkspaceEnterprise'))
+const ESignPlatformAdmin = lazy(() => import('./ESignPlatformAdmin'))
+const FieldWorkAdmin = lazy(() => import('./FieldWorkAdmin'))
+const FieldWorkDetail = lazy(() => import('./FieldWorkVendor'))
+const FieldWorkList = lazy(() => import('./FieldWorkVendor').then((m) => ({ default: m.FieldWorkList })))
+const CasesAdmin = lazy(() => import('./CasesAdmin'))
+const PublicFunnelAdmin = lazy(() => import('./PublicFunnelAdmin'))
+const QuotesAdmin = lazy(() => import('./QuotesAdmin'))
 
 const STAFF_VISIBLE = ['dashboard','pipelines','clients','inquiries','quotes','messages','cases','activity','invoices','field-work','service-assignments','security-center']
 
@@ -67,7 +70,7 @@ function AdminShell(){
   const nav = isVendor
     ? vendorNavForWorld(workspace.world)
     : user?.role==='admin'?adminNav.filter(item=>(item.key!=='roles'&&item.key!=='automation-center'&&item.key!=='public-funnel')||caps.is_owner):adminNav.filter(item=>visible.has(item.key))
-  return <AdminLayout nav={nav} badge={copy.badge}/>
+  return <AdminLayout nav={nav} badge={copy.badge} vendorMobile={isVendor}/>
 }
 function AdminIndex(){
   const {workspace}=useAuth(); const p=useAppPath()

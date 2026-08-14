@@ -19,6 +19,13 @@ describe('HQ navigation contract', () => {
     expect(new Set(destinations).size).toBe(destinations.length)
   })
 
+  it('lazy-loads HQ workspaces so field work is not in the AdminApp entry graph', () => {
+    expect(appSource).toContain("lazy(() => import('./FieldWorkVendor'))")
+    expect(appSource).toContain("lazy(() => import('./QuotesAdmin'))")
+    expect(appSource).toContain("lazy(() => import('./CommunicationsCRMAdmin'))")
+    expect(appSource).not.toMatch(/^import FieldWorkDetail/m)
+  })
+
   it('keeps revenue, documents, and people tools on a shorter HQ sidebar', () => {
     const keys = adminNav.map((item) => item.key)
     expect(keys).toContain('invoices')
