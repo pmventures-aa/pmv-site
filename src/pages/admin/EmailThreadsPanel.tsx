@@ -76,6 +76,7 @@ export function EmailThreadsPanel() {
         const fromUrl = new URLSearchParams(window.location.search).get('thread')
         if (fromUrl && r.threads.some((t) => t.id === fromUrl)) return fromUrl
         if (current && r.threads.some((t) => t.id === current)) return current
+        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) return null
         return r.threads[0]?.id ?? null
       })
     } catch (err) { if (err instanceof ApiError) toast.error(err.message) }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { AtSign, CheckCheck, ChevronLeft, Circle, Hash, Loader2, Lock, MessageSquare, Paperclip, PinIcon, Plus, Send, User, X } from 'lucide-react'
+import { AtSign, CheckCheck, ChevronDown, ChevronLeft, Circle, Hash, Loader2, Lock, MessageSquare, Paperclip, PinIcon, Plus, Send, User, Users, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { Panel, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
@@ -54,6 +54,7 @@ export function ConversationsPanel() {
         const fromUrl = new URLSearchParams(window.location.search).get('conv')
         if (fromUrl && r.conversations.some((c) => c.id === fromUrl)) return fromUrl
         if (current && r.conversations.some((c) => c.id === current)) return current
+        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) return null
         return r.conversations[0]?.id ?? null
       })
     } catch (err) {
@@ -83,8 +84,8 @@ export function ConversationsPanel() {
   useEffect(() => { if (!selectedId) return; const t = setInterval(() => void loadDetail(), POLL_MS); return () => clearInterval(t) }, [selectedId, loadDetail])
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-      <Panel className={`!p-0 ${selectedId ? 'hidden md:block' : ''}`}>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 md:grid md:grid-cols-[320px_1fr] lg:grid-cols-[360px_1fr]">
+      <Panel className={`min-h-0 flex-1 flex-col !p-0 md:flex md:flex-none ${selectedId ? 'hidden' : 'flex'}`}>
         <div className="flex items-center justify-between border-b border-white/10 p-3">
           <p className="text-sm font-extrabold text-white">Conversations</p>
           <button className={btnPrimary} onClick={() => setComposerOpen(true)}><Plus size={14}/>New</button>
@@ -100,7 +101,7 @@ export function ConversationsPanel() {
             ))}
           </div>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto divide-y divide-white/10">
+        <div className="min-h-0 flex-1 divide-y divide-white/10 overflow-y-auto md:max-h-[70vh]">
           {loading && !conversations.length && <p className="p-4 text-xs text-slate-500">Loading conversations…</p>}
           {!loading && !conversations.length && <p className="p-4 text-xs text-slate-500">No conversations match. Start one with the "New" button above.</p>}
           {conversations.map((c) => (
@@ -128,7 +129,7 @@ export function ConversationsPanel() {
         </div>
       </Panel>
 
-      <div className={selectedId ? 'block' : 'hidden md:block'}>
+      <div className={`min-h-0 flex-1 ${selectedId ? 'flex' : 'hidden md:flex'}`}>
         <ConversationDetail detail={detail} onBack={() => setSelectedId(null)} onChanged={() => { void load(); void loadDetail() }} />
       </div>
 
@@ -146,6 +147,7 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
   const [busy, setBusy] = useState(false)
   const [body, setBody] = useState('')
   const [internal, setInternal] = useState(false)
+  const [whoOpen, setWhoOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pinned = useMemo(() => new Set((detail?.pins || []).map((p) => p.message_id)), [detail])
 
@@ -184,15 +186,15 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
   }
 
   return (
-    <Panel className="!p-0">
-      <div className="border-b border-white/10 p-4">
+    <Panel className="flex min-h-0 flex-1 flex-col !p-0">
+      <div className="sticky top-0 z-10 shrink-0 border-b border-white/10 bg-navy-950/90 p-3 backdrop-blur md:static md:bg-transparent md:p-4 md:backdrop-blur-none">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-2">
             <button type="button" onClick={onBack} className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 text-slate-300 hover:border-gold/40 hover:text-gold md:hidden" aria-label="Back to conversations">
               <ChevronLeft size={16}/>
             </button>
             <div className="min-w-0">
-              <p className="text-lg font-extrabold text-white">{conversation.subject}</p>
+              <p className="truncate text-base font-extrabold text-white md:text-lg">{conversation.subject}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                 <Tag>{KIND_LABEL[conversation.kind] || conversation.kind}</Tag>
                 <Tag tone={STATUS_TONE[conversation.status]}>{conversation.status}</Tag>
@@ -201,10 +203,15 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {conversation.status === 'open' ? <button className={btnSecondary} onClick={() => setStatus('closed')}>Close</button> : <button className={btnSecondary} onClick={() => setStatus('open')}>Reopen</button>}
+            {conversation.status === 'open' ? <button className={`${btnSecondary} !px-2.5 md:!px-3`} onClick={() => setStatus('closed')}>Close</button> : <button className={`${btnSecondary} !px-2.5 md:!px-3`} onClick={() => setStatus('open')}>Reopen</button>}
           </div>
         </div>
       </div>
+      <button type="button" onClick={() => setWhoOpen((value) => !value)} className="flex w-full items-center justify-between border-b border-white/10 px-3 py-2 text-left text-xs font-semibold text-slate-400 md:hidden">
+        <span className="inline-flex items-center gap-2"><Users size={13}/>Participants</span>
+        <ChevronDown size={14} className={`transition ${whoOpen ? 'rotate-180' : ''}`}/>
+      </button>
+      <div className={`${whoOpen ? 'block' : 'hidden'} md:block`}>
       <WhoSection
         rows={[
           { label: 'People', people: participants.map((part) => ({
@@ -223,8 +230,9 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
           }] : [] },
         ]}
       />
+      </div>
 
-      <div ref={scrollRef} className="max-h-[52vh] min-h-[320px] space-y-3 overflow-y-auto p-4">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pb-24 md:min-h-[320px] md:max-h-[52vh] md:p-4 md:pb-4">
         {messages.map((m) => {
           const isNote = !!m.is_internal_note
           return (
@@ -238,17 +246,17 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-slate-500">
                   <span>{new Date(m.created_at).toLocaleString()}</span>
-                  <button onClick={() => void togglePin(m.id)} className={`opacity-40 transition group-hover:opacity-100 ${pinned.has(m.id) ? 'text-gold opacity-100' : ''}`} aria-label="Pin"><PinIcon size={12}/></button>
+                  <button onClick={() => void togglePin(m.id)} className={`opacity-100 transition md:opacity-40 md:group-hover:opacity-100 ${pinned.has(m.id) ? 'text-gold !opacity-100' : ''}`} aria-label="Pin"><PinIcon size={12}/></button>
                 </div>
               </div>
-              <div className="prose prose-sm prose-invert mt-2 max-w-none text-sm text-slate-200" dangerouslySetInnerHTML={{ __html: m.body_html || escapeHtml(m.body_md) }}/>
+              <div className="prose prose-sm prose-invert mt-2 max-w-none overflow-x-auto text-sm text-slate-200" dangerouslySetInnerHTML={{ __html: m.body_html || escapeHtml(m.body_md) }}/>
             </div>
           )
         })}
         {messages.length === 0 && <p className="text-center text-xs text-slate-500">No messages yet.</p>}
       </div>
 
-      <div className="border-t border-white/10 p-3">
+      <div className="sticky bottom-0 z-10 shrink-0 border-t border-white/10 bg-navy-950/90 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:bg-transparent md:backdrop-blur-none">
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -262,7 +270,7 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
             <Lock size={12}/> Internal note
           </label>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-slate-600">Ctrl / ⌘ + Enter to send</span>
+            <span className="hidden text-[10px] text-slate-600 md:inline">Ctrl / ⌘ + Enter to send</span>
             <button className={btnPrimary} onClick={() => void send()} disabled={busy || !body.trim()}>{busy ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}Send</button>
           </div>
         </div>
@@ -310,7 +318,7 @@ function ComposerDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
-      <DialogContent size="lg" title="New conversation" description="Start a 1:1 or group thread with any staff, client, or vendor.">
+      <DialogContent size="lg" className="max-h-[calc(100dvh-1rem)] overflow-y-auto sm:max-h-none sm:overflow-visible" title="New conversation" description="Start a 1:1 or group thread with any staff, client, or vendor.">
       <div className="space-y-4">
         <div className="flex gap-2">
           {(['dm','group_dm'] as const).map((k) => (
@@ -334,8 +342,8 @@ function ComposerDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
           {results.length > 0 && (
             <div className="mt-1 max-h-40 divide-y divide-white/10 overflow-y-auto rounded-lg border border-white/10 bg-navy-950">
               {results.filter((r) => !participants.find((p) => p.id === r.id)).slice(0, 8).map((r) => (
-                <button key={r.id} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/[.03]" onClick={() => { setParticipants((c) => kind === 'dm' ? [r] : [...c, r]); setQuery(''); setResults([]) }}>
-                  <span><span className="font-semibold text-white">{r.full_name || r.email}</span><span className="ml-2 text-[11px] text-slate-500">{r.email} · {r.role}</span></span>
+                <button key={r.id} className="flex w-full min-w-0 items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-white/[.03]" onClick={() => { setParticipants((c) => kind === 'dm' ? [r] : [...c, r]); setQuery(''); setResults([]) }}>
+                  <span className="min-w-0"><span className="block truncate font-semibold text-white">{r.full_name || r.email}</span><span className="block truncate text-[11px] text-slate-500">{r.email} · {r.role}</span></span>
                   <Plus size={12} className="text-gold"/>
                 </button>
               ))}

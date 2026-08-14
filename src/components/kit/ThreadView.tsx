@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCheck, Paperclip, X } from 'lucide-react'
+import { CheckCheck, ChevronDown, Paperclip, Users, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
@@ -56,6 +56,7 @@ export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: ()
   const [draft, setDraft] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [sending, setSending] = useState(false)
+  const [whoOpen, setWhoOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -136,12 +137,17 @@ export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: ()
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-white/10 px-5 py-4">
+      <div className="thread-view-header border-b border-white/10 px-5 py-4">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Secure conversation</p>
         <h2 className="mt-1 text-base font-semibold text-white">{data.thread.subject}</h2>
       </div>
-      <WhoSection rows={whoRows} />
-      <div className="flex-1 overflow-y-auto p-5">
+      <button type="button" onClick={() => setWhoOpen((value) => !value)} className="flex w-full items-center justify-between border-b border-white/10 px-3 py-2 text-left text-xs font-semibold text-slate-400 md:hidden">
+        <span className="inline-flex items-center gap-2"><Users size={13}/>Participants</span>
+        <ChevronDown size={14} className={`transition ${whoOpen ? 'rotate-180' : ''}`}/>
+      </button>
+      {whoOpen && <div className="md:hidden"><WhoSection rows={whoRows} /></div>}
+      <div className="hidden md:block"><WhoSection rows={whoRows} /></div>
+      <div className="flex-1 overflow-y-auto p-3 pb-24 sm:p-5 md:pb-5">
         <ul className="space-y-4">
           {data.messages.map((m) => {
             const mine = m.sender_user_id === user?.id
@@ -161,8 +167,8 @@ export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: ()
                     <ul className="mt-3 space-y-1 border-t border-white/10 pt-2">
                       {files.map((f) => (
                         <li key={f.id}>
-                          <a href={`/api/portal/message-attachments/${f.id}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-gold hover:underline">
-                            <Paperclip size={13} />{f.file_name}<span className="text-slate-500">({fmtSize(f.size_bytes)})</span>
+                          <a href={`/api/portal/message-attachments/${f.id}`} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-1.5 text-xs text-gold hover:underline">
+                            <Paperclip size={13} className="shrink-0"/><span className="truncate">{f.file_name}</span><span className="shrink-0 text-slate-500">({fmtSize(f.size_bytes)})</span>
                           </a>
                         </li>
                       ))}
@@ -184,7 +190,7 @@ export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: ()
           <div ref={bottomRef} />
         </ul>
       </div>
-      <form onSubmit={send} className="border-t border-white/10 bg-navy-950/40 p-4">
+      <form onSubmit={send} className="sticky bottom-0 z-10 border-t border-white/10 bg-navy-950/90 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:bg-navy-950/40 md:p-4 md:backdrop-blur-none">
         {pendingFiles.length > 0 && (
           <ul className="mb-3 flex flex-wrap gap-2">
             {pendingFiles.map((f, i) => (
@@ -221,7 +227,7 @@ export function ThreadView({ threadId, onSent }: { threadId: string; onSent?: ()
           />
           <button type="submit" disabled={sending || !draft.trim()} className="btn-gold shrink-0 disabled:opacity-60">{sending ? 'Sending…' : 'Send'}</button>
         </div>
-        <p className="mt-2 text-[10px] text-slate-600">Attachments: PDF, PNG, JPG, WebP, DOCX, XLSX, or TXT · 15 MB maximum each</p>
+        <p className="mt-2 hidden text-[10px] text-slate-600 md:block">Attachments: PDF, PNG, JPG, WebP, DOCX, XLSX, or TXT · 15 MB maximum each</p>
       </form>
     </div>
   )
