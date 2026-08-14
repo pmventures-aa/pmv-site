@@ -93,3 +93,13 @@ describe('Network page search chrome', () => {
     expect(source).toContain('place-items-center rounded-md border')
   })
 })
+
+describe('provider profile dispatch', () => {
+  const source = readFileSync(new URL('../src/pages/admin/ProviderProfile.tsx', import.meta.url), 'utf8')
+
+  it('dispatches from the profile with the provider prefilled on the board', () => {
+    expect(source).toContain('networkDispatchHref')
+    expect(source).toContain('canDispatchPerson')
+    expect(source).not.toContain("to={p('field-work')} className=\"btn-gold\"")
+  })
+})

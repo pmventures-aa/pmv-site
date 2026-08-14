@@ -10,6 +10,9 @@ import { renderFieldAssignmentAuditEmail } from '../emailTemplates/fieldAssignme
 import { resolveEligibleFieldProvider } from '../fieldProviders'
 import { canAccessClient } from '../scope'
 import { requireNamedPermission } from '../capabilities'
+import { DispatchProviderConflict, loadDispatchProviderProfile, provisionDispatchProvider } from '../vendorStaging'
+import { toDisplayCase } from '../../../shared/displayCase'
+import { isEligibleProviderAccount } from '../../../shared/operations'
 
 export const fieldWorkRoutes = new Hono<AppEnv>()
 
@@ -111,6 +114,41 @@ function nowIso(): string {
 }
 
 // ---------- Staff: create + list all ----------
+
+fieldWorkRoutes.post('/dispatch-providers', requireStaff, async (c) => {
+  const body = await c.req.json<{
+    email?: string
+    full_name?: string
+    phone?: string
+    vendor_category?: string
+    company_name?: string
+  }>().catch(() => ({} as Record<string, string>))
+
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  const fullName = toDisplayCase(typeof body.full_name === 'string' ? body.full_name.trim().slice(0, 240) : '')
+  if (!email || !email.includes('@')) return c.json({ error: 'a valid email is required' }, 400)
+  if (!fullName) return c.json({ error: 'provider name is required' }, 400)
+
+  try {
+    const result = await provisionDispatchProvider(c.env, {
+      email,
+      fullName,
+      phone: typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) : null,
+      vendorCategory: typeof body.vendor_category === 'string' ? body.vendor_category.trim().slice(0, 120) : null,
+      companyName: typeof body.company_name === 'string' ? body.company_name.trim().slice(0, 200) : null,
+    })
+    const user = await loadDispatchProviderProfile(c.env, result.userId)
+    if (!user || !isEligibleProviderAccount(user.role, user.status)) {
+      return c.json({ error: 'provider could not be prepared for dispatch' }, 500)
+    }
+    return c.json({ user, created: result.created, activated: result.activated })
+  } catch (err) {
+    if (err instanceof DispatchProviderConflict) {
+      return c.json({ error: err.message }, 409)
+    }
+    throw err
+  }
+})
 
 fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   const user = c.get('user')

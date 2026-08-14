@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canCompleteStagedVendorSignup, vendorInvitePlan } from '../functions/_lib/vendorStaging'
+import { canCompleteStagedVendorSignup, dispatchProviderPlan, vendorInvitePlan } from '../functions/_lib/vendorStaging'
 
 const staged = { id: 'u1', role: 'staff', status: 'pending', password_hash: null, party_type: 'vendor' as string | null }
 const applied = { ...staged, password_hash: 'hash' }
@@ -28,5 +28,15 @@ describe('vendor invite staging', () => {
     expect(canCompleteStagedVendorSignup(staged)).toBe(true)
     expect(canCompleteStagedVendorSignup(applied)).toBe(false)
     expect(canCompleteStagedVendorSignup(active)).toBe(false)
+  })
+})
+
+describe('dispatch provider provisioning', () => {
+  it('creates, reuses, activates, or rejects provider emails', () => {
+    expect(dispatchProviderPlan(null)).toBe('create')
+    expect(dispatchProviderPlan(active)).toBe('reuse')
+    expect(dispatchProviderPlan(staged)).toBe('activate')
+    expect(dispatchProviderPlan(client)).toBe('conflict')
+    expect(dispatchProviderPlan(pendingEmployee)).toBe('conflict')
   })
 })

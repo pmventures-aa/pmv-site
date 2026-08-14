@@ -8,6 +8,7 @@ import { useAppPath } from '../../lib/basePath'
 import { toast } from '../../components/kit/toast'
 import { liveLetterheadHtml, type SignatureRosterPerson } from '../../lib/emailSignatures'
 import { SignaturePreview } from './SignatureLetterhead'
+import { canDispatchPerson, networkDispatchHref } from '../../lib/networkRoster'
 
 interface Data {
   employee: any
@@ -142,7 +143,14 @@ export default function ProviderProfile() {
             uploadPath={`/admin/users/${e.id}/avatar`}
           />
         }
-        action={e.is_preferred_provider ? <Tag tone="gold"><Star size={12} className="fill-gold" />Preferred</Tag> : undefined}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {canDispatchPerson(e) && (
+              <Link to={networkDispatchHref(p, e.id)} className="btn-gold">Dispatch</Link>
+            )}
+            {e.is_preferred_provider ? <Tag tone="gold"><Star size={12} className="fill-gold" />Preferred</Tag> : null}
+          </div>
+        }
       />
 
       <nav className="mb-5 flex gap-1 overflow-x-auto border-b border-white/10">
@@ -253,9 +261,19 @@ export default function ProviderProfile() {
 
       {tab === 'dispatch' && (
         <Panel>
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">Dispatch history</h2>
-            <Link to={p('field-work')} className="btn-gold">Open Dispatch Board</Link>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Dispatch history</h2>
+              {!canDispatchPerson(e) && (
+                <p className="mt-1 text-xs text-slate-500">Activate this profile before dispatching new work.</p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {canDispatchPerson(e) && (
+                <Link to={networkDispatchHref(p, e.id)} className="btn-gold">Dispatch</Link>
+              )}
+              <Link to={p('field-work')} className="btn-outline">Open Dispatch Board</Link>
+            </div>
           </div>
           <div className="mt-4 divide-y divide-white/[.06]">
             {data.dispatch_history.length ? data.dispatch_history.map((a: any) => (

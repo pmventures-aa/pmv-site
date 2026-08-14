@@ -28,10 +28,14 @@ describe('debug regressions', () => {
   it('lets Field Work load providers without manage_team', () => {
     const field = readFileSync(new URL('../src/pages/admin/FieldWorkAdmin.tsx', import.meta.url), 'utf8')
     const employees = readFileSync(new URL('../functions/_lib/routes/employees.ts', import.meta.url), 'utf8')
+    const fieldWork = readFileSync(new URL('../functions/_lib/routes/fieldWork.ts', import.meta.url), 'utf8')
     expect(field).toContain('/admin/staff-directory')
+    expect(field).toContain('/admin/dispatch-providers')
+    expect(field).toContain('New provider')
     expect(field).not.toContain('/admin/employees')
     expect(employees).toContain('tm.party_type')
     expect(employees).toContain('ON CONFLICT(user_id) DO UPDATE SET')
+    expect(fieldWork).toContain("fieldWorkRoutes.post('/dispatch-providers'")
   })
 
   it('rejects Vite SPA HTML so a missing API is not treated as a logged-out session', () => {
