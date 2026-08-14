@@ -22,7 +22,7 @@ searchRoutes.get('/search', requireStaff, async (c) => {
 
   const [clients, inquiries, matters, invoices, quotes] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT u.id, u.full_name, u.email, cp.business_name
+      `SELECT u.id, u.public_ref, u.full_name, u.email, cp.business_name
        FROM users u LEFT JOIN client_profiles cp ON cp.user_id = u.id
        WHERE u.role = 'client' AND ${clientScope.where}
          AND (u.full_name LIKE ? OR u.email LIKE ? OR cp.business_name LIKE ?)
@@ -36,13 +36,13 @@ searchRoutes.get('/search', requireStaff, async (c) => {
        ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ?`,
     ).bind(like, like, like, like, like, like, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
-      `SELECT m.id, m.title, m.status, m.client_user_id, u.full_name AS client_name, u.email AS client_email
+      `SELECT m.id, m.title, m.status, m.client_user_id, u.public_ref AS client_public_ref, u.full_name AS client_name, u.email AS client_email
        FROM matters m JOIN users u ON u.id = m.client_user_id
        WHERE ${matterScope.where} AND m.title LIKE ?
        ORDER BY m.created_at DESC LIMIT ?`,
     ).bind(...matterScope.params, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
-      `SELECT i.id, i.amount_cents, i.status, i.invoice_number, i.title, i.client_user_id, u.full_name AS client_name, u.email AS client_email
+      `SELECT i.id, i.amount_cents, i.status, i.invoice_number, i.title, i.client_user_id, u.public_ref AS client_public_ref, u.full_name AS client_name, u.email AS client_email
        FROM invoices i JOIN users u ON u.id = i.client_user_id
        WHERE ${invoiceScope.where} AND (
          u.full_name LIKE ? OR u.email LIKE ? OR i.id LIKE ? OR COALESCE(i.invoice_number,'') LIKE ? OR COALESCE(i.title,'') LIKE ?

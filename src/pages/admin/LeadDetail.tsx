@@ -134,9 +134,9 @@ export default function LeadDetail() {
     if (!window.confirm(`Convert ${data.record.name} to a client? Their notes, outbound email history, and activity will carry forward.`)) return
     setBusy(true)
     try {
-      const res = await api.post<{ client_user_id: string }>(`/admin/inquiries/${id}/convert`)
+      const res = await api.post<{ client_user_id: string; client_public_ref: string | null }>(`/admin/inquiries/${id}/convert`)
       toast.success('Converted to client.')
-      window.location.href = p(`clients/${res.client_user_id}/overview`)
+      window.location.href = p(`clients/${res.client_public_ref || res.client_user_id}/overview`)
     } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Could not convert this record.') }
     finally { setBusy(false) }
   }

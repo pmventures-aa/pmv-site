@@ -11,6 +11,7 @@ import { sendEmail, escapeHtml } from '../email'
 import { getService, getQuestions, prefillForQuestions, persistAnswers } from './serviceApplications'
 import { toDisplayCase } from '../../../shared/displayCase'
 import { calendarFeedUrls, signCalendarFeedToken } from '../calendarFeed'
+import { loadStaffClientReference } from '../clientRef'
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -174,7 +175,7 @@ adminRoutes.get('/clients', requireStaff, async (c) => {
   const user = c.get('user')
   const { where, params } = await scopeFilter(c.env, user, 'u.id')
   const res = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.full_name, u.first_name, u.last_name, u.status, u.created_at,
+    `SELECT u.id, u.public_ref, u.email, u.full_name, u.first_name, u.last_name, u.status, u.created_at,
             cp.business_name, cp.onboarding_completed
      FROM users u LEFT JOIN client_profiles cp ON cp.user_id = u.id
      WHERE u.role = 'client' AND ${where}
@@ -185,16 +186,16 @@ adminRoutes.get('/clients', requireStaff, async (c) => {
 
 adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   const user = c.get('user')
-  const id = c.req.param('id')!
-  const ok = await canAccessClient(c.env, user, id)
-  if (!ok) return c.json({ error: 'forbidden' }, 403)
+  const client = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  const id = client.id
 
   // Client profiles are intentionally sectional. HQ asks only for the active
   // subpage instead of pulling the entire relationship history on every open.
   const section = c.req.query('section')
   if (section && ['overview', 'activity', 'services', 'work', 'documents', 'billing', 'relationships', 'details'].includes(section)) {
     const [account, profile, assignedStaff] = await Promise.all([
-      c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
+      c.env.DB.prepare('SELECT id, public_ref, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
       c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
       c.env.DB.prepare('SELECT u.id, u.full_name, u.email FROM staff_assignments sa JOIN users u ON u.id = sa.staff_user_id WHERE sa.client_user_id = ?').bind(id).all(),
     ])
@@ -259,7 +260,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
 
   const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes, assignedStaff, recentActivity, catalog, applications] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
-    c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
+    c.env.DB.prepare('SELECT id, public_ref, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT cs.*, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE client_user_id = ?').bind(id).all(),
     c.env.DB.prepare('SELECT * FROM matters WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all(),
     c.env.DB.prepare('SELECT * FROM client_tasks WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all(),
@@ -359,9 +360,9 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
 // submitted — this only gets it started for them.
 adminRoutes.post('/clients/:id/services', requireStaff, async (c) => {
   const user = c.get('user')
-  const clientId = c.req.param('id')!
-  const ok = await canAccessClient(c.env, user, clientId)
-  if (!ok) return c.json({ error: 'forbidden' }, 403)
+  const clientRef = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!clientRef) return c.json({ error: 'client not found' }, 404)
+  const clientId = clientRef.id
 
   const client = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.full_name, u.first_name, u.last_name, u.phone
@@ -418,9 +419,9 @@ adminRoutes.post('/clients/:id/services', requireStaff, async (c) => {
 // own requireClient-only endpoint for the same client_profiles columns.
 adminRoutes.patch('/clients/:id/profile', requireStaff, async (c) => {
   const user = c.get('user')
-  const id = c.req.param('id')!
-  const ok = await canAccessClient(c.env, user, id)
-  if (!ok) return c.json({ error: 'forbidden' }, 403)
+  const client = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  const id = client.id
 
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>)
   const profileFields: Record<string, string | null> = {}
@@ -494,9 +495,9 @@ adminRoutes.patch('/clients/:id/profile', requireStaff, async (c) => {
 // a running internal conversation, not a single owner's private scratchpad.
 adminRoutes.post('/clients/:id/notes', requireStaff, async (c) => {
   const user = c.get('user')
-  const clientId = c.req.param('id') ?? ''
-  const ok = await canAccessClient(c.env, user, clientId)
-  if (!ok) return c.json({ error: 'forbidden' }, 403)
+  const client = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  const clientId = client.id
 
   const body = await c.req.json<{ body?: string; matter_id?: string }>().catch(() => ({}) as { body?: string; matter_id?: string })
   const noteBody = (body.body || '').trim().slice(0, 4000)
@@ -538,15 +539,12 @@ adminRoutes.get('/matters/:matterId/notes', requireStaff, async (c) => {
 // blocked and every successful reveal is itself logged.
 adminRoutes.post('/clients/:id/payment-methods/:pmId/reveal', requireStaff, async (c) => {
   const user = c.get('user')
-  const clientId = c.req.param('id') ?? ''
+  const client = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  const clientId = client.id
   const pmId = c.req.param('pmId')
 
   if (!(await hasCapability(c.env, user, 'can_reveal_payment_info'))) return c.json({ error: 'forbidden' }, 403)
-  if (user.role !== 'admin') {
-    const ok = await canAccessClient(c.env, user, clientId)
-    if (!ok) return c.json({ error: 'forbidden' }, 403)
-  }
-
   const row = await c.env.DB.prepare(
     'SELECT * FROM client_payment_methods WHERE id = ? AND client_user_id = ?',
   ).bind(pmId, clientId).first<any>()
