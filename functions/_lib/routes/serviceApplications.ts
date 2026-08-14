@@ -812,7 +812,9 @@ serviceApplicationRoutes.get('/documents/:id/file', requireUser, async (c) => {
   if (!c.env.UPLOADS) {
     if (!isProcessorReviewSampleDocument(doc)) return c.json({ error: 'file not found' }, 404)
     const bytes = await renderProcessorReviewSamplePdf()
-    return new Response(bytes, {
+    const body = new ArrayBuffer(bytes.byteLength)
+    new Uint8Array(body).set(bytes)
+    return new Response(body, {
       headers: {
         'Content-Type': PROCESSOR_REVIEW_DOCUMENT_CONTENT_TYPE,
         'Content-Disposition': `inline; filename="${filename.replace(/"/g, '')}"`,
