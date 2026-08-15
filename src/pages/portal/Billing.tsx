@@ -111,6 +111,7 @@ export default function Billing() {
         <div className="space-y-5">
           {vault.length > 0 && (
             <section className="space-y-2">
+              <h2 className="text-sm font-semibold text-white">Payment methods</h2>
               {vault.map((m) => (
                 <Card key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                   <div>
@@ -129,8 +130,8 @@ export default function Billing() {
               <div className="mt-3 space-y-3">
                 {liveQuotes.map((quote) => (
                   <Card key={quote.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-semibold text-white">{quote.quote_number}: {quote.title}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white truncate">{quote.quote_number}: {quote.title}</p>
                       <p className="mt-1 text-xs text-slate-500">{quoteStatusLabel(quote.status)} · {quoteMoney(quote.total_cents)}</p>
                     </div>
                     <a href={`/quote/${encodeURIComponent(quote.public_token)}`} className="btn-gold shrink-0 text-center">Review and respond</a>
@@ -146,7 +147,7 @@ export default function Billing() {
               <ul className="mt-3 divide-y divide-white/10 border-y border-white/10">
                 {quotes.filter((q) => q.status === 'accepted' || q.status === 'declined').map((quote) => (
                   <li key={quote.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-                    <span className="text-slate-200">{quote.quote_number}: {quote.title}</span>
+                    <span className="text-slate-200 truncate">{quote.quote_number}: {quote.title}</span>
                     <span className="text-xs text-slate-500">{quoteStatusLabel(quote.status)}{quote.decision_note ? ` · ${quote.decision_note}` : ''}</span>
                   </li>
                 ))}
@@ -154,68 +155,76 @@ export default function Billing() {
             </section>
           )}
 
-          {invoices.length === 0 ? <Card><EmptyState label="No invoices yet." /></Card> : (
+          {invoices.length === 0 ? (
+            <Card><EmptyState label="No invoices yet." /></Card>
+          ) : (
             <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-white">Invoices</h2>
               {invoices.map((inv) => {
                 const accepted = parseMethods(inv.payment_methods_json)
                 const overdue = isInvoiceOverdue(inv)
                 return (
                   <Card key={inv.id} className="!p-0 overflow-hidden">
-                    <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-3 p-3 sm:space-y-0 sm:flex sm:flex-col sm:gap-3">
+                      {/* Mobile-friendly card header */}
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="font-semibold text-white">{inv.title || 'Pinnacle invoice'}</h2>
+                          <h3 className="font-semibold text-white truncate">{inv.title || 'Pinnacle invoice'}</h3>
                           <StatusBadge tone={inv.status === 'paid' ? 'green' : inv.status === 'void' ? 'slate' : overdue ? 'red' : 'gold'}>{invoiceStatusLabel(inv)}</StatusBadge>
                         </div>
-                        <p className="mt-1 text-xs text-slate-500">{inv.invoice_number || `Invoice ${inv.id.slice(0, 8)}`}{inv.quote_number ? ` · from ${inv.quote_number}` : ''}{inv.customer_number ? ` · Customer ${inv.customer_number}` : ''}</p>
+                        <p className="mt-1 text-xs text-slate-500 break-words">{inv.invoice_number || `Invoice ${inv.id.slice(0, 8)}`}{inv.quote_number ? ` · from ${inv.quote_number}` : ''}{inv.customer_number ? ` · ${inv.customer_number}` : ''}</p>
                         <p className="mt-2 text-xl font-semibold text-white">{invoiceMoney(inv.amount_cents, inv.currency)}</p>
                         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
                           <span>Issued {inv.issue_date ? new Date(`${inv.issue_date}T12:00:00`).toLocaleDateString() : new Date(inv.created_at).toLocaleDateString()}</span>
                           <span>{invoiceDueLabel(inv)}</span>
                         </div>
                       </div>
+
+                      {/* Status box for open invoices */}
                       {inv.status === 'open' && (
                         <div className={`rounded-md border px-3 py-2 text-sm ${overdue ? 'border-red-400/25 bg-red-400/[.06] text-red-100' : 'border-gold/15 bg-gold/[.05] text-slate-300'}`}>
                           <p className="font-medium text-gold">{overdue ? 'Past due' : 'Payment due'}</p>
                           <p className="mt-1 text-xs leading-5 text-slate-400">Contact your Pinnacle team if you need payment instructions or have a billing question.</p>
                         </div>
                       )}
+
+                      {/* Details toggle */}
+                      <details className="border-t border-white/10">
+                        <summary className="flex cursor-pointer list-none items-center justify-between px-0 py-2 text-sm font-medium text-slate-300 hover:text-slate-100">
+                          <span>Invoice details</span>
+                          <Icon name="chevronRight" size={16} />
+                        </summary>
+                        <div className="grid gap-4 border-t border-white/5 pt-3 md:grid-cols-2">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lines</p>
+                            {(inv.line_items || []).length ? (
+                              <ul className="mt-3 space-y-2 text-sm">
+                                {inv.line_items!.map((line) => (
+                                  <li key={line.id} className="flex justify-between gap-3">
+                                    <span className="text-slate-300 break-words">{line.name}{line.quantity !== 1 ? ` × ${line.quantity}` : ''}</span>
+                                    <span className="shrink-0 text-slate-200">{invoiceMoney(Math.round(line.quantity * line.unit_price_cents) - (line.discount_cents || 0), inv.currency)}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-3 text-sm text-slate-500">No line items on this invoice.</p>
+                            )}
+                            <dl className="mt-4 space-y-2 text-sm">
+                              {Number(inv.discount_cents) > 0 && <div className="flex justify-between"><dt className="text-slate-500">Discount</dt><dd>-{invoiceMoney(inv.discount_cents || 0, inv.currency)}</dd></div>}
+                              {Number(inv.tax_cents) > 0 && <div className="flex justify-between"><dt className="text-slate-500">Tax</dt><dd>{invoiceMoney(inv.tax_cents || 0, inv.currency)}</dd></div>}
+                              {Number(inv.shipping_cents) > 0 && <div className="flex justify-between"><dt className="text-slate-500">Shipping / additional</dt><dd>{invoiceMoney(inv.shipping_cents || 0, inv.currency)}</dd></div>}
+                              <div className="flex justify-between border-t border-white/10 pt-2 font-semibold"><dt>Total</dt><dd className="text-gold">{invoiceMoney(inv.amount_cents, inv.currency)}</dd></div>
+                            </dl>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Available payment methods</p>
+                            {accepted.length ? <div className="mt-2 flex flex-wrap gap-1.5">{accepted.map((m) => <span key={m} className="rounded-sm border border-white/10 bg-white/[.03] px-2 py-0.5 text-[11px] font-semibold text-slate-300">{methodLabel[m] || m}</span>)}</div> : <p className="mt-2 text-xs text-slate-500">Payment methods will be added by your Pinnacle team.</p>}
+                            {inv.card_processor_label && <p className="mt-3 text-xs text-slate-500">Card charges, if any, go through {inv.card_processor_label}. Card numbers are not entered on this site.</p>}
+                            {inv.message && <div className="mt-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Message</p><p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-400">{inv.message}</p></div>}
+                          </div>
+                        </div>
+                      </details>
                     </div>
-                    <details className="border-t border-white/10">
-                      <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/[.025]">
-                        <span>Invoice details</span>
-                        <Icon name="chevronRight" size={16} />
-                      </summary>
-                      <div className="grid gap-4 border-t border-white/5 p-3 md:grid-cols-2">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lines</p>
-                          {(inv.line_items || []).length ? (
-                            <ul className="mt-3 space-y-2 text-sm">
-                              {inv.line_items!.map((line) => (
-                                <li key={line.id} className="flex justify-between gap-3">
-                                  <span className="text-slate-300">{line.name}{line.quantity !== 1 ? ` × ${line.quantity}` : ''}</span>
-                                  <span className="text-slate-200">{invoiceMoney(Math.round(line.quantity * line.unit_price_cents) - (line.discount_cents || 0), inv.currency)}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="mt-3 text-sm text-slate-500">No line items on this invoice.</p>
-                          )}
-                          <dl className="mt-4 space-y-2 text-sm">
-                            {Number(inv.discount_cents) > 0 && <div className="flex justify-between"><dt className="text-slate-500">Discount</dt><dd>-{invoiceMoney(inv.discount_cents || 0, inv.currency)}</dd></div>}
-                            {Number(inv.tax_cents) > 0 && <div className="flex justify-between"><dt className="text-slate-500">Tax</dt><dd>{invoiceMoney(inv.tax_cents || 0, inv.currency)}</dd></div>}
-                            {Number(inv.shipping_cents) > 0 && <div className="flex justify-between"><dt className="text-slate-500">Shipping / additional</dt><dd>{invoiceMoney(inv.shipping_cents || 0, inv.currency)}</dd></div>}
-                            <div className="flex justify-between border-t border-white/10 pt-2 font-semibold"><dt>Total</dt><dd className="text-gold">{invoiceMoney(inv.amount_cents, inv.currency)}</dd></div>
-                          </dl>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Available payment methods</p>
-                          {accepted.length ? <div className="mt-2 flex flex-wrap gap-1.5">{accepted.map((m) => <span key={m} className="rounded-sm border border-white/10 bg-white/[.03] px-2 py-0.5 text-xs text-slate-300">{methodLabel[m] || m}</span>)}</div> : <p className="mt-2 text-sm text-slate-500">Contact Pinnacle for payment instructions.</p>}
-                          {inv.card_processor_label && <p className="mt-3 text-xs text-slate-500">Card charges, if any, go through {inv.card_processor_label}. Card numbers are not entered on this page.</p>}
-                          {inv.message && <div className="mt-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Message</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{inv.message}</p></div>}
-                        </div>
-                      </div>
-                    </details>
                   </Card>
                 )
               })}
