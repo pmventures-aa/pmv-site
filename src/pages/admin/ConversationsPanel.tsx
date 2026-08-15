@@ -243,15 +243,91 @@ function ConversationDetail({ detail, onBack, onChanged }: { detail: Detail | nu
   )
 }
 
+type RoleFilter = 'all' | 'staff' | 'client' | 'vendor'
+type Priority = 'low' | 'normal' | 'high' | 'urgent'
+type ClientOption = { id: string; full_name: string | null; email: string }
+
+const COMPOSER_DRAFT_KEY = 'pmv:hq:composer-draft-v1'
+
+const TEMPLATES: { id: string; label: string; kind: 'dm' | 'group_dm'; subject: string; body: string; priority: Priority }[] = [
+  { id: 'client-check', label: 'Client status update', kind: 'dm', subject: 'Quick status update for you', body: 'Hi, wanted to give you a quick update on where things stand. ', priority: 'normal' },
+  { id: 'vendor-schedule', label: 'Vendor scheduling', kind: 'dm', subject: 'Scheduling confirmation', body: 'Confirming the appointment window and site details. Please reply with any conflicts. ', priority: 'normal' },
+  { id: 'ops-handoff', label: 'Ops handoff', kind: 'group_dm', subject: 'Handoff to next shift', body: 'Handing this over. Current state, open items, and who to loop in: ', priority: 'high' },
+  { id: 'urgent-issue', label: 'Urgent property issue', kind: 'group_dm', subject: 'Urgent: property issue needs response', body: 'Flagging an urgent situation at the property. Details, contact, and what we need next: ', priority: 'urgent' },
+]
+
+const PRIORITY_META: Record<Priority, { label: string; tone: string }> = {
+  low: { label: 'Low', tone: 'border-white/10 text-slate-400 hover:border-white/25' },
+  normal: { label: 'Normal', tone: 'border-white/10 text-slate-300 hover:border-white/25' },
+  high: { label: 'High', tone: 'border-amber-400/30 text-amber-300 hover:border-amber-400/50' },
+  urgent: { label: 'Urgent', tone: 'border-rose-400/30 text-rose-300 hover:border-rose-400/50' },
+}
+
+const PRIORITY_ACTIVE: Record<Priority, string> = {
+  low: 'border-slate-300/40 bg-slate-300/10 text-slate-100',
+  normal: 'border-gold/50 bg-gold/10 text-gold',
+  high: 'border-amber-400/60 bg-amber-400/10 text-amber-200',
+  urgent: 'border-rose-400/60 bg-rose-400/10 text-rose-200',
+}
+
 function ComposerDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
   const [kind, setKind] = useState<'dm'|'group_dm'>('dm')
+  const [priority, setPriority] = useState<Priority>('normal')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [participants, setParticipants] = useState<MentionableUser[]>([])
+  const [scopeClient, setScopeClient] = useState<ClientOption | null>(null)
   const [query, setQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
   const [results, setResults] = useState<MentionableUser[]>([])
+  const [clientQuery, setClientQuery] = useState('')
+  const [clientResults, setClientResults] = useState<ClientOption[]>([])
   const [busy, setBusy] = useState(false)
+  const [draftRestored, setDraftRestored] = useState(false)
 
+  // Load persisted draft when the dialog opens
+  useEffect(() => {
+    if (!open) return
+    try {
+      const raw = window.localStorage.getItem(COMPOSER_DRAFT_KEY)
+      if (!raw) return
+      const draft = JSON.parse(raw) as {
+        kind?: 'dm'|'group_dm'; priority?: Priority; subject?: string; body?: string
+        participants?: MentionableUser[]; scopeClient?: ClientOption | null
+      }
+      if (draft.subject || draft.body || (draft.participants && draft.participants.length)) {
+        setKind(draft.kind === 'group_dm' ? 'group_dm' : 'dm')
+        setPriority(draft.priority && PRIORITY_META[draft.priority] ? draft.priority : 'normal')
+        setSubject(draft.subject || '')
+        setBody(draft.body || '')
+        setParticipants(Array.isArray(draft.participants) ? draft.participants : [])
+        setScopeClient(draft.scopeClient || null)
+        setDraftRestored(true)
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Reset when closed
+  useEffect(() => {
+    if (open) return
+    setKind('dm'); setPriority('normal'); setSubject(''); setBody(''); setParticipants([])
+    setScopeClient(null); setQuery(''); setResults([]); setClientQuery(''); setClientResults([])
+    setRoleFilter('all'); setDraftRestored(false)
+  }, [open])
+
+  // Autosave draft
+  useEffect(() => {
+    if (!open) return
+    const draft = { kind, priority, subject, body, participants, scopeClient }
+    const empty = !subject.trim() && !body.trim() && participants.length === 0 && !scopeClient
+    try {
+      if (empty) window.localStorage.removeItem(COMPOSER_DRAFT_KEY)
+      else window.localStorage.setItem(COMPOSER_DRAFT_KEY, JSON.stringify(draft))
+    } catch {}
+  }, [open, kind, priority, subject, body, participants, scopeClient])
+
+  // Participant search
   useEffect(() => {
     if (!query.trim()) { setResults([]); return }
     const t = setTimeout(async () => {
@@ -263,66 +339,213 @@ function ComposerDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
     return () => clearTimeout(t)
   }, [query])
 
-  useEffect(() => { if (!open) { setKind('dm'); setSubject(''); setBody(''); setParticipants([]); setQuery(''); setResults([]) } }, [open])
+  // Client (scope) search
+  useEffect(() => {
+    if (!clientQuery.trim()) { setClientResults([]); return }
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.get<{ clients: ClientOption[] }>(`/admin/clients?q=${encodeURIComponent(clientQuery.trim())}`)
+        setClientResults(r.clients || [])
+      } catch {}
+    }, 200)
+    return () => clearTimeout(t)
+  }, [clientQuery])
 
-  const canSubmit = subject.trim() && participants.length >= 1 && (kind === 'dm' ? participants.length === 1 : participants.length >= 2)
+  const filteredResults = useMemo(() => {
+    const already = new Set(participants.map((p) => p.id))
+    return results
+      .filter((r) => !already.has(r.id))
+      .filter((r) => {
+        if (roleFilter === 'all') return true
+        const role = (r.role || '').toLowerCase()
+        if (roleFilter === 'staff') return ['owner', 'staff', 'admin', 'super_admin'].includes(role)
+        if (roleFilter === 'client') return role === 'client'
+        if (roleFilter === 'vendor') return role === 'vendor'
+        return true
+      })
+      .slice(0, 10)
+  }, [results, participants, roleFilter])
+
+  const canSubmit = subject.trim().length > 0 && (kind === 'dm' ? participants.length === 1 : participants.length >= 2)
+
+  function applyTemplate(t: typeof TEMPLATES[number]) {
+    setKind(t.kind)
+    setPriority(t.priority)
+    if (!subject.trim()) setSubject(t.subject)
+    setBody((prev) => prev ? `${t.body}\n\n${prev}` : t.body)
+  }
+
+  function discardDraft() {
+    try { window.localStorage.removeItem(COMPOSER_DRAFT_KEY) } catch {}
+    setKind('dm'); setPriority('normal'); setSubject(''); setBody(''); setParticipants([])
+    setScopeClient(null); setDraftRestored(false)
+  }
 
   async function create() {
     setBusy(true)
     try {
       const r = await api.post<{ id: string }>('/admin/conversations', {
-        kind, subject: subject.trim(),
+        kind,
+        subject: subject.trim(),
+        priority,
+        scope_client_user_id: scopeClient?.id,
         participant_user_ids: participants.map((p) => p.id),
         initial_body: body.trim() || undefined,
       })
+      try { window.localStorage.removeItem(COMPOSER_DRAFT_KEY) } catch {}
       onCreated(r.id)
     } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Could not create conversation') }
     finally { setBusy(false) }
   }
 
+  const participantsHint = kind === 'dm'
+    ? `Pick one recipient (${participants.length}/1)`
+    : `Pick at least two participants (${participants.length})`
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
-      <DialogContent size="lg" title="New conversation" description="Start a 1:1 or group thread with any staff, client, or vendor.">
-      <div className="space-y-4">
-        <div className="flex gap-2">
-          {(['dm','group_dm'] as const).map((k) => (
-            <button key={k} onClick={() => setKind(k)} className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${kind===k?'border-gold/50 bg-gold/10 text-gold':'border-white/10 text-slate-400'}`}>{k==='dm'?'1:1 DM':'Group DM'}</button>
-          ))}
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-slate-400">Subject</label>
-          <input className={inputCls} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="What's this about?"/>
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-slate-400">Participants ({participants.length}{kind==='dm'?' / 1':''})</label>
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {participants.map((p) => (
-              <span key={p.id} className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/[.06] px-2.5 py-1 text-[11px] font-semibold text-gold">
-                {p.full_name || p.email}<button onClick={() => setParticipants((c) => c.filter((x) => x.id !== p.id))} className="text-gold hover:text-white"><X size={10}/></button>
-              </span>
-            ))}
-          </div>
-          <input className={`${inputCls} mt-2`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or email…"/>
-          {results.length > 0 && (
-            <div className="mt-1 max-h-40 divide-y divide-white/10 overflow-y-auto rounded-lg border border-white/10 bg-navy-950">
-              {results.filter((r) => !participants.find((p) => p.id === r.id)).slice(0, 8).map((r) => (
-                <button key={r.id} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/[.03]" onClick={() => { setParticipants((c) => kind === 'dm' ? [r] : [...c, r]); setQuery(''); setResults([]) }}>
-                  <span><span className="font-semibold text-white">{r.full_name || r.email}</span><span className="ml-2 text-[11px] text-slate-500">{r.email} · {r.role}</span></span>
-                  <Plus size={12} className="text-gold"/>
+      <DialogContent
+        size="lg"
+        title="New conversation"
+        description="Start a 1:1 or group thread with any staff, client, or vendor."
+        className="flex max-h-[92dvh] flex-col overflow-hidden !p-0"
+      >
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-3 pt-1 sm:px-6">
+          {draftRestored && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-gold/20 bg-gold/[.06] px-3 py-2 text-[11px] text-gold">
+              <span>Restored your last draft.</span>
+              <button type="button" className="font-bold underline underline-offset-2 hover:text-white" onClick={discardDraft}>Discard</button>
+            </div>
+          )}
+
+          <section>
+            <p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Quick starts</p>
+            <div className="mt-2 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {TEMPLATES.map((t) => (
+                <button key={t.id} type="button" onClick={() => applyTemplate(t)}
+                  className="shrink-0 rounded-full border border-white/12 bg-white/[.03] px-3 py-1.5 text-[11px] font-semibold text-slate-300 hover:border-gold/40 hover:text-gold">
+                  {t.label}
                 </button>
               ))}
             </div>
-          )}
+          </section>
+
+          <section className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Type</label>
+              <div className="mt-2 flex gap-2">
+                {(['dm','group_dm'] as const).map((k) => (
+                  <button key={k} type="button" onClick={() => setKind(k)}
+                    className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${kind===k?'border-gold/50 bg-gold/10 text-gold':'border-white/10 text-slate-400 hover:border-white/25'}`}>
+                    {k==='dm'?'1:1 DM':'Group DM'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Priority</label>
+              <div className="mt-2 flex gap-1.5">
+                {(['low','normal','high','urgent'] as Priority[]).map((p) => (
+                  <button key={p} type="button" onClick={() => setPriority(p)}
+                    className={`flex-1 rounded-lg border px-2.5 py-2 text-[12px] font-semibold ${priority===p?PRIORITY_ACTIVE[p]:PRIORITY_META[p].tone}`}>
+                    {PRIORITY_META[p].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <label className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Subject</label>
+            <input className={`${inputCls} mt-2`} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="What's this about?"/>
+          </section>
+
+          <section>
+            <div className="flex items-baseline justify-between">
+              <label className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Link to client (optional)</label>
+              {scopeClient && (
+                <button type="button" onClick={() => setScopeClient(null)} className="text-[11px] font-semibold text-slate-500 hover:text-white">Unlink</button>
+              )}
+            </div>
+            {scopeClient ? (
+              <div className="mt-2 flex items-center gap-2 rounded-lg border border-sky-400/30 bg-sky-400/[.08] px-3 py-2">
+                <Lock size={13} className="text-sky-300"/>
+                <span className="min-w-0 flex-1 truncate text-sm text-sky-100"><span className="font-semibold">{scopeClient.full_name || scopeClient.email}</span><span className="ml-2 text-[11px] text-sky-300/70">Thread will appear on this client's timeline</span></span>
+              </div>
+            ) : (
+              <>
+                <input className={`${inputCls} mt-2`} value={clientQuery} onChange={(e) => setClientQuery(e.target.value)} placeholder="Search clients by name or email..."/>
+                {clientResults.length > 0 && (
+                  <div className="mt-1 max-h-36 divide-y divide-white/10 overflow-y-auto rounded-lg border border-white/10 bg-navy-950">
+                    {clientResults.slice(0, 6).map((r) => (
+                      <button key={r.id} type="button" className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/[.03]"
+                        onClick={() => { setScopeClient(r); setClientQuery(''); setClientResults([]) }}>
+                        <span className="min-w-0"><span className="font-semibold text-white">{r.full_name || r.email}</span><span className="ml-2 text-[11px] text-slate-500">{r.email}</span></span>
+                        <Plus size={12} className="text-gold"/>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          <section>
+            <div className="flex items-baseline justify-between">
+              <label className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Participants</label>
+              <span className="text-[11px] text-slate-500">{participantsHint}</span>
+            </div>
+            {participants.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {participants.map((p) => (
+                  <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/[.06] py-1 pl-2.5 pr-1.5 text-[11px] font-semibold text-gold">
+                    {p.full_name || p.email}
+                    <span className="rounded-full bg-white/[.06] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-slate-300">{p.role}</span>
+                    <button type="button" onClick={() => setParticipants((c) => c.filter((x) => x.id !== p.id))} className="grid h-4 w-4 place-items-center rounded-full text-gold hover:bg-white/10 hover:text-white">
+                      <X size={10}/>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(['all','staff','client','vendor'] as RoleFilter[]).map((r) => (
+                <button key={r} type="button" onClick={() => setRoleFilter(r)}
+                  className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${roleFilter===r?'border-gold/50 bg-gold/10 text-gold':'border-white/10 text-slate-500 hover:border-white/25 hover:text-slate-300'}`}>
+                  {r==='all'?'Any':r}
+                </button>
+              ))}
+            </div>
+            <input className={`${inputCls} mt-2`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or email..."/>
+            {filteredResults.length > 0 && (
+              <div className="mt-1 max-h-48 divide-y divide-white/10 overflow-y-auto rounded-lg border border-white/10 bg-navy-950">
+                {filteredResults.map((r) => (
+                  <button key={r.id} type="button" className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/[.03]"
+                    onClick={() => { setParticipants((c) => kind === 'dm' ? [r] : [...c, r]); setQuery(''); setResults([]) }}>
+                    <span className="min-w-0"><span className="font-semibold text-white">{r.full_name || r.email}</span><span className="ml-2 text-[11px] text-slate-500">{r.email} · {r.role}</span></span>
+                    <Plus size={12} className="text-gold"/>
+                  </button>
+                ))}
+              </div>
+            )}
+            {query.trim() && filteredResults.length === 0 && results.length > 0 && (
+              <p className="mt-2 text-[11px] text-slate-500">No results in "{roleFilter}". Switch the role filter above to broaden the search.</p>
+            )}
+          </section>
+
+          <section>
+            <label className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">First message (optional)</label>
+            <textarea className={`${inputCls} mt-2 min-h-28`} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Say hello, share context, or paste in the details..."/>
+            <p className="mt-1 text-[10px] text-slate-500">Use @name to notify a specific person. Drafts auto-save while you type.</p>
+          </section>
         </div>
-        <div>
-          <label className="text-xs font-semibold text-slate-400">First message (optional)</label>
-          <textarea className={`${inputCls} min-h-24`} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Say hello…"/>
+
+        <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 border-t border-white/10 bg-navy-900/95 px-5 py-3 backdrop-blur sm:flex-row sm:justify-end sm:px-6">
+          <button type="button" className={btnSecondary} onClick={onClose}>Cancel</button>
+          <button type="button" className={btnPrimary} disabled={!canSubmit || busy} onClick={() => void create()}>
+            {busy && <Loader2 size={14} className="animate-spin"/>}Start conversation
+          </button>
         </div>
-      </div>
-      <div className="mt-6 flex justify-end gap-2">
-        <button className={btnSecondary} onClick={onClose}>Cancel</button>
-        <button className={btnPrimary} disabled={!canSubmit || busy} onClick={() => void create()}>{busy && <Loader2 size={14} className="animate-spin"/>}Start conversation</button>
-      </div>
       </DialogContent>
     </Dialog>
   )

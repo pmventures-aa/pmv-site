@@ -233,12 +233,14 @@ conversationRoutes.post('/conversations', async (c) => {
   const conversationId = uuid()
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
   const initialBody = clean(body.initial_body, 8000)
+  const requestedPriority = typeof body.priority === 'string' ? body.priority.toLowerCase() : 'normal'
+  const priority = ['low', 'normal', 'high', 'urgent'].includes(requestedPriority) ? requestedPriority : 'normal'
 
   const stmts = [
     c.env.DB.prepare(
-      `INSERT INTO conversations (id, kind, subject, scope_client_user_id, created_by_user_id, last_message_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(conversationId, kind, subject, scopeClientId, user.id, now, now),
+      `INSERT INTO conversations (id, kind, subject, scope_client_user_id, priority, created_by_user_id, last_message_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(conversationId, kind, subject, scopeClientId, priority, user.id, now, now),
     ...[...participantIds].map((pid) =>
       c.env.DB.prepare(
         `INSERT INTO conversation_participants (conversation_id, user_id, role_in_conv, added_by_user_id) VALUES (?, ?, 'participant', ?)`
