@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { lifecycleLabel } from '../../../shared/lifecycle'
+import { crmRecordLine } from '../../../shared/crmRecord'
 import { useAppPath } from '../../lib/basePath'
 
-interface ClientHit { id: string; full_name: string | null; email: string; business_name: string | null }
-interface InquiryHit { id: string; name: string; email: string; phone: string | null; company_name: string | null; record_type: string; lifecycle_stage: string; status: string }
-interface MatterHit { id: string; title: string; status: string; client_user_id: string; client_name: string | null; client_email: string }
-interface InvoiceHit { id: string; amount_cents: number; status: string; client_user_id: string; client_name: string | null; client_email: string }
-interface SearchResults { clients: ClientHit[]; inquiries: InquiryHit[]; matters: MatterHit[]; invoices: InvoiceHit[] }
-const EMPTY: SearchResults = { clients: [], inquiries: [], matters: [], invoices: [] }
+interface ClientHit { id: string; public_ref: string; full_name: string | null; email: string; business_name: string | null }
+interface InquiryHit { id: string; name: string; email: string; phone: string | null; company_name: string | null; first_name: string | null; last_name: string | null; job_title: string | null; record_type: string; lifecycle_stage: string; status: string }
+interface MatterHit { id: string; title: string; status: string; client_user_id: string; client_public_ref: string; client_name: string | null; client_email: string }
+interface InvoiceHit { id: string; amount_cents: number; status: string; invoice_number?: string | null; title?: string | null; client_user_id: string; client_public_ref: string; client_name: string | null; client_email: string }
+interface QuoteHit { id: string; quote_number: string; title: string; status: string; recipient_name: string; recipient_email: string; total_cents: number }
+interface SearchResults { clients: ClientHit[]; inquiries: InquiryHit[]; matters: MatterHit[]; invoices: InvoiceHit[]; quotes: QuoteHit[] }
+const EMPTY: SearchResults = { clients: [], inquiries: [], matters: [], invoices: [], quotes: [] }
 
 function money(cents: number): string {
   return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -41,19 +43,20 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
     return () => clearTimeout(t)
   }, [q])
 
-  const hasAny = results.clients.length + results.inquiries.length + results.matters.length + results.invoices.length > 0
+  const hasAny = results.clients.length + results.inquiries.length + results.matters.length + results.invoices.length + results.quotes.length > 0
   const showPanel = open && q.trim().length >= 2
   function go() { setOpen(false); setQ(''); inputRef.current?.blur() }
 
   return (
     <div className={`relative ${className}`} ref={boxRef}>
-      <input ref={inputRef} type="search" value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setOpen(true)} placeholder="Search clients, leads, businesses, work…" className="w-full rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white placeholder:text-slate-500 focus:border-gold/40 focus:outline-none" />
+      <input ref={inputRef} type="search" value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setOpen(true)} placeholder="Search clients, leads, quotes, invoices…" className="w-full rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white placeholder:text-slate-500 focus:border-gold/40 focus:outline-none" />
       {showPanel && <div className="absolute left-0 top-10 z-30 max-h-[28rem] w-96 overflow-y-auto rounded-md border border-white/10 bg-navy-900 shadow-lg">
         {loading ? <p className="px-4 py-6 text-center text-sm text-slate-400">Searching…</p> : !hasAny ? <p className="px-4 py-6 text-center text-sm text-slate-400">No matches for "{q.trim()}".</p> : <div className="divide-y divide-white/5">
-          {results.clients.length > 0 && <SearchGroup label="Clients">{results.clients.map((r) => <Link key={r.id} to={p(`clients/${r.id}/overview`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.full_name || r.email}</p><p className="text-xs text-slate-500">{r.business_name || r.email}</p></Link>)}</SearchGroup>}
-          {results.inquiries.length > 0 && <SearchGroup label="Leads & Prospects">{results.inquiries.map((r) => <Link key={r.id} to={p(`leads/${r.id}/overview`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.name}</p><p className="text-xs text-slate-500">{r.record_type === 'business' ? 'Business' : r.company_name || 'Person'} · {r.email} · {lifecycleLabel(r.lifecycle_stage)}</p></Link>)}</SearchGroup>}
-          {results.matters.length > 0 && <SearchGroup label="Matters">{results.matters.map((r) => <Link key={r.id} to={p(`clients/${r.client_user_id}`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.title}</p><p className="text-xs text-slate-500">{r.client_name || r.client_email} · {r.status.replace(/_/g, ' ')}</p></Link>)}</SearchGroup>}
-          {results.invoices.length > 0 && <SearchGroup label="Invoices">{results.invoices.map((r) => <Link key={r.id} to={p(`clients/${r.client_user_id}`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{money(r.amount_cents)}: {r.status.replace(/_/g, ' ')}</p><p className="text-xs text-slate-500">{r.client_name || r.client_email}</p></Link>)}</SearchGroup>}
+          {results.clients.length > 0 && <SearchGroup label="Clients">{results.clients.map((r) => <Link key={r.id} to={p(`clients/${r.public_ref}/overview`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.full_name || r.email}</p><p className="text-xs text-slate-500">{r.business_name || r.email}</p></Link>)}</SearchGroup>}
+          {results.inquiries.length > 0 && <SearchGroup label="Leads & Prospects">{results.inquiries.map((r) => <Link key={r.id} to={p(`leads/${r.id}/overview`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.name}</p><p className="text-xs text-slate-500">{crmRecordLine(r)} · {lifecycleLabel(r.lifecycle_stage)}</p></Link>)}</SearchGroup>}
+          {results.quotes.length > 0 && <SearchGroup label="Quotes">{results.quotes.map((r) => <Link key={r.id} to={`${p('quotes')}?quote=${encodeURIComponent(r.id)}`} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.quote_number}: {r.title}</p><p className="text-xs text-slate-500">{r.recipient_name} · {r.status} · {money(r.total_cents)}</p></Link>)}</SearchGroup>}
+          {results.matters.length > 0 && <SearchGroup label="Matters">{results.matters.map((r) => <Link key={r.id} to={p(`clients/${r.client_public_ref}`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.title}</p><p className="text-xs text-slate-500">{r.client_name || r.client_email} · {r.status.replace(/_/g, ' ')}</p></Link>)}</SearchGroup>}
+          {results.invoices.length > 0 && <SearchGroup label="Invoices">{results.invoices.map((r) => <Link key={r.id} to={`${p('invoices')}?invoice=${encodeURIComponent(r.id)}`} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.invoice_number || money(r.amount_cents)}: {r.status.replace(/_/g, ' ')}</p><p className="text-xs text-slate-500">{r.title || r.client_name || r.client_email}</p></Link>)}</SearchGroup>}
         </div>}
       </div>}
     </div>

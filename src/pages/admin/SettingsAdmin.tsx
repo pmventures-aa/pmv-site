@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Bell, BriefcaseBusiness, Building2, ChevronRight, Files, Palette, Search, Settings2, ShieldCheck, SlidersHorizontal, Trash2, Users } from 'lucide-react'
 import { PageIntro, NoAccess, Panel, inputCls } from '../../components/admin/ui'
 import { useCapabilities } from '../../lib/capabilities'
@@ -14,17 +14,21 @@ import NotificationSettings from './settings/NotificationSettings'
 import ManagedTemplatesSettings from './settings/ManagedTemplatesSettings'
 
 const TABS = [
-  { key: 'general', label: 'General', short: 'Firm identity, contact details, communications, and compliance copy.', icon: Building2, terms: 'business firm address phone hours marketing compliance application resend webhook inbound email' },
+  { key: 'general', label: 'General', short: 'Firm identity, contact details, invitation link lifetime, communications, processor review login, and compliance copy.', icon: Building2, terms: 'business firm address phone hours marketing compliance application resend webhook inbound email invite expiry token lifetime processor review login underwriting authorize payment cloud' },
   { key: 'appearance', label: 'Appearance', short: 'Personal HQ display preferences for this device.', icon: Palette, terms: 'theme dark light workspace display' },
   { key: 'catalog', label: 'Service Catalog', short: 'Define service structure, intake configuration, and client-facing service data.', icon: BriefcaseBusiness, terms: 'services catalog intake applications client offerings' },
   { key: 'offerings', label: 'Service Offerings', short: 'Control which services are available and how they are presented.', icon: SlidersHorizontal, terms: 'services offerings enabled availability pricing scope' },
   { key: 'staff', label: 'Network Access & Permissions', short: 'Create and rename coding roles, set defaults, and control every permission for a specific user.', icon: Users, terms: 'staff users roles access permissions team providers professionals network coding role templates overrides owner' },
   { key: 'notifications', label: 'Notifications', short: 'Choose how operational events reach you across HQ, email, desktop, and sound.', icon: Bell, terms: 'notifications email desktop sound alerts events' },
-  { key: 'templates', label: 'Templates', short: 'Edit, version, review, and publish Pinnacle agreements and reusable master copy.', icon: Files, terms: 'templates agreement provider version publish document legal' },
+  { key: 'templates', label: 'Templates', short: 'Create, version, duplicate, and publish agreements and reusable master copy.', icon: Files, terms: 'templates agreement provider version publish document legal create duplicate archive' },
   { key: 'deletions', label: 'Permanent Deletions', short: 'Owner-only irreversible record deletion and impact review.', icon: Trash2, terms: 'delete danger purge permanent owner archive' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
+
+function isSettingsTab(value: string | null): value is TabKey {
+  return TABS.some((item) => item.key === value)
+}
 
 function AppearanceSettings() {
   return (
@@ -52,10 +56,13 @@ function AppearanceSettings() {
 export default function SettingsAdmin() {
   const caps = useCapabilities()
   const p = useAppPath()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTabState] = useState<TabKey>(() => {
+    const fromUrl = searchParams.get('tab')
+    if (isSettingsTab(fromUrl)) return fromUrl
     if (typeof window === 'undefined') return 'general'
-    const stored = window.localStorage.getItem('pmv_settings_tab') as TabKey | null
-    return TABS.some(item => item.key === stored) ? stored! : 'general'
+    const stored = window.localStorage.getItem('pmv_settings_tab')
+    return isSettingsTab(stored) ? stored : 'general'
   })
   const [query, setQuery] = useState('')
   const visibleTabs = useMemo(() => TABS.filter((item) => !['deletions', 'templates'].includes(item.key) || caps.is_owner), [caps.is_owner])
@@ -66,9 +73,24 @@ export default function SettingsAdmin() {
   }, [query, visibleTabs])
   const current = visibleTabs.find(item => item.key === tab) || visibleTabs[0]
 
+  useEffect(() => {
+    const fromUrl = searchParams.get('tab')
+    if (isSettingsTab(fromUrl) && visibleTabs.some((item) => item.key === fromUrl)) {
+      if (fromUrl !== tab) setTabState(fromUrl)
+      return
+    }
+    if (!visibleTabs.some((item) => item.key === tab)) setTabState(visibleTabs[0].key)
+  }, [searchParams, visibleTabs, tab])
+
   function setTab(next: TabKey) {
     setTabState(next)
     if (typeof window !== 'undefined') window.localStorage.setItem('pmv_settings_tab', next)
+    setSearchParams((currentParams) => {
+      const params = new URLSearchParams(currentParams)
+      if (next === 'general') params.delete('tab')
+      else params.set('tab', next)
+      return params
+    }, { replace: true })
   }
 
   return (

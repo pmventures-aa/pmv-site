@@ -30,6 +30,8 @@ interface PublicQuote {
   discount_cents: number
   total_cents: number
   created_at: string
+  decided_at?: string | null
+  decision_note?: string | null
   line_items: QuoteLine[]
 }
 
@@ -41,7 +43,7 @@ export default function QuoteView() {
   const [quote, setQuote] = useState<PublicQuote | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
-  const [declining, setDeclining] = useState(false)
+  const [responding, setResponding] = useState<'accept' | 'decline' | null>(null)
   const [note, setNote] = useState('')
   usePageMeta(quote ? `Quote ${quote.quote_number} - Pinnacle Management Ventures` : 'Your Pinnacle Quote', 'Review and accept your quote from Pinnacle Management Ventures.')
 
@@ -56,9 +58,10 @@ export default function QuoteView() {
     if (!token) return
     setBusy(decision)
     try {
-      await api.post(`/public-quotes/${encodeURIComponent(token)}/respond`, { decision, note: note || undefined })
-      setQuote((current) => current ? { ...current, status: decision === 'accept' ? 'accepted' : 'declined' } : current)
-      setDeclining(false)
+      await api.post(`/public-quotes/${encodeURIComponent(token)}/respond`, { decision, note: note.trim() || undefined })
+      setQuote((current) => current ? { ...current, status: decision === 'accept' ? 'accepted' : 'declined', decision_note: note.trim() || current.decision_note || null } : current)
+      setResponding(null)
+      setNote('')
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'We could not record your response. Call (561) 388-7879 and we will handle it.')
     } finally { setBusy('') }
@@ -102,8 +105,14 @@ export default function QuoteView() {
         </header>
 
         <div className="px-6 py-7 sm:px-10">
-          {quote.status === 'accepted' && <p className="mb-6 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] px-4 py-3 text-sm font-semibold text-emerald-200 print:hidden">This quote has been accepted. A Pinnacle coordinator will reach out to schedule the work.</p>}
-          {quote.status === 'declined' && <p className="mb-6 rounded-xl border border-white/15 bg-white/[.03] px-4 py-3 text-sm text-slate-300 print:hidden">This quote was declined. If anything changes, call (561) 388-7879 and we will re-scope it.</p>}
+          {quote.status === 'accepted' && <div className="mb-6 rounded-xl border border-emerald-400/25 bg-emerald-400/[.07] px-4 py-3 text-sm text-emerald-100 print:hidden">
+            <p className="font-semibold text-emerald-200">This quote has been accepted. A Pinnacle coordinator will reach out to schedule the work.</p>
+            {quote.decision_note && <p className="mt-2 text-sm leading-6 text-emerald-100/90">Your note: {quote.decision_note}</p>}
+          </div>}
+          {quote.status === 'declined' && <div className="mb-6 rounded-xl border border-white/15 bg-white/[.03] px-4 py-3 text-sm text-slate-300 print:hidden">
+            <p>This quote was declined. If anything changes, call (561) 388-7879 and we will re-scope it.</p>
+            {quote.decision_note && <p className="mt-2 text-sm leading-6 text-slate-400">Your note: {quote.decision_note}</p>}
+          </div>}
           {quote.status === 'expired' && <p className="mb-6 rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-4 py-3 text-sm text-amber-200 print:hidden">This quote has expired. Call (561) 388-7879 or reply to your quote email for updated pricing.</p>}
           {error && <p className="mb-6 rounded-xl border border-red-400/25 bg-red-400/[.06] px-4 py-3 text-sm text-red-200 print:hidden">{error}</p>}
 
@@ -154,16 +163,18 @@ export default function QuoteView() {
           {quote.pass_through_note && <p className="mt-4 text-xs leading-6 text-slate-500">{quote.pass_through_note}</p>}
 
           {live && <div className="mt-9 print:hidden">
-            {!declining ? <div className="flex flex-wrap items-center gap-3">
-              <button onClick={() => void respond('accept')} disabled={!!busy} className="rounded-xl bg-gold px-7 py-3.5 text-sm font-bold text-navy-950 transition hover:bg-gold-300 disabled:opacity-60">{busy === 'accept' ? 'Recording…' : `Accept Quote · ${money(quote.total_cents)}`}</button>
-              <button onClick={() => setDeclining(true)} disabled={!!busy} className="rounded-xl border border-white/15 px-6 py-3.5 text-sm font-bold text-slate-300 transition hover:border-white/35 hover:text-white disabled:opacity-60">Decline</button>
+            {!responding ? <div className="flex flex-wrap items-center gap-3">
+              <button onClick={() => setResponding('accept')} disabled={!!busy} className="rounded-xl bg-gold px-7 py-3.5 text-sm font-bold text-navy-950 transition hover:bg-gold-300 disabled:opacity-60">Accept Quote · {money(quote.total_cents)}</button>
+              <button onClick={() => setResponding('decline')} disabled={!!busy} className="rounded-xl border border-white/15 px-6 py-3.5 text-sm font-bold text-slate-300 transition hover:border-white/35 hover:text-white disabled:opacity-60">Decline</button>
               <button onClick={() => window.print()} className="text-sm font-semibold text-slate-400 transition hover:text-gold">Print / save PDF</button>
             </div> : <div className="rounded-xl border border-white/15 bg-white/[.02] p-4">
-              <p className="text-sm font-semibold text-white">Before you go - anything we should adjust?</p>
-              <textarea className="mt-3 w-full rounded-lg border border-white/15 bg-navy-950/60 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-gold/50 focus:outline-none" rows={3} placeholder="Optional: price, scope, timing, or anything else" value={note} onChange={(e) => setNote(e.target.value)} />
+              <p className="text-sm font-semibold text-white">{responding === 'accept' ? 'Anything we should know before we schedule?' : 'Before you go - anything we should adjust?'}</p>
+              <textarea className="mt-3 w-full rounded-lg border border-white/15 bg-navy-950/60 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-gold/50 focus:outline-none" rows={3} placeholder={responding === 'accept' ? 'Optional: timing, access, or anything else for the coordinator' : 'Optional: price, scope, timing, or anything else'} value={note} onChange={(e) => setNote(e.target.value)} />
               <div className="mt-3 flex gap-2">
-                <button onClick={() => void respond('decline')} disabled={!!busy} className="rounded-lg border border-red-400/25 px-5 py-2.5 text-sm font-bold text-red-200 transition hover:border-red-400/50 disabled:opacity-60">{busy === 'decline' ? 'Recording…' : 'Confirm Decline'}</button>
-                <button onClick={() => setDeclining(false)} disabled={!!busy} className="rounded-lg border border-white/15 px-5 py-2.5 text-sm font-bold text-slate-300 transition hover:text-white">Back</button>
+                {responding === 'accept'
+                  ? <button onClick={() => void respond('accept')} disabled={!!busy} className="rounded-lg bg-gold px-5 py-2.5 text-sm font-bold text-navy-950 transition hover:bg-gold-300 disabled:opacity-60">{busy === 'accept' ? 'Recording…' : 'Confirm Accept'}</button>
+                  : <button onClick={() => void respond('decline')} disabled={!!busy} className="rounded-lg border border-red-400/25 px-5 py-2.5 text-sm font-bold text-red-200 transition hover:border-red-400/50 disabled:opacity-60">{busy === 'decline' ? 'Recording…' : 'Confirm Decline'}</button>}
+                <button onClick={() => { setResponding(null); setNote('') }} disabled={!!busy} className="rounded-lg border border-white/15 px-5 py-2.5 text-sm font-bold text-slate-300 transition hover:text-white">Back</button>
               </div>
             </div>}
             <p className="mt-4 text-xs leading-6 text-slate-500">Accepting confirms the scope above. A Pinnacle coordinator confirms scheduling and any access details before work begins. Nothing is charged on this page.</p>

@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import type { AppEnv, SessionUser } from '../types'
 import { requireAdmin, requireOwner, requireStaff } from '../mid'
 import { NAMED_PERMISSIONS, namedPermissionColumn, requireNamedPermission, resolveNamedPermission } from '../capabilities'
-import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult, type InviteType } from '../invites'
+import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult, getInviteTtlHours, type InviteType } from '../invites'
+import { INVITE_TTL_SETTING_KEY, parseInviteTtlHours } from '../../../shared/inviteTtl'
 import { stageVendorProfile, VendorInviteConflict } from '../vendorStaging'
 import { logAudit, actorIp, actorUserAgent } from '../auditLog'
 import { uuid } from '../crypto'
@@ -40,7 +41,26 @@ invitationAdminRoutes.get('/invitations', requireStaff, requireNamedPermission('
      LEFT JOIN users staged ON staged.id = ai.staged_user_id
      ORDER BY ai.created_at DESC LIMIT 500`,
   ).all()
-  return c.json({ invitations: rows.results || [], can_invite_staff: await isOwner(c, c.get('user')) })
+  return c.json({ invitations: rows.results || [], can_invite_staff: await isOwner(c, c.get('user')), invite_ttl_hours: await getInviteTtlHours(c.env) })
+})
+
+invitationAdminRoutes.patch('/invitations/settings', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
+  const actor = c.get('user')
+  const body = await c.req.json<{ invite_ttl_hours?: unknown }>().catch(() => ({} as { invite_ttl_hours?: unknown }))
+  const hours = parseInviteTtlHours(body.invite_ttl_hours)
+  await c.env.DB.prepare(
+    'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+  ).bind(INVITE_TTL_SETTING_KEY, String(hours)).run()
+  await logAudit(c.env, {
+    actorUserId: actor.id,
+    actorIp: actorIp(c.req.raw),
+    actorUserAgent: actorUserAgent(c.req.raw),
+    action: 'record_updated',
+    entityType: 'invite_settings',
+    entityId: INVITE_TTL_SETTING_KEY,
+    after: { invite_ttl_hours: hours },
+  })
+  return c.json({ ok: true, invite_ttl_hours: hours })
 })
 
 // Role names are safe for an invitation manager to see, but only the Owner can

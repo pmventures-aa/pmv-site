@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Loader2, Send, X } from 'lucide-react'
 import { RichTextComposer } from '../../components/admin/RichTextComposer'
 import { pickDefaultSignature, rememberSignatureId, signatureLabel, type EmailSignature } from '../../lib/emailSignatures'
 import { SignaturePreview } from './SignatureLetterhead'
+import { api } from '../../lib/api'
+import type { HqEmailTemplate } from '../../lib/hqEmailTemplates'
 
 export type ComposeDraft = {
   mode: 'new' | 'reply'
@@ -35,6 +38,8 @@ export function EmailComposePane({
   const [showBcc, setShowBcc] = useState(!!draft.bcc)
   const defaultSig = useMemo(() => pickDefaultSignature(signatures), [signatures])
   const [signatureId, setSignatureId] = useState<string>(defaultSig?.id || 'none')
+  const [templates, setTemplates] = useState<HqEmailTemplate[]>([])
+  const [, setSearchParams] = useSearchParams()
 
   useEffect(() => {
     if (signatureId !== 'none' && signatures.some((s) => s.id === signatureId)) return
@@ -43,6 +48,11 @@ export function EmailComposePane({
 
   useEffect(() => { if (draft.cc) setShowCc(true) }, [draft.cc])
   useEffect(() => { if (draft.bcc) setShowBcc(true) }, [draft.bcc])
+  useEffect(() => {
+    void api.get<{ templates: HqEmailTemplate[] }>('/admin/email-templates')
+      .then((r) => setTemplates((r.templates || []).filter((row) => row.enabled)))
+      .catch(() => setTemplates([]))
+  }, [])
 
   const selected = signatures.find((s) => s.id === signatureId) || null
   const canSend = draft.to.trim() && draft.subject.trim() && stripEditor(draft.html).trim()
@@ -52,30 +62,62 @@ export function EmailComposePane({
     if (id !== 'none') rememberSignatureId(id)
   }
 
+  function applyTemplate(id: string) {
+    const row = templates.find((item) => item.id === id)
+    if (!row) return
+    onChange({
+      ...draft,
+      subject: draft.subject.trim() ? draft.subject : row.subject.replace(/\{\{[^}]+\}\}/g, '').replace(/\s+/g, ' ').trim(),
+      html: row.body_html,
+    })
+  }
+
+  function openTemplates() {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set('tab', 'templates')
+      return next
+    })
+  }
+
   function send() {
     onSend(signatureId === 'none' ? null : signatureId)
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f7f4ee] text-[#0a1728]">
-      <div className="flex shrink-0 items-center gap-2 border-b border-[#e4dfd4] bg-white px-4 py-2.5">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[#e4dfd4] bg-white px-3 py-2.5 sm:px-4 lg:flex-nowrap">
         <button
           type="button"
           disabled={busy || !canSend}
           onClick={send}
-          className="inline-flex items-center gap-2 rounded-md bg-[#c9a227] px-4 py-1.5 text-sm font-semibold text-[#07111f] transition hover:bg-[#d9b84a] disabled:opacity-50"
+          className="inline-flex shrink-0 items-center gap-2 rounded-md bg-[#c9a227] px-4 py-1.5 text-sm font-semibold text-[#07111f] transition hover:bg-[#d9b84a] disabled:opacity-50"
         >
           {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
           Send
         </button>
-        <button type="button" disabled={busy} onClick={onDiscard} className="rounded-md px-3 py-1.5 text-sm font-medium text-[#5b6573] hover:bg-black/[.04] hover:text-[#0a1728]">
+        <button type="button" disabled={busy} onClick={onDiscard} className="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-[#5b6573] hover:bg-black/[.04] hover:text-[#0a1728]">
           Discard
         </button>
-        <div className="ml-auto flex min-w-0 items-center gap-2">
-          <label className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[.12em] text-[#5b6573]">
+        <div className="order-3 flex w-full min-w-0 items-center gap-2 overflow-x-auto border-t border-[#eeeae2] pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:order-none lg:ml-auto lg:w-auto lg:overflow-visible lg:border-0 lg:pt-0">
+          <label className="flex min-w-0 shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[.12em] text-[#5b6573]">
+            Template
+            <select
+              className="h-8 min-w-[148px] rounded-md border border-[#ddd6c8] bg-white px-2 text-[13px] font-medium normal-case tracking-normal text-[#0a1728] outline-none focus:border-[#c9a227]"
+              defaultValue=""
+              onChange={(e) => { applyTemplate(e.target.value); e.currentTarget.value = '' }}
+            >
+              <option value="">Insert…</option>
+              {templates.map((row) => (
+                <option key={row.id} value={row.id}>{row.name}</option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="text-[12px] font-semibold text-[#9a7838] hover:underline" onClick={openTemplates}>Manage</button>
+          <label className="flex min-w-0 shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[.12em] text-[#5b6573]">
             Signature
             <select
-              className="h-8 min-w-[168px] rounded-md border border-[#ddd6c8] bg-white px-2 text-[13px] font-medium normal-case tracking-normal text-[#0a1728] outline-none focus:border-[#c9a227]"
+              className="h-8 min-w-[148px] rounded-md border border-[#ddd6c8] bg-white px-2 text-[13px] font-medium normal-case tracking-normal text-[#0a1728] outline-none focus:border-[#c9a227]"
               value={signatureId}
               onChange={(e) => setSig(e.target.value)}
             >
@@ -87,7 +129,7 @@ export function EmailComposePane({
           </label>
           <button type="button" className="text-[12px] font-semibold text-[#9a7838] hover:underline" onClick={onManageSignatures}>Edit</button>
         </div>
-        <button type="button" className="grid h-8 w-8 place-items-center rounded-md text-[#7b8492] hover:bg-black/[.05] hover:text-[#0a1728]" onClick={onDiscard} aria-label="Close">
+        <button type="button" className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-md text-[#7b8492] hover:bg-black/[.05] hover:text-[#0a1728] lg:ml-0" onClick={onDiscard} aria-label="Close">
           <X size={16} />
         </button>
       </div>
@@ -124,21 +166,19 @@ export function EmailComposePane({
         </FieldRow>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white">
-        <div className="min-h-0 flex-1">
-          <RichTextComposer
-            fill
-            surface="letter"
-            value={draft.html}
-            onChange={(html) => onChange({ ...draft, html })}
-            placeholder="Start writing"
-          />
-        </div>
-        {selected && (
-          <div className="shrink-0 px-8 pb-10 pt-2">
-            <SignaturePreview signature={selected} />
-          </div>
-        )}
+      <div className="min-h-0 flex-1 overflow-hidden bg-white">
+        <RichTextComposer
+          fill
+          surface="letter"
+          value={draft.html}
+          onChange={(html) => onChange({ ...draft, html })}
+          placeholder="Start writing"
+          footer={selected ? (
+            <div className="px-4 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-7">
+              <SignaturePreview signature={selected} />
+            </div>
+          ) : null}
+        />
       </div>
     </div>
   )
@@ -146,8 +186,8 @@ export function EmailComposePane({
 
 function FieldRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 border-b border-[#eeeae2] px-4 last:border-b-0">
-      <span className="w-[4.5rem] shrink-0 text-[11px] font-semibold uppercase tracking-[.14em] text-[#7b8492]">{label}</span>
+    <div className="flex items-center gap-2 border-b border-[#eeeae2] px-3 last:border-b-0 sm:gap-3 sm:px-4">
+      <span className="w-[3.25rem] shrink-0 text-[10px] font-semibold uppercase tracking-[.12em] text-[#7b8492] sm:w-[4.5rem] sm:text-[11px] sm:tracking-[.14em]">{label}</span>
       <div className="flex min-w-0 flex-1 items-center">{children}</div>
     </div>
   )

@@ -116,11 +116,8 @@ export function AuthLayout({
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[.18em] text-gold">{eyebrow}</p>
             <h1 className="mt-3 font-display text-4xl font-semibold leading-tight tracking-[-.025em] text-white sm:text-[2.7rem]">{title}</h1>
-            {live ? (
-              <AuthRotatingLine lines={moments.map((moment) => moment.line)} />
-            ) : (
-              subtitle && <p className="mt-3 max-w-md text-[15px] leading-7 text-slate-400">{subtitle}</p>
-            )}
+            {subtitle && <p className="mt-3 max-w-md text-[15px] leading-7 text-slate-400">{subtitle}</p>}
+            {live && <AuthRotatingLine lines={moments.map((moment) => moment.line)} />}
           </div>
 
           <div className="auth-card mt-8">{children}</div>

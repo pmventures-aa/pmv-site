@@ -17,8 +17,10 @@ import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
+import { Avatar } from '../../components/kit/Avatar'
 import { toast } from '../../components/kit/toast'
 import { hqWorkspaceCopy } from '../../lib/workspace'
+import { formatVendorFee } from '../../../shared/vendorFeeAdjustment'
 
 interface Assignment {
   id: string
@@ -49,6 +51,10 @@ interface Assignment {
   client_name: string | null
   client_email: string | null
   vendor_name: string | null
+  vendor_fee_cents?: number | null
+  vendor_fee_base_cents?: number | null
+  vendor_fee_adjustment_cents?: number | null
+  vendor_fee_reason?: string | null
 }
 
 interface DocumentRow {
@@ -134,6 +140,7 @@ export function FieldWorkList() {
         kicker={copy.homeKicker}
         title="My assignments"
         subtitle={copy.homeSubtitle}
+        leading={user ? <Avatar userId={user.id} name={user.full_name} size={56} editable uploadPath="/me/avatar" /> : undefined}
       />
       <div className="mb-4 flex gap-2">
         <button
@@ -180,6 +187,14 @@ export function FieldWorkList() {
                     <p className="mt-2 truncate text-sm font-semibold text-white">{assignment.title || assignment.service_key.replace(/_/g, ' ')}</p>
                     <p className="mt-1 truncate text-xs text-slate-400">{siteLine(assignment)}</p>
                     <p className="mt-1 text-xs text-slate-500">Client: {assignment.client_name || assignment.client_email || 'Not provided'}</p>
+                    {assignment.vendor_fee_cents ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Offered payout: <span className="text-slate-300">{formatVendorFee(assignment.vendor_fee_cents)}</span>
+                        {assignment.vendor_fee_adjustment_cents ? (
+                          <span className="text-gold"> ({assignment.vendor_fee_adjustment_cents > 0 ? '+' : ''}{(assignment.vendor_fee_adjustment_cents / 100).toFixed(0)} local)</span>
+                        ) : null}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </button>
@@ -196,6 +211,7 @@ export function FieldWorkList() {
 // -------------------------------------------------------------
 
 export default function FieldWorkDetail() {
+  const { user } = useAuth()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const p = useAppPath()
@@ -204,6 +220,7 @@ export default function FieldWorkDetail() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<'depart' | 'arrive' | 'complete' | null>(null)
   const [addingDoc, setAddingDoc] = useState(false)
+  const [assigningSelf, setAssigningSelf] = useState(false)
   const [signatureType, setSignatureType] = useState<'typed' | 'drawn'>('typed')
   const [signatureName, setSignatureName] = useState('')
   const [signatureAck, setSignatureAck] = useState(false)
@@ -226,6 +243,20 @@ export default function FieldWorkDetail() {
   }, [id, signatureName])
 
   useEffect(() => { void load() }, [load])
+
+  async function assignToMe() {
+    if (!assignment) return
+    setAssigningSelf(true)
+    try {
+      await api.post(`/admin/work-assignments/field_assignment/${assignment.id}/assign-self`)
+      toast.success('Field job assigned to you.')
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not assign this field job.')
+    } finally {
+      setAssigningSelf(false)
+    }
+  }
 
   async function markDeparted() {
     if (!assignment) return
@@ -425,7 +456,7 @@ export default function FieldWorkDetail() {
         kicker={isRon ? 'Remote Online Notarization' : 'Field assignment'}
         title={assignment.title || assignment.service_key.replace(/_/g, ' ')}
         subtitle={siteLine(assignment)}
-        action={<Tag tone={tone.tone}>{tone.label}</Tag>}
+        action={<div className="flex items-center gap-2">{assignment.vendor_user_id !== user?.id && <button type="button" disabled={assigningSelf} onClick={() => void assignToMe()} className={`${btnOutline} disabled:opacity-50`}>{assigningSelf ? <Loader2 size={14} className="animate-spin" /> : null} Assign to me</button>}<Tag tone={tone.tone}>{tone.label}</Tag></div>}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
@@ -634,6 +665,23 @@ export default function FieldWorkDetail() {
               </a>
             )}
           </Panel>
+          {assignment.vendor_fee_cents ? (
+            <Panel>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Your payout offer</p>
+              <p className="mt-1 text-lg font-semibold text-white">{formatVendorFee(assignment.vendor_fee_cents)}</p>
+              {assignment.vendor_fee_base_cents && assignment.vendor_fee_base_cents !== assignment.vendor_fee_cents ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  Catalog base {formatVendorFee(assignment.vendor_fee_base_cents)}
+                  {assignment.vendor_fee_adjustment_cents ? (
+                    <span className="text-gold"> · {assignment.vendor_fee_adjustment_cents > 0 ? '+' : ''}{(assignment.vendor_fee_adjustment_cents / 100).toFixed(0)} local adjustment</span>
+                  ) : null}
+                </p>
+              ) : null}
+              {assignment.vendor_fee_reason ? (
+                <p className="mt-2 text-xs leading-5 text-slate-500">{assignment.vendor_fee_reason}</p>
+              ) : null}
+            </Panel>
+          ) : null}
           {assignment.notes && (
             <Panel>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Job notes</p>

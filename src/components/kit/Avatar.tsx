@@ -8,9 +8,6 @@ function initialsOf(name?: string | null): string {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?'
 }
 
-// Shared across admin, portal, and (via ClientDetail) the client-on-staff's-
-// behalf case: self-styled like the rest of src/components/kit/ so it
-// doesn't pull in any one surface's design tokens.
 export function Avatar({
   userId,
   name,
@@ -22,9 +19,6 @@ export function Avatar({
   userId: string
   name?: string | null
   size?: number
-  // When set, hovering shows an upload overlay; the file POSTs to this path
-  // (either /me/avatar for self-service, or /admin/clients/:id/avatar for
-  // staff setting a client's photo on their behalf).
   editable?: boolean
   uploadPath?: string
   onUploaded?: () => void
@@ -33,6 +27,7 @@ export function Avatar({
   const [busy, setBusy] = useState(false)
   const [version, setVersion] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const showLabel = size >= 56
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -74,10 +69,12 @@ export function Avatar({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="absolute inset-0 grid place-items-center bg-black/60 text-xs text-white opacity-0 transition group-hover:opacity-100 disabled:opacity-100"
+          className={`absolute inset-0 grid place-items-center bg-black/55 text-white transition ${showLabel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} disabled:opacity-100`}
           aria-label="Change photo"
         >
-          {busy ? '…' : '📷'}
+          <span className={showLabel ? 'px-2 text-center text-[10px] font-semibold leading-tight' : 'text-xs'}>
+            {busy ? 'Saving…' : showLabel ? 'Change photo' : '📷'}
+          </span>
         </button>
       )}
       {editable && <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFile} />}

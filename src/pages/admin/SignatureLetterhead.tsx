@@ -1,8 +1,15 @@
-import { Crest } from '../../components/ui'
-import type { EmailSignature } from '../../lib/emailSignatures'
+import { LetterheadCrest } from '../../components/admin/LetterheadCrest'
+import {
+  FIRM_NAME,
+  FIRM_PHONE,
+  FIRM_REGION,
+  FIRM_SITE_HOST,
+  FIRM_TAGLINE,
+} from '../../../shared/letterhead'
+import { previewSignatureHtml, type EmailSignature } from '../../lib/emailSignatures'
 
-const PHONE = '(561) 388-7879'
-const SITE = 'pinnaclemanagementventures.com'
+const PHONE = FIRM_PHONE
+const SITE = FIRM_SITE_HOST
 
 export function SignatureLetterhead({
   kind,
@@ -26,13 +33,13 @@ export function SignatureLetterhead({
   return (
     <div className="max-w-[580px] text-[#0a1728]">
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-5">
-        <Crest size={76} tone="dark" decorative />
+        <LetterheadCrest />
         <div className="min-w-0">
-          <p className="font-serif text-[18px] font-semibold leading-[22px] tracking-[.04em]">Pinnacle Management Ventures</p>
-          <p className="mt-1.5 text-[10px] uppercase tracking-[.16em] text-[#5b6573]">Property · Documents · Operations</p>
+          <p className="font-serif text-[18px] font-semibold leading-[22px] tracking-[.04em]">{FIRM_NAME}</p>
+          <p className="mt-1.5 text-[10px] uppercase tracking-[.16em] text-[#5b6573]">{FIRM_TAGLINE}</p>
         </div>
         <div className="hidden shrink-0 text-right text-[11px] leading-[17px] text-[#64748b] sm:block">
-          <p>South Florida</p>
+          <p>{FIRM_REGION}</p>
           <p>{PHONE}</p>
           <p>{SITE}</p>
         </div>
@@ -53,15 +60,17 @@ export function SignatureLetterhead({
   )
 }
 
-export function SignaturePreview({ signature }: { signature: EmailSignature }) {
-  if (signature.kind === 'custom') {
-    return <SignatureLetterhead kind="company" />
-  }
+export function SignaturePreview({
+  signature,
+  html,
+}: {
+  signature: EmailSignature
+  html?: string
+}) {
   return (
-    <SignatureLetterhead
-      kind={signature.kind}
-      personName={signature.kind === 'support' ? 'PMV Support' : signature.name}
-      title={signature.kind === 'support' ? 'Client Care' : undefined}
+    <div
+      className="signature-preview"
+      dangerouslySetInnerHTML={{ __html: previewSignatureHtml(html ?? signature.html) }}
     />
   )
 }

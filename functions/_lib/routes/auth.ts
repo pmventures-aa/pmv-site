@@ -17,6 +17,7 @@ import { activityInsert, logActivity } from '../activity'
 import { logAudit, actorIp, actorUserAgent, actorGeo } from '../auditLog'
 import { notifyStaff, escapeHtml, sendEmail } from '../email'
 import { renderPinnacleEmailLayout } from '../emailTemplates/layout'
+import { renderHqEmailOrFallback } from '../hqEmailTemplates'
 import { CLIENT_PORTAL_URL, sendAccountWelcome, sendVendorApplicationReceived } from '../accountEmails'
 import { PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
 import { getCurrentProviderAgreementVersion } from '../managedTemplates'
@@ -24,6 +25,7 @@ import { toDisplayCase } from '../../../shared/displayCase'
 import { advanceInquiryLifecycle } from '../lifecycle'
 import { getInviteByToken } from '../invites'
 import { canCompleteStagedVendorSignup, type ExistingAccount } from '../vendorStaging'
+import { auth0Routes, logAuth0StartupWarnings } from './auth0'
 
 export const MIN_PASSWORD = 10
 const MAX_FAILS = 5
@@ -65,6 +67,8 @@ async function resetThrottled(env: AppEnv['Bindings'], email: string, ip: string
 }
 
 export const authRoutes = new Hono<AppEnv>()
+
+authRoutes.route('/', auth0Routes)
 
 authRoutes.get('/health', (c) => c.json({ ok: true, service: 'pmv-api', time: new Date().toISOString() }))
 
@@ -359,16 +363,21 @@ authRoutes.post('/forgot-password', async (c) => {
     ? `https://www.pinnaclemanagementventures.com/admin/reset-password?token=${encodeURIComponent(token)}`
     : `https://www.pinnaclemanagementventures.com/portal/reset-password?token=${encodeURIComponent(token)}`
   const firstName = user.first_name || String(user.full_name || '').split(/\s+/)[0] || 'there'
-  const html = renderPinnacleEmailLayout({
+  const fallbackHtml = renderPinnacleEmailLayout({
     preheader: 'Reset your Pinnacle password',
     eyebrow: isStaff ? 'Pinnacle HQ security' : 'Pinnacle account security',
     title: 'Reset your password',
     bodyHtml: `<p>Hi ${escapeHtml(firstName)},</p><p>We received a request to reset the password for your Pinnacle account. This secure link expires in 30 minutes and can be used only once.</p><p style="margin:24px 0"><a href="${resetUrl}" style="display:inline-block;background:#c9a227;color:#06111f;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:8px">Reset My Password</a></p><p>If you did not request this, you can ignore this email. Your current password will remain unchanged.</p>`,
   })
+  const rendered = await renderHqEmailOrFallback(c.env, 'password_reset', {
+    first_name: firstName,
+    action_url: resetUrl,
+    action_label: 'Reset My Password',
+  }, { subject: 'Reset your Pinnacle password', html: fallbackHtml, text: `Reset your Pinnacle password: ${resetUrl}` })
   c.executionCtx.waitUntil(sendEmail(c.env, {
     to: user.email,
-    subject: 'Reset your Pinnacle password',
-    html,
+    subject: rendered.subject,
+    html: rendered.html,
     replyTo: 'support@pinnaclemanagementventures.com',
     tags: [{ name: 'category', value: 'account_security' }],
   }))

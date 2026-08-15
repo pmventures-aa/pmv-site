@@ -3,6 +3,7 @@ import type { AppEnv, Env } from '../types'
 import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
+import { parseContactName } from '../../../shared/crmRecord'
 
 export const crmRoutes = new Hono<AppEnv>()
 crmRoutes.use('*', requireStaff)
@@ -44,6 +45,14 @@ function displayName(body: Record<string, unknown>, recordType: RecordType): str
   return clean(body.name, 200) || [first, last].filter(Boolean).join(' ') || clean(body.company_name, 200) || 'Lead'
 }
 
+function importContactNames(row: Record<string, unknown>) {
+  const parsed = parseContactName(row.contact_name || row.contact || row.contact_person)
+  return {
+    first_name: clean(row.first_name, 100) || clean(row.contact_first_name, 100) || clean(parsed.first_name, 100),
+    last_name: clean(row.last_name, 100) || clean(row.contact_last_name, 100) || clean(parsed.last_name, 100),
+  }
+}
+
 function buildDynamicWhere(filter: DynamicFilter, alias = 'ci') {
   const clauses = [`${alias}.converted_at IS NULL`, `${alias}.archived_at IS NULL`]
   const params: string[] = []
@@ -77,8 +86,8 @@ function buildDynamicWhere(filter: DynamicFilter, alias = 'ci') {
   }
   if (filter.search?.trim()) {
     const q = `%${filter.search.trim().slice(0, 120)}%`
-    clauses.push(`(${alias}.name LIKE ? OR ${alias}.email LIKE ? OR ${alias}.company_name LIKE ? OR ${alias}.phone LIKE ?)`)
-    params.push(q, q, q, q)
+    clauses.push(`(${alias}.name LIKE ? OR ${alias}.email LIKE ? OR ${alias}.company_name LIKE ? OR ${alias}.phone LIKE ? OR ${alias}.first_name LIKE ? OR ${alias}.last_name LIKE ? OR ${alias}.job_title LIKE ?)`)
+    params.push(q, q, q, q, q, q, q)
   }
   return { where: clauses.join(' AND '), params }
 }
@@ -337,7 +346,8 @@ crmRoutes.post('/crm/imports', async (c) => {
       continue
     }
     const recordType = normalizeRecordType(row.record_type || defaultType)
-    const name = displayName(row, recordType)
+    const contact = importContactNames(row)
+    const name = displayName({ ...row, first_name: contact.first_name, last_name: contact.last_name }, recordType)
     const existing = await c.env.DB.prepare('SELECT id FROM contact_inquiries WHERE lower(email) = lower(?) AND archived_at IS NULL ORDER BY created_at DESC LIMIT 1')
       .bind(email).first<{ id: string }>()
     const serviceKey = typeof row.service_key === 'string' && validServices.has(row.service_key) ? row.service_key : null
@@ -349,7 +359,7 @@ crmRoutes.post('/crm/imports', async (c) => {
            source = COALESCE(?, source), lifecycle_stage = COALESCE(?, lifecycle_stage), service_key = COALESCE(?, service_key), updated_at = datetime('now')
          WHERE id = ?`,
       ).bind(
-        name, recordType, clean(row.first_name, 100), clean(row.last_name, 100), clean(row.company_name, 200), clean(row.job_title, 160),
+        name, recordType, contact.first_name, contact.last_name, clean(row.company_name, 200), clean(row.job_title, 160),
         clean(row.phone, 60), clean(row.website, 500), clean(row.industry, 160), clean(row.source, 160),
         typeof row.lifecycle_stage === 'string' && LIFECYCLES.includes(row.lifecycle_stage as any) ? row.lifecycle_stage : null,
         serviceKey, existing.id,
@@ -366,7 +376,7 @@ crmRoutes.post('/crm/imports', async (c) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     ).bind(
       id, name, email, clean(row.phone, 60), serviceKey, clean(row.message ?? row.notes, 4000) ?? '', status, recordType,
-      clean(row.first_name, 100), clean(row.last_name, 100), clean(row.company_name, 200), clean(row.job_title, 160), clean(row.website, 500),
+      contact.first_name, contact.last_name, clean(row.company_name, 200), clean(row.job_title, 160), clean(row.website, 500),
       clean(row.industry, 160), clean(row.source, 160) ?? 'CSV import', lifecycle,
     ).run()
     created++

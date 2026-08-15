@@ -1,0 +1,13 @@
+export const FIRM_NAME = 'Pinnacle Management Ventures'
+export const FIRM_PHONE = '(561) 388-7879'
+export const FIRM_PHONE_TEL = '+15613887879'
+export const FIRM_TAGLINE = 'Property · Documents · Operations'
+export const FIRM_REGION = 'South Florida'
+export const FIRM_SITE_HOST = 'pinnaclemanagementventures.com'
+export const PUBLIC_SITE_URL = 'https://www.pinnaclemanagementventures.com'
+export const SUPPORT_EMAIL = 'support@pinnaclemanagementventures.com'
+export const CREST_PATH = '/logo-crest-letterhead.png'
+export const CREST_ABSOLUTE_URL = `${PUBLIC_SITE_URL}${CREST_PATH}`
+export const CREST_CID = 'pmv-crest'
+export const CREST_LETTERHEAD_WIDTH = 73
+export const CREST_LETTERHEAD_HEIGHT = 94

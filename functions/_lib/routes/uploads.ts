@@ -6,6 +6,7 @@ import { uuid } from '../crypto'
 import { logActivity } from '../activity'
 import { logAudit, actorGeo, actorIp, actorUserAgent } from '../auditLog'
 import { validateUploadSignature } from '../fileValidation'
+import { loadStaffClientReference } from '../clientRef'
 
 export const uploadRoutes = new Hono<AppEnv>()
 
@@ -38,7 +39,8 @@ uploadRoutes.post('/me/avatar', requireUser, async(c)=>{
 
 uploadRoutes.post('/admin/clients/:id/avatar', requireUser, async(c)=>{
   const user=c.get('user');if(user.role==='client')return c.json({error:'forbidden'},403)
-  const clientId=c.req.param('id')??'';if(!(await canAccessClient(c.env,user,clientId)))return c.json({error:'forbidden'},403)
+  const client=await loadStaffClientReference(c.env,user,c.req.param('id'));if(!client)return c.json({error:'not found'},404)
+  const clientId=client.id
   const result=await storeAvatar(c.env,clientId,c.req.raw);if('error'in result)return c.json({error:result.error},result.status as any)
   await Promise.all([
     logActivity(c.env,{actorUserId:user.id,clientUserId:clientId,kind:'avatar_updated',detail:{}}),
@@ -47,9 +49,30 @@ uploadRoutes.post('/admin/clients/:id/avatar', requireUser, async(c)=>{
   return c.json({ok:true,key:result.key})
 })
 
-uploadRoutes.get('/avatar/:userId',async(c)=>{
+uploadRoutes.post('/admin/users/:id/avatar', requireUser, async(c)=>{
+  const actor=c.get('user');if(actor.role==='client')return c.json({error:'forbidden'},403)
+  const targetId=c.req.param('id')??''
+  const target=await c.env.DB.prepare('SELECT id, role FROM users WHERE id=?').bind(targetId).first<{id:string;role:string}>()
+  if(!target)return c.json({error:'not found'},404)
+  if(target.role==='client' && !(await canAccessClient(c.env,actor,targetId)))return c.json({error:'forbidden'},403)
+  const result=await storeAvatar(c.env,targetId,c.req.raw);if('error'in result)return c.json({error:result.error},result.status as any)
+  await Promise.all([
+    target.role==='client' ? logActivity(c.env,{actorUserId:actor.id,clientUserId:targetId,kind:'avatar_updated',detail:{}}) : Promise.resolve(),
+    logAudit(c.env,{actorUserId:actor.id,actorIp:actorIp(c.req.raw),actorUserAgent:actorUserAgent(c.req.raw),actorGeo:actorGeo(c.req.raw),action:'file_uploaded',entityType:'user_avatar',entityId:targetId,after:{size_bytes:result.size,content_type:result.contentType,target_role:target.role}}),
+  ])
+  return c.json({ok:true,key:result.key})
+})
+
+uploadRoutes.get('/avatar/:userId',requireUser,async(c)=>{
   if(!c.env.UPLOADS)return c.json({error:'not found'},404)
-  const row=await c.env.DB.prepare('SELECT avatar_key FROM users WHERE id=?').bind(c.req.param('userId')).first<{avatar_key:string|null}>()
+  const user=c.get('user')
+  const targetId=c.req.param('userId')
+  const row=await c.env.DB.prepare('SELECT id,role,avatar_key FROM users WHERE id=?').bind(targetId).first<{id:string;role:string;avatar_key:string|null}>()
+  if(!row)return c.json({error:'not found'},404)
+  if(row.role==='client'){
+    if(user.role==='client'&&user.id!==row.id)return c.json({error:'not found'},404)
+    if(user.role!=='client'&&!(await canAccessClient(c.env,user,row.id)))return c.json({error:'not found'},404)
+  }
   if(!row?.avatar_key)return c.json({error:'not found'},404)
   const obj=await c.env.UPLOADS.get(row.avatar_key);if(!obj)return c.json({error:'not found'},404)
   return new Response(obj.body,{headers:{'Content-Type':obj.httpMetadata?.contentType||'application/octet-stream','Cache-Control':'public, max-age=300','X-Content-Type-Options':'nosniff'}})

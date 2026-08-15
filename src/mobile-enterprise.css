@@ -1,14 +1,14 @@
-/* Mobile hardening for PMV - public site, portal, HQ, mail, and shared shell. */
-
-/* --- Universal: prevent horizontal overflow anywhere on any surface --- */
-html, body, #root {
-  max-width: 100%;
-  overflow-x: hidden;
-}
+/* Mobile hardening for PMV - public site, portal, HQ, mail, and shared shell.
+   Desktop HQ/mail keep their wide Outlook layout. These rules apply on phones. */
 body { -webkit-text-size-adjust: 100%; }
 
 /* --- iOS/Android 16px input rule (below which mobile Safari zooms on focus) --- */
 @media (max-width: 767px) {
+  html, body, #root {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   input:not([type='checkbox']):not([type='radio']),
   select,
   textarea {

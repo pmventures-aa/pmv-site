@@ -12,7 +12,7 @@ const RESULT_LIMIT = 8
 
 searchRoutes.get('/search', requireStaff, async (c) => {
   const q = (c.req.query('q') ?? '').trim()
-  if (q.length < 2) return c.json({ clients: [], inquiries: [], matters: [], invoices: [] })
+  if (q.length < 2) return c.json({ clients: [], inquiries: [], matters: [], invoices: [], quotes: [] })
   const user = c.get('user')
   const like = `%${q}%`
 
@@ -20,34 +20,48 @@ searchRoutes.get('/search', requireStaff, async (c) => {
   const matterScope = await scopeFilter(c.env, user, 'm.client_user_id')
   const invoiceScope = await scopeFilter(c.env, user, 'i.client_user_id')
 
-  const [clients, inquiries, matters, invoices] = await Promise.all([
+  const [clients, inquiries, matters, invoices, quotes] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT u.id, u.full_name, u.email, cp.business_name
+      `SELECT u.id, u.public_ref, u.full_name, u.email, cp.business_name
        FROM users u LEFT JOIN client_profiles cp ON cp.user_id = u.id
        WHERE u.role = 'client' AND ${clientScope.where}
          AND (u.full_name LIKE ? OR u.email LIKE ? OR cp.business_name LIKE ?)
        ORDER BY u.full_name LIMIT ?`,
     ).bind(...clientScope.params, like, like, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
-      `SELECT id, name, email, phone, company_name, record_type, lifecycle_stage, status
+      `SELECT id, name, email, phone, company_name, first_name, last_name, job_title, record_type, lifecycle_stage, status
        FROM contact_inquiries
        WHERE converted_at IS NULL AND archived_at IS NULL
-         AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR company_name LIKE ?)
+         AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR company_name LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR job_title LIKE ?)
        ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ?`,
-    ).bind(like, like, like, like, RESULT_LIMIT).all(),
+    ).bind(like, like, like, like, like, like, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
-      `SELECT m.id, m.title, m.status, m.client_user_id, u.full_name AS client_name, u.email AS client_email
+      `SELECT m.id, m.title, m.status, m.client_user_id, u.public_ref AS client_public_ref, u.full_name AS client_name, u.email AS client_email
        FROM matters m JOIN users u ON u.id = m.client_user_id
        WHERE ${matterScope.where} AND m.title LIKE ?
        ORDER BY m.created_at DESC LIMIT ?`,
     ).bind(...matterScope.params, like, RESULT_LIMIT).all(),
     c.env.DB.prepare(
-      `SELECT i.id, i.amount_cents, i.status, i.client_user_id, u.full_name AS client_name, u.email AS client_email
+      `SELECT i.id, i.amount_cents, i.status, i.invoice_number, i.title, i.client_user_id, u.public_ref AS client_public_ref, u.full_name AS client_name, u.email AS client_email
        FROM invoices i JOIN users u ON u.id = i.client_user_id
-       WHERE ${invoiceScope.where} AND (u.full_name LIKE ? OR u.email LIKE ? OR i.id LIKE ?)
+       WHERE ${invoiceScope.where} AND (
+         u.full_name LIKE ? OR u.email LIKE ? OR i.id LIKE ? OR COALESCE(i.invoice_number,'') LIKE ? OR COALESCE(i.title,'') LIKE ?
+       )
        ORDER BY i.created_at DESC LIMIT ?`,
-    ).bind(...invoiceScope.params, like, like, like, RESULT_LIMIT).all(),
+    ).bind(...invoiceScope.params, like, like, like, like, like, RESULT_LIMIT).all(),
+    c.env.DB.prepare(
+      `SELECT id, quote_number, title, status, recipient_name, recipient_email, total_cents
+       FROM service_quotes
+       WHERE quote_number LIKE ? OR title LIKE ? OR recipient_name LIKE ? OR recipient_email LIKE ? OR COALESCE(recipient_company,'') LIKE ?
+       ORDER BY created_at DESC LIMIT ?`,
+    ).bind(like, like, like, like, like, RESULT_LIMIT).all(),
   ])
 
-  return c.json({ clients: clients.results ?? [], inquiries: inquiries.results ?? [], matters: matters.results ?? [], invoices: invoices.results ?? [] })
+  return c.json({
+    clients: clients.results ?? [],
+    inquiries: inquiries.results ?? [],
+    matters: matters.results ?? [],
+    invoices: invoices.results ?? [],
+    quotes: quotes.results ?? [],
+  })
 })

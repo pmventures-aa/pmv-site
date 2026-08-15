@@ -5,6 +5,7 @@ import { toast } from '../../../components/kit/toast'
 import { useAuth } from '../../../lib/auth'
 import { useCapabilities } from '../../../lib/capabilities'
 import { RoleTemplatesPanel, groupPermissions, type Permission, type RoleDef } from './RoleTemplatesPanel'
+import { Avatar } from '../../../components/kit/Avatar'
 
 type OverrideMode = 'inherit' | 'allow' | 'deny'
 
@@ -201,7 +202,9 @@ export default function StaffSettings() {
             return (
               <Panel key={user.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <button type="button" className="min-w-0 text-left" onClick={() => setOpenId(open ? null : user.id)}>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <Avatar userId={user.id} name={user.full_name || user.email} size={40} editable={isAdmin} uploadPath={`/admin/users/${user.id}/avatar`} />
+                    <button type="button" className="min-w-0 text-left" onClick={() => setOpenId(open ? null : user.id)}>
                     <p className="font-medium text-white">{user.full_name || user.email}</p>
                     <p className="text-xs text-slate-500">
                       {user.email} · <Tag tone={user.role === 'admin' ? 'gold' : 'slate'}>{user.role}</Tag>{' '}
@@ -211,7 +214,8 @@ export default function StaffSettings() {
                       {user.status === 'suspended' && <Tag tone="red">suspended</Tag>}
                       {user.is_owner ? <Tag tone="gold">owner</Tag> : null}
                     </p>
-                  </button>
+                    </button>
+                  </div>
                   <div className="flex gap-2">
                     <button type="button" className={`${btnOutline} text-xs`} onClick={() => setOpenId(open ? null : user.id)}>{open ? 'Collapse' : 'Control access'}</button>
                     {isAdmin && <button type="button" onClick={() => save(user)} className={`${btnPrimary} text-xs`} disabled={savingId === user.id}>{savingId === user.id ? 'Saving…' : 'Save'}</button>}

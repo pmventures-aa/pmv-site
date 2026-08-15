@@ -27,8 +27,12 @@ import Notifications from './Notifications'
 import Security from './Security'
 import ClientPortalDemo from './ClientPortalDemo'
 import { ModulePage } from './ModulePage'
-import { callsConfig, mattersConfig, tasksConfig, fundingConfig, propertyConfig, taxConfig } from './moduleConfigs'
+import { callsConfig, tasksConfig, fundingConfig, taxConfig } from './moduleConfigs'
 import CalendarPage from './CalendarPage'
+import Properties from './Properties'
+import PropertyProfile from './PropertyProfile'
+import Matters from './Matters'
+import MatterDetail from './MatterDetail'
 
 function ClientShell() {
   const { workspace } = useAuth()
@@ -74,14 +78,16 @@ export default function PortalApp({ basePath }: { basePath: string }) {
             <Route path="planned-calls" element={<ModulePage config={callsConfig} />} />
             <Route path="services" element={<Services />} />
             <Route path="services/:key/apply" element={<ServiceApplication />} />
-            <Route path="matters" element={<ModulePage config={mattersConfig} />} />
+            <Route path="matters" element={<Matters />} />
+            <Route path="matters/:id" element={<MatterDetail />} />
             <Route path="tasks" element={<ModulePage config={tasksConfig} />} />
             <Route path="documents" element={<Documents />} />
             <Route path="messages" element={<Messages />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="billing" element={<Billing />} />
             <Route path="funding" element={<ModulePage config={fundingConfig} />} />
-            <Route path="property-management" element={<ModulePage config={propertyConfig} />} />
+            <Route path="property-management" element={<Properties />} />
+            <Route path="property-management/:id" element={<PropertyProfile />} />
             <Route path="tax-filings" element={<ModulePage config={taxConfig} />} />
             <Route path="support" element={<Support />} />
             <Route path="business-profile" element={<BusinessProfile />} />

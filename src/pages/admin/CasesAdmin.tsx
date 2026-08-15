@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { AlertTriangle, Filter, Search, Settings, RefreshCw, Loader2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { AlertTriangle, ArrowRightLeft, Filter, Search, Settings, RefreshCw, Loader2, UserCheck } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnOutline, btnPrimary, SkeletonTable } from '../../components/admin/ui'
 import { SlaClock } from '../../components/kit/SlaClock'
 import { useAppPath } from '../../lib/basePath'
+import { clientEmailHref } from '../../lib/engagements'
 import { useAuth } from '../../lib/auth'
 import { toast } from '../../components/kit/toast'
 import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../components/admin/RecentWindow'
+import { CASE_CONVERSION_TARGETS, caseConversionLabel, type CaseConversionTarget } from '../../../shared/operations'
 
 interface CaseRow {
   id: string
@@ -26,8 +28,11 @@ interface CaseRow {
   created_at: string
   client_name: string | null
   client_email: string | null
+  client_public_ref: string | null
   assignee_name: string | null
   assignee_email: string | null
+  details?: string | null
+  conversion_count?: number
 }
 
 interface SlaPolicy { priority: string; response_minutes: number; resolution_minutes: number; updated_at: string }
@@ -55,10 +60,13 @@ export default function CasesAdmin() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const p = useAppPath()
+  const navigate = useNavigate()
   const [cases, setCases] = useState<CaseRow[]>([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({ status: 'open,in_progress', priority: '', waiting_on: '', over_sla: false, search: '' })
   const [showSlaEditor, setShowSlaEditor] = useState(false)
+  const [convertCase, setConvertCase] = useState<CaseRow | null>(null)
+  const [assigningId, setAssigningId] = useState<string | null>(null)
 
   const load = useCallback(async (silent = false) => {
     // Server does the coarse filter; we do search + over_sla client-side so
@@ -105,6 +113,22 @@ export default function CasesAdmin() {
   }, [cases, filters, now])
 
   const overCount = useMemo(() => cases.filter((row) => isOverSla(row, now)).length, [cases, now])
+
+  async function assignToMe(row: CaseRow) {
+    if (!user) return
+    setAssigningId(row.id)
+    try {
+      await api.post(`/admin/work-assignments/ticket/${row.id}/assign-self`)
+      setCases((current) => current.map((item) => item.id === row.id
+        ? { ...item, assigned_staff_user_id: user.id, assignee_name: user.full_name, assignee_email: user.email }
+        : item))
+      toast.success('Case assigned to you.')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not assign this case.')
+    } finally {
+      setAssigningId(null)
+    }
+  }
 
   return (
     <div>
@@ -193,13 +217,35 @@ export default function CasesAdmin() {
       ) : visible.length === 0 ? (
         <Panel><EmptyState label="No cases match these filters." /></Panel>
       ) : (
-        <CaseRows rows={visible} now={now} p={p} />
+        <CaseRows rows={visible} now={now} p={p} userId={user?.id || ''} assigningId={assigningId} onAssignSelf={assignToMe} onConvert={setConvertCase} />
+      )}
+      {convertCase && user && (
+        <CaseConversionDialog
+          row={convertCase}
+          currentUserId={user.id}
+          onClose={() => setConvertCase(null)}
+          onConverted={(href) => {
+            setConvertCase(null)
+            void load(true)
+            navigate(p(href))
+          }}
+        />
       )}
     </div>
   )
 }
 
-function CaseRows({ rows, now, p }: { rows: CaseRow[]; now: number; p: (path: string) => string }) {
+function CaseRows({
+  rows, now, p, userId, assigningId, onAssignSelf, onConvert,
+}: {
+  rows: CaseRow[]
+  now: number
+  p: (path: string) => string
+  userId: string
+  assigningId: string | null
+  onAssignSelf: (row: CaseRow) => void
+  onConvert: (row: CaseRow) => void
+}) {
   const windowed = useRecentWindow(rows)
   return (
     <RecentListShell footer={<RecentWindowBar extra={windowed.extra} expanded={windowed.expanded} onToggle={() => windowed.setExpanded((v) => !v)} showing={windowed.showing} total={windowed.total} noun="cases" />}>
@@ -217,7 +263,7 @@ function CaseRows({ rows, now, p }: { rows: CaseRow[]; now: number; p: (path: st
               </div>
               <p className="mt-2 text-sm font-semibold text-white">{row.subject}</p>
               <p className="mt-1 text-xs text-slate-400">
-                <Link to={p(`clients/${row.client_user_id}`)} className="text-slate-300 hover:text-gold hover:underline">
+                <Link to={p(`clients/${row.client_public_ref || row.client_user_id}`)} className="text-slate-300 hover:text-gold hover:underline">
                   {row.client_name || row.client_email || 'Unknown client'}
                 </Link>
                 {' · '}
@@ -226,14 +272,166 @@ function CaseRows({ rows, now, p }: { rows: CaseRow[]; now: number; p: (path: st
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs">
+              <div className="flex flex-wrap justify-end gap-2">
+                {row.assigned_staff_user_id !== userId && (
+                  <button type="button" disabled={assigningId === row.id} onClick={() => onAssignSelf(row)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-300 hover:text-gold disabled:opacity-50">
+                    <UserCheck size={12} /> Assign to me
+                  </button>
+                )}
+                <button type="button" onClick={() => onConvert(row)} className="inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline">
+                  <ArrowRightLeft size={12} /> Convert
+                </button>
+                <Link to={clientEmailHref(p, { id: row.client_user_id, email: row.client_email, name: row.client_name })} className="text-xs font-semibold text-gold hover:underline">Email</Link>
+              </div>
               <SlaClock due={row.response_due_at} complete={!!row.first_response_at} label="Response" />
               <SlaClock due={row.resolution_due_at} complete={row.status === 'closed'} label="Resolution" />
+              {!!row.conversion_count && <span className="text-[10px] text-emerald-300">{row.conversion_count} linked record{row.conversion_count === 1 ? '' : 's'}</span>}
               <span className="text-[10px] text-slate-500">Opened {new Date(row.created_at).toLocaleString()}</span>
             </div>
           </div>
         )
       })}
     </RecentListShell>
+  )
+}
+
+function CaseConversionDialog({
+  row, currentUserId, onClose, onConverted,
+}: {
+  row: CaseRow
+  currentUserId: string
+  onClose: () => void
+  onConverted: (href: string) => void
+}) {
+  const [target, setTarget] = useState<CaseConversionTarget>('matter')
+  const [providers, setProviders] = useState<Array<{ id: string; full_name: string | null; email: string }>>([])
+  const [form, setForm] = useState({
+    title: row.subject,
+    notes: row.details || '',
+    due_date: '',
+    matter_type: row.category || 'other',
+    kind: 'field',
+    service_key: row.service_key || row.category || 'general',
+    provider_user_id: currentUserId,
+    scheduled_at: '',
+    amount_dollars: '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    api.get<{ staff: Array<{ id: string; full_name: string | null; email: string }> }>('/admin/staff-directory')
+      .then((result) => setProviders(result.staff || []))
+      .catch(() => setProviders([]))
+  }, [])
+
+  async function submit() {
+    if (!form.title.trim()) {
+      toast.error('Add a title for the new record.')
+      return
+    }
+    setSaving(true)
+    try {
+      const result = await api.post<{ href: string }>(`/admin/cases/${row.id}/convert`, {
+        target_type: target,
+        title: form.title.trim(),
+        notes: form.notes.trim() || undefined,
+        due_date: form.due_date || undefined,
+        matter_type: form.matter_type || undefined,
+        kind: form.kind,
+        service_key: form.service_key || undefined,
+        provider_user_id: form.provider_user_id || currentUserId,
+        scheduled_at: form.scheduled_at || undefined,
+        amount_cents: Math.max(0, Math.round(Number(form.amount_dollars || 0) * 100)),
+      })
+      toast.success(`${caseConversionLabel(target)} created and linked to the case.`)
+      onConverted(result.href)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not convert this case.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-navy-950/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="case-conversion-title">
+      <Panel className="max-h-[90vh] w-full max-w-2xl overflow-y-auto !p-0">
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-gold/80">Client request conversion</p>
+            <h2 id="case-conversion-title" className="mt-1 text-lg font-semibold text-white">{row.subject}</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-400">The original case stays intact. The new operational record is linked back to it for audit and follow-through.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-xs font-semibold text-slate-400 hover:text-white">Close</button>
+        </div>
+        <div className="grid gap-4 p-5 sm:grid-cols-2">
+          <label>
+            <span className="mb-1 block text-xs font-medium text-slate-400">Convert into</span>
+            <select className={inputCls} value={target} onChange={(event) => setTarget(event.target.value as CaseConversionTarget)}>
+              {CASE_CONVERSION_TARGETS.map((item) => <option key={item} value={item}>{caseConversionLabel(item)}</option>)}
+            </select>
+          </label>
+          <label>
+            <span className="mb-1 block text-xs font-medium text-slate-400">Title</span>
+            <input className={inputCls} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+          </label>
+
+          {(target === 'matter' || target === 'task') && (
+            <label>
+              <span className="mb-1 block text-xs font-medium text-slate-400">Due date</span>
+              <input className={inputCls} type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
+            </label>
+          )}
+          {target === 'matter' && (
+            <label>
+              <span className="mb-1 block text-xs font-medium text-slate-400">Work type</span>
+              <input className={inputCls} value={form.matter_type} onChange={(event) => setForm({ ...form, matter_type: event.target.value })} placeholder="property_work, document_prep, other" />
+            </label>
+          )}
+          {target === 'field_assignment' && (
+            <>
+              <label>
+                <span className="mb-1 block text-xs font-medium text-slate-400">Job kind</span>
+                <select className={inputCls} value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })}>
+                  <option value="field">Field job</option>
+                  <option value="ron">RON session</option>
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs font-medium text-slate-400">Provider</span>
+                <select className={inputCls} value={form.provider_user_id} onChange={(event) => setForm({ ...form, provider_user_id: event.target.value })}>
+                  {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.full_name || provider.email}{provider.id === currentUserId ? ' (me)' : ''}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs font-medium text-slate-400">Service</span>
+                <input className={inputCls} value={form.service_key} onChange={(event) => setForm({ ...form, service_key: event.target.value })} />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs font-medium text-slate-400">Scheduled for</span>
+                <input className={inputCls} type="datetime-local" value={form.scheduled_at} onChange={(event) => setForm({ ...form, scheduled_at: event.target.value })} />
+              </label>
+            </>
+          )}
+          {target === 'quote' && (
+            <label>
+              <span className="mb-1 block text-xs font-medium text-slate-400">Draft estimate</span>
+              <div className="relative"><span className="absolute inset-y-0 left-3 grid place-items-center text-sm text-slate-500">$</span><input className={`${inputCls} pl-7`} min="0" step="0.01" type="number" value={form.amount_dollars} onChange={(event) => setForm({ ...form, amount_dollars: event.target.value })} placeholder="0.00" /></div>
+              <span className="mt-1 block text-[10px] text-slate-500">Creates a draft only. Review scope, line items, terms, and pricing before sending.</span>
+            </label>
+          )}
+          <label className="sm:col-span-2">
+            <span className="mb-1 block text-xs font-medium text-slate-400">Carry into the new record</span>
+            <textarea className={`${inputCls} min-h-24`} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Client details, access instructions, scope, and context" />
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
+          <button type="button" onClick={onClose} className={btnOutline}>Cancel</button>
+          <button type="button" disabled={saving} onClick={() => void submit()} className={`${btnPrimary} disabled:opacity-50`}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRightLeft size={14} />} Create {caseConversionLabel(target).toLowerCase()}
+          </button>
+        </div>
+      </Panel>
+    </div>
   )
 }
 

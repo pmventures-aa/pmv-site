@@ -35,7 +35,12 @@ const MONEY_KINDS = new Set<string>([
   'invoice_created',
   'invoice_sent',
   'invoice_status_changed',
+  'invoice_updated',
   'invoice_reminder_sent',
+  'quote_created',
+  'quote_sent',
+  'quote_accepted',
+  'quote_declined',
   'funding_created',
   'funding_status_changed',
 ])
@@ -63,6 +68,9 @@ const COMMUNICATIONS_KINDS = new Set<string>([
   'account_email_failed',
   'email.inbound',
   'email.sent',
+  'conversation.created',
+  'conversation.message',
+  'conversation.internal_note',
 ])
 
 export function categorizeActivity(kind: string): ActivityCategory {
@@ -107,7 +115,9 @@ export function describeActivity(e: ActivityEvent): string {
     case 'lead_note_added': return `${actor} added an internal note to a lead/prospect`
     case 'crm_import_completed': return `${actor} completed a CRM import · ${d.created ?? 0} new · ${d.updated ?? 0} updated · ${d.skipped ?? 0} skipped`
     case 'comms_message_created': return `${actor} created a ${fmtStatus(d.message_type)} communication “${d.subject || ''}”${typeof d.eligible_recipients === 'number' ? ` for ${d.eligible_recipients} eligible recipient${d.eligible_recipients === 1 ? '' : 's'}` : ''}`
-    case 'comms_message_sent': return `${actor} sent “${d.subject || 'a communication'}” to ${d.recipients ?? 'selected'} recipient${d.recipients === 1 ? '' : 's'}`
+    case 'comms_message_sent':
+      if (typeof d.to === 'string' && d.to) return `${actor} sent “${d.subject || 'a communication'}” to ${e.client_name || e.client_email || d.to}`
+      return `${actor} sent “${d.subject || 'a communication'}” to ${d.recipients ?? 'selected'} recipient${d.recipients === 1 ? '' : 's'}`
     case 'client_signed_up': return `${client} signed up${d.business_name ? ` (${d.business_name})` : ''}`
     case 'user_created': return `${actor} created a${d.role === 'admin' ? 'n' : ''} ${d.role} account for ${d.full_name || d.email}`
     case 'user_status_changed': return `${actor} updated ${d.name || 'a user'}: ${d.to?.status ?? ''} · ${d.to?.role ?? ''}`.trim()
@@ -128,10 +138,15 @@ export function describeActivity(e: ActivityEvent): string {
     case 'call_status_changed': return `${actor} set call “${d.topic}” (${client}) to ${fmtStatus(d.to)}`
     case 'appointment_created': return `${actor} scheduled “${d.title}” for ${client}`
     case 'appointment_status_changed': return `${actor} set appointment “${d.title}” (${client}) to ${fmtStatus(d.to)}`
-    case 'invoice_created': return `${actor} created an invoice for ${money(d.amount_cents)} for ${client}${d.invoice_number ? ` · ${d.invoice_number}` : ''}`
+    case 'invoice_created': return `${actor} created an invoice for ${money(d.amount_cents)} for ${client}${d.invoice_number ? ` · ${d.invoice_number}` : ''}${d.quote_number ? ` from quote ${d.quote_number}` : ''}`
     case 'invoice_sent': return `${actor} sent ${d.invoice_number || 'an invoice'} to ${d.recipients ?? 1} recipient${d.recipients === 1 ? '' : 's'} for ${client}`
     case 'invoice_status_changed': return `${actor} marked ${client}’s invoice as ${fmtStatus(d.to)}`
+    case 'invoice_updated': return `${actor} updated ${d.invoice_number || 'an invoice'} for ${client}`
     case 'invoice_reminder_sent': return `${actor} sent a payment reminder to ${client}${d.invoice_number ? ` for ${d.invoice_number}` : ''}`
+    case 'quote_created': return `${actor} created quote ${d.quote_number || ''} for ${money(d.total_cents)}`
+    case 'quote_sent': return `${actor} sent quote ${d.quote_number || ''} for ${money(d.total_cents)}`
+    case 'quote_accepted': return `${d.quote_number || 'A quote'} was accepted${d.total_cents ? ` for ${money(d.total_cents)}` : ''}`
+    case 'quote_declined': return `${d.quote_number || 'A quote'} was declined`
     case 'service_assigned_by_staff': return `${actor} assigned ${d.service_name || fmtStatus(d.service_key)} to ${client}: awaiting their signature`
     case 'funding_created': return `${actor} opened a funding application for ${client}`
     case 'funding_status_changed': return `${actor} set ${client}’s funding application to ${fmtStatus(d.to)}`
@@ -160,7 +175,10 @@ export function describeActivity(e: ActivityEvent): string {
     case 'message_sent': return `${actor} sent a message to ${client}: “${d.subject}”`
     case 'message_attachment_added': return `${actor} attached “${d.file_name}” to a message${d.subject ? `: “${d.subject}”` : ''}`
     case 'email.inbound': return `Email reply from ${d.from_name || d.from || 'a sender'}: “${d.subject || 'no subject'}”`
-    case 'email.sent': return `${actor} sent an email: “${d.subject || 'no subject'}”`
+    case 'email.sent': return `${actor} sent an email${e.client_name || e.client_email ? ` to ${client}` : ''}: “${d.subject || 'no subject'}”`
+    case 'conversation.created': return `${actor} started a conversation${d.subject ? `: “${d.subject}”` : ''}`
+    case 'conversation.message': return `${actor} sent a staff message${d.subject ? ` in “${d.subject}”` : ''}${e.client_name || e.client_email ? ` for ${client}` : ''}`
+    case 'conversation.internal_note': return `${actor} added an internal note${d.subject ? ` in “${d.subject}”` : ''}`
     default: return fmtStatus(e.kind)
   }
 }

@@ -6,6 +6,7 @@ import { uuid } from '../crypto'
 import { createActivationToken } from '../session'
 import { activityInsert } from '../activity'
 import { sendAccountWelcome, sendPortalReminder, sendVendorApproved } from '../accountEmails'
+import { hqUrl, portalUrl } from '../appUrls'
 import { toDisplayCase } from '../../../shared/displayCase'
 
 export const accountEmailsAdminRoutes = new Hono<AppEnv>()
@@ -20,8 +21,8 @@ function firstName(row: { first_name?: string | null; full_name?: string | null 
 }
 
 function setupUrl(role: string, token: string): string {
-  const host = role === 'client' ? 'client.pinnaclemanagementventures.com' : 'hq.pinnaclemanagementventures.com'
-  return `https://${host}/set-password?token=${encodeURIComponent(token)}`
+  const origin = role === 'client' ? portalUrl() : hqUrl()
+  return `${origin}/set-password?token=${encodeURIComponent(token)}`
 }
 
 async function canManageUsers(c: any): Promise<boolean> {

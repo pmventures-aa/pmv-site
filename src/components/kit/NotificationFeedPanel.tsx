@@ -18,9 +18,16 @@ export function resolveHqDeepLink(path: string, p: (s: string) => string): strin
   if (!raw || /^https?:/i.test(raw)) return raw
   const qIndex = raw.indexOf('?')
   const pathname = qIndex >= 0 ? raw.slice(0, qIndex) : raw
-  const search = qIndex >= 0 ? raw.slice(qIndex) : ''
-  const stripped = pathname.replace(/^\/hq\/?/i, '').replace(/^\//, '')
-  return `${p(stripped)}${search}`
+  const search = qIndex >= 0 ? raw.slice(qIndex + 1) : ''
+  let stripped = pathname.replace(/^\/hq\/?/i, '').replace(/^\//, '')
+  const params = new URLSearchParams(search)
+  if (stripped === 'communications') {
+    stripped = 'messages'
+    if (!params.get('tab')) params.set('tab', 'email')
+  }
+  if (params.get('tab') === 'threads') params.set('tab', 'staff')
+  const qs = params.toString()
+  return qs ? `${p(stripped)}?${qs}` : p(stripped)
 }
 
 export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin' | 'portal' }) {
@@ -94,6 +101,7 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
               <p className="text-sm font-extrabold text-white">Notifications</p>
               <div className="flex items-center gap-2">
                 {unread > 0 && <button className="text-[11px] font-semibold text-slate-400 hover:text-gold" onClick={() => void markAllRead()}><Check size={11} className="mr-1 inline"/>Mark all read</button>}
+                {surface === 'admin' && <Link to={`${p('settings')}?tab=notifications`} onClick={() => setOpen(false)} className="text-[11px] font-semibold text-slate-400 hover:text-gold">Settings</Link>}
                 <button className="text-slate-500 hover:text-white" onClick={() => setOpen(false)}><X size={14}/></button>
               </div>
             </div>

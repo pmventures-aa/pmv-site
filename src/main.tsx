@@ -15,6 +15,8 @@ import ServiceDetail from './pages/public/ServiceDetail'
 import { BusinessOperationsHub, PropertyFieldHub, MobileDocumentHub } from './pages/public/ServiceHubs'
 import ProjectGuidePage from './pages/public/ProjectGuides'
 import About from './pages/public/About'
+import HowItWorks from './pages/public/HowItWorks'
+import Resources from './pages/public/Resources'
 import ServiceArea from './pages/public/ServiceArea'
 import Contact from './pages/public/Contact'
 import Professionals from './pages/public/Professionals'
@@ -88,6 +90,11 @@ function App() {
       <Route path="/projects/:slug" element={<ProjectGuidePage />} />
       <Route path="/scope-request" element={<ScopeRequest />} />
       <Route path="/scope-request/confirmation" element={<ScopeConfirmation />} />
+      <Route path="/start" element={<Navigate to="/scope-request" replace />} />
+      <Route path="/start-a-request" element={<Navigate to="/scope-request" replace />} />
+      <Route path="/request-assistance" element={<Navigate to="/scope-request" replace />} />
+      <Route path="/how-it-works" element={<HowItWorks />} />
+      <Route path="/resources" element={<Resources />} />
       <Route path="/instant-quote" element={<InstantQuote />} />
       <Route path="/quote/:token" element={<QuoteView />} />
       <Route path="/care-plans" element={<CarePlans />} />

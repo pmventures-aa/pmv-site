@@ -1,7 +1,10 @@
 import type { Env } from './types'
 import { sendEmailStrict } from './email'
 import { uuid } from './crypto'
+import { hqUrl, wwwPortalUrl } from './appUrls'
 import { renderRelationshipEvent } from './emailTemplates/relationship'
+import { renderHqEmailOrFallback } from './hqEmailTemplates'
+import { DEFAULT_INVITE_TTL_HOURS, INVITE_TTL_SETTING_KEY, formatInviteTtl, parseInviteTtlHours } from '../../shared/inviteTtl'
 
 export type InviteType = 'vendor' | 'client' | 'staff' | 'trusted_contact'
 
@@ -36,19 +39,32 @@ export async function inviteTokenHash(token: string): Promise<string> {
   return hex(new Uint8Array(digest))
 }
 
-export function inviteExpiry(hours = 24): string {
-  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+export function inviteExpiry(hours = DEFAULT_INVITE_TTL_HOURS): string {
+  return new Date(Date.now() + parseInviteTtlHours(hours) * 60 * 60 * 1000).toISOString()
 }
 
-const PUBLIC_BASE = 'https://www.pinnaclemanagementventures.com'
-const CLIENT_BASE = `${PUBLIC_BASE}/portal`
-const HQ_BASE = 'https://hq.pinnaclemanagementventures.com'
+export async function getInviteTtlHours(env: Env): Promise<number> {
+  try {
+    const row = await env.DB.prepare('SELECT value FROM app_settings WHERE key = ?').bind(INVITE_TTL_SETTING_KEY).first<{ value: string | null }>()
+    return parseInviteTtlHours(row?.value)
+  } catch {
+    return DEFAULT_INVITE_TTL_HOURS
+  }
+}
+
+const CLIENT_BASE = wwwPortalUrl()
+const HQ_BASE = hqUrl()
 
 export function inviteUrl(type: InviteType, token: string): string {
   if (type === 'vendor') return `${HQ_BASE}/vendor-signup?invite=${encodeURIComponent(token)}`
   if (type === 'trusted_contact') return `${CLIENT_BASE}/trusted-invite/${encodeURIComponent(token)}`
   if (type === 'client') return `${CLIENT_BASE}/signup?invite=${encodeURIComponent(token)}`
   return `${HQ_BASE}/invite/${encodeURIComponent(token)}`
+}
+
+function hoursUntil(expiresAt: string): number {
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  return parseInviteTtlHours(Math.max(1, Math.round(ms / (60 * 60 * 1000))))
 }
 
 export async function createInvite(
@@ -67,7 +83,7 @@ export async function createInvite(
   const token = newInviteToken()
   const tokenHash = await inviteTokenHash(token)
   const id = uuid()
-  const expiresAt = inviteExpiry(24)
+  const expiresAt = inviteExpiry(await getInviteTtlHours(env))
   await env.DB.prepare(
     `INSERT INTO access_invites
       (id, invite_type, email, full_name, client_user_id, role_definition_id, metadata_json, token_hash, status, invited_by_user_id, expires_at, staged_user_id, email_status)
@@ -102,7 +118,7 @@ export async function getInviteByToken(env: Env, token: string): Promise<InviteR
 export async function rotateInviteToken(env: Env, inviteId: string): Promise<{ token: string; expiresAt: string }> {
   const token = newInviteToken()
   const hash = await inviteTokenHash(token)
-  const expiresAt = inviteExpiry(24)
+  const expiresAt = inviteExpiry(await getInviteTtlHours(env))
   await env.DB.prepare(
     `UPDATE access_invites SET token_hash=?, status='pending', expires_at=?, accepted_by_user_id=NULL,
        accepted_at=NULL, revoked_at=NULL, updated_at=datetime('now') WHERE id=?`,
@@ -186,17 +202,23 @@ export async function sendInviteEmail(
   const url = inviteUrl(row.invite_type, token)
   const copy = inviteCopy(row.invite_type, row.client_name, parseInviteMetadata(row.metadata_json))
   const firstName = (row.full_name || '').trim().split(/\s+/)[0] || 'there'
-  const rendered = renderRelationshipEvent({
+  const fallback = renderRelationshipEvent({
     eventKey: `invite_${row.invite_type}`,
     firstName,
     subject: copy.subject,
-    preheader: row.invite_type === 'vendor' ? 'A personal invitation to apply to Pinnacle’s professional provider network.' : 'Your private Pinnacle invitation expires in 24 hours.',
+    preheader: row.invite_type === 'vendor' ? 'A personal invitation to apply to Pinnacle\'s professional provider network.' : `Your private Pinnacle invitation expires in ${formatInviteTtl(hoursUntil(expiresAt))}.`,
     eyebrow: copy.eyebrow,
     title: copy.title,
-    body: `${copy.body}\n\nThis private invitation expires in 24 hours. If you were not expecting it, you can ignore this message or contact Pinnacle before creating an account.`,
+    body: `${copy.body}\n\nThis private invitation expires in ${formatInviteTtl(hoursUntil(expiresAt))}. If you were not expecting it, you can ignore this message or contact Pinnacle before creating an account.`,
     ctaLabel: copy.cta,
     ctaUrl: url,
   })
+  const rendered = await renderHqEmailOrFallback(env, `invite_${row.invite_type}`, {
+    first_name: firstName,
+    client_name: row.client_name || '',
+    action_url: url,
+    action_label: copy.cta,
+  }, fallback)
   return sendEmailStrict(env, {
     to: row.email,
     subject: rendered.subject,

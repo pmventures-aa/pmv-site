@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Loader2, Plus, MapPin } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
@@ -11,6 +11,9 @@ import { FieldLiveMap, type FieldMapPin } from '../../components/admin/FieldLive
 import { ScopeIntakePicker } from '../../components/admin/ScopeIntakePicker'
 import { fieldPrefillFromScope } from '../../../shared/scopeIntakePrefill'
 import { composeAddressQuery, isUsefulGeoQuery, type GeoHit } from '../../../shared/geocode'
+import { useAuth } from '../../lib/auth'
+import { DispatchFeeSettingsPanel } from '../../components/admin/DispatchFeeSettingsPanel'
+import { formatVendorFee, type VendorFeeEstimate } from '../../../shared/vendorFeeAdjustment'
 
 interface StaffOption { id: string; full_name: string | null; email: string; party_type: string | null; vendor_category: string | null }
 interface ClientOption { id: string; full_name: string | null; email: string; business_name: string | null }
@@ -31,6 +34,8 @@ interface Assignment {
   vendor_user_id: string
   completed_at: string | null
   audit_email_sent_at: string | null
+  vendor_fee_cents?: number | null
+  vendor_fee_adjustment_cents?: number | null
 }
 
 type MapPayload = {
@@ -48,8 +53,10 @@ type MapPayload = {
     arrival_lat: number | null
     arrival_lng: number | null
     vendor_user_id: string
-    vendor_name: string | null
-  }>
+  vendor_name: string | null
+  vendor_fee_cents?: number | null
+  vendor_fee_adjustment_cents?: number | null
+}>
   agents: Array<{
     user_id: string
     assignment_id: string | null
@@ -74,11 +81,13 @@ const KIND_LABEL = { field: 'Field visit', ron: 'RON session' } as const
 
 export default function FieldWorkAdmin() {
   const p = useAppPath()
+  const [searchParams] = useSearchParams()
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [mapPins, setMapPins] = useState<FieldMapPin[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
+  const [showCreate, setShowCreate] = useState(() => searchParams.get('dispatch') === '1')
   const [kindFilter, setKindFilter] = useState<'all' | 'field' | 'ron'>('all')
+  const dispatchVendorId = searchParams.get('vendor') || ''
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -133,6 +142,9 @@ export default function FieldWorkAdmin() {
   }, [])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    if (searchParams.get('dispatch') === '1') setShowCreate(true)
+  }, [searchParams])
   const backgroundLoad = useCallback(() => load(true), [load])
   useLiveRefresh(backgroundLoad)
 
@@ -156,8 +168,11 @@ export default function FieldWorkAdmin() {
 
       <FieldLiveMap pins={mapPins} className="mb-4" />
 
+      {!showCreate && <DispatchFeeSettingsPanel className="mb-4" />}
+
       {showCreate && (
         <CreateAssignment
+          initialVendorId={dispatchVendorId}
           onCreated={() => { setShowCreate(false); void load() }}
           onCancel={() => setShowCreate(false)}
         />
@@ -202,6 +217,12 @@ export default function FieldWorkAdmin() {
                   <p className="mt-1 text-xs text-slate-500">
                     Client: <span className="text-slate-300">{a.client_name || 'Not provided'}</span>
                     &nbsp;·&nbsp; Provider: <span className="text-slate-300">{a.vendor_name || 'Not provided'}</span>
+                    {a.vendor_fee_cents ? (
+                      <>
+                        &nbsp;·&nbsp; Fee: <span className="text-slate-300">{formatVendorFee(a.vendor_fee_cents)}</span>
+                        {a.vendor_fee_adjustment_cents ? <span className="text-gold"> ({a.vendor_fee_adjustment_cents > 0 ? '+' : ''}{(a.vendor_fee_adjustment_cents / 100).toFixed(0)} local)</span> : null}
+                      </>
+                    ) : null}
                   </p>
                 </div>
                 {a.scheduled_at && (
@@ -216,16 +237,19 @@ export default function FieldWorkAdmin() {
   )
 }
 
-function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
+function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated: () => void; onCancel: () => void; initialVendorId?: string }) {
+  const { user } = useAuth()
   const [clients, setClients] = useState<ClientOption[]>([])
   const [vendors, setVendors] = useState<StaffOption[]>([])
   const [clientMode, setClientMode] = useState<'existing' | 'new'>('existing')
+  const [providerMode, setProviderMode] = useState<'existing' | 'new'>(initialVendorId ? 'existing' : 'existing')
   const [newClient, setNewClient] = useState({ full_name: '', email: '', phone: '', business_name: '' })
+  const [newProvider, setNewProvider] = useState({ full_name: '', email: '', phone: '', vendor_category: '' })
   const [form, setForm] = useState({
     kind: 'field' as 'field' | 'ron',
     service_key: 'mobile_notary',
     client_user_id: '',
-    vendor_user_id: '',
+    vendor_user_id: initialVendorId || '',
     title: '',
     site_label: '',
     site_address: '',
@@ -239,14 +263,33 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
   })
   const [saving, setSaving] = useState(false)
   const [geoStatus, setGeoStatus] = useState<'idle' | 'looking' | 'pinned' | 'miss'>('idle')
+  const [feeEstimate, setFeeEstimate] = useState<VendorFeeEstimate | null>(null)
+  const [feeManual, setFeeManual] = useState('')
+  const [feeLoading, setFeeLoading] = useState(false)
   const pinnedQueryRef = useRef('')
 
   useEffect(() => {
-    api.get<{ clients: ClientOption[] }>('/admin/clients').then((r) => setClients(r.clients ?? [])).catch(() => {})
-    api.get<{ employees: StaffOption[] }>('/admin/employees').then((r) => setVendors(r.employees ?? [])).catch(() => {})
+    api.get<{ clients: ClientOption[] }>('/admin/clients').then((r) => setClients(r.clients ?? [])).catch((err) => {
+      toast.error(err instanceof ApiError ? err.message : 'Could not load clients for dispatch.')
+    })
+    api.get<{ staff: StaffOption[] }>('/admin/staff-directory').then((r) => setVendors(r.staff ?? [])).catch((err) => {
+      toast.error(err instanceof ApiError ? err.message : 'Could not load providers for dispatch.')
+    })
   }, [])
 
-  const availableVendors = useMemo(() => vendors.filter((v) => v.party_type === 'vendor'), [vendors])
+  useEffect(() => {
+    if (!initialVendorId) return
+    setForm((current) => current.vendor_user_id === initialVendorId ? current : { ...current, vendor_user_id: initialVendorId })
+  }, [initialVendorId])
+
+  const availableVendors = useMemo(() => {
+    const list = vendors.filter((v) => v.party_type === 'vendor' || v.id === user?.id)
+    if (initialVendorId && !list.some((v) => v.id === initialVendorId)) {
+      const extra = vendors.find((v) => v.id === initialVendorId)
+      if (extra) return [extra, ...list]
+    }
+    return list
+  }, [vendors, initialVendorId, user?.id])
 
   useEffect(() => {
     if (form.kind !== 'field') return
@@ -288,9 +331,44 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
     }
   }, [form.kind, form.site_address, form.site_city, form.site_state, form.site_postal_code])
 
+  useEffect(() => {
+    if (!form.service_key) return
+    let cancelled = false
+    const handle = window.setTimeout(async () => {
+      setFeeLoading(true)
+      try {
+        const res = await api.post<{ estimate: VendorFeeEstimate }>('/admin/dispatch-fee-estimate', {
+          service_key: form.service_key,
+          site_postal_code: form.site_postal_code || undefined,
+          site_city: form.site_city || undefined,
+          site_state: form.site_state || undefined,
+        })
+        if (cancelled) return
+        setFeeEstimate(res.estimate)
+        setFeeManual((res.estimate.offeredCents / 100).toFixed(2))
+      } catch {
+        if (!cancelled) setFeeEstimate(null)
+      } finally {
+        if (!cancelled) setFeeLoading(false)
+      }
+    }, 350)
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
+    }
+  }, [form.service_key, form.site_postal_code, form.site_city, form.site_state])
+
   async function submit() {
-    if (!form.vendor_user_id || !form.service_key) {
-      toast.error('Choose a provider and enter the service.')
+    if (!form.service_key) {
+      toast.error('Enter the service for this assignment.')
+      return
+    }
+    if (providerMode === 'existing' && !form.vendor_user_id) {
+      toast.error('Choose a provider or add a new one.')
+      return
+    }
+    if (providerMode === 'new' && (!newProvider.full_name.trim() || !newProvider.email.trim())) {
+      toast.error('Add the provider’s name and email so Pinnacle can create their profile.')
       return
     }
     if (clientMode === 'existing' && !form.client_user_id) {
@@ -303,6 +381,37 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
     }
     setSaving(true)
     try {
+      let vendorUserId = form.vendor_user_id
+      if (providerMode === 'new') {
+        const normalizedEmail = newProvider.email.trim().toLowerCase()
+        const existing = vendors.find((vendor) => vendor.email.toLowerCase() === normalizedEmail)
+        if (existing) {
+          vendorUserId = existing.id
+          toast.success(`${existing.full_name || existing.email} was already in Pinnacle, so this assignment was connected to that profile.`)
+        } else {
+          const created = await api.post<{
+            user: StaffOption
+            created?: boolean
+            activated?: boolean
+          }>('/admin/dispatch-providers', {
+            full_name: newProvider.full_name.trim(),
+            email: normalizedEmail,
+            phone: newProvider.phone.trim() || undefined,
+            vendor_category: newProvider.vendor_category.trim() || undefined,
+          })
+          vendorUserId = created.user.id
+          setVendors((current) => [created.user, ...current])
+          if (created.activated) {
+            toast.success(`${created.user.full_name || created.user.email} was already staged and is now active for dispatch.`)
+          } else if (created.created) {
+            toast.success(`Provider profile created for ${created.user.full_name || created.user.email}.`)
+          } else {
+            toast.success(`${created.user.full_name || created.user.email} was connected to this assignment.`)
+          }
+        }
+        setForm((current) => ({ ...current, vendor_user_id: vendorUserId }))
+      }
+
       let clientUserId = form.client_user_id
       if (clientMode === 'new') {
         const normalizedEmail = newClient.email.trim().toLowerCase()
@@ -340,7 +449,12 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
       }
       await api.post('/admin/field-assignments', {
         ...form,
+        vendor_user_id: vendorUserId,
         client_user_id: clientUserId,
+        vendor_fee_base_cents: feeEstimate?.baseCents ?? null,
+        vendor_fee_adjustment_cents: feeEstimate?.adjustmentCents ?? 0,
+        vendor_fee_cents: feeManual ? Math.round(Number(feeManual) * 100) : feeEstimate?.offeredCents ?? null,
+        vendor_fee_reason: feeEstimate?.reason ?? null,
         site_lat: form.site_lat ? Number(form.site_lat) : null,
         site_lng: form.site_lng ? Number(form.site_lng) : null,
         scheduled_at: form.scheduled_at || null,
@@ -413,7 +527,76 @@ function CreateAssignment({ onCreated, onCancel }: { onCreated: () => void; onCa
             </div>
           )}
         </div>
-        <label><span className="mb-1 block text-xs text-slate-400">Provider</span><select className={inputCls} value={form.vendor_user_id} onChange={(e) => setForm({ ...form, vendor_user_id: e.target.value })}><option value="">Choose a provider…</option>{availableVendors.map((v) => <option key={v.id} value={v.id}>{v.full_name || v.email}{v.vendor_category ? `: ${v.vendor_category}` : ''}</option>)}</select></label>
+        <div className="sm:col-span-2 rounded-xl border border-white/10 bg-white/[.018] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <span className="block text-xs font-semibold text-slate-200">Who is doing the work?</span>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Choose a provider already in Pinnacle, or create a profile for someone new without leaving this assignment.</p>
+            </div>
+            <div className="inline-flex w-fit rounded-lg border border-white/10 bg-navy-950/45 p-1">
+              <button type="button" onClick={() => setProviderMode('existing')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${providerMode === 'existing' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>Existing provider</button>
+              <button type="button" onClick={() => setProviderMode('new')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${providerMode === 'new' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>New provider</button>
+            </div>
+          </div>
+          {providerMode === 'existing' ? (
+            <label className="mt-4 block">
+              <span className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-400">
+                <span>Provider</span>
+                {user && <button type="button" onClick={() => setForm({ ...form, vendor_user_id: user.id })} className="font-semibold text-gold hover:underline">Assign to me</button>}
+              </span>
+              <select className={inputCls} value={form.vendor_user_id} onChange={(e) => setForm({ ...form, vendor_user_id: e.target.value })}>
+                <option value="">Choose a provider…</option>
+                {availableVendors.map((v) => <option key={v.id} value={v.id}>{v.full_name || v.email}{v.id === user?.id ? ' (me)' : v.vendor_category ? `: ${v.vendor_category}` : ''}</option>)}
+              </select>
+            </label>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label><span className="mb-1 block text-xs text-slate-400">Name</span><input className={inputCls} required value={newProvider.full_name} onChange={(e) => setNewProvider((current) => ({ ...current, full_name: e.target.value }))} placeholder="Provider’s full name" /></label>
+              <label><span className="mb-1 block text-xs text-slate-400">Email</span><input className={inputCls} type="email" required value={newProvider.email} onChange={(e) => setNewProvider((current) => ({ ...current, email: e.target.value }))} placeholder="For their provider profile" /></label>
+              <label><span className="mb-1 block text-xs text-slate-400">Phone <span className="text-slate-600">(optional)</span></span><input className={inputCls} type="tel" value={newProvider.phone} onChange={(e) => setNewProvider((current) => ({ ...current, phone: e.target.value }))} /></label>
+              <label><span className="mb-1 block text-xs text-slate-400">Specialty <span className="text-slate-600">(optional)</span></span><input className={inputCls} value={newProvider.vendor_category} onChange={(e) => setNewProvider((current) => ({ ...current, vendor_category: e.target.value }))} placeholder="Mobile notary, inspector…" /></label>
+              <p className="text-xs leading-5 text-slate-500 sm:col-span-2">Pinnacle will create the provider profile, connect this assignment to it, and add them to Network & Dispatch. You can finish vetting later.</p>
+            </div>
+          )}
+        </div>
+        <div className="sm:col-span-2 rounded-xl border border-gold/15 bg-gold/[.03] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <span className="block text-xs font-semibold text-slate-200">Provider payout offer</span>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Snapdocs-style local adjustment uses recent payouts near the job ZIP to suggest a fee providers are more likely to accept.</p>
+            </div>
+            {feeLoading && <span className="text-xs text-slate-500">Calculating…</span>}
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,180px)_1fr]">
+            <label>
+              <span className="mb-1 block text-xs text-slate-400">Offered fee</span>
+              <input
+                className={inputCls}
+                type="number"
+                min="0"
+                step="0.01"
+                value={feeManual}
+                onChange={(e) => setFeeManual(e.target.value)}
+                placeholder="0.00"
+              />
+            </label>
+            <div className="text-xs leading-5 text-slate-400">
+              {feeEstimate ? (
+                <>
+                  <p>
+                    Base catalog payout: <span className="text-slate-200">{formatVendorFee(feeEstimate.baseCents)}</span>
+                    {feeEstimate.marketMedianCents ? (
+                      <> · Recent local median: <span className="text-slate-200">{formatVendorFee(feeEstimate.marketMedianCents)}</span> ({feeEstimate.sampleSize} jobs)</>
+                    ) : null}
+                  </p>
+                  <p className="mt-1">{feeEstimate.reason}</p>
+                </>
+              ) : (
+                <p>Enter a service and ZIP to calculate a suggested provider fee.</p>
+              )}
+            </div>
+          </div>
+        </div>
         <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Title</span><input className={inputCls} placeholder='e.g. "Loan signing: Boca Raton office"' value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Scheduled for</span><input className={inputCls} type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}/></label>
         <label><span className="mb-1 block text-xs text-slate-400">Site label (optional)</span><input className={inputCls} placeholder="Client home, conference room…" value={form.site_label} onChange={(e) => setForm({ ...form, site_label: e.target.value })}/></label>

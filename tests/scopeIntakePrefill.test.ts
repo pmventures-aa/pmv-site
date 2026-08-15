@@ -45,7 +45,8 @@ describe('scope intake prefill', () => {
       'Photo package',
       'Written report',
     ])
-    expect(quote.lines[0].unit_price).toBe('185.00')
+    expect(quote.lines[0].unit_price).toBe('212.50')
+    expect(quote.intro_message).toContain('Hi Jordan')
   })
 
   it('prefills a field assignment without re-asking the scope questions', () => {

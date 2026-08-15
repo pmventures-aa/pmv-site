@@ -8,19 +8,24 @@ export const employeeRoutes = new Hono<AppEnv>()
 
 employeeRoutes.get('/staff-directory', requireStaff, async (c) => {
   const res = await c.env.DB.prepare(
-    "SELECT id, full_name, email FROM users WHERE role IN ('staff', 'admin') AND status = 'active' ORDER BY full_name",
+    `SELECT u.id, u.full_name, u.email, tm.party_type, tm.vendor_category
+     FROM users u
+     LEFT JOIN team_members tm ON tm.user_id = u.id
+     WHERE u.role IN ('staff', 'admin') AND u.status = 'active'
+     ORDER BY u.full_name`,
   ).all()
   return c.json({ staff: res.results ?? [] })
 })
 
 employeeRoutes.get('/employees', requireStaff, requireNamedPermission('manage_team'), async (c) => {
   const res = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status,
+    `SELECT u.id, u.email, u.full_name, u.phone, u.last_seen_at, u.last_login_at, u.status,
             tm.staff_role, tm.title, tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name,
             tm.network_status, tm.availability_status, tm.is_preferred_provider, tm.service_area_summary,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id) AS tasks_assigned,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status = 'done') AS tasks_completed,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status != 'done' AND due_date IS NOT NULL AND due_date < date('now')) AS tasks_overdue,
+            (SELECT COUNT(*) FROM field_assignments WHERE vendor_user_id = u.id AND status NOT IN ('completed','cancelled')) AS dispatch_open,
             (SELECT COUNT(*) FROM internal_notes WHERE author_user_id = u.id) AS notes_added,
             (SELECT COUNT(*) FROM email_log WHERE sent_by_user_id = u.id) AS emails_sent,
             (SELECT COUNT(*) FROM activity_events WHERE actor_user_id = u.id) AS client_interactions,
@@ -37,7 +42,7 @@ employeeRoutes.get('/employees', requireStaff, requireNamedPermission('manage_te
 employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manage_team'), async (c) => {
   const id = c.req.param('id') || ''
   const employee = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.full_name, u.last_seen_at, u.last_login_at, u.status, u.created_at,
+    `SELECT u.id, u.email, u.full_name, u.phone, u.last_seen_at, u.last_login_at, u.status, u.created_at,
             tm.staff_role, tm.title, tm.can_reveal_payment_info, tm.can_manage_users, tm.can_manage_settings,
             tm.can_view_reports, tm.can_view_audit_log, tm.can_manage_communications, tm.is_owner,
             tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name,
@@ -115,14 +120,30 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
 
 employeeRoutes.patch('/employees/:id/network', requireStaff, requireNamedPermission('manage_team'), async (c) => {
   const id = c.req.param('id') || ''
+  const target = await c.env.DB.prepare(
+    `SELECT u.id, u.role, tm.network_status, tm.availability_status, tm.is_preferred_provider, tm.service_area_summary, tm.staff_role, tm.party_type
+     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE u.id = ?`,
+  ).bind(id).first<{
+    id: string; role: string; network_status: string | null; availability_status: string | null
+    is_preferred_provider: number | null; service_area_summary: string | null; staff_role: string | null; party_type: string | null
+  }>()
+  if (!target || !['staff', 'admin'].includes(target.role)) return c.json({ error: 'provider not found' }, 404)
   const body: Record<string, unknown> = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
-  const networkStatus = String(body.network_status || 'active')
-  const availability = String(body.availability_status || 'available')
+  const networkStatus = body.network_status != null ? String(body.network_status) : (target.network_status || 'active')
+  const availability = body.availability_status != null ? String(body.availability_status) : (target.availability_status || 'available')
   if (!['prospect','vetting','active','paused','inactive'].includes(networkStatus)) return c.json({ error: 'invalid network status' }, 400)
   if (!['available','limited','unavailable'].includes(availability)) return c.json({ error: 'invalid availability status' }, 400)
-  const result = await c.env.DB.prepare(`UPDATE team_members SET network_status=?,availability_status=?,is_preferred_provider=?,service_area_summary=? WHERE user_id=?`)
-    .bind(networkStatus, availability, body.is_preferred_provider ? 1 : 0, String(body.service_area_summary || '').slice(0,500) || null, id).run()
-  if (!result.meta.changes) return c.json({ error: 'provider not found' }, 404)
+  const preferred = body.is_preferred_provider != null ? (body.is_preferred_provider ? 1 : 0) : (target.is_preferred_provider ? 1 : 0)
+  const area = body.service_area_summary != null ? (String(body.service_area_summary).slice(0,500) || null) : target.service_area_summary
+  await c.env.DB.prepare(
+    `INSERT INTO team_members(id,user_id,staff_role,party_type,network_status,availability_status,is_preferred_provider,service_area_summary)
+     VALUES(?,?,?,?,?,?,?,?)
+     ON CONFLICT(user_id) DO UPDATE SET
+       network_status = excluded.network_status,
+       availability_status = excluded.availability_status,
+       is_preferred_provider = excluded.is_preferred_provider,
+       service_area_summary = excluded.service_area_summary`,
+  ).bind(uuid(), id, target.staff_role || 'representative', target.party_type || 'employee', networkStatus, availability, preferred, area).run()
   return c.json({ ok: true })
 })
 

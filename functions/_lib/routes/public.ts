@@ -3,8 +3,9 @@ import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
 import { notifyStaff, escapeHtml } from '../email'
-import { icsResponse, loadFeedAppointments, verifyCalendarFeedToken } from '../calendarFeed'
+import { icsResponse, loadFeedAppointments, userIdForCalendarFeedToken } from '../calendarFeed'
 import type { SessionUser } from '../types'
+import { getAnotherBriefingQuote, getBriefingQuote } from '../briefingQuotes'
 
 const CONTACT_MAX_PER_HOUR = 10
 
@@ -80,7 +81,7 @@ publicRoutes.post('/contact', async (c) => {
 
 publicRoutes.get('/calendar-feed/:token', async (c) => {
   const token = c.req.param('token') || ''
-  const userId = await verifyCalendarFeedToken(token, c.env.SESSION_SECRET)
+  const userId = await userIdForCalendarFeedToken(c.env.DB, token)
   if (!userId) return c.json({ error: 'invalid calendar link' }, 404)
   const user = await c.env.DB.prepare(
     'SELECT id, email, role, full_name, status FROM users WHERE id = ?',
@@ -88,4 +89,17 @@ publicRoutes.get('/calendar-feed/:token', async (c) => {
   if (!user || user.status === 'suspended') return c.json({ error: 'invalid calendar link' }, 404)
   const events = await loadFeedAppointments(c.env, user)
   return icsResponse(events, 'Pinnacle')
+})
+
+publicRoutes.get('/briefing-quote', async (c) => {
+  const seed = (c.req.query('seed') || '').trim()
+  const quote = await getBriefingQuote(c.env, seed)
+  return c.json({ quote })
+})
+
+publicRoutes.get('/briefing-quote/another', async (c) => {
+  const seed = (c.req.query('seed') || '').trim()
+  const current = (c.req.query('current') || '').trim()
+  const quote = await getAnotherBriefingQuote(c.env, current, seed)
+  return c.json({ quote })
 })

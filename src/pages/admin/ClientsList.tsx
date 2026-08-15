@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnOutline } from '../../components/admin/ui'
+import { Avatar } from '../../components/kit/Avatar'
 import { useAppPath } from '../../lib/basePath'
+import { clientEmailHref, clientInboxHref } from '../../lib/engagements'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { RecentListShell, RecentWindowBar, useRecentWindow } from '../../components/admin/RecentWindow'
 
 interface ClientRow {
   id: string
+  public_ref: string
   email: string
   full_name: string | null
   business_name: string | null
@@ -89,16 +92,22 @@ export default function ClientsList() {
                 <th className="px-5 py-3 font-medium">Business</th>
                 <th className="px-5 py-3 font-medium">Onboarding</th>
                 <th className="px-5 py-3 font-medium">Joined</th>
+                <th className="px-5 py-3 font-medium">Engage</th>
               </tr>
             </thead>
             <tbody>
               {windowed.visible.map((c) => (
                 <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                   <td className="px-5 py-3">
-                    <Link to={p(`clients/${c.id}/overview`)} className="font-medium text-white hover:text-gold">
-                      {c.full_name || c.email}
-                    </Link>
-                    <p className="text-xs text-slate-500">{c.email}</p>
+                    <div className="flex items-center gap-3">
+                      <Avatar userId={c.id} name={c.full_name || c.email} size={36} />
+                      <div>
+                        <Link to={p(`clients/${c.public_ref}/overview`)} className="font-medium text-white hover:text-gold">
+                          {c.full_name || c.email}
+                        </Link>
+                        <p className="text-xs text-slate-500">{c.email}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-5 py-3 text-slate-200">{c.business_name ?? 'Not provided'}</td>
                   <td className="px-5 py-3">
@@ -107,6 +116,12 @@ export default function ClientsList() {
                     </Tag>
                   </td>
                   <td className="px-5 py-3 text-slate-400">{new Date(c.created_at.replace(' ', 'T') + 'Z').toLocaleDateString()}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Link to={clientEmailHref(p, { id: c.id, email: c.email, name: c.full_name })} className="text-xs font-semibold text-gold hover:underline">Email</Link>
+                      <Link to={clientInboxHref(p, c.id)} className="text-xs font-semibold text-slate-400 hover:text-gold hover:underline">Message</Link>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

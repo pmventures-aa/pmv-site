@@ -5,10 +5,8 @@ export interface Quote {
   prompt?: string
 }
 
-// Pinnacle Briefings intentionally avoid a live quote API. A third-party feed
-// would add latency, availability risk, questionable attribution, and generic
-// copy with little relationship to the work. The briefing library is original
-// operating copy written for Pinnacle's service, judgment, and execution model.
+// Local fallback library for briefing quotes when Quotable is unavailable.
+// Live quotes are served from /api/briefing-quote (Quotable.io, cached daily in KV).
 export const quotes: Quote[] = [
   { text: 'Make the next step obvious enough that nobody has to chase it.', author: 'Pinnacle Field Note', theme: 'service', prompt: 'What can you make easier to act on today?' },
   { text: 'The handoff is part of the work. Own it until the next person can actually move.', author: 'Pinnacle Operating Principle', theme: 'business', prompt: 'Which handoff needs a cleaner owner?' },

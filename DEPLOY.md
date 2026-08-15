@@ -39,6 +39,14 @@ Post-authentication surfaces (Client Portal + Pinnacle HQ) live behind
 | `RESEND_FROM_EMAIL` | No | Var (`wrangler.toml` `[vars]`) | Verified sender identity. The code defaults to `Pinnacle Management Ventures <orders@pinnaclemanagementventures.com>` if this is not set. |
 | `RESEND_WEBHOOK_SECRET` | No | Secret | Optional Cloudflare copy of the Svix signing secret for `POST /api/webhooks/resend`. HQ → Settings → General can create the Resend webhook and store this secret in D1 instead. |
 | `RESEND_INBOUND_DOMAIN` | No | Var (`wrangler.toml` `[vars]`) | Resend receiving domain. Defaults in wrangler to `ziloifaluk.resend.app`. Used only as Reply-To so replies can be received without changing pinnaclemanagementventures.com MX or the From address. |
+| `AUTH0_DOMAIN` | No | Secret / Var | Auth0 tenant domain (for example `your-tenant.us.auth0.com`). Required together with `AUTH0_CLIENT_ID` and `AUTH0_CLIENT_SECRET` to enable client-portal social sign-in. |
+| `AUTH0_CLIENT_ID` | No | Secret / Var | Auth0 Regular Web Application client ID. |
+| `AUTH0_CLIENT_SECRET` | No | Secret | Auth0 Regular Web Application client secret. Never expose this to the frontend. |
+| `AUTH0_AUDIENCE` | No | Secret / Var | Optional Auth0 API audience when your tenant requires it. |
+| `AUTH0_CALLBACK_URL` | No | Var | OAuth callback URL. Production: `https://www.pinnaclemanagementventures.com/api/auth/auth0/callback`. Local dev: `http://127.0.0.1:8788/api/auth/auth0/callback`. |
+| `AUTH0_LOGOUT_URL` | No | Var | Post-logout return URL. Production: `https://www.pinnaclemanagementventures.com/portal/login`. |
+| `AUTH0_CONNECTION_GOOGLE` | No | Var | Auth0 connection name for Google (for example `google-oauth2`). Provider button stays hidden until set. |
+| `AUTH0_CONNECTION_MICROSOFT` | No | Var | Auth0 connection name for Microsoft (for example `windowslive`). Provider button stays hidden until set. |
 
 **Local dev:** copy `.dev.vars.example` to `.dev.vars` (gitignored) and fill in test values — `wrangler pages dev` reads it automatically.
 

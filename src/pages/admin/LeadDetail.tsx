@@ -5,8 +5,10 @@ import { useAppPath } from '../../lib/basePath'
 import { lifecycleLabel } from '../../../shared/lifecycle'
 import { Panel, Tag, inputCls, btnPrimary, btnOutline, EmptyState } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
-import { timeAgo } from '../../lib/activity'
+import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
+import { campaignAudienceHref, leadEmailHref } from '../../lib/engagements'
 import { InlineLoading } from '../../components/LoadingScreen'
+import { crmPersonName } from '../../../shared/crmRecord'
 
 interface LeadRecord {
   id: string
@@ -60,10 +62,6 @@ function lifecycleTone(stage: string): 'gold' | 'green' | 'blue' | 'slate' | 're
   return 'slate'
 }
 
-function prettyKind(kind: string) {
-  return kind.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
-}
-
 function plainText(html: string) {
   return html.replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim()
 }
@@ -99,7 +97,7 @@ export default function LeadDetail() {
     const rows = [
       ...data.notes.map((n) => ({ id: `note-${n.id}`, at: n.created_at, type: 'note', title: 'Internal note', body: n.body, meta: n.author_name || n.author_email })),
       ...data.emails.map((e) => ({ id: `email-${e.id}`, at: e.created_at, type: 'email', title: e.subject, body: plainText(e.body), meta: `Email to ${e.to_address}` })),
-      ...data.activity.map((a) => ({ id: `activity-${a.id}`, at: a.created_at, type: 'activity', title: prettyKind(a.kind), body: '', meta: a.actor_name || a.actor_email || 'Pinnacle' })),
+      ...data.activity.filter((a) => a.kind !== 'email.sent' && a.kind !== 'comms_message_sent').map((a) => ({ id: `activity-${a.id}`, at: a.created_at, type: 'activity', title: describeActivity({ id: a.id, actor_user_id: null, actor_name: a.actor_name, actor_email: a.actor_email, client_user_id: null, kind: a.kind, detail: a.detail, created_at: a.created_at } satisfies ActivityEvent), body: '', meta: a.actor_name || a.actor_email || 'Pinnacle' })),
     ]
     return rows.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
   }, [data])
@@ -136,9 +134,9 @@ export default function LeadDetail() {
     if (!window.confirm(`Convert ${data.record.name} to a client? Their notes, outbound email history, and activity will carry forward.`)) return
     setBusy(true)
     try {
-      const res = await api.post<{ client_user_id: string }>(`/admin/inquiries/${id}/convert`)
+      const res = await api.post<{ client_user_id: string; client_public_ref: string | null }>(`/admin/inquiries/${id}/convert`)
       toast.success('Converted to client.')
-      window.location.href = p(`clients/${res.client_user_id}/overview`)
+      window.location.href = p(`clients/${res.client_public_ref || res.client_user_id}/overview`)
     } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Could not convert this record.') }
     finally { setBusy(false) }
   }
@@ -147,6 +145,8 @@ export default function LeadDetail() {
   const r = data.record
   const location = [r.city, r.state].filter(Boolean).join(', ')
   const unusedLists = allLists.filter((l) => l.list_type === 'static' && !data.lists.some((member) => member.id === l.id))
+  const contactName = crmPersonName(r)
+  const contactLine = [r.job_title, contactName].filter(Boolean).join(' · ')
 
   return (
     <div className="mx-auto max-w-[1440px]">
@@ -162,6 +162,7 @@ export default function LeadDetail() {
             </div>
             <h1 className="truncate font-display text-3xl font-medium text-white sm:text-4xl">{r.name}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-400">
+              {r.record_type === 'business' && contactLine && <span>{contactLine}</span>}
               {r.company_name && r.record_type !== 'business' && <span>{r.job_title ? `${r.job_title} at ` : ''}<strong className="font-medium text-slate-200">{r.company_name}</strong></span>}
               <a href={`mailto:${r.email}`} className="hover:text-gold">{r.email}</a>
               {r.phone && <a href={`tel:${r.phone}`} className="hover:text-gold">{r.phone}</a>}
@@ -176,7 +177,9 @@ export default function LeadDetail() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link to={`${p('communications')}?lead=${encodeURIComponent(r.id)}`} className={btnPrimary}>Email</Link>
+            <Link to={leadEmailHref(p, { id: r.id, email: r.email, name: r.name })} className={btnPrimary}>Email</Link>
+            <Link to={`${p('quotes')}?new=1&email=${encodeURIComponent(r.email)}&name=${encodeURIComponent(r.name)}`} className={btnOutline}>New quote</Link>
+            <Link to={campaignAudienceHref(p, { lead: r.id })} className={btnOutline}>Campaign</Link>
             <Link className={btnOutline} to={p(`leads/${r.id}/activity`)}>Add note</Link>
             {!r.converted_at && !data.conversion && <button className={btnOutline} disabled={busy} onClick={convert}>Convert to client</button>}
             {(r.converted_at || data.conversion) && <Link to={p(`clients/${r.client_user_id || data.conversion?.client_user_id}/overview`)} className={btnOutline}>Open client</Link>}
@@ -199,6 +202,7 @@ export default function LeadDetail() {
             <Info label="Owner" value={r.owner_name || r.owner_email || 'Unassigned'} />
             <Info label="Interested in" value={r.service_name || 'Not specified'} />
             <Info label="Company / business" value={r.company_name || (r.record_type === 'business' ? r.name : 'Not provided')} />
+            <Info label="Contact person" value={contactLine || 'Not listed'} />
             <Info label="Industry" value={r.industry || 'Not provided'} />
             <Info label="Source" value={r.source || 'Not provided'} />
             <Info label="Last contacted" value={r.last_contacted_at ? timeAgo(r.last_contacted_at) : 'Not yet'} />
@@ -213,12 +217,12 @@ export default function LeadDetail() {
 
       {tab === 'activity' && <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section><div className="mb-5"><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Relationship history</p><h2 className="mt-1 text-xl font-semibold text-white">Activity & communication</h2></div>{timeline.length ? <Timeline rows={timeline} /> : <EmptyState label="No activity yet." />}</section>
-        <aside className="xl:border-l xl:border-white/10 xl:pl-7"><h3 className="font-semibold text-white">Add internal note</h3><p className="mt-1 text-xs leading-5 text-slate-500">Staff-only. This note follows the record if it becomes a client.</p><form onSubmit={addNote} className="mt-4"><textarea className={inputCls} rows={6} placeholder="Add context, call notes, next steps…" value={note} onChange={(e) => setNote(e.target.value)} /><button className={`${btnPrimary} mt-3 w-full`} disabled={busy || !note.trim()}>Save note</button></form><Link to={`${p('communications')}?lead=${encodeURIComponent(r.id)}`} className={`${btnOutline} mt-3 w-full`}>Compose email</Link></aside>
+        <aside className="xl:border-l xl:border-white/10 xl:pl-7"><h3 className="font-semibold text-white">Add internal note</h3><p className="mt-1 text-xs leading-5 text-slate-500">Staff-only. This note follows the record if it becomes a client.</p><form onSubmit={addNote} className="mt-4"><textarea className={inputCls} rows={6} placeholder="Add context, call notes, next steps…" value={note} onChange={(e) => setNote(e.target.value)} /><button className={`${btnPrimary} mt-3 w-full`} disabled={busy || !note.trim()}>Save note</button></form><Link to={leadEmailHref(p, { id: r.id, email: r.email, name: r.name })} className={`${btnOutline} mt-3 w-full`}>Compose email</Link></aside>
       </div>}
 
-      {tab === 'lists' && <div className="mt-6 max-w-4xl"><div className="mb-5"><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Audience organization</p><h2 className="mt-1 text-xl font-semibold text-white">Lists & segments</h2></div><div className="border-y border-white/10">{data.lists.length === 0 ? <p className="py-6 text-sm text-slate-500">This record is not in any static lists yet.</p> : data.lists.map((list) => <div key={list.id} className="flex items-center justify-between border-t border-white/5 py-4 first:border-t-0"><div><p className="font-medium text-white">{list.name}</p><p className="text-xs text-slate-500">{list.list_type}</p></div><Link to={`${p('communications')}?list=${list.id}`} className="text-sm font-medium text-gold hover:underline">Email list →</Link></div>)}</div>{unusedLists.length > 0 && <div className="mt-5 flex gap-2"><select className={inputCls} value={listId} onChange={(e) => setListId(e.target.value)}><option value="">Add to a static list…</option>{unusedLists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><button className={btnPrimary} disabled={!listId || busy} onClick={addToList}>Add</button></div>}</div>}
+      {tab === 'lists' && <div className="mt-6 max-w-4xl"><div className="mb-5"><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Audience organization</p><h2 className="mt-1 text-xl font-semibold text-white">Lists & segments</h2></div><div className="border-y border-white/10">{data.lists.length === 0 ? <p className="py-6 text-sm text-slate-500">This record is not in any static lists yet.</p> : data.lists.map((list) => <div key={list.id} className="flex items-center justify-between border-t border-white/5 py-4 first:border-t-0"><div><p className="font-medium text-white">{list.name}</p><p className="text-xs text-slate-500">{list.list_type}</p></div><Link to={campaignAudienceHref(p, { list: list.id })} className="text-sm font-medium text-gold hover:underline">Email list →</Link></div>)}</div>{unusedLists.length > 0 && <div className="mt-5 flex gap-2"><select className={inputCls} value={listId} onChange={(e) => setListId(e.target.value)}><option value="">Add to a static list…</option>{unusedLists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select><button className={btnPrimary} disabled={!listId || busy} onClick={addToList}>Add</button></div>}</div>}
 
-      {tab === 'details' && <div className="mt-6 max-w-5xl"><div className="mb-5 flex items-end justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Record data</p><h2 className="mt-1 text-xl font-semibold text-white">Contact & business details</h2></div><button onClick={() => setEditing((v) => !v)} className="text-sm font-medium text-gold hover:underline">{editing ? 'Cancel' : 'Edit'}</button></div>{editing ? <RecordEditor record={r} staff={staff} onSave={async (patch) => { await updateRecord(patch); setEditing(false) }} /> : <dl className="grid border-y border-white/10 sm:grid-cols-2"><Info label="Record type" value={r.record_type} /><Info label="Email status" value={r.email_status} /><Info label="Email" value={r.email} /><Info label="Phone" value={r.phone || 'Not provided'} /><Info label="Job title" value={r.job_title || 'Not provided'} /><Info label="Website" value={r.website || 'Not provided'} /><Info label="Industry" value={r.industry || 'Not provided'} /><Info label="Owner" value={r.owner_name || r.owner_email || 'Unassigned'} /><Info label="Address" value={[r.address_line1, r.address_line2, r.city, r.state, r.postal_code, r.country].filter(Boolean).join(', ') || 'Not provided'} /><Info label="Created" value={new Date(r.created_at).toLocaleString()} /></dl>}</div>}
+      {tab === 'details' && <div className="mt-6 max-w-5xl"><div className="mb-5 flex items-end justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Record data</p><h2 className="mt-1 text-xl font-semibold text-white">Contact & business details</h2></div><button onClick={() => setEditing((v) => !v)} className="text-sm font-medium text-gold hover:underline">{editing ? 'Cancel' : 'Edit'}</button></div>{editing ? <RecordEditor record={r} staff={staff} onSave={async (patch) => { await updateRecord(patch); setEditing(false) }} /> : <dl className="grid border-y border-white/10 sm:grid-cols-2"><Info label="Record type" value={r.record_type} /><Info label="Email status" value={r.email_status} /><Info label="Email" value={r.email} /><Info label="Phone" value={r.phone || 'Not provided'} /><Info label={r.record_type === 'business' ? 'Contact first name' : 'First name'} value={r.first_name || 'Not provided'} /><Info label={r.record_type === 'business' ? 'Contact last name' : 'Last name'} value={r.last_name || 'Not provided'} /><Info label={r.record_type === 'business' ? 'Contact title' : 'Job title'} value={r.job_title || 'Not provided'} /><Info label="Website" value={r.website || 'Not provided'} /><Info label="Industry" value={r.industry || 'Not provided'} /><Info label="Owner" value={r.owner_name || r.owner_email || 'Unassigned'} /><Info label="Address" value={[r.address_line1, r.address_line2, r.city, r.state, r.postal_code, r.country].filter(Boolean).join(', ') || 'Not provided'} /><Info label="Created" value={new Date(r.created_at).toLocaleString()} /></dl>}</div>}
     </div>
   )
 }
@@ -240,5 +244,5 @@ function RecordEditor({ record, staff, onSave }: { record: LeadRecord; staff: St
   const [busy, setBusy] = useState(false)
   async function submit(e: React.FormEvent) { e.preventDefault(); setBusy(true); try { await onSave(form) } finally { setBusy(false) } }
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }))
-  return <form onSubmit={submit} className="grid gap-4 md:grid-cols-2"><select className={inputCls} value={form.record_type} onChange={(e) => set('record_type', e.target.value)}><option value="person">Person</option><option value="business">Business</option></select><select className={inputCls} value={form.lifecycle_stage} onChange={(e) => set('lifecycle_stage', e.target.value)}><option value="lead">Lead</option><option value="prospect">Prospect</option><option value="opportunity">Application</option><option value="lost">Lost</option></select>{form.record_type === 'person' && <><input className={inputCls} placeholder="First name" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} /><input className={inputCls} placeholder="Last name" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} /></>}<input className={inputCls} placeholder="Company / business" value={form.company_name} onChange={(e) => set('company_name', e.target.value)} /><input className={inputCls} placeholder="Job title" value={form.job_title} onChange={(e) => set('job_title', e.target.value)} /><input className={inputCls} placeholder="Phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} /><input className={inputCls} placeholder="Website" value={form.website} onChange={(e) => set('website', e.target.value)} /><input className={inputCls} placeholder="Industry" value={form.industry} onChange={(e) => set('industry', e.target.value)} /><input className={inputCls} placeholder="Source" value={form.source} onChange={(e) => set('source', e.target.value)} /><select className={inputCls} value={form.status} onChange={(e) => set('status', e.target.value)}><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="lost">Lost</option></select><select className={inputCls} value={form.owner_staff_user_id} onChange={(e) => set('owner_staff_user_id', e.target.value)}><option value="">Unassigned</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.full_name || s.email}</option>)}</select><select className={inputCls} value={form.email_status} onChange={(e) => set('email_status', e.target.value)}><option value="emailable">Email allowed</option><option value="unsubscribed">Unsubscribed</option><option value="bounced">Bounced</option><option value="suppressed">Suppressed</option></select><input className={inputCls} placeholder="Address line 1" value={form.address_line1} onChange={(e) => set('address_line1', e.target.value)} /><input className={inputCls} placeholder="Address line 2" value={form.address_line2} onChange={(e) => set('address_line2', e.target.value)} /><input className={inputCls} placeholder="City" value={form.city} onChange={(e) => set('city', e.target.value)} /><input className={inputCls} placeholder="State" value={form.state} onChange={(e) => set('state', e.target.value)} /><input className={inputCls} placeholder="Postal code" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} /><input className={inputCls} placeholder="Country" value={form.country} onChange={(e) => set('country', e.target.value)} /><div className="md:col-span-2"><button className={btnPrimary} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div></form>
+  return <form onSubmit={submit} className="grid gap-4 md:grid-cols-2"><select className={inputCls} value={form.record_type} onChange={(e) => set('record_type', e.target.value)}><option value="person">Person</option><option value="business">Business</option></select><select className={inputCls} value={form.lifecycle_stage} onChange={(e) => set('lifecycle_stage', e.target.value)}><option value="lead">Lead</option><option value="prospect">Prospect</option><option value="opportunity">Application</option><option value="lost">Lost</option></select><input className={inputCls} placeholder={form.record_type === 'business' ? 'Contact first name' : 'First name'} value={form.first_name} onChange={(e) => set('first_name', e.target.value)} /><input className={inputCls} placeholder={form.record_type === 'business' ? 'Contact last name' : 'Last name'} value={form.last_name} onChange={(e) => set('last_name', e.target.value)} /><input className={inputCls} placeholder="Company / business" value={form.company_name} onChange={(e) => set('company_name', e.target.value)} /><input className={inputCls} placeholder={form.record_type === 'business' ? 'Contact title' : 'Job title'} value={form.job_title} onChange={(e) => set('job_title', e.target.value)} /><input className={inputCls} placeholder="Phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} /><input className={inputCls} placeholder="Website" value={form.website} onChange={(e) => set('website', e.target.value)} /><input className={inputCls} placeholder="Industry" value={form.industry} onChange={(e) => set('industry', e.target.value)} /><input className={inputCls} placeholder="Source" value={form.source} onChange={(e) => set('source', e.target.value)} /><select className={inputCls} value={form.status} onChange={(e) => set('status', e.target.value)}><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="lost">Lost</option></select><select className={inputCls} value={form.owner_staff_user_id} onChange={(e) => set('owner_staff_user_id', e.target.value)}><option value="">Unassigned</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.full_name || s.email}</option>)}</select><select className={inputCls} value={form.email_status} onChange={(e) => set('email_status', e.target.value)}><option value="emailable">Email allowed</option><option value="unsubscribed">Unsubscribed</option><option value="bounced">Bounced</option><option value="suppressed">Suppressed</option></select><input className={inputCls} placeholder="Address line 1" value={form.address_line1} onChange={(e) => set('address_line1', e.target.value)} /><input className={inputCls} placeholder="Address line 2" value={form.address_line2} onChange={(e) => set('address_line2', e.target.value)} /><input className={inputCls} placeholder="City" value={form.city} onChange={(e) => set('city', e.target.value)} /><input className={inputCls} placeholder="State" value={form.state} onChange={(e) => set('state', e.target.value)} /><input className={inputCls} placeholder="Postal code" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} /><input className={inputCls} placeholder="Country" value={form.country} onChange={(e) => set('country', e.target.value)} /><div className="md:col-span-2"><button className={btnPrimary} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div></form>
 }

@@ -7,6 +7,13 @@ import { actorIp, actorUserAgent, actorGeo, logAudit } from '../auditLog'
 import { sendEmail } from '../email'
 import { renderPinnacleEmailLayout } from '../emailTemplates/layout'
 import { renderFieldAssignmentAuditEmail } from '../emailTemplates/fieldAssignmentAudit'
+import { resolveEligibleFieldProvider } from '../fieldProviders'
+import { canAccessClient } from '../scope'
+import { requireNamedPermission } from '../capabilities'
+import { DispatchProviderConflict, loadDispatchProviderProfile, provisionDispatchProvider } from '../vendorStaging'
+import { toDisplayCase } from '../../../shared/displayCase'
+import { isEligibleProviderAccount } from '../../../shared/operations'
+import { estimateVendorFee, loadVendorFeeSettings, saveVendorFeeSettings } from '../vendorFeeAdjustment'
 
 export const fieldWorkRoutes = new Hono<AppEnv>()
 
@@ -109,6 +116,87 @@ function nowIso(): string {
 
 // ---------- Staff: create + list all ----------
 
+fieldWorkRoutes.post('/dispatch-providers', requireStaff, async (c) => {
+  const body = await c.req.json<{
+    email?: string
+    full_name?: string
+    phone?: string
+    vendor_category?: string
+    company_name?: string
+  }>().catch(() => ({} as Record<string, string>))
+
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  const fullName = toDisplayCase(typeof body.full_name === 'string' ? body.full_name.trim().slice(0, 240) : '')
+  if (!email || !email.includes('@')) return c.json({ error: 'a valid email is required' }, 400)
+  if (!fullName) return c.json({ error: 'provider name is required' }, 400)
+
+  try {
+    const result = await provisionDispatchProvider(c.env, {
+      email,
+      fullName,
+      phone: typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) : null,
+      vendorCategory: typeof body.vendor_category === 'string' ? body.vendor_category.trim().slice(0, 120) : null,
+      companyName: typeof body.company_name === 'string' ? body.company_name.trim().slice(0, 200) : null,
+    })
+    const user = await loadDispatchProviderProfile(c.env, result.userId)
+    if (!user || !isEligibleProviderAccount(user.role, user.status)) {
+      return c.json({ error: 'provider could not be prepared for dispatch' }, 500)
+    }
+    return c.json({ user, created: result.created, activated: result.activated })
+  } catch (err) {
+    if (err instanceof DispatchProviderConflict) {
+      return c.json({ error: err.message }, 409)
+    }
+    throw err
+  }
+})
+
+fieldWorkRoutes.get('/dispatch-fee-settings', requireStaff, async (c) => {
+  const settings = await loadVendorFeeSettings(c.env)
+  return c.json({ settings })
+})
+
+fieldWorkRoutes.patch('/dispatch-fee-settings', requireStaff, async (c) => {
+  const body = await c.req.json<{
+    enabled?: boolean
+    max_adjustment_cents?: number
+    down_only?: boolean
+  }>().catch(() => ({} as Record<string, unknown>))
+
+  const current = await loadVendorFeeSettings(c.env)
+  const next = {
+    enabled: typeof body.enabled === 'boolean' ? body.enabled : current.enabled,
+    maxAdjustmentCents: typeof body.max_adjustment_cents === 'number' && Number.isFinite(body.max_adjustment_cents)
+      ? Math.min(5000, Math.max(100, Math.round(body.max_adjustment_cents)))
+      : current.maxAdjustmentCents,
+    downOnly: typeof body.down_only === 'boolean' ? body.down_only : current.downOnly,
+  }
+  await saveVendorFeeSettings(c.env, next)
+  return c.json({ settings: next })
+})
+
+fieldWorkRoutes.post('/dispatch-fee-estimate', requireStaff, async (c) => {
+  const body = await c.req.json<{
+    service_key?: string
+    site_postal_code?: string
+    site_city?: string
+    site_state?: string
+    base_cents?: number
+  }>().catch(() => ({} as Record<string, unknown>))
+
+  const serviceKey = typeof body.service_key === 'string' ? body.service_key.trim() : ''
+  if (!serviceKey) return c.json({ error: 'service_key is required' }, 400)
+
+  const estimate = await estimateVendorFee(c.env, {
+    service_key: serviceKey,
+    site_postal_code: typeof body.site_postal_code === 'string' ? body.site_postal_code : null,
+    site_city: typeof body.site_city === 'string' ? body.site_city : null,
+    site_state: typeof body.site_state === 'string' ? body.site_state : null,
+    base_cents: typeof body.base_cents === 'number' ? body.base_cents : null,
+  })
+  return c.json({ estimate })
+})
+
 fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   const user = c.get('user')
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
@@ -119,19 +207,45 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   if (!serviceKey || !clientUserId || !vendorUserId) {
     return c.json({ error: 'service_key, client_user_id and vendor_user_id are required' }, 400)
   }
+  if (!(await canAccessClient(c.env, user, clientUserId))) return c.json({ error: 'forbidden' }, 403)
+  const eligibleProviderId = await resolveEligibleFieldProvider(c.env, vendorUserId)
+  if (!eligibleProviderId) return c.json({ error: 'provider must be an active staff or admin account' }, 400)
+
+  let vendorFeeBaseCents = num(body.vendor_fee_base_cents)
+  let vendorFeeAdjustmentCents = num(body.vendor_fee_adjustment_cents) ?? 0
+  let vendorFeeCents = num(body.vendor_fee_cents)
+  let vendorFeeReason = typeof body.vendor_fee_reason === 'string' ? body.vendor_fee_reason.trim().slice(0, 500) : null
+
+  if (!vendorFeeCents && serviceKey) {
+    const estimate = await estimateVendorFee(c.env, {
+      service_key: serviceKey,
+      site_postal_code: typeof body.site_postal_code === 'string' ? body.site_postal_code : null,
+      site_city: typeof body.site_city === 'string' ? body.site_city : null,
+      site_state: typeof body.site_state === 'string' ? body.site_state : null,
+      base_cents: vendorFeeBaseCents,
+    })
+    vendorFeeBaseCents = estimate.baseCents
+    vendorFeeAdjustmentCents = estimate.adjustmentCents
+    vendorFeeCents = estimate.offeredCents
+    vendorFeeReason = estimate.reason
+  } else if (vendorFeeCents && vendorFeeBaseCents == null) {
+    vendorFeeBaseCents = Math.max(0, vendorFeeCents - vendorFeeAdjustmentCents)
+  }
+
   const id = uuid()
   await c.env.DB.prepare(
     `INSERT INTO field_assignments (
        id, kind, service_key, client_user_id, vendor_user_id, assigned_by_user_id,
        title, site_label, site_address, site_city, site_state, site_postal_code,
-       site_lat, site_lng, scheduled_at, notes
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       site_lat, site_lng, scheduled_at, notes,
+       vendor_fee_base_cents, vendor_fee_adjustment_cents, vendor_fee_cents, vendor_fee_reason
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id,
     kind,
     serviceKey,
     clientUserId,
-    vendorUserId,
+    eligibleProviderId,
     user.id,
     (body.title as string) || null,
     (body.site_label as string) || null,
@@ -143,13 +257,24 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
     num(body.site_lng),
     typeof body.scheduled_at === 'string' ? body.scheduled_at : null,
     (body.notes as string) || null,
+    vendorFeeBaseCents,
+    vendorFeeAdjustmentCents,
+    vendorFeeCents,
+    vendorFeeReason,
   ).run()
 
   await logActivity(c.env, {
     actorUserId: user.id,
     clientUserId,
     kind: 'field_assignment_created',
-    detail: { id, service_key: serviceKey, kind_value: kind, vendor_user_id: vendorUserId },
+    detail: {
+      id,
+      service_key: serviceKey,
+      kind_value: kind,
+      vendor_user_id: eligibleProviderId,
+      vendor_fee_cents: vendorFeeCents,
+      vendor_fee_adjustment_cents: vendorFeeAdjustmentCents,
+    },
   })
 
   const row = await loadAssignment(c.env, id)
@@ -331,6 +456,9 @@ fieldWorkRoutes.post('/field-assignments/:id/complete', requireStaff, async (c) 
     now,
     row.id,
   ).run()
+  await c.env.DB.prepare(
+    'UPDATE field_agent_locations SET sharing_active = 0 WHERE user_id = ? AND assignment_id = ?',
+  ).bind(row.vendor_user_id, row.id).run()
 
   const updated = await loadAssignment(c.env, row.id)
   if (updated && updated.client_email) {
@@ -372,6 +500,9 @@ fieldWorkRoutes.post('/field-assignments/:id/cancel', requireStaff, async (c) =>
   if (user.role !== 'admin' && row.assigned_by_user_id !== user.id) return c.json({ error: 'forbidden' }, 403)
   if (row.status === 'completed') return c.json({ error: 'cannot cancel completed assignment' }, 409)
   await c.env.DB.prepare(`UPDATE field_assignments SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?`).bind(row.id).run()
+  await c.env.DB.prepare(
+    'UPDATE field_agent_locations SET sharing_active = 0 WHERE user_id = ? AND assignment_id = ?',
+  ).bind(row.vendor_user_id, row.id).run()
   return c.json({ ok: true })
 })
 
@@ -383,18 +514,69 @@ fieldWorkRoutes.post('/field-assignments/:id/ping', requireStaff, async (c) => {
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
   const lat = num(body.lat)
   const lng = num(body.lng)
-  if (lat == null || lng == null) return c.json({ error: 'lat and lng are required' }, 400)
+  if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return c.json({ error: 'valid lat and lng are required' }, 400)
+  }
   await c.env.DB.prepare(
-    `INSERT INTO field_agent_locations (user_id, assignment_id, lat, lng, accuracy_m, updated_at)
-     VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `INSERT INTO field_agent_locations (user_id, assignment_id, lat, lng, accuracy_m, source, sharing_active, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'assignment', 1, datetime('now'))
      ON CONFLICT(user_id) DO UPDATE SET
        assignment_id = excluded.assignment_id,
        lat = excluded.lat,
        lng = excluded.lng,
        accuracy_m = excluded.accuracy_m,
+       source = 'assignment',
+       sharing_active = 1,
        updated_at = datetime('now')`,
   ).bind(user.id, row.id, lat, lng, num(body.accuracy_m)).run()
   return c.json({ ok: true })
+})
+
+fieldWorkRoutes.post('/location', requireStaff, async (c) => {
+  const user = c.get('user')
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
+  const lat = num(body.lat)
+  const lng = num(body.lng)
+  if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return c.json({ error: 'valid lat and lng are required' }, 400)
+  }
+  await c.env.DB.prepare(
+    `INSERT INTO field_agent_locations (user_id, assignment_id, lat, lng, accuracy_m, source, sharing_active, updated_at)
+     VALUES (?, NULL, ?, ?, ?, 'network', 1, datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET
+       assignment_id = NULL,
+       lat = excluded.lat,
+       lng = excluded.lng,
+       accuracy_m = excluded.accuracy_m,
+       source = 'network',
+       sharing_active = 1,
+       updated_at = datetime('now')`,
+  ).bind(user.id, lat, lng, num(body.accuracy_m)).run()
+  return c.json({ ok: true })
+})
+
+fieldWorkRoutes.post('/location/stop', requireStaff, async (c) => {
+  await c.env.DB.prepare(
+    'UPDATE field_agent_locations SET sharing_active = 0 WHERE user_id = ?',
+  ).bind(c.get('user').id).run()
+  return c.json({ ok: true })
+})
+
+fieldWorkRoutes.get('/network-map', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT u.id AS user_id, u.full_name, u.email, u.last_seen_at, u.status,
+            tm.party_type, tm.vendor_category, tm.title,
+            loc.assignment_id, loc.lat, loc.lng, loc.accuracy_m, loc.source,
+            loc.sharing_active, loc.updated_at,
+            fa.title AS assignment_title, fa.status AS assignment_status
+     FROM users u
+     LEFT JOIN team_members tm ON tm.user_id = u.id
+     LEFT JOIN field_agent_locations loc ON loc.user_id = u.id
+     LEFT JOIN field_assignments fa ON fa.id = loc.assignment_id
+     WHERE u.role IN ('staff','admin') AND u.status = 'active'
+     ORDER BY u.full_name, u.email`,
+  ).all()
+  return c.json({ people: rows.results ?? [], viewer_user_id: c.get('user').id })
 })
 
 fieldWorkRoutes.get('/field-map', requireStaff, async (c) => {

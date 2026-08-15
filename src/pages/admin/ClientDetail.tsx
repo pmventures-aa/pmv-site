@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAppPath } from '../../lib/basePath'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, StatCard } from '../../components/admin/ui'
@@ -8,9 +8,11 @@ import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialo
 import { Avatar } from '../../components/kit/Avatar'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { InlineLoading } from '../../components/LoadingScreen'
+import { useAuth } from '../../lib/auth'
+import { MILESTONE_STATUSES, RESPONSIBILITY_STATES, milestoneStatusLabel } from '../../../shared/matterWorkspace'
 
 interface Bundle {
-  account: { id: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
+  account: { id: string; public_ref: string; email: string; full_name: string | null; phone: string | null; created_at: string; last_login_at: string | null }
   profile: { business_name: string | null; entity_type: string | null; ein: string | null; state: string | null; onboarding_completed: number } | null
   assigned_staff: { id: string; full_name: string | null; email: string }[]
   recent_activity: ActivityEvent[]
@@ -188,6 +190,7 @@ function Section({
   clientId,
   onCreated,
   archiveEntity,
+  assignEntity,
 }: {
   title: string
   rows: any[]
@@ -200,8 +203,11 @@ function Section({
   clientId: string
   onCreated: () => void
   archiveEntity?: ArchiveEntity
+  assignEntity?: 'matter' | 'task' | 'ticket'
 }) {
+  const { user } = useAuth()
   const [adding, setAdding] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   async function archive(id: string) {
     if (!archiveEntity) return
@@ -214,18 +220,33 @@ function Section({
     }
   }
 
+  async function assignSelf(id: string) {
+    if (!assignEntity || !user) return
+    try {
+      await api.post(`/admin/work-assignments/${assignEntity}/${id}/assign-self`)
+      toast.success('Assigned to you.')
+      onCreated()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not assign this record.')
+    }
+  }
+
   return (
     <Panel className="!p-0">
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <button type="button" onClick={() => setExpanded((value) => !value)} className="flex min-w-0 items-center gap-2 text-left">
+          <span className="text-sm font-semibold text-white">{title}</span>
+          <span className="rounded-full bg-white/[.06] px-2 py-0.5 text-[10px] tabular-nums text-slate-400">{rows.length}</span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{expanded ? 'Collapse' : 'Open'}</span>
+        </button>
         {createConfig && (
-          <button onClick={() => setAdding((a) => !a)} className="text-xs font-medium text-gold hover:underline">
+          <button onClick={() => { setExpanded(true); setAdding((a) => !a) }} className="text-xs font-medium text-gold hover:underline">
             {adding ? 'Cancel' : '+ Add'}
           </button>
         )}
       </div>
 
-      {adding && createConfig && (
+      {expanded && adding && createConfig && (
         <CreateForm
           config={createConfig}
           clientId={clientId}
@@ -237,7 +258,7 @@ function Section({
         />
       )}
 
-      {rows.length === 0 ? (
+      {expanded && (rows.length === 0 ? (
         <div className="p-5">
           <EmptyState label={emptyLabel} />
         </div>
@@ -252,7 +273,7 @@ function Section({
                   </th>
                 ))}
                 {statusKey && <th className="px-5 py-2 font-medium">Status</th>}
-                {archiveEntity && <th className="px-5 py-2 font-medium"></th>}
+                {(archiveEntity || assignEntity) && <th className="px-5 py-2 font-medium"></th>}
               </tr>
             </thead>
             <tbody>
@@ -278,11 +299,16 @@ function Section({
                       </select>
                     </td>
                   )}
-                  {archiveEntity && (
+                  {(archiveEntity || assignEntity) && (
                     <td className="whitespace-nowrap px-5 py-2.5">
-                      <button onClick={() => archive(r.id)} className="text-xs font-medium text-slate-500 hover:text-rose-300">
-                        Archive
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {assignEntity && r.assigned_staff_user_id !== user?.id && (
+                          <button onClick={() => assignSelf(r.id)} className="text-xs font-medium text-gold hover:underline">Assign to me</button>
+                        )}
+                        {archiveEntity && (
+                          <button onClick={() => archive(r.id)} className="text-xs font-medium text-slate-500 hover:text-rose-300">Archive</button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -290,7 +316,7 @@ function Section({
             </tbody>
           </table>
         </div>
-      )}
+      ))}
     </Panel>
   )
 }
@@ -595,6 +621,131 @@ function MatterNotesDialog({ clientId, matterId, title }: { clientId: string; ma
   )
 }
 
+function MatterClientViewDialog({ matterId, title, onSaved }: { matterId: string; title: string; onSaved: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [milestones, setMilestones] = useState<{ id: string; name: string; status: string; derived?: boolean }[]>([])
+  const [form, setForm] = useState({
+    responsibility_state: 'pinnacle',
+    next_action_label: '',
+    next_action_type: 'other',
+    next_action_due_at: '',
+    blocked_reason_client_safe: '',
+    completion_summary: '',
+  })
+
+  const load = useCallback(async () => {
+    const res = await api.get<{
+      matter: {
+        responsibility_state: string | null
+        next_action_label: string | null
+        next_action_type: string | null
+        next_action_due_at: string | null
+        blocked_reason_client_safe: string | null
+        completion_summary: string | null
+      }
+      milestones: { id: string; name: string; status: string; derived?: boolean }[]
+    }>(`/portal/matters/${matterId}`)
+    setForm({
+      responsibility_state: res.matter.responsibility_state || 'pinnacle',
+      next_action_label: res.matter.next_action_label || '',
+      next_action_type: res.matter.next_action_type || 'other',
+      next_action_due_at: (res.matter.next_action_due_at || '').slice(0, 10),
+      blocked_reason_client_safe: res.matter.blocked_reason_client_safe || '',
+      completion_summary: res.matter.completion_summary || '',
+    })
+    setMilestones(res.milestones || [])
+  }, [matterId])
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api.patch(`/portal/matters/${matterId}`, form)
+      toast.success('Client view saved.')
+      onSaved()
+      setOpen(false)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not save the client view.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function setMilestone(id: string, status: string) {
+    if (id.startsWith('derived-')) {
+      toast.error('Open this work once from the portal or recreate it so milestones are stored.')
+      return
+    }
+    try {
+      await api.patch(`/portal/matters/${matterId}/milestones/${id}`, { status })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update that milestone.')
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) void load() }}>
+      <DialogTrigger asChild>
+        <button className="text-xs font-medium text-gold hover:underline">Client view</button>
+      </DialogTrigger>
+      <DialogContent title={`Client view: ${title}`} description="What the client sees: who is waiting, the next action, and milestones.">
+        <form onSubmit={save} className="space-y-3">
+          <label>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Waiting on</span>
+            <select className={inputCls} value={form.responsibility_state} onChange={(e) => setForm((f) => ({ ...f, responsibility_state: e.target.value }))}>
+              {RESPONSIBILITY_STATES.map((state) => <option key={state} value={state}>{state.replace(/_/g, ' ')}</option>)}
+            </select>
+          </label>
+          {(form.responsibility_state === 'third_party') && (
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Client-safe explanation</span>
+              <textarea className={`${inputCls} min-h-[70px]`} required value={form.blocked_reason_client_safe} onChange={(e) => setForm((f) => ({ ...f, blocked_reason_client_safe: e.target.value }))} placeholder="We are waiting on the county clerk to record the package." />
+            </label>
+          )}
+          <label>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Next action</span>
+            <input className={inputCls} value={form.next_action_label} onChange={(e) => setForm((f) => ({ ...f, next_action_label: e.target.value }))} placeholder="Upload the signed HOA packet" />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Action type</span>
+              <select className={inputCls} value={form.next_action_type} onChange={(e) => setForm((f) => ({ ...f, next_action_type: e.target.value }))}>
+                {['upload', 'sign', 'pay', 'approve', 'schedule', 'message', 'acknowledge', 'other'].map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Due</span>
+              <input className={inputCls} type="date" value={form.next_action_due_at} onChange={(e) => setForm((f) => ({ ...f, next_action_due_at: e.target.value }))} />
+            </label>
+          </div>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Completion summary</span>
+            <textarea className={`${inputCls} min-h-[70px]`} value={form.completion_summary} onChange={(e) => setForm((f) => ({ ...f, completion_summary: e.target.value }))} />
+          </label>
+          {milestones.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Milestones</p>
+              <ul className="space-y-2">
+                {milestones.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-slate-200">{item.name}</span>
+                    <select className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white" value={item.status} onChange={(e) => void setMilestone(item.id, e.target.value)}>
+                      {MILESTONE_STATUSES.map((status) => <option key={status} value={status}>{milestoneStatusLabel(status)}</option>)}
+                    </select>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <button type="submit" disabled={busy} className={btnPrimary}>{busy ? 'Saving…' : 'Save client view'}</button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 interface StaffMember {
   id: string
   full_name: string | null
@@ -840,14 +991,16 @@ type ClientTab = 'dashboard' | 'profile' | 'records'
 const TABS: { key: ClientTab; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'profile', label: 'Profile' },
-  { key: 'records', label: 'Records' },
+  { key: 'records', label: 'Operations' },
 ]
 
 export default function ClientDetail() {
   const p = useAppPath()
+  const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<Bundle | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [tab, setTab] = useState<ClientTab>('dashboard')
   // Bumped whenever `id` changes so a slow response for a previously-viewed
@@ -866,7 +1019,15 @@ export default function ClientDetail() {
     const thisRequest = ++requestId.current
     try {
       const res = await api.get<Bundle>(`/admin/clients/${id}`)
-      if (requestId.current === thisRequest) setData(res)
+      if (requestId.current === thisRequest) {
+        setData(res)
+        setLoadError('')
+      }
+    } catch (err) {
+      if (requestId.current === thisRequest) {
+        setData(null)
+        setLoadError(err instanceof ApiError && err.status === 404 ? 'This client workspace was not found.' : 'This client workspace could not be loaded.')
+      }
     } finally {
       if (requestId.current === thisRequest) setLoading(false)
     }
@@ -877,6 +1038,11 @@ export default function ClientDetail() {
     setTab('dashboard')
     load()
   }, [load])
+
+  useEffect(() => {
+    const publicRef = data?.account.public_ref
+    if (publicRef && id && id !== publicRef) navigate(p(`clients/${publicRef}/manage`), { replace: true })
+  }, [data?.account.public_ref, id, navigate, p])
 
   async function setStatus(module: string, itemId: string, status: string) {
     try {
@@ -896,9 +1062,8 @@ export default function ClientDetail() {
     }
   }
 
-  if (loading || !data) {
-    return <InlineLoading />
-  }
+  if (loading) return <InlineLoading />
+  if (!data) return <Panel><EmptyState label={loadError || 'This client workspace was not found.'} /></Panel>
 
   const clientId = data.account.id
 
@@ -917,7 +1082,7 @@ export default function ClientDetail() {
             name={data.account.full_name}
             size={56}
             editable
-            uploadPath={`/admin/clients/${clientId}/avatar`}
+            uploadPath={`/admin/clients/${data.account.public_ref}/avatar`}
           />
         }
         action={
@@ -957,7 +1122,13 @@ export default function ClientDetail() {
       )}
 
       {tab === 'records' && (
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div>
+        <div className="mb-5 border-y border-white/10 py-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-gold/80">Operational workspace</p>
+          <h2 className="mt-1 text-lg font-semibold text-white">Open only the record set you need</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">Create, assign, update, or archive without loading eleven expanded tables at once. Each section keeps its count visible and opens in place.</p>
+        </div>
+      <div className="grid gap-3 lg:grid-cols-2">
         <Section
           title="Matters"
           statusOptionsKey="matters"
@@ -966,20 +1137,43 @@ export default function ClientDetail() {
             { key: 'title', label: 'Title' },
             { key: 'type', label: 'Type' },
             { key: 'assigned_staff_user_id', label: 'Assigned to', render: (r) => staffName(r.assigned_staff_user_id) },
-            { key: 'notes', label: '', render: (r) => <MatterNotesDialog clientId={clientId} matterId={r.id} title={r.title} /> },
+            { key: 'notes', label: '', render: (r) => (
+              <span className="flex items-center gap-3">
+                <MatterNotesDialog clientId={clientId} matterId={r.id} title={r.title} />
+                <MatterClientViewDialog matterId={r.id} title={r.title} onSaved={load} />
+              </span>
+            ) },
           ]}
           statusKey="status"
-          onStatusChange={(itemId, status) => setStatus('matters', itemId, status)}
+          onStatusChange={async (itemId, status) => {
+            if (status === 'blocked') {
+              const reason = window.prompt('Client-safe explanation for the wait (required).')
+              if (!reason?.trim()) {
+                toast.error('A client-safe explanation is required when a matter is waiting on a third party.')
+                return
+              }
+              try {
+                await api.patch(`/portal/matters/${itemId}`, { status, blocked_reason_client_safe: reason.trim(), responsibility_state: 'third_party' })
+                await load()
+              } catch (err) {
+                toast.error(err instanceof ApiError ? err.message : 'Could not update status. Try again.')
+              }
+              return
+            }
+            setStatus('matters', itemId, status)
+          }}
           emptyLabel="No matters."
           clientId={clientId}
           onCreated={load}
           archiveEntity="matters"
+          assignEntity="matter"
           createConfig={{
             postPath: 'matters',
             fields: [
               { key: 'title', label: 'Title', required: true },
               { key: 'type', label: 'Type', placeholder: 'tax_resolution, document_prep…' },
               { key: 'due_date', label: 'Due date', type: 'date' },
+              { key: 'next_action_label', label: 'Client next action' },
               { key: 'assigned_staff_user_id', label: 'Assigned to', type: 'select', options: staffOptions },
             ],
           }}
@@ -998,6 +1192,7 @@ export default function ClientDetail() {
           clientId={clientId}
           onCreated={load}
           archiveEntity="tasks"
+          assignEntity="task"
           createConfig={{
             postPath: 'tasks',
             fields: [
@@ -1022,6 +1217,7 @@ export default function ClientDetail() {
           clientId={clientId}
           onCreated={load}
           archiveEntity="tickets"
+          assignEntity="ticket"
           createConfig={{
             postPath: 'support',
             fields: [
@@ -1083,8 +1279,14 @@ export default function ClientDetail() {
           createConfig={{
             postPath: 'property',
             fields: [
+              { key: 'name', label: 'Property name' },
               { key: 'address', label: 'Address', required: true },
+              { key: 'city', label: 'City' },
+              { key: 'state', label: 'State' },
+              { key: 'postal_code', label: 'ZIP' },
               { key: 'property_type', label: 'Property type' },
+              { key: 'occupancy', label: 'Occupancy' },
+              { key: 'notes', label: 'Notes', type: 'textarea' },
             ],
           }}
         />
@@ -1153,6 +1355,7 @@ export default function ClientDetail() {
             toBody: (v) => ({ title: v.title, starts_at: v.starts_at ? new Date(v.starts_at).toISOString() : undefined }),
           }}
         />
+      </div>
       </div>
       )}
     </div>

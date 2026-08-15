@@ -8,6 +8,7 @@ import { selfRoutes } from '../_lib/routes/self'
 import { portalRoutes } from '../_lib/routes/portal'
 import { messageRoutes } from '../_lib/routes/messages'
 import { adminRoutes } from '../_lib/routes/admin'
+import { processorReviewLoginRoutes } from '../_lib/routes/processorReviewLogin'
 import { publicRoutes } from '../_lib/routes/public'
 import { uploadRoutes } from '../_lib/routes/uploads'
 import { unsubscribeRoutes } from '../_lib/routes/unsubscribe'
@@ -64,6 +65,7 @@ import { communicationsHubRoutes } from '../_lib/routes/communicationsHub'
 import { conversationRoutes } from '../_lib/routes/conversations'
 import { emailThreadRoutes } from '../_lib/routes/emailThreads'
 import { emailSignatureRoutes } from '../_lib/routes/emailSignatures'
+import { hqEmailTemplateRoutes } from '../_lib/routes/hqEmailTemplates'
 import { notificationFeedRoutes } from '../_lib/routes/notificationFeed'
 import { clientBannerAdminRoutes, clientBannerSelfRoutes } from '../_lib/routes/clientBanners'
 import { impersonationRoutes } from '../_lib/routes/impersonation'
@@ -72,8 +74,19 @@ import { managedTemplatePublicRoutes, managedTemplateAdminRoutes } from '../_lib
 import { clientRelationshipRoutes } from '../_lib/routes/clientRelationships'
 import { geoRoutes } from '../_lib/routes/geo'
 import { loadWorkspaceContext } from '../_lib/workspaceContext'
+import { logAuth0StartupWarnings } from '../_lib/routes/auth0'
+import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
 
 const app = new Hono<AppEnv>().basePath('/api')
+
+let auth0StartupChecked = false
+app.use('*', async (c, next) => {
+  if (!auth0StartupChecked) {
+    auth0StartupChecked = true
+    logAuth0StartupWarnings(c.env)
+  }
+  await next()
+})
 
 // Impersonation audit + destructive-action guard. Both wrap the whole
 // app: guard 403s a denylisted path before the handler runs;
@@ -126,6 +139,7 @@ app.route('/admin', communicationsHubRoutes)
 app.route('/admin', conversationRoutes)
 app.route('/portal', conversationRoutes)
 app.route('/admin', emailSignatureRoutes)
+app.route('/admin', hqEmailTemplateRoutes)
 app.route('/admin', emailThreadRoutes)
 app.route('/admin', notificationFeedRoutes)
 app.route('/portal', notificationFeedRoutes)
@@ -138,6 +152,7 @@ app.route('/admin', intakeCatalogAdminRoutes)
 app.route('/admin', accountEmailsAdminRoutes)
 app.route('/admin', resendWebhookAdminRoutes)
 app.route('/admin', signatureAdminSyncRoutes)
+app.route('/admin', processorReviewLoginRoutes)
 app.route('/admin', staffServiceAssignmentRoutes)
 app.route('/admin', staffServicePrefillRoutes)
 app.route('/admin', invoiceAdminRoutes)
@@ -165,6 +180,7 @@ app.route('/admin', commsRoutes)
 app.route('/admin', crmWriteRoutes)
 app.route('/admin', crmRoutes)
 app.route('/admin', fieldWorkRoutes)
+app.route('/admin', workAssignmentRoutes)
 app.route('/admin', casesRoutes)
 app.route('/admin', communicationBrandingAdminRoutes)
 app.route('/admin', presenceRoutes)

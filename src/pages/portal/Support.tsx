@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
+import { propertyDisplayName } from '../../../shared/propertyProfile'
 import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
 
@@ -26,11 +28,13 @@ interface Msg {
 
 export default function Support() {
   const { user } = useAuth()
+  const [params] = useSearchParams()
   const isStaff = user?.role === 'staff' || user?.role === 'admin'
   const [tickets, setTickets] = useState<Ticket[]>([])
+  const [properties, setProperties] = useState<{ id: string; name: string | null; address: string }[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '' })
+  const [showForm, setShowForm] = useState(!!params.get('property'))
+  const [form, setForm] = useState({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '', property_id: params.get('property') || '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -40,8 +44,12 @@ export default function Support() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.get<{ tickets: Ticket[] }>('/portal/support')
+      const [res, props] = await Promise.all([
+        api.get<{ tickets: Ticket[] }>('/portal/support'),
+        api.get<{ properties: { id: string; name: string | null; address: string }[] }>('/portal/property').catch(() => ({ properties: [] })),
+      ])
       setTickets(res.tickets)
+      setProperties(props.properties)
     } finally {
       setLoading(false)
     }
@@ -57,7 +65,7 @@ export default function Support() {
     setError(null)
     try {
       await api.post('/portal/support', form)
-      setForm({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '' })
+      setForm({ subject: '', category: 'general', priority: 'normal', details: '', service_key: '', property_id: '' })
       setShowForm(false)
       await load()
     } catch (err) {
@@ -98,9 +106,9 @@ export default function Support() {
   return (
     <div>
       <PageHeader
-        eyebrow="One place for every need"
+        eyebrow="Requests"
         title="Requests & Cases"
-        subtitle="Request a service, send instructions, and follow ownership, messages, and response commitments in one thread."
+        subtitle="One thread per request: status, ownership, and replies."
         action={
           <button className="btn-gold" onClick={() => setShowForm((s) => !s)}>
             {showForm ? 'Cancel' : '+ Start request'}
@@ -109,8 +117,8 @@ export default function Support() {
       />
 
       {showForm && (
-        <Card className="mb-6">
-          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-3">
+        <Card className="mb-4">
+          <form onSubmit={onCreate} className="grid gap-3 sm:grid-cols-3">
             <label>
               <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">What do you need?</span>
               <select className={inputCls} value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
@@ -132,6 +140,15 @@ export default function Support() {
               </select>
               <span className="mt-1 block text-[11px] text-slate-500">Urgent: 30 min · High: 2 hrs · Normal: 4 hrs</span>
             </label>
+            {properties.length > 0 && (
+              <label className="sm:col-span-3">
+                <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Property</span>
+                <select className={inputCls} value={form.property_id} onChange={(e) => setForm((f) => ({ ...f, property_id: e.target.value }))}>
+                  <option value="">Not tied to an address</option>
+                  {properties.map((prop) => <option key={prop.id} value={prop.id}>{propertyDisplayName(prop)}</option>)}
+                </select>
+              </label>
+            )}
             <label className="sm:col-span-2">
               <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Details</span>
               <textarea className={`${inputCls} min-h-24`} value={form.details} onChange={(e) => setForm((f) => ({ ...f, details: e.target.value }))} placeholder="Address, deadline, access notes, documents needed, or anything else that will help us begin." />
@@ -153,12 +170,12 @@ export default function Support() {
           <EmptyState label="No requests yet. Start one whenever you need Pinnacle's help." />
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {ordered.map((t) => {
             const yours = t.status !== 'closed' && (t.waiting_on === 'you' || t.waiting_on === 'client')
             return (
             <Card key={t.id} className={`!p-0 ${yours ? 'border-gold/30' : ''}`}>
-              <button onClick={() => openThread(t.id)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
+              <button onClick={() => openThread(t.id)} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left">
                 <div>
                   {yours && <p className="mb-1 text-[10px] font-semibold uppercase tracking-[.14em] text-gold">Action needed</p>}
                   <p className="text-sm font-medium text-white">{t.subject}</p>
@@ -168,15 +185,15 @@ export default function Support() {
                 <StatusBadge tone={t.status === 'closed' ? 'green' : yours ? 'gold' : t.status === 'in_progress' ? 'blue' : 'gold'}>{yours ? 'waiting on you' : t.status}</StatusBadge>
               </button>
               {openId === t.id && (
-                <div className="border-t border-white/10 p-5">
+                <div className="border-t border-white/10 p-3">
                   {isStaff && (
-                    <div className="mb-4 flex items-center gap-2">
+                    <div className="mb-3 flex items-center gap-2">
                       <span className="text-xs text-slate-400">Set status:</span>
                       {['open', 'in_progress', 'closed'].map((s) => (
                         <button
                           key={s}
                           onClick={() => setStatus(t.id, s)}
-                          className={`rounded-full border px-3 py-1 text-xs ${t.status === s ? 'border-gold text-gold' : 'border-white/10 text-slate-400'}`}
+                          className={`rounded-sm border px-2 py-0.5 text-xs ${t.status === s ? 'border-gold text-gold' : 'border-white/10 text-slate-400'}`}
                         >
                           {s.replace('_', ' ')}
                         </button>
@@ -188,7 +205,7 @@ export default function Support() {
                       <li className="text-sm text-slate-500">No replies yet.</li>
                     ) : (
                       thread.map((m) => (
-                        <li key={m.id} className="rounded-lg bg-white/[0.04] px-3 py-2 text-sm text-slate-200">
+                        <li key={m.id} className="rounded-md bg-white/[0.04] px-2.5 py-1.5 text-sm text-slate-200">
                           {m.body}
                           <span className="ml-2 text-[10px] text-slate-500">{new Date(m.created_at).toLocaleTimeString()}</span>
                         </li>

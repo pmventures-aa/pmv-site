@@ -6,6 +6,7 @@ import { useAppPath } from '../../lib/basePath'
 import { playWelcomeSound, primeAudio } from '../../lib/sound'
 import { AuthLayout, Field, inputCls, ErrorBanner } from './AuthLayout'
 import { clientWorkspaceForWorld, hqWorkspaceCopy, rememberOperatingWorld, rememberedHqParty, rememberedWorld, worldFromServiceParam } from '../../lib/workspace'
+import { AUTH_ERROR_MESSAGES, Auth0Providers } from '../../components/auth/Auth0Providers'
 
 export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const { login, logout } = useAuth()
@@ -19,6 +20,15 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [oauthBusy, setOauthBusy] = useState(false)
+
+  const authErrorCode = params.get('auth_error')
+  const returnTo = params.get('returnTo') || (serviceKey ? `${p(`services/${encodeURIComponent(serviceKey)}/apply`)}${offeringId ? `?offering=${encodeURIComponent(offeringId)}` : ''}` : p())
+
+  useEffect(() => {
+    if (!authErrorCode) return
+    setError(AUTH_ERROR_MESSAGES[authErrorCode] || AUTH_ERROR_MESSAGES.sign_in_failed)
+  }, [authErrorCode])
 
   const clientWorld = useMemo(() => worldFromServiceParam(serviceKey) || rememberedWorld() || 'general', [serviceKey])
   const clientCopy = clientWorkspaceForWorld(clientWorld)
@@ -63,9 +73,6 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
     }
   }
 
-  const signupQuery = serviceKey
-    ? `?service=${encodeURIComponent(serviceKey)}${offeringId ? `&offering=${encodeURIComponent(offeringId)}` : ''}`
-    : ''
   const forgotQuery = `?surface=${surface}${email ? `&email=${encodeURIComponent(email)}` : ''}`
 
   return (
@@ -73,10 +80,11 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
       surface={surface}
       liveCopy
       eyebrow={surface === 'staff' ? hqCopy.loginEyebrow : clientCopy.loginEyebrow}
-      title={surface === 'staff' ? 'Come back in' : 'Your workspace'}
+      title={surface === 'staff' ? 'Come back in' : 'Welcome Back to Pinnacle'}
+      subtitle={surface === 'client' ? 'Access your matters, documents, agreements, billing, and updates.' : undefined}
       sideLabel={surface === 'staff' ? hqCopy.badge : clientCopy.badge}
       footer={surface === 'client'
-        ? <span>New to Pinnacle? <Link to={`../signup${signupQuery}`} className="font-bold text-gold transition hover:text-gold-300">Start your workspace</Link></span>
+        ? <span>Not a client yet? <a href="/scope-request?source=login" className="font-bold text-gold transition hover:text-gold-300">Start a Request</a></span>
         : <span className="text-slate-500">HQ and provider access is provisioned by Pinnacle.</span>}
     >
       <ErrorBanner message={error} />
@@ -95,17 +103,26 @@ export default function Login({ surface }: { surface: 'client' | 'staff' }) {
             </button>
           </div>
         </Field>
-        <button type="submit" disabled={busy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
+        <button type="submit" disabled={busy || oauthBusy} className="btn-gold min-h-12 w-full text-[15px] disabled:opacity-60">{busy ? 'Signing In…' : surface === 'staff' ? 'Enter workspace' : 'Open my workspace'}</button>
       </form>
+
+      <Auth0Providers
+        mode="login"
+        surface={surface}
+        returnTo={returnTo}
+        disabled={busy}
+        compact
+        onBusyChange={setOauthBusy}
+      />
 
       {surface === 'client' && (
         <div className="mt-6 rounded-xl border border-gold/15 bg-gold/[.045] p-4">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-gold/20 bg-gold/[.06] text-gold"><LockKeyhole size={15} /></span>
             <div>
-              <p className="text-sm font-bold text-white">Need a different kind of help?</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Property, documents, operations, and funding each have their own workspace. Start from the work in front of you.</p>
-              <Link to={`../signup${signupQuery}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-gold hover:text-gold-300"><LockKeyhole size={13} /> Start your workspace</Link>
+              <p className="text-sm font-bold text-white">Not a client yet?</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Start with the situation. We will help determine the next step.</p>
+              <a href="/scope-request?source=login" className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-gold hover:text-gold-300">Start a Request</a>
             </div>
           </div>
         </div>

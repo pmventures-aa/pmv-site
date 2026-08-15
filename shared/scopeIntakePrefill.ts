@@ -1,4 +1,13 @@
 import { resolveScopeEntry } from './scopeEntries'
+import {
+  SCOPE_JOB_PRIMARY_OFFERING,
+  buildScopeIntroMessage,
+  estimateMidpointCents,
+  formatEstimateRange,
+  offeringIdForScopePhoto,
+  offeringIdForScopeReport,
+  type CatalogOffering,
+} from './quoteCatalog'
 
 export type ScopeAnswerValue = string | number | boolean | string[]
 
@@ -88,7 +97,30 @@ function moneyFromCents(cents: number | null): string {
   return (cents / 100).toFixed(2)
 }
 
-export function quotePrefillFromScope(row: ScopeIntakeRow): {
+function catalogLine(
+  offeringId: string | null,
+  fallbackName: string,
+  fallbackDescription: string,
+  fallbackCents: number | null,
+  catalog?: Map<string, CatalogOffering>,
+): QuoteLinePrefill {
+  const offering = offeringId ? catalog?.get(offeringId) : undefined
+  const priceCents = fallbackCents ?? offering?.starting_price_cents ?? null
+  return {
+    offering_id: offeringId,
+    name: offering?.name || fallbackName,
+    description: offering?.description || fallbackDescription,
+    quantity: '1',
+    unit_price: moneyFromCents(priceCents),
+    is_optional: false,
+    is_pass_through: false,
+  }
+}
+
+export function quotePrefillFromScope(
+  row: ScopeIntakeRow,
+  catalog?: Map<string, CatalogOffering>,
+): {
   title: string
   recipient_name: string
   recipient_email: string
@@ -104,50 +136,55 @@ export function quotePrefillFromScope(row: ScopeIntakeRow): {
   const occupied = isYes(answers.occupied)
   const photos = answerText(answers.photos_required)
   const reports = answerText(answers.reports_required)
+  const estimateRange = formatEstimateRange(row.estimate_low_cents, row.estimate_high_cents)
+  const midpoint = estimateMidpointCents(row.estimate_low_cents, row.estimate_high_cents)
+  const primaryOfferingId = SCOPE_JOB_PRIMARY_OFFERING[row.job_type] || null
   const lines: QuoteLinePrefill[] = []
-  const estimate = moneyFromCents(row.estimate_low_cents)
 
-  lines.push({
-    offering_id: null,
-    name: jobLabel,
-    description: [row.timing, address].filter(Boolean).join(' · '),
-    quantity: '1',
-    unit_price: estimate,
-    is_optional: false,
-    is_pass_through: false,
-  })
+  const primaryDescription = [
+    row.timing,
+    address,
+    estimateRange ? `Planning range ${estimateRange}` : '',
+  ].filter(Boolean).join(' · ')
+
+  lines.push(catalogLine(
+    primaryOfferingId,
+    jobLabel,
+    primaryDescription,
+    midpoint,
+    catalog,
+  ))
+
   if (occupied) {
-    lines.push({
-      offering_id: null,
-      name: 'Occupied-property coordination',
-      description: 'Access, occupant notice, and on-site coordination from the scope answers.',
-      quantity: '1',
-      unit_price: '0.00',
-      is_optional: false,
-      is_pass_through: false,
-    })
+    lines.push(catalogLine(
+      'occupancy-notice',
+      'Occupied-property coordination',
+      'Access, occupant notice, and on-site coordination from the scope answers.',
+      null,
+      catalog,
+    ))
   }
+
   if (photos && !/^no\b/i.test(photos)) {
-    lines.push({
-      offering_id: null,
-      name: 'Photo package',
-      description: photos,
-      quantity: '1',
-      unit_price: '0.00',
-      is_optional: false,
-      is_pass_through: false,
-    })
+    const photoOfferingId = offeringIdForScopePhoto(photos)
+    lines.push(catalogLine(
+      photoOfferingId,
+      'Photo package',
+      photos,
+      null,
+      catalog,
+    ))
   }
+
   if (reports && !/^no\b/i.test(reports)) {
-    lines.push({
-      offering_id: null,
-      name: 'Written report',
-      description: reports,
-      quantity: '1',
-      unit_price: '0.00',
-      is_optional: false,
-      is_pass_through: false,
-    })
+    const reportOfferingId = offeringIdForScopeReport(reports)
+    lines.push(catalogLine(
+      reportOfferingId,
+      'Written report',
+      reports,
+      null,
+      catalog,
+    ))
   }
 
   return {
@@ -156,7 +193,13 @@ export function quotePrefillFromScope(row: ScopeIntakeRow): {
     recipient_email: row.email,
     recipient_phone: row.phone || '',
     property_address: address,
-    intro_message: formatScopeAnswersSummary(row),
+    intro_message: buildScopeIntroMessage({
+      contactName: row.contact_name,
+      jobLabel,
+      propertyAddress: address,
+      estimateRange,
+      summary: formatScopeAnswersSummary(row),
+    }),
     lines,
   }
 }

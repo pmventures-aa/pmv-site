@@ -1,11 +1,11 @@
 import { Hono } from 'hono'
-import type { AppEnv, Env, SessionUser } from '../types'
+import type { AppEnv, Env } from '../types'
 import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { sendEmailStrict } from '../email'
-import { logActivity } from '../activity'
 import { sendingFrom, threadReplyAddress, formattedReplyTo } from '../resendInbound'
 import { applySelectedSignature } from '../emailSignatures'
+import { recordOutboundEmailEngagement, mergeParty } from '../engagements'
 
 export const emailThreadRoutes = new Hono<AppEnv>()
 emailThreadRoutes.use('*', requireStaff)
@@ -65,6 +65,8 @@ emailThreadRoutes.get('/email-threads', async (c) => {
             et.conversation_id,
             (SELECT COUNT(*) FROM email_messages em WHERE em.email_thread_id = et.id) message_count,
             (SELECT full_name FROM users WHERE id = et.scope_client_user_id) client_name,
+            (SELECT email FROM users WHERE id = et.scope_client_user_id) client_email,
+            (SELECT COALESCE(from_name, from_email) FROM email_messages WHERE email_thread_id = et.id ORDER BY created_at DESC LIMIT 1) last_from,
             (SELECT direction FROM email_messages WHERE email_thread_id = et.id ORDER BY created_at DESC LIMIT 1) last_direction,
             (SELECT provider_status FROM email_messages WHERE email_thread_id = et.id ORDER BY created_at DESC LIMIT 1) last_status,
             CASE WHEN ${UNREAD_SQL} THEN 1 ELSE 0 END AS unread
@@ -76,7 +78,12 @@ emailThreadRoutes.get('/email-threads', async (c) => {
 
 emailThreadRoutes.get('/email-threads/:id', async (c) => {
   const user = c.get('user')
-  const thread = await c.env.DB.prepare(`SELECT * FROM email_threads WHERE id = ?`).bind(c.req.param('id')).first() as any
+  const thread = await c.env.DB.prepare(
+    `SELECT et.*, u.full_name AS client_name, u.email AS client_email
+     FROM email_threads et
+     LEFT JOIN users u ON u.id = et.scope_client_user_id
+     WHERE et.id = ?`,
+  ).bind(c.req.param('id')).first() as any
   if (!thread) return c.json({ error: 'not found' }, 404)
   await c.env.DB.prepare(
     `INSERT INTO email_thread_reads (user_id, email_thread_id, last_read_at)
@@ -118,7 +125,12 @@ emailThreadRoutes.post('/email-threads', async (c) => {
   const bodyHtml = signed.html
   const bodyText = clean(body.body_text, 60_000) || signed.text || undefined
 
-  const scopeClientId = clean(body.scope_client_user_id, 40) || null
+  const knownInquiryId = clean(body.inquiry_id, 40) || null
+  const party = await mergeParty(c.env, {
+    clientUserId: clean(body.scope_client_user_id, 40) || null,
+    inquiryId: knownInquiryId,
+  }, to.map((a) => a.email))
+  const scopeClientId = party.clientUserId
   let conversationId = clean(body.conversation_id, 40) || null
 
   // Create the parent conversation if none was passed. Every email thread
@@ -176,10 +188,15 @@ emailThreadRoutes.post('/email-threads', async (c) => {
   }
 
   try {
-    await logActivity(c.env, {
-      actorUserId: user.id, clientUserId: scopeClientId,
+    await recordOutboundEmailEngagement(c.env, {
+      actorUserId: user.id,
+      toEmail: to[0].email,
+      subject,
+      bodyHtml,
+      clientUserId: party.clientUserId,
+      inquiryId: party.inquiryId,
       kind: 'email.sent',
-      detail: { email_thread_id: threadId, subject, to: to.map((a) => a.email), conversation_id: conversationId },
+      detail: { email_thread_id: threadId, to: to.map((a) => a.email), conversation_id: conversationId },
     })
   } catch {}
 
@@ -264,6 +281,20 @@ emailThreadRoutes.post('/email-threads/:id/reply', async (c) => {
     ).bind(err instanceof Error ? err.message.slice(0, 1000) : 'send failed', messageId).run()
     return c.json({ error: 'send failed', message: err instanceof Error ? err.message : 'unknown' }, 502)
   }
+
+  try {
+    const party = await mergeParty(c.env, { clientUserId: thread.scope_client_user_id }, replyTo.map((a) => a.email))
+    await recordOutboundEmailEngagement(c.env, {
+      actorUserId: user.id,
+      toEmail: replyTo[0].email,
+      subject: replySubject,
+      bodyHtml,
+      clientUserId: party.clientUserId,
+      inquiryId: party.inquiryId,
+      kind: 'email.sent',
+      detail: { email_thread_id: thread.id, to: replyTo.map((a) => a.email), reply: true },
+    })
+  } catch {}
 
   return c.json({ ok: true, id: messageId }, 201)
 })

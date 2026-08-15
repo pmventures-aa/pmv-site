@@ -5,6 +5,7 @@ import { pmvMotion } from '../../lib/motionTheme'
 export interface KanbanColumn {
   key: string
   label: string
+  hint?: string
 }
 
 // Native HTML5 drag-and-drop board: no extra dependency. Columns are fixed
@@ -16,12 +17,14 @@ export function KanbanBoard<T extends { id: string }>({
   getStatus,
   onMove,
   renderCard,
+  sortItems,
 }: {
   columns: KanbanColumn[]
   items: T[]
   getStatus: (item: T) => string
   onMove: (item: T, toStatus: string) => void | Promise<void>
   renderCard: (item: T) => ReactNode
+  sortItems?: (a: T, b: T) => number
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
@@ -32,6 +35,7 @@ export function KanbanBoard<T extends { id: string }>({
     <motion.div layout className="flex gap-4 overflow-x-auto pb-2">
       {columns.map((col) => {
         const colItems = items.filter((i) => getStatus(i) === col.key)
+        if (sortItems) colItems.sort(sortItems)
         return (
           <motion.div
             layout="position"
@@ -50,18 +54,21 @@ export function KanbanBoard<T extends { id: string }>({
             }}
             animate={{scale: overCol === col.key ? 1.008 : 1}}
             transition={pmvMotion.ui}
-            className={`flex w-72 shrink-0 flex-col rounded-md border transition-colors ${
+            className={`flex min-w-[18rem] flex-1 shrink-0 flex-col rounded-xl border transition-colors ${
               overCol === col.key ? 'border-gold/50 bg-gold/[0.04]' : 'border-white/10 bg-white/[0.02]'
             }`}
           >
-            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">{col.label}</span>
-              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-slate-400">{colItems.length}</span>
+            <div className="border-b border-white/10 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-200">{col.label}</span>
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-slate-400">{colItems.length}</span>
+              </div>
+              {col.hint && <p className="mt-1 text-[11px] leading-4 text-slate-500">{col.hint}</p>}
             </div>
-            <div className="flex min-h-[100px] flex-1 flex-col gap-2 p-2.5">
+            <div className="flex min-h-[120px] flex-1 flex-col gap-2 p-2.5">
               <AnimatePresence initial={false} mode="popLayout">
               {colItems.length === 0 ? (
-                <motion.p key={`${col.key}-empty`} initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={pmvMotion.snap} className="px-1 py-4 text-center text-xs text-slate-600">No items</motion.p>
+                <motion.p key={`${col.key}-empty`} initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={pmvMotion.snap} className="px-1 py-6 text-center text-xs text-slate-600">Nothing here yet</motion.p>
               ) : (
                 colItems.map((item) => (
                   <motion.div

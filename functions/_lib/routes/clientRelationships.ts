@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
-import { canAccessClient } from '../scope'
 import { uuid } from '../crypto'
 import { toDisplayCase } from '../../../shared/displayCase'
 import { requireNamedPermission } from '../capabilities'
+import { loadStaffClientReference } from '../clientRef'
 
 export const clientRelationshipRoutes = new Hono<AppEnv>()
 
@@ -16,9 +16,9 @@ function text(value: unknown, max = 300): string {
 function email(value: unknown): string { return text(value, 254).toLowerCase() }
 
 async function requireClientAccess(c: any): Promise<string | Response> {
-  const clientId = c.req.param('id') || ''
-  if (!(await canAccessClient(c.env, c.get('user'), clientId))) return c.json({ error: 'forbidden' }, 403)
-  return clientId
+  const client = await loadStaffClientReference(c.env, c.get('user'), c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  return client.id
 }
 
 async function ensurePrimaryPerson(c: any, clientId: string): Promise<string> {
@@ -118,16 +118,30 @@ clientRelationshipRoutes.post('/clients/:id/relationships/businesses', requireSt
   const access = await requireClientAccess(c); if (access instanceof Response) return access
   const clientId = access, actor = c.get('user'), body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
   const legalName = toDisplayCase(body.legal_name)
-  const contactId = text(body.primary_contact_party_id, 100) || await ensurePrimaryPerson(c, clientId)
   if (!legalName) return c.json({ error: 'business legal name is required' }, 400)
+  const contactFirst = toDisplayCase(body.contact_first_name)
+  const contactLast = toDisplayCase(body.contact_last_name)
+  const contactName = [contactFirst, contactLast].filter(Boolean).join(' ')
+  let contactId = text(body.primary_contact_party_id, 100)
+  const statements: ReturnType<typeof c.env.DB.prepare>[] = []
+  if (!contactId && contactName) {
+    contactId = uuid()
+    statements.push(
+      c.env.DB.prepare('INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,?,?,?,?,?)').bind(contactId, 'person', contactName, email(body.contact_email)||null, text(body.contact_phone,60)||null, actor.id),
+      c.env.DB.prepare('INSERT INTO relationship_people(party_id,first_name,last_name,title) VALUES (?,?,?,?)').bind(contactId, contactFirst || null, contactLast || null, toDisplayCase(body.contact_title)||null),
+      c.env.DB.prepare('INSERT INTO party_relationships(id,from_party_id,to_party_id,relationship_type,label,created_by_user_id) VALUES (?,?,?,?,?,?)').bind(uuid(), await ensurePrimaryPerson(c, clientId), contactId, 'contact', 'Business contact', actor.id),
+    )
+  }
+  if (!contactId) contactId = await ensurePrimaryPerson(c, clientId)
   const contact = await c.env.DB.prepare("SELECT id FROM relationship_parties WHERE id=? AND party_type='person' AND status='active'").bind(contactId).first()
-  if (!contact) return c.json({ error: 'every business requires an active contact person' }, 400)
+  if (!contact) return c.json({ error: 'choose or enter an active contact person' }, 400)
   const id = uuid()
-  await c.env.DB.batch([
+  statements.push(
     c.env.DB.prepare('INSERT INTO relationship_parties(id,party_type,display_name,email,phone,created_by_user_id) VALUES (?,?,?,?,?,?)').bind(id, 'business', legalName, email(body.email)||null, text(body.phone,60)||null, actor.id),
     c.env.DB.prepare('INSERT INTO relationship_businesses(party_id,legal_name,dba_name,entity_type,ein,state,primary_contact_party_id) VALUES (?,?,?,?,?,?,?)').bind(id,legalName,toDisplayCase(body.dba_name)||null,toDisplayCase(body.entity_type)||null,text(body.ein,100)||null,toDisplayCase(body.state)||null,contactId),
     c.env.DB.prepare("INSERT INTO party_relationships(id,from_party_id,to_party_id,relationship_type,label,created_by_user_id) VALUES (?,?,?,'primary_contact','Primary Contact',?)").bind(uuid(),contactId,id,actor.id),
-  ])
+  )
+  await c.env.DB.batch(statements)
   if (body.make_profile_business === true) {
     await c.env.DB.prepare('UPDATE client_profiles SET business_party_id=?,business_name=?,entity_type=?,ein=?,state=? WHERE user_id=?').bind(id,legalName,toDisplayCase(body.entity_type)||null,text(body.ein,100)||null,toDisplayCase(body.state)||null,clientId).run()
   }

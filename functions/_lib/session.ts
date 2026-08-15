@@ -205,6 +205,11 @@ export async function revokeSession(env: Env, sessionId: string, actorUserId?: s
   return { userId: row.user_id, revoked: true }
 }
 
+export async function rotateSession(env: Env, request: Request, user: SessionUser): Promise<string> {
+  await destroySession(env, request)
+  return createSession(env, user, request)
+}
+
 export async function destroySession(env: Env, request: Request): Promise<void> {
   const token = cookieToken(request)
   if (!token) return

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
 import { Card, PageHeader } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
+import { useAuth } from '../../lib/auth'
+import { Avatar } from '../../components/kit/Avatar'
 import { toast } from '../../components/kit/toast'
 
 interface Profile {
@@ -12,6 +14,7 @@ interface Profile {
 }
 
 export default function BusinessProfile() {
+  const { user } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [form, setForm] = useState<Profile>({ business_name: '', entity_type: '', ein: '', state: '' })
   const [loading, setLoading] = useState(true)
@@ -45,7 +48,18 @@ export default function BusinessProfile() {
 
   return (
     <div>
-      <PageHeader eyebrow="Your business" title="Business Profile" subtitle="Kept on file for every service you enroll in: update anytime." />
+      <PageHeader eyebrow="Your business" title="Business Profile" subtitle="On file for every service you enroll in." />
+      {user && (
+        <Card className="mb-3 max-w-2xl">
+          <div className="flex items-center gap-3">
+            <Avatar userId={user.id} name={user.full_name} size={56} editable uploadPath="/me/avatar" />
+            <div>
+              <h2 className="text-sm font-semibold text-white">Profile photo</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Visible to you and to Pinnacle staff. PNG, JPEG, or WebP, up to 3MB.</p>
+            </div>
+          </div>
+        </Card>
+      )}
       <Card className="max-w-2xl">
         {loading ? (
           <p className="text-sm text-slate-400">Loading…</p>

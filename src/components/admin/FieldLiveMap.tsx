@@ -5,7 +5,7 @@ import { useAppPath } from '../../lib/basePath'
 
 export type FieldMapPin = {
   id: string
-  kind: 'site' | 'agent'
+  kind: 'site' | 'agent' | 'staff' | 'vendor' | 'me'
   label: string
   sublabel?: string
   status?: string
@@ -33,7 +33,17 @@ function wrapTile(n: number, zoom: number) {
   return ((n % max) + max) % max
 }
 
-export function FieldLiveMap({ pins, className = '' }: { pins: FieldMapPin[]; className?: string }) {
+export function FieldLiveMap({
+  pins,
+  className = '',
+  title = 'Live field map',
+  emptyLabel = 'No live coordinates yet. Create a field assignment with a site pin, or open an assignment on a provider phone so GPS can report in.',
+}: {
+  pins: FieldMapPin[]
+  className?: string
+  title?: string
+  emptyLabel?: string
+}) {
   const p = useAppPath()
   const boxRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 640, h: 360 })
@@ -80,15 +90,17 @@ export function FieldLiveMap({ pins, className = '' }: { pins: FieldMapPin[]; cl
   }
 
   const selectedPin = view.pins.find((pin) => pin.id === selected) || null
+  const people = view.pins.filter((pin) => pin.kind !== 'site')
+  const livePeople = people.filter((pin) => !pin.stale)
 
   return (
     <div className={`overflow-hidden rounded-lg border border-white/10 bg-[#0b1a2b] ${className}`}>
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold/80">Live field map</p>
-          <p className="mt-0.5 text-xs text-slate-400">{view.pins.length ? `${view.pins.filter((pin) => pin.kind === 'agent').length} agents · ${view.pins.filter((pin) => pin.kind === 'site').length} job sites` : 'Waiting for GPS from an assignment or agent ping'}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold/80">{title}</p>
+          <p className="mt-0.5 text-xs text-slate-400">{view.pins.length ? `${people.length} people · ${view.pins.filter((pin) => pin.kind === 'site').length} job sites · ${livePeople.length} live` : 'Waiting for a team member to share a location'}</p>
         </div>
-        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-300"><Radio size={11} /> Live</span>
+        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide ${livePeople.length ? 'text-emerald-300' : 'text-slate-400'}`}><Radio size={11} /> {livePeople.length ? `${livePeople.length} live` : 'Last known'}</span>
       </div>
       <div ref={boxRef} className="relative h-[360px] overflow-hidden bg-[#1b2838]">
         {tiles.map((tile) => (
@@ -112,25 +124,28 @@ export function FieldLiveMap({ pins, className = '' }: { pins: FieldMapPin[]; cl
               key={pin.id}
               type="button"
               onClick={() => setSelected(pin.id)}
-              className={`absolute z-10 -translate-x-1/2 -translate-y-full rounded-full border px-1.5 py-0.5 text-[10px] font-bold shadow-lg ${pin.kind === 'agent' ? 'border-emerald-300/50 bg-emerald-400 text-navy-950' : 'border-gold/50 bg-gold text-navy-950'} ${active ? 'ring-2 ring-white' : ''} ${pin.stale ? 'opacity-60' : ''}`}
+              className={`absolute z-10 -translate-x-1/2 -translate-y-full rounded-full border px-1.5 py-0.5 text-[10px] font-bold shadow-lg ${pin.kind === 'site' ? 'border-gold/50 bg-gold text-navy-950' : pin.kind === 'me' ? 'border-sky-200/70 bg-sky-300 text-navy-950' : 'border-emerald-300/50 bg-emerald-400 text-navy-950'} ${active ? 'ring-2 ring-white' : ''} ${pin.stale ? 'opacity-60' : ''}`}
               style={{ left, top }}
               title={pin.label}
             >
-              <span className="inline-flex items-center gap-1">{pin.kind === 'agent' ? <Navigation size={10} /> : <MapPin size={10} />}{pin.label.split(' ')[0]}</span>
+              <span className="inline-flex items-center gap-1">{pin.kind === 'site' ? <MapPin size={10} /> : <Navigation size={10} />}{pin.label.split(' ')[0]}</span>
             </button>
           )
         })}
         {!view.pins.length && (
           <div className="absolute inset-0 z-10 grid place-items-center bg-navy-950/35">
-            <p className="max-w-sm px-4 text-center text-xs leading-5 text-slate-300">No live coordinates yet. Create a field assignment with a site pin, or open an assignment on a vendor phone so GPS can report in.</p>
+            <p className="max-w-sm px-4 text-center text-xs leading-5 text-slate-300">{emptyLabel}</p>
           </div>
         )}
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="absolute bottom-1 right-1 z-20 rounded bg-navy-950/75 px-1.5 py-0.5 text-[9px] text-slate-300 hover:text-white">
+          © OpenStreetMap contributors
+        </a>
       </div>
       {selectedPin && (
         <div className="flex items-start justify-between gap-3 border-t border-white/10 px-3 py-2.5">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{selectedPin.label}</p>
-            <p className="mt-0.5 text-[11px] text-slate-500">{selectedPin.sublabel || selectedPin.status || (selectedPin.kind === 'agent' ? 'Agent location' : 'Job site')}</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">{selectedPin.sublabel || selectedPin.status || (selectedPin.kind === 'site' ? 'Job site' : 'Team location')}</p>
           </div>
           {selectedPin.href && <Link to={p(selectedPin.href)} className="shrink-0 text-xs font-bold text-gold hover:underline">Open</Link>}
         </div>

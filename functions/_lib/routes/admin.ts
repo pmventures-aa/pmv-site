@@ -10,7 +10,8 @@ import { hasCapability, requireCapability, type NamedPermission } from '../capab
 import { sendEmail, escapeHtml } from '../email'
 import { getService, getQuestions, prefillForQuestions, persistAnswers } from './serviceApplications'
 import { toDisplayCase } from '../../../shared/displayCase'
-import { calendarFeedUrls, signCalendarFeedToken } from '../calendarFeed'
+import { calendarFeedTokenForUser, calendarFeedUrls } from '../calendarFeed'
+import { loadStaffClientReference } from '../clientRef'
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -64,17 +65,19 @@ adminRoutes.get('/my-capabilities', requireStaff, async (c) => {
 adminRoutes.get('/calendar/feed', requireStaff, async (c) => {
   try {
     const user = c.get('user')
-    const secret = String(c.env.SESSION_SECRET || '').trim()
-    if (!secret) {
-      return c.json({ error: 'Calendar subscription is not configured yet - SESSION_SECRET is missing on the deployment.' }, 503)
-    }
-    const token = await signCalendarFeedToken(user.id, secret)
+    const token = await calendarFeedTokenForUser(c.env.DB, user.id)
     const origin = new URL(c.req.url).origin
     return c.json(calendarFeedUrls(origin, token))
   } catch (err) {
     console.error('[calendar-feed:admin] token generation failed', err)
     return c.json({ error: `Could not create a calendar link: ${err instanceof Error ? err.message : 'unknown'}` }, 500)
   }
+})
+
+adminRoutes.post('/calendar/feed/rotate', requireStaff, async (c) => {
+  const user = c.get('user')
+  const token = await calendarFeedTokenForUser(c.env.DB, user.id, true)
+  return c.json(calendarFeedUrls(new URL(c.req.url).origin, token))
 })
 
 // ---------------- staff + admin: cross-client views ----------------
@@ -84,7 +87,7 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
   const clientCount = await c.env.DB.prepare(`SELECT COUNT(*) n FROM client_profiles WHERE ${where}`).bind(...params).first<{ n: number }>()
 
   const { where: w2, params: p2 } = await scopeFilter(c.env, user)
-  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices, appts, activity, overdueTasks, overdueInvoices, staleTickets, staleInquiries] = await Promise.all([
+  const [openTickets, openMatters, pendingTasks, pendingCalls, openInvoices, appts, activity, overdueTasks, overdueInvoices, staleTickets, staleInquiries, staleQuotes, acceptedQuotes] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) n FROM support_tickets WHERE ${w2} AND status = 'open'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${w2} AND status != 'closed'`).bind(...p2).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${w2} AND status != 'done'`).bind(...p2).first<{ n: number }>(),
@@ -133,6 +136,19 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
        WHERE status = 'new' AND archived_at IS NULL AND created_at < datetime('now', '-2 days')
        ORDER BY created_at ASC LIMIT 5`,
     ).all(),
+    c.env.DB.prepare(
+      `SELECT id, quote_number, title, recipient_name, recipient_email, total_cents, sent_at, status
+       FROM service_quotes
+       WHERE status IN ('sent','viewed') AND COALESCE(sent_at, created_at) < datetime('now', '-3 days')
+       ORDER BY COALESCE(sent_at, created_at) ASC LIMIT 5`,
+    ).all(),
+    c.env.DB.prepare(
+      `SELECT q.id, q.quote_number, q.title, q.recipient_name, q.recipient_email, q.total_cents, q.decided_at
+       FROM service_quotes q
+       WHERE q.status = 'accepted'
+         AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void')
+       ORDER BY q.decided_at DESC LIMIT 5`,
+    ).all(),
   ])
 
   return c.json({
@@ -151,6 +167,8 @@ adminRoutes.get('/dashboard', requireStaff, async (c) => {
       overdue_invoices: overdueInvoices.results ?? [],
       stale_tickets: staleTickets.results ?? [],
       stale_inquiries: staleInquiries.results ?? [],
+      stale_quotes: staleQuotes.results ?? [],
+      accepted_quotes: acceptedQuotes.results ?? [],
     },
   })
 })
@@ -159,7 +177,7 @@ adminRoutes.get('/clients', requireStaff, async (c) => {
   const user = c.get('user')
   const { where, params } = await scopeFilter(c.env, user, 'u.id')
   const res = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.full_name, u.first_name, u.last_name, u.status, u.created_at,
+    `SELECT u.id, u.public_ref, u.email, u.full_name, u.first_name, u.last_name, u.status, u.created_at,
             cp.business_name, cp.onboarding_completed
      FROM users u LEFT JOIN client_profiles cp ON cp.user_id = u.id
      WHERE u.role = 'client' AND ${where}
@@ -170,16 +188,16 @@ adminRoutes.get('/clients', requireStaff, async (c) => {
 
 adminRoutes.get('/clients/:id', requireStaff, async (c) => {
   const user = c.get('user')
-  const id = c.req.param('id')!
-  const ok = await canAccessClient(c.env, user, id)
-  if (!ok) return c.json({ error: 'forbidden' }, 403)
+  const client = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  const id = client.id
 
   // Client profiles are intentionally sectional. HQ asks only for the active
   // subpage instead of pulling the entire relationship history on every open.
   const section = c.req.query('section')
   if (section && ['overview', 'activity', 'services', 'work', 'documents', 'billing', 'relationships', 'details'].includes(section)) {
     const [account, profile, assignedStaff] = await Promise.all([
-      c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
+      c.env.DB.prepare('SELECT id, public_ref, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
       c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
       c.env.DB.prepare('SELECT u.id, u.full_name, u.email FROM staff_assignments sa JOIN users u ON u.id = sa.staff_user_id WHERE sa.client_user_id = ?').bind(id).all(),
     ])
@@ -225,8 +243,18 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
     }
     if (section === 'documents') { const rows = await c.env.DB.prepare('SELECT * FROM client_documents WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 200').bind(id).all(); return c.json({ ...base, documents: rows.results ?? [] }) }
     if (section === 'billing') {
-      const [invoices, methods] = await Promise.all([c.env.DB.prepare('SELECT * FROM invoices WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 200').bind(id).all(), c.env.DB.prepare('SELECT id, service_key, method_type, account_holder_name, bank_name, account_type, account_last4, created_at FROM client_payment_methods WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all()])
-      return c.json({ ...base, invoices: invoices.results ?? [], payment_methods: methods.results ?? [] })
+      const [invoices, methods, quotes] = await Promise.all([
+        c.env.DB.prepare('SELECT * FROM invoices WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 200').bind(id).all(),
+        c.env.DB.prepare('SELECT id, service_key, method_type, account_holder_name, bank_name, account_type, account_last4, created_at FROM client_payment_methods WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all(),
+        c.env.DB.prepare(
+          `SELECT q.id, q.quote_number, q.title, q.status, q.total_cents, q.decided_at, q.decision_note,
+                  (SELECT i.id FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void' ORDER BY i.created_at DESC LIMIT 1) AS invoice_id
+           FROM service_quotes q
+           WHERE q.client_user_id = ? OR lower(q.recipient_email) = lower((SELECT email FROM users WHERE id = ?))
+           ORDER BY q.created_at DESC LIMIT 50`,
+        ).bind(id, id).all(),
+      ])
+      return c.json({ ...base, invoices: invoices.results ?? [], payment_methods: methods.results ?? [], quotes: quotes.results ?? [] })
     }
     const onboarding = await c.env.DB.prepare(`SELECT (SELECT COUNT(*) FROM onboarding_questions q JOIN client_services cs ON cs.service_key=q.service_key WHERE cs.client_user_id=? AND q.required=1) total, (SELECT COUNT(*) FROM client_onboarding_responses r WHERE r.client_user_id=? AND r.value IS NOT NULL AND r.value!='') answered`).bind(id, id).first<any>()
     return c.json({ ...base, onboarding_progress: { answered: onboarding?.answered ?? 0, total: onboarding?.total ?? 0 } })
@@ -234,7 +262,7 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
 
   const [profile, account, services, matters, tasks, docs, invoices, funding, properties, tax, tickets, calls, appts, answers, paymentMethods, notes, assignedStaff, recentActivity, catalog, applications] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(id).first(),
-    c.env.DB.prepare('SELECT id, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
+    c.env.DB.prepare('SELECT id, public_ref, email, full_name, first_name, last_name, phone, status, created_at, last_login_at FROM users WHERE id = ?').bind(id).first(),
     c.env.DB.prepare('SELECT cs.*, s.name FROM client_services cs JOIN services s ON s.key = cs.service_key WHERE client_user_id = ?').bind(id).all(),
     c.env.DB.prepare('SELECT * FROM matters WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all(),
     c.env.DB.prepare('SELECT * FROM client_tasks WHERE client_user_id = ? ORDER BY created_at DESC').bind(id).all(),
@@ -334,9 +362,9 @@ adminRoutes.get('/clients/:id', requireStaff, async (c) => {
 // submitted — this only gets it started for them.
 adminRoutes.post('/clients/:id/services', requireStaff, async (c) => {
   const user = c.get('user')
-  const clientId = c.req.param('id')!
-  const ok = await canAccessClient(c.env, user, clientId)
-  if (!ok) return c.json({ error: 'forbidden' }, 403)
+  const clientRef = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!clientRef) return c.json({ error: 'client not found' }, 404)
+  const clientId = clientRef.id
 
   const client = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.full_name, u.first_name, u.last_name, u.phone
@@ -393,9 +421,9 @@ adminRoutes.post('/clients/:id/services', requireStaff, async (c) => {
 // own requireClient-only endpoint for the same client_profiles columns.
 adminRoutes.patch('/clients/:id/profile', requireStaff, async (c) => {
   const user = c.get('user')
-  const id = c.req.param('id')!
-  const ok = await canAccessClient(c.env, user, id)
-  if (!ok) return c.json({ error: 'forbidden' }, 403)
+  const client = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  const id = client.id
 
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>)
   const profileFields: Record<string, string | null> = {}
@@ -469,9 +497,9 @@ adminRoutes.patch('/clients/:id/profile', requireStaff, async (c) => {
 // a running internal conversation, not a single owner's private scratchpad.
 adminRoutes.post('/clients/:id/notes', requireStaff, async (c) => {
   const user = c.get('user')
-  const clientId = c.req.param('id') ?? ''
-  const ok = await canAccessClient(c.env, user, clientId)
-  if (!ok) return c.json({ error: 'forbidden' }, 403)
+  const client = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  const clientId = client.id
 
   const body = await c.req.json<{ body?: string; matter_id?: string }>().catch(() => ({}) as { body?: string; matter_id?: string })
   const noteBody = (body.body || '').trim().slice(0, 4000)
@@ -513,15 +541,12 @@ adminRoutes.get('/matters/:matterId/notes', requireStaff, async (c) => {
 // blocked and every successful reveal is itself logged.
 adminRoutes.post('/clients/:id/payment-methods/:pmId/reveal', requireStaff, async (c) => {
   const user = c.get('user')
-  const clientId = c.req.param('id') ?? ''
+  const client = await loadStaffClientReference(c.env, user, c.req.param('id'))
+  if (!client) return c.json({ error: 'not found' }, 404)
+  const clientId = client.id
   const pmId = c.req.param('pmId')
 
   if (!(await hasCapability(c.env, user, 'can_reveal_payment_info'))) return c.json({ error: 'forbidden' }, 403)
-  if (user.role !== 'admin') {
-    const ok = await canAccessClient(c.env, user, clientId)
-    if (!ok) return c.json({ error: 'forbidden' }, 403)
-  }
-
   const row = await c.env.DB.prepare(
     'SELECT * FROM client_payment_methods WHERE id = ? AND client_user_id = ?',
   ).bind(pmId, clientId).first<any>()
@@ -803,15 +828,32 @@ adminRoutes.patch('/my-signature', requireStaff, async (c) => {
   const user = c.get('user')
   const body = await c.req.json<{ signature_html?: string }>().catch(() => ({}) as any)
   const html = typeof body.signature_html === 'string' ? body.signature_html.slice(0, 5000) : ''
-  await c.env.DB.prepare(
-    `INSERT INTO team_members (id, user_id, staff_role, signature_html) VALUES (?, ?, 'representative', ?)
-     ON CONFLICT(user_id) DO UPDATE SET signature_html = excluded.signature_html`,
-  ).bind(uuid(), user.id, html || null).run()
+  const personal = await c.env.DB.prepare(
+    `SELECT id FROM email_signatures WHERE owner_user_id = ? AND kind = 'personal' LIMIT 1`,
+  ).bind(user.id).first<{ id: string }>()
+  const stmts = [
+    c.env.DB.prepare(
+      `INSERT INTO team_members (id, user_id, staff_role, signature_html) VALUES (?, ?, 'representative', ?)
+       ON CONFLICT(user_id) DO UPDATE SET signature_html = excluded.signature_html`,
+    ).bind(uuid(), user.id, html || null),
+  ]
+  if (personal) {
+    stmts.push(
+      c.env.DB.prepare(
+        `UPDATE email_signatures SET html = ?, updated_at = datetime('now') WHERE id = ?`,
+      ).bind(html, personal.id),
+    )
+  }
+  await c.env.DB.batch(stmts)
   return c.json({ ok: true })
 })
 
 adminRoutes.get('/my-signature', requireStaff, async (c) => {
   const user = c.get('user')
+  const personal = await c.env.DB.prepare(
+    `SELECT html FROM email_signatures WHERE owner_user_id = ? AND kind = 'personal' LIMIT 1`,
+  ).bind(user.id).first<{ html: string | null }>()
+  if (personal?.html) return c.json({ signature_html: personal.html })
   const row = await c.env.DB.prepare('SELECT signature_html FROM team_members WHERE user_id = ?').bind(user.id).first<{ signature_html: string | null }>()
   return c.json({ signature_html: row?.signature_html ?? '' })
 })

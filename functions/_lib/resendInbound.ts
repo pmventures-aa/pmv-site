@@ -2,6 +2,7 @@ import type { Env } from './types'
 import { uuid } from './crypto'
 import { pushNotification } from './notificationFeed'
 import { logActivity } from './activity'
+import { mergeParty } from './engagements'
 
 export const DEFAULT_INBOUND_DOMAIN = 'ziloifaluk.resend.app'
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
@@ -266,9 +267,11 @@ async function notifyInbound(env: Env, threadId: string, from: { email: string; 
     })
   }
   try {
+    const party = await mergeParty(env, { clientUserId: thread.scope_client_user_id }, [from.email])
     await logActivity(env, {
       actorUserId: null,
-      clientUserId: thread.scope_client_user_id,
+      clientUserId: party.clientUserId,
+      inquiryId: party.inquiryId,
       kind: 'email.inbound',
       detail: { email_thread_id: thread.id, subject: thread.subject, from: from.email, from_name: from.name },
     })

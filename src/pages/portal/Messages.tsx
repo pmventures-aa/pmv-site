@@ -91,7 +91,7 @@ export default function Messages() {
       <PageHeader
         eyebrow="Secure messages"
         title="Messages"
-        subtitle="A private line to your Pinnacle team."
+        subtitle="Private line to your Pinnacle team."
         action={<NewThreadDialog onCreated={onCreated} />}
       />
       <Card className="grid h-[65vh] grid-cols-1 gap-0 overflow-hidden !p-0 md:grid-cols-[280px_1fr]">
@@ -108,7 +108,7 @@ export default function Messages() {
                 <li key={t.id}>
                   <button
                     onClick={() => setActiveId(t.id)}
-                    className={`block w-full px-4 py-3 text-left transition ${activeId === t.id ? 'bg-gold/10' : 'hover:bg-white/5'}`}
+                    className={`block w-full px-3 py-2.5 text-left transition ${activeId === t.id ? 'bg-gold/10' : 'hover:bg-white/5'}`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className={`truncate text-sm font-medium ${t.unread ? 'text-white' : 'text-slate-300'}`}>{t.subject}</p>

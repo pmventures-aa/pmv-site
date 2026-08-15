@@ -2,8 +2,10 @@ import type { Env } from './types'
 import { uuid } from './crypto'
 import { sendEmailStrict } from './email'
 import { CLIENT_NURTURE_STEPS, renderNurtureEmail } from './emailTemplates/relationship'
+import { portalUrl } from './appUrls'
+import { renderHqEmailOrFallback } from './hqEmailTemplates'
 
-export const CLIENT_PORTAL_BASE = 'https://client.pinnaclemanagementventures.com'
+export const CLIENT_PORTAL_BASE = portalUrl()
 
 export async function enrollClientNurture(env: Env, userId: string): Promise<void> {
   await env.DB.prepare(
@@ -69,7 +71,13 @@ export async function runDueClientNurture(env: Env, limit = 40): Promise<{ proce
       continue
     }
     try {
-      const email = renderNurtureEmail({ firstName: row.first_name || row.full_name, step, portalBase: CLIENT_PORTAL_BASE })
+      const fallback = renderNurtureEmail({ firstName: row.first_name || row.full_name, step, portalBase: CLIENT_PORTAL_BASE })
+      const ctaUrl = `${CLIENT_PORTAL_BASE.replace(/\/$/, '')}${step.ctaPath}`
+      const email = await renderHqEmailOrFallback(env, `nurture_${step.key}`, {
+        first_name: String(row.first_name || row.full_name || '').trim().split(/\s+/)[0] || 'there',
+        action_url: ctaUrl,
+        action_label: step.ctaLabel,
+      }, fallback)
       const providerId = await sendEmailStrict(env, {
         to: row.email,
         subject: email.subject,

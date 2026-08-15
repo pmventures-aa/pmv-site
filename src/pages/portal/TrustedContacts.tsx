@@ -124,13 +124,13 @@ export default function TrustedContacts() {
       <PageHeader
         eyebrow="Delegated account access"
         title="Trusted Contacts"
-        subtitle="Invite someone you trust and decide exactly which parts of your Pinnacle account they may view. Where delegated editing is supported, you can grant that separately."
+        subtitle="Invite someone and choose which sections they can view or edit."
         action={<button className="btn-gold" onClick={startInvite}>+ Invite trusted contact</button>}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:max-w-md">
-        <Card className="!p-4"><p className="text-xs uppercase tracking-wide text-slate-500">Active</p><p className="mt-1 text-2xl font-semibold text-white">{activeCount}</p></Card>
-        <Card className="!p-4"><p className="text-xs uppercase tracking-wide text-slate-500">Pending</p><p className="mt-1 text-2xl font-semibold text-white">{pendingCount}</p></Card>
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:max-w-md">
+        <Card className="!p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">Active</p><p className="mt-0.5 text-xl font-semibold text-white">{activeCount}</p></Card>
+        <Card className="!p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">Pending</p><p className="mt-0.5 text-xl font-semibold text-white">{pendingCount}</p></Card>
       </div>
 
       {showInvite && (
@@ -149,7 +149,7 @@ export default function TrustedContacts() {
             )}
             {editing && <label className="mt-5 block max-w-sm"><span className="mb-1 block text-xs text-slate-400">Relationship</span><input className={inputCls} value={form.relationship_label} onChange={(e) => setForm((f) => ({ ...f, relationship_label: e.target.value }))} /></label>}
 
-            <div className="mt-6 overflow-hidden rounded-xl border border-white/10">
+            <div className="mt-4 overflow-hidden rounded-md border border-white/10">
               <div className="grid grid-cols-[1fr_82px_82px] border-b border-white/10 bg-white/[0.025] px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><span>Portal section</span><span className="text-center">View</span><span className="text-center">Edit</span></div>
               {sections.map((s) => {
                 const mode = form.permissions[s.key] || 'none'
@@ -183,7 +183,7 @@ export default function TrustedContacts() {
                 </div>
                 {c.status !== 'revoked' && <div className="flex flex-wrap gap-2"><button className="btn-outline !px-3 !py-2 text-xs" onClick={() => startEdit(c)}>Edit access</button>{c.status === 'invited' && <button className="btn-outline !px-3 !py-2 text-xs" onClick={() => resend(c)}>Resend</button>}<button className="rounded-md border border-rose-400/20 px-3 py-2 text-xs font-medium text-rose-300 hover:bg-rose-400/10" onClick={() => revoke(c)}>Revoke</button></div>}
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">{sections.filter((s) => c.permissions[s.key] && c.permissions[s.key] !== 'none').map((s) => <span key={s.key} className="rounded-full border border-white/10 bg-white/[0.025] px-2.5 py-1 text-[11px] text-slate-300">{s.label}: <strong className="font-medium text-gold">{c.permissions[s.key]}</strong></span>)}</div>
+              <div className="mt-3 flex flex-wrap gap-1.5">{sections.filter((s) => c.permissions[s.key] && c.permissions[s.key] !== 'none').map((s) => <span key={s.key} className="rounded-sm border border-white/10 bg-white/[0.025] px-2 py-0.5 text-[11px] text-slate-300">{s.label}: <strong className="font-medium text-gold">{c.permissions[s.key]}</strong></span>)}</div>
             </Card>
           ))}
         </div>

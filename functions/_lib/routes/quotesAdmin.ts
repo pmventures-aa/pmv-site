@@ -1,10 +1,13 @@
 import { Hono } from 'hono'
-import type { AppEnv } from '../types'
+import type { AppEnv, Env } from '../types'
 import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { logActivity } from '../activity'
 import { escapeHtml, notifyStaff, sendEmailStrict } from '../email'
+import { renderHqEmailOrFallback } from '../hqEmailTemplates'
 import { PUBLIC_SITE_BASE } from '../scopeFunnel'
+import { applyCatalogToQuoteLines, type CatalogOffering } from '../../../shared/quoteCatalog'
+import { ensureServiceOfferingsSeeded } from './serviceOfferings'
 
 // Branded quote workspace: staff build quotes (optionally from reusable
 // templates), send a branded public link, and the recipient accepts or
@@ -29,6 +32,19 @@ export interface QuoteLineInput {
   discount_cents?: number
   is_optional?: boolean
   is_pass_through?: boolean
+}
+
+async function loadOfferingCatalog(env: Env): Promise<Map<string, CatalogOffering>> {
+  await ensureServiceOfferingsSeeded(env)
+  const rows = await env.DB.prepare(
+    'SELECT id, name, description, starting_price_cents, pricing_label FROM service_offerings WHERE active = 1',
+  ).all<CatalogOffering>()
+  return new Map((rows.results || []).map((row) => [row.id, row]))
+}
+
+async function resolveQuoteLines(env: Env, raw: QuoteLineInput[]) {
+  const catalog = await loadOfferingCatalog(env)
+  return normalizeQuoteLines(applyCatalogToQuoteLines(raw, catalog))
 }
 
 interface NormalizedLine {
@@ -105,7 +121,7 @@ quoteAdminRoutes.post('/quote-templates', requireStaff, async (c) => {
   const body = await c.req.json<any>().catch(() => null)
   const name = text(body?.name, 160)
   if (!name) return c.json({ error: 'template name is required' }, 400)
-  const { lines } = normalizeQuoteLines(Array.isArray(body?.line_items) ? body.line_items : [])
+  const { lines } = await resolveQuoteLines(c.env, Array.isArray(body?.line_items) ? body.line_items : [])
   if (!lines.length) return c.json({ error: 'add at least one line item' }, 400)
   const id = `tpl-${uuid().slice(0, 12)}`
   await c.env.DB.prepare(
@@ -132,7 +148,7 @@ quoteAdminRoutes.patch('/quote-templates/:id', requireStaff, async (c) => {
   if ('intro_message' in body) add('intro_message', text(body.intro_message, 4000) || null)
   if ('terms' in body) add('terms', text(body.terms, 4000) || null)
   if (Array.isArray(body.line_items)) {
-    const { lines } = normalizeQuoteLines(body.line_items)
+    const { lines } = await resolveQuoteLines(c.env, body.line_items)
     if (!lines.length) return c.json({ error: 'a template needs at least one line item' }, 400)
     add('line_items_json', JSON.stringify(lines))
   }
@@ -170,8 +186,11 @@ quoteAdminRoutes.get('/quotes', requireStaff, async (c) => {
   }
   const rows = await c.env.DB.prepare(
     `SELECT q.id, q.quote_number, q.public_token, q.status, q.title, q.recipient_name, q.recipient_email, q.recipient_company,
-            q.service_key, q.total_cents, q.valid_until, q.sent_at, q.viewed_at, q.decided_at, q.created_at,
-            (SELECT COUNT(*) FROM service_quote_line_items li WHERE li.quote_id = q.id) AS line_item_count
+            q.service_key, q.total_cents, q.valid_until, q.sent_at, q.viewed_at, q.decided_at, q.decision_note, q.client_user_id, q.created_at,
+            (SELECT COUNT(*) FROM service_quote_line_items li WHERE li.quote_id = q.id) AS line_item_count,
+            (SELECT i.id FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void' ORDER BY i.created_at DESC LIMIT 1) AS invoice_id,
+            (SELECT i.invoice_number FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void' ORDER BY i.created_at DESC LIMIT 1) AS invoice_number,
+            (SELECT i.status FROM invoices i WHERE i.quote_id = q.id AND i.status != 'void' ORDER BY i.created_at DESC LIMIT 1) AS invoice_status
      FROM service_quotes q
      WHERE ${clauses.join(' AND ')}
      ORDER BY CASE q.status WHEN 'draft' THEN 0 WHEN 'sent' THEN 1 WHEN 'viewed' THEN 1 ELSE 2 END, q.created_at DESC
@@ -183,11 +202,14 @@ quoteAdminRoutes.get('/quotes', requireStaff, async (c) => {
 quoteAdminRoutes.get('/quotes/:id', requireStaff, async (c) => {
   const quote = await c.env.DB.prepare('SELECT * FROM service_quotes WHERE id = ?').bind(c.req.param('id') || '').first<any>()
   if (!quote) return c.json({ error: 'quote not found' }, 404)
-  const [lines, events] = await Promise.all([
+  const [lines, events, invoice] = await Promise.all([
     c.env.DB.prepare('SELECT * FROM service_quote_line_items WHERE quote_id = ? ORDER BY sort_order, created_at').bind(quote.id).all(),
     c.env.DB.prepare('SELECT kind, actor, detail, created_at FROM service_quote_events WHERE quote_id = ? ORDER BY created_at DESC LIMIT 50').bind(quote.id).all(),
+    c.env.DB.prepare(
+      `SELECT id, invoice_number, status, amount_cents FROM invoices WHERE quote_id = ? AND status != 'void' ORDER BY created_at DESC LIMIT 1`,
+    ).bind(quote.id).first(),
   ])
-  return c.json({ quote, line_items: lines.results || [], events: events.results || [] })
+  return c.json({ quote, line_items: lines.results || [], events: events.results || [], invoice: invoice || null })
 })
 
 quoteAdminRoutes.post('/quotes', requireStaff, async (c) => {
@@ -210,7 +232,7 @@ quoteAdminRoutes.post('/quotes', requireStaff, async (c) => {
   const rawLines: QuoteLineInput[] = Array.isArray(body.line_items) && body.line_items.length
     ? body.line_items
     : template ? parseTemplateLines(template.line_items_json) : []
-  const { lines, subtotal, discount, total } = normalizeQuoteLines(rawLines)
+  const { lines, subtotal, discount, total } = await resolveQuoteLines(c.env, rawLines)
   if (!lines.length) return c.json({ error: 'add at least one line item' }, 400)
 
   const id = uuid()
@@ -219,6 +241,16 @@ quoteAdminRoutes.post('/quotes', requireStaff, async (c) => {
   const quoteNumber = text(body.quote_number, 60) || `PMV-Q-${now.getUTCFullYear()}-${now.getTime().toString().slice(-6)}`
   const validDays = Math.min(120, Math.max(1, Math.round(Number(body.valid_days) || Number(template?.valid_days) || 14)))
   const validUntil = text(body.valid_until, 40) || new Date(now.getTime() + validDays * 86_400_000).toISOString().slice(0, 10)
+
+  let clientUserId = text(body.client_user_id, 100) || null
+  if (clientUserId) {
+    const owned = await c.env.DB.prepare("SELECT id FROM users WHERE id = ? AND role = 'client'").bind(clientUserId).first<{ id: string }>()
+    if (!owned) clientUserId = null
+  }
+  if (!clientUserId) {
+    const match = await c.env.DB.prepare("SELECT id FROM users WHERE role = 'client' AND lower(email) = lower(?)").bind(recipientEmail).first<{ id: string }>()
+    clientUserId = match?.id || null
+  }
 
   const statements = [
     c.env.DB.prepare(
@@ -231,7 +263,7 @@ quoteAdminRoutes.post('/quotes', requireStaff, async (c) => {
     ).bind(
       id, token, quoteNumber,
       text(body.title, 200) || template?.name || 'Service quote',
-      text(body.client_user_id, 100) || null,
+      clientUserId,
       text(body.scope_request_id, 100) || null,
       template?.id || null,
       text(body.service_key, 100) || template?.service_key || null,
@@ -298,7 +330,7 @@ quoteAdminRoutes.patch('/quotes/:id', requireStaff, async (c) => {
 
   const statements: D1PreparedStatement[] = []
   if (Array.isArray(body.line_items)) {
-    const { lines, subtotal, discount, total } = normalizeQuoteLines(body.line_items)
+    const { lines, subtotal, discount, total } = await resolveQuoteLines(c.env, body.line_items)
     if (!lines.length) return c.json({ error: 'a quote needs at least one line item' }, 400)
     add('subtotal_cents', subtotal)
     add('discount_cents', discount)
@@ -336,7 +368,7 @@ quoteAdminRoutes.post('/quotes/:id/send', requireStaff, async (c) => {
   const validUntil = quote.valid_until
     ? new Date(`${String(quote.valid_until).slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null
-  const html = [
+  const htmlFallback = [
     `<p>Hi ${escapeHtml(quote.recipient_name)},</p>`,
     `<p>Pinnacle Management Ventures has prepared quote <strong>${escapeHtml(quote.quote_number)}</strong> - ${escapeHtml(quote.title)} - for <strong>${escapeHtml(amount)}</strong>.</p>`,
     quote.intro_message ? `<p>${escapeHtml(quote.intro_message)}</p>` : '',
@@ -344,6 +376,20 @@ quoteAdminRoutes.post('/quotes/:id/send', requireStaff, async (c) => {
     validUntil ? `<p>This quote is valid through ${escapeHtml(validUntil)}.</p>` : '',
     '<p>Reply to this email or call (561) 388-7879 with any questions.</p>',
   ].join('')
+  const rendered = await renderHqEmailOrFallback(c.env, 'quote_send', {
+    first_name: String(quote.recipient_name || 'there').trim().split(/\s+/)[0] || 'there',
+    quote_number: String(quote.quote_number || ''),
+    quote_title: String(quote.title || ''),
+    quote_amount: amount,
+    quote_intro: quote.intro_message ? String(quote.intro_message) : '',
+    valid_until: validUntil || '',
+    action_url: url,
+  }, {
+    subject: `Your Pinnacle quote ${quote.quote_number} - ${amount}`,
+    html: htmlFallback,
+    text: `Pinnacle quote ${quote.quote_number}: ${quote.title}, ${amount}. Review and accept at ${url}`,
+  })
+  const html = rendered.html
 
   // Without an email provider the quote still goes live on its public link so
   // staff can share it manually; the response tells the UI no email was sent.
@@ -352,9 +398,9 @@ quoteAdminRoutes.post('/quotes/:id/send', requireStaff, async (c) => {
     try {
       await sendEmailStrict(c.env, {
         to: quote.recipient_email,
-        subject: `Your Pinnacle quote ${quote.quote_number} - ${amount}`,
+        subject: rendered.subject,
         html,
-        text: `Pinnacle quote ${quote.quote_number}: ${quote.title}, ${amount}. Review and accept at ${url}`,
+        text: rendered.text,
         replyTo: 'orders@pinnaclemanagementventures.com',
         idempotencyKey: `quote/${quote.id}/${new Date().toISOString().slice(0, 16)}`,
         tags: [{ name: 'type', value: 'quote' }],
@@ -375,13 +421,20 @@ quoteAdminRoutes.patch('/quotes/:id/status', requireStaff, async (c) => {
   const actor = c.get('user')
   const quote = await c.env.DB.prepare('SELECT * FROM service_quotes WHERE id = ?').bind(c.req.param('id') || '').first<any>()
   if (!quote) return c.json({ error: 'quote not found' }, 404)
-  const body = await c.req.json<{ status?: string }>().catch(() => ({} as { status?: string }))
-  // Staff can void a live quote or record an offline decision.
+  const body = await c.req.json<{ status?: string; note?: string }>().catch(() => ({} as { status?: string; note?: string }))
+  // Staff can void a live quote or record an offline decision, with an optional note.
   const next = body.status && ['void', 'accepted', 'declined'].includes(body.status) ? body.status : null
   if (!next) return c.json({ error: 'status must be void, accepted, or declined' }, 400)
   if (['accepted', 'declined', 'void'].includes(quote.status)) return c.json({ error: `quote is already ${quote.status}` }, 409)
-  await c.env.DB.prepare("UPDATE service_quotes SET status = ?, decided_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").bind(next, quote.id).run()
-  await insertEvent(c, quote.id, next === 'void' ? 'voided' : next, `staff:${actor.id}`)
+  const note = next === 'void' ? null : (text(body.note, 1000) || null)
+  if (next === 'accepted' || next === 'declined') {
+    await c.env.DB.prepare("UPDATE service_quotes SET status = ?, decided_at = datetime('now'), decision_note = ?, updated_at = datetime('now') WHERE id = ?")
+      .bind(next, note, quote.id).run()
+  } else {
+    await c.env.DB.prepare("UPDATE service_quotes SET status = ?, decided_at = datetime('now'), updated_at = datetime('now') WHERE id = ?")
+      .bind(next, quote.id).run()
+  }
+  await insertEvent(c, quote.id, next === 'void' ? 'voided' : next, `staff:${actor.id}`, note || undefined)
   return c.json({ ok: true })
 })
 
@@ -405,6 +458,7 @@ function publicQuoteShape(quote: any, lines: any[]) {
     total_cents: quote.total_cents,
     sent_at: quote.sent_at,
     decided_at: quote.decided_at,
+    decision_note: quote.decision_note || null,
     created_at: quote.created_at,
     line_items: lines.map((line) => ({
       name: line.name,

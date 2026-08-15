@@ -5,6 +5,7 @@ import { uuid, hashPassword, verifyPassword, encryptSensitive } from '../crypto'
 import { MIN_PASSWORD } from './auth'
 import { activityInsert } from '../activity'
 import { notifyStaff, escapeHtml } from '../email'
+import { rejectCardPayload } from '../../../shared/cardBrandCompliance'
 
 // Self-service endpoints for the authenticated client: profile + dynamic onboarding.
 //
@@ -278,6 +279,8 @@ selfRoutes.post('/services/:key/apply', requireClient, async (c) => {
     }
   }
   const body = await c.req.json<ApplyBody>().catch(() => ({}) as ApplyBody)
+  const cardBlock = rejectCardPayload(body)
+  if (cardBlock) return c.json({ error: cardBlock }, 400)
 
   const questions = await c.env.DB.prepare(
     'SELECT * FROM onboarding_questions WHERE service_key = ? ORDER BY step_order, sort_order',
