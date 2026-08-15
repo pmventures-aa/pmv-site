@@ -76,6 +76,7 @@ import { geoRoutes } from '../_lib/routes/geo'
 import { loadWorkspaceContext } from '../_lib/workspaceContext'
 import { logAuth0StartupWarnings } from '../_lib/routes/auth0'
 import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
+import { portalCalendarRoutes, adminCalendarRoutes } from '../_lib/routes/calendarRoutes'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -131,6 +132,7 @@ app.route('/portal', serviceApplicationRoutes)
 app.route('/portal', trustedContactRoutes)
 app.route('/portal', selfRoutes)
 app.route('/portal', portalRoutes)
+app.route('/portal', portalCalendarRoutes)
 app.route('/portal', messageRoutes)
 app.route('/portal', presenceRoutes)
 
@@ -181,6 +183,7 @@ app.route('/admin', crmWriteRoutes)
 app.route('/admin', crmRoutes)
 app.route('/admin', fieldWorkRoutes)
 app.route('/admin', workAssignmentRoutes)
+app.route('/admin', adminCalendarRoutes)
 app.route('/admin', casesRoutes)
 app.route('/admin', communicationBrandingAdminRoutes)
 app.route('/admin', presenceRoutes)

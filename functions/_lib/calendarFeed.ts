@@ -1,6 +1,8 @@
 import type { Env, SessionUser } from './types'
 import { scopeFilter } from './scope'
+import { loadCalendarEvents } from './calendarQuery'
 import { buildIcs, type CalendarEvent } from '../../shared/ics'
+import { defaultEventDurationMinutes } from '../../shared/calendarWorkspace'
 
 function randomFeedToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
@@ -48,6 +50,36 @@ export async function loadFeedAppointments(env: Env, user: SessionUser): Promise
     startsAt: row.starts_at,
     description: `Pinnacle appointment (${row.status.replace(/_/g, ' ')})`,
   }))
+}
+
+// Unified ICS feed: legacy `appointments` PLUS the canonical
+// calendar_events store AND derived deadline entries, all scoped by role.
+export async function loadFeedEvents(env: Env, user: SessionUser): Promise<CalendarEvent[]> {
+  const legacy = await loadFeedAppointments(env, user)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const key = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const from = new Date(); from.setDate(from.getDate() - 60)
+  const to = new Date(); to.setDate(to.getDate() + 370)
+  const unified = await loadCalendarEvents(env, user, {
+    from: key(from),
+    to: key(to),
+    includeDerived: true,
+    includeStored: true,
+  })
+  const events = unified.map((ev): CalendarEvent => ({
+    id: ev.id,
+    title: ev.title,
+    startsAt: ev.startsAt,
+    durationMinutes: ev.endsAt
+      ? Math.max(15, Math.round((new Date(ev.endsAt.replace(' ', 'T')).getTime() - new Date(ev.startsAt.replace(' ', 'T')).getTime()) / 60000))
+      : defaultEventDurationMinutes(ev.eventType, ev.allDay),
+    description: [ev.description, ev.matterTitle ? `Matter: ${ev.matterTitle}` : null]
+      .filter(Boolean)
+      .join('\n') || undefined,
+    location: ev.address || ev.locationName || undefined,
+  }))
+  const seen = new Set(events.map((e) => e.id))
+  return [...events, ...legacy.filter((e) => !seen.has(e.id))]
 }
 
 export function icsResponse(events: CalendarEvent[], calendarName: string) {

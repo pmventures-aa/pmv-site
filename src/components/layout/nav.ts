@@ -51,6 +51,7 @@ export const adminNav: NavItem[] = [
   {key:'inquiries',label:'Leads',to:'inquiries',icon:UserPlus,section:'Revenue'},
   {key:'messages',label:'Messages',to:'messages',icon:MessageSquare,section:'Operations'},
   {key:'cases',label:'Cases & SLA',to:'cases',icon:HelpCircle,section:'Operations'},
+  {key:'calendar',label:'Calendar',to:'calendar',icon:Calendar,section:'Operations'},
   {key:'field-work',label:'Field Work & RON',to:'field-work',icon:MapPinned,section:'Operations'},
   {key:'service-assignments',label:'Service Assignments',to:'service-assignments',icon:Wrench,section:'Operations'},
   {key:'document-center',label:'Documents',to:'document-center',icon:FileText,section:'Operations'},

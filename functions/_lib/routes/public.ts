@@ -3,7 +3,7 @@ import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
 import { notifyStaff, escapeHtml } from '../email'
-import { icsResponse, loadFeedAppointments, userIdForCalendarFeedToken } from '../calendarFeed'
+import { icsResponse, loadFeedEvents, userIdForCalendarFeedToken } from '../calendarFeed'
 import type { SessionUser } from '../types'
 import { getAnotherBriefingQuote, getBriefingQuote } from '../briefingQuotes'
 
@@ -87,7 +87,7 @@ publicRoutes.get('/calendar-feed/:token', async (c) => {
     'SELECT id, email, role, full_name, status FROM users WHERE id = ?',
   ).bind(userId).first<SessionUser & { status: string }>()
   if (!user || user.status === 'suspended') return c.json({ error: 'invalid calendar link' }, 404)
-  const events = await loadFeedAppointments(c.env, user)
+  const events = await loadFeedEvents(c.env, user)
   return icsResponse(events, 'Pinnacle')
 })
 
