@@ -3,7 +3,7 @@ import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
 import { notifyStaff, escapeHtml } from '../email'
-import { icsResponse, loadFeedAppointments, verifyCalendarFeedToken } from '../calendarFeed'
+import { icsResponse, loadFeedAppointments, userIdForCalendarFeedToken } from '../calendarFeed'
 import type { SessionUser } from '../types'
 import { getAnotherBriefingQuote, getBriefingQuote } from '../briefingQuotes'
 
@@ -81,7 +81,7 @@ publicRoutes.post('/contact', async (c) => {
 
 publicRoutes.get('/calendar-feed/:token', async (c) => {
   const token = c.req.param('token') || ''
-  const userId = await verifyCalendarFeedToken(token, c.env.SESSION_SECRET)
+  const userId = await userIdForCalendarFeedToken(c.env.DB, token)
   if (!userId) return c.json({ error: 'invalid calendar link' }, 404)
   const user = await c.env.DB.prepare(
     'SELECT id, email, role, full_name, status FROM users WHERE id = ?',
