@@ -89,7 +89,10 @@ conversationRoutes.get('/conversations', async (c) => {
     clauses.push(`c.id IN (SELECT conversation_id FROM conversation_participants WHERE user_id=? AND removed_at IS NULL)`)
     params.push(user.id)
   }
-  if (kindFilter) { clauses.push('c.kind = ?'); params.push(kindFilter) }
+  // Staff DMs is internal chat only. Email threads belong to the dedicated
+  // Email workspace even though both features share conversation metadata.
+  if (kindFilter === 'staff') clauses.push("c.kind IN ('dm','group_dm')")
+  else if (kindFilter) { clauses.push('c.kind = ?'); params.push(kindFilter) }
   if (statusFilter && statusFilter !== 'all') { clauses.push('c.status = ?'); params.push(statusFilter) }
   if (scopeClient) { clauses.push('c.scope_client_user_id = ?'); params.push(scopeClient) }
   if (search) { clauses.push('c.subject LIKE ?'); params.push(`%${search}%`) }

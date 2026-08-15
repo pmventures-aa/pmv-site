@@ -27,13 +27,6 @@ type ModuleKey=(typeof MODULE_TABS)[number]['key']
 const PATCH_PATH:Record<'matters'|'tasks'|'funding',string>={matters:'/portal/matters',tasks:'/portal/tasks',funding:'/portal/funding'}
 
 interface JourneyCounts { leads:number; quotes:number; onboarding:number; delivery:number; funding:number }
-const JOURNEY_STAGES:{key:keyof JourneyCounts;label:string;module:ModuleKey;caption:string}[]=[
-  {key:'leads',label:'Leads & Prospects',module:'inquiries',caption:'in play'},
-  {key:'quotes',label:'Quotes',module:'quotes',caption:'awaiting decision'},
-  {key:'onboarding',label:'Onboarding',module:'service_applications',caption:'enrolling'},
-  {key:'delivery',label:'Delivery',module:'matters',caption:'projects + tasks open'},
-  {key:'funding',label:'Funding',module:'funding',caption:'applications live'},
-]
 
 function money(cents?:number|null){return typeof cents==='number'?`$${(cents/100).toLocaleString()}`:'Not provided'}
 
@@ -190,33 +183,37 @@ export default function PipelinesAdmin(){
     return out
   },[])
 
+  function moduleCount(key:ModuleKey){
+    if(!counts)return null
+    if(key==='inquiries')return counts.leads
+    if(key==='quotes')return counts.quotes
+    if(key==='service_applications')return counts.onboarding
+    if(key==='matters'||key==='tasks')return counts.delivery
+    return counts.funding
+  }
+
   function toggleDensity(){setCompact(value=>{const next=!value;window.localStorage.setItem('pmv_pipeline_compact',next?'1':'0');return next})}
 
   return <div className={compact?'[&_.pmv-kanban-card]:text-xs':''}>
     <PageIntro kicker="Revenue & Delivery" title="Pipeline" subtitle="Follow the relationship from first interest through delivery. Leads become prospects when you start a conversation, then convert when they are ready for a client account." action={<div className="flex flex-wrap items-center gap-2">{tab==='quotes'?<Link to={p('quotes')} className={btnOutline}>Open Quotes</Link>:null}<button type="button" onClick={toggleDensity} className="rounded-md border border-white/10 px-3 py-1.5 text-xs font-bold text-slate-300 hover:border-gold/30 hover:text-gold">{compact?'Comfortable':'Compact'}</button></div>}/>
 
-    <div className="mb-5 overflow-hidden rounded-xl border border-white/[.08] bg-white/[.018]">
-      <div className="grid grid-cols-2 divide-x divide-white/[.06] sm:grid-cols-5">
-        {JOURNEY_STAGES.map((stage,index)=>{
-          const active=activeTab&&(stage.module===tab||(stage.key==='delivery'&&(tab==='matters'||tab==='tasks')))
-          return <button key={stage.key} type="button" onClick={()=>{setTab(stage.module);setQuery('')}} className={`relative px-4 py-3.5 text-left transition ${active?'bg-gold/[.06]':'hover:bg-white/[.02]'}`}>
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">{index>0&&<span className="text-gold/40" aria-hidden="true">›</span>}{stage.label}</span>
-            <span className={`mt-1 block font-display text-2xl font-bold ${active?'text-gold':'text-white'}`}>{counts?counts[stage.key]:'–'}</span>
-            <span className="block text-[10px] text-slate-500">{stage.caption}</span>
-          </button>
-        })}
+    <div className="sticky top-0 z-20 mb-5 rounded-xl border border-white/[.08] bg-navy-950/95 shadow-xl shadow-navy-950/30 backdrop-blur">
+      <div className="border-b border-white/[.08] p-3 md:hidden">
+        <label className="block text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Pipeline workspace
+          <select className={`${inputCls} mt-1.5`} value={tab} onChange={event=>{setTab(event.target.value as ModuleKey);setQuery('')}}>
+            {MODULE_TABS.map(item=><option key={item.key} value={item.key}>{item.label}{moduleCount(item.key)!==null?` (${moduleCount(item.key)})`:''}</option>)}
+          </select>
+        </label>
+        <p className="mt-2 text-xs leading-5 text-slate-400">{activeTab?.hint}</p>
       </div>
-    </div>
-
-    <div className="mb-5 overflow-hidden rounded-xl border border-white/[.08] bg-white/[.018]">
-      <div className="flex gap-4 overflow-x-auto px-3 pt-2">
+      <div className="hidden gap-4 overflow-x-auto px-3 pt-2 md:flex">
         {groups.map(section=><div key={section.group} className="flex shrink-0 items-end gap-1">
           <span className="pb-2.5 pr-1 text-[9px] font-bold uppercase tracking-[.14em] text-slate-600">{section.group}</span>
-          {section.tabs.map(item=><button key={item.key} onClick={()=>{setTab(item.key);setQuery('')}} title={item.hint} className={`shrink-0 rounded-t-lg border-b-2 px-3.5 py-2.5 text-sm font-bold transition ${tab===item.key?'border-gold bg-gold/[.06] text-white':'border-transparent text-slate-500 hover:bg-white/[.025] hover:text-slate-200'}`}>{item.label}</button>)}
+          {section.tabs.map(item=><button key={item.key} onClick={()=>{setTab(item.key);setQuery('')}} title={item.hint} className={`shrink-0 rounded-t-lg border-b-2 px-3.5 py-2.5 text-sm font-bold transition ${tab===item.key?'border-gold bg-gold/[.06] text-white':'border-transparent text-slate-500 hover:bg-white/[.025] hover:text-slate-200'}`}>{item.label}{moduleCount(item.key)!==null&&<span className="ml-2 rounded-full bg-white/[.06] px-1.5 py-0.5 text-[10px] text-slate-400">{moduleCount(item.key)}</span>}</button>)}
         </div>)}
       </div>
       {tab!=='inquiries'&&<div className="grid gap-3 border-t border-white/[.08] p-3 md:grid-cols-[minmax(220px,1fr)_auto] md:items-center">
-        <input className={inputCls} placeholder={`Search ${activeTab?.label.toLowerCase()||'this pipeline'}`} value={query} onChange={e=>setQuery(e.target.value)} />
+        <input type="search" className={inputCls} placeholder={`Search ${activeTab?.label.toLowerCase()||'this pipeline'} by client, email, title, service, or owner`} value={query} onChange={e=>setQuery(e.target.value)} />
         {query&&<button type="button" onClick={()=>setQuery('')} className="px-2 py-2 text-xs font-bold text-slate-500 hover:text-white">Clear</button>}
       </div>}
     </div>

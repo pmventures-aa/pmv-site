@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { LayoutGrid, List, Plus, Search } from 'lucide-react'
+import { LayoutGrid, List, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { Panel, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
 import { LeadConversionDialog } from '../../components/admin/LeadConversionDialog'
@@ -95,6 +95,7 @@ export function LeadPipelineBoard({
   const [focus, setFocus] = useState<FocusKey>('all')
   const [view, setView] = useState<ViewKey>(() => (typeof window !== 'undefined' && window.localStorage.getItem('pmv_lead_pipeline_view') === 'list' ? 'list' : 'board'))
   const [showAdd, setShowAdd] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [draft, setDraft] = useState(emptyDraft)
   const [sendInvite, setSendInvite] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -301,14 +302,16 @@ export function LeadPipelineBoard({
           <button type="button" onClick={() => setViewMode('board')} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium ${view === 'board' ? 'border-gold/40 bg-gold/10 text-gold' : 'border-white/10 text-slate-400 hover:text-white'}`}><LayoutGrid size={12} /> Board</button>
           <button type="button" onClick={() => setViewMode('list')} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium ${view === 'list' ? 'border-gold/40 bg-gold/10 text-gold' : 'border-white/10 text-slate-400 hover:text-white'}`}><List size={12} /> List</button>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/10 text-slate-500"><Search size={14} /></span>
-          <input className={`${inputCls} min-w-[180px] flex-1`} placeholder="Search name, contact, email, company, source" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <select className={`${inputCls} !min-h-9 w-auto min-w-[140px]`} value={recordType} onChange={(e) => setRecordType(e.target.value)}><option value="">People and businesses</option><option value="person">People</option><option value="business">Businesses</option></select>
-          <select className={`${inputCls} !min-h-9 w-auto min-w-[140px]`} value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}><option value="">All owners</option>{ownerOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-          <select className={`${inputCls} !min-h-9 w-auto min-w-[140px]`} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}><option value="">All sources</option>{sourceOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-          <button type="button" onClick={() => setHideLost((value) => !value)} className={`rounded-md border px-3 py-2 text-xs font-bold ${hideLost ? 'border-white/10 text-slate-400' : 'border-gold/30 bg-gold/[.07] text-gold'}`}>{hideLost ? 'Show lost' : 'Lost visible'}</button>
-          {filtersOn && <button type="button" onClick={clearFilters} className="px-2 py-2 text-xs font-bold text-slate-500 hover:text-white">Clear</button>}
+        <div className="mt-3 grid grid-cols-[auto_1fr_auto] items-center gap-2">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-white/10 text-slate-500"><Search size={14} /></span>
+          <input type="search" className={`${inputCls} min-w-0`} placeholder="Search name, email, company, service, source, or owner" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button type="button" onClick={() => setShowFilters((value) => !value)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 text-xs font-bold ${showFilters||recordType||ownerFilter||sourceFilter||!hideLost?'border-gold/30 bg-gold/[.07] text-gold':'border-white/10 text-slate-400'}`}><SlidersHorizontal size={13}/><span className="hidden sm:inline">{showFilters?'Hide filters':'Filters'}</span></button>
+        </div>
+        <div className={`${showFilters ? 'grid' : 'hidden'} mt-2 gap-2 rounded-lg border border-white/[.07] bg-white/[.015] p-2 sm:grid sm:grid-cols-2 lg:grid-cols-4`}>
+          <select className={`${inputCls} !min-h-10 w-full`} value={recordType} onChange={(e) => setRecordType(e.target.value)}><option value="">People and businesses</option><option value="person">People</option><option value="business">Businesses</option></select>
+          <select className={`${inputCls} !min-h-10 w-full`} value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}><option value="">All owners</option>{ownerOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select>
+          <select className={`${inputCls} !min-h-10 w-full`} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}><option value="">All sources</option>{sourceOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select>
+          <div className="flex items-center gap-2"><button type="button" onClick={() => setHideLost((value) => !value)} className={`min-h-10 flex-1 rounded-md border px-3 py-2 text-xs font-bold ${hideLost ? 'border-white/10 text-slate-400' : 'border-gold/30 bg-gold/[.07] text-gold'}`}>{hideLost ? 'Show lost' : 'Lost visible'}</button>{filtersOn && <button type="button" onClick={clearFilters} className="min-h-10 px-2 py-2 text-xs font-bold text-slate-500 hover:text-white">Clear</button>}</div>
         </div>
       </Panel>
 

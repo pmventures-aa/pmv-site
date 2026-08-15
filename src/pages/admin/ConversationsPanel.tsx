@@ -46,7 +46,7 @@ export function ConversationsPanel() {
     try {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') params.set('status', statusFilter)
-      if (kindFilter !== 'all') params.set('kind', kindFilter)
+      params.set('kind', kindFilter === 'all' ? 'staff' : kindFilter)
       if (search.trim()) params.set('q', search.trim())
       const r = await api.get<{ conversations: Conversation[] }>(`/admin/conversations?${params}`)
       setConversations(r.conversations)
@@ -365,4 +365,3 @@ function ComposerDialog({ open, onClose, onCreated }: { open: boolean; onClose: 
 }
 
 function escapeHtml(s: string): string { return s.replace(/[&<>]/g, (c) => c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;') }
-
