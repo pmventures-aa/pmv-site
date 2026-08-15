@@ -272,7 +272,7 @@ export default function InvoicesAdmin() {
       kicker="Revenue"
       title="Invoices"
       subtitle="Write an invoice, send it to the client portal, and mark it paid. Pinnacle records the amount and methods; it does not charge cards or ACH here."
-      action={<button className={btnPrimary} onClick={openBuild}><Plus size={14} />New invoice</button>}
+      action={<button className={`${btnPrimary} min-h-11 w-full justify-center sm:w-auto`} onClick={openBuild}><Plus size={14} />New invoice</button>}
     />
     {error && <div className="mb-4 rounded-xl border border-red-400/20 bg-red-400/[.06] p-4 text-sm text-red-200">{error}</div>}
 
@@ -298,7 +298,28 @@ export default function InvoicesAdmin() {
 
     {rows === null ? <p className="text-sm text-slate-400">Loading invoices…</p>
       : visible.length === 0 ? <EmptyState label={rows.length === 0 ? 'No invoices yet. Create one for a client and it will show up here.' : 'Nothing matches this view.'} />
-      : <div className="overflow-hidden rounded-xl border border-white/10">
+      : <>
+        <div className="grid gap-3 md:hidden">
+          {visible.map((invoice) => {
+            const action = invoiceNextAction(invoice)
+            return <article key={invoice.id} className="rounded-xl border border-white/10 bg-white/[.02] p-4" onClick={() => openDetail(invoice.id)}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0"><b className="block truncate text-white">{invoice.invoice_number || invoice.id.slice(0, 8)}</b><p className="mt-1 truncate text-xs text-slate-400">{invoice.business_name || invoice.client_name || invoice.client_email}</p></div>
+                <Tag tone={invoiceStatusTone(invoice)}>{invoiceStatusLabel(invoice)}</Tag>
+              </div>
+              <p className="mt-3 text-sm text-slate-300">{invoice.title || 'Invoice'}</p>
+              <div className="mt-3 flex items-end justify-between gap-3">
+                <div><p className="font-display text-xl font-bold text-gold">{invoiceMoney(invoice.amount_cents, invoice.currency)}</p><p className="text-[11px] text-slate-500">{invoiceDueLabel(invoice)}</p></div>
+                <div onClick={(e) => e.stopPropagation()}>
+                  {action === 'send' && <button className={`${btnPrimary} min-h-11`} onClick={() => void sendInvoice(invoice)}>Send</button>}
+                  {action === 'paid' && <button className={`${btnOutline} min-h-11`} onClick={() => void markPaid(invoice)}>Mark paid</button>}
+                  {action === 'none' && <button className={`${btnOutline} min-h-11`} onClick={() => openDetail(invoice.id)}>Open</button>}
+                </div>
+              </div>
+            </article>
+          })}
+        </div>
+        <div className="hidden overflow-x-auto rounded-xl border border-white/10 md:block">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="bg-white/[0.025] text-[10px] uppercase tracking-wide text-slate-500">
               <tr><th className="px-4 py-3 font-medium">Invoice</th><th className="px-4 py-3 font-medium">Client</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Amount</th><th className="px-4 py-3 font-medium">Next</th></tr>
@@ -322,7 +343,8 @@ export default function InvoicesAdmin() {
               })}
             </tbody>
           </table>
-        </div>}
+        </div>
+      </>}
     <p className="mt-3 text-xs text-slate-600"><Link to={p('quotes')} className="text-gold hover:underline">Accepted quotes</Link> convert to an invoice from the quote record, or you can fill a new invoice from a matching quote.</p>
   </div>
 }
@@ -339,10 +361,10 @@ function LineItemsEditor({ lines, setLines, shipping, setShipping }: {
   return <div className="space-y-3">
     {lines.map((line, index) => <div key={index} className="rounded-xl border border-white/10 bg-white/[.02] p-3">
       <div className="grid gap-2 sm:grid-cols-[1fr_7rem_8rem_auto]">
-        <input className={inputCls} placeholder="What is this line for?" value={line.name} onChange={(e) => update(index, { name: e.target.value })} />
-        <input className={inputCls} inputMode="decimal" aria-label="Quantity" value={line.quantity} onChange={(e) => update(index, { quantity: e.target.value })} />
-        <input className={inputCls} inputMode="decimal" aria-label="Unit price" value={line.unit_price} onChange={(e) => update(index, { unit_price: e.target.value })} />
-        <button type="button" className="text-xs font-bold text-red-300 hover:text-red-200" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>Remove</button>
+        <label className="text-[11px] font-bold text-slate-500"><span className="mb-1 block sm:hidden">Service or item</span><input className={inputCls} placeholder="What is this line for?" value={line.name} onChange={(e) => update(index, { name: e.target.value })} /></label>
+        <label className="text-[11px] font-bold text-slate-500"><span className="mb-1 block sm:hidden">Quantity</span><input className={inputCls} inputMode="decimal" aria-label="Quantity" placeholder="Quantity" value={line.quantity} onChange={(e) => update(index, { quantity: e.target.value })} /></label>
+        <label className="text-[11px] font-bold text-slate-500"><span className="mb-1 block sm:hidden">Unit price</span><input className={inputCls} inputMode="decimal" aria-label="Unit price" placeholder="Unit price" value={line.unit_price} onChange={(e) => update(index, { unit_price: e.target.value })} /></label>
+        <button type="button" className="min-h-10 rounded-lg border border-red-400/15 text-xs font-bold text-red-300 hover:text-red-200 sm:border-0 sm:px-1" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>Remove</button>
       </div>
       {advanced && <>
         <textarea className={`${inputCls} mt-2 min-h-16`} placeholder="Description shown on the invoice" value={line.description} onChange={(e) => update(index, { description: e.target.value })} />
@@ -488,9 +510,9 @@ function InvoiceComposer({ clients, initialClientId, onClose, onSaved }: {
         <p className="mt-1 text-sm text-slate-400">Client, then pricing, then send. Address and tax details stay optional.</p>
       </div>
     </div>
-    <div className="mb-5 flex gap-2">
+    <div className="mb-5 grid grid-cols-3 gap-2">
       {steps.map((item) => (
-        <button key={item.n} type="button" onClick={() => { if (item.n < step) setStep(item.n) }} className={`rounded-full border px-3 py-1.5 text-xs font-bold ${step === item.n ? 'border-gold/50 bg-gold/10 text-gold' : item.n < step ? 'border-white/15 text-slate-300' : 'border-white/10 text-slate-600'}`}>
+        <button key={item.n} type="button" onClick={() => { if (item.n < step) setStep(item.n) }} className={`min-h-11 rounded-xl border px-2 py-2 text-[11px] font-bold sm:rounded-full sm:px-3 sm:text-xs ${step === item.n ? 'border-gold/50 bg-gold/10 text-gold' : item.n < step ? 'border-white/15 text-slate-300' : 'border-white/10 text-slate-600'}`}>
           {item.n}. {item.label}
         </button>
       ))}
@@ -510,25 +532,26 @@ function InvoiceComposer({ clients, initialClientId, onClose, onSaved }: {
             {matchingQuotes.map((quote) => <option key={quote.id} value={quote.id}>{quote.quote_number} · {quote.title} · {invoiceMoney(quote.total_cents)}</option>)}
           </select>
         </label>}
-        <input className={inputCls} placeholder="Invoice title" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <div>
-          <div className="mb-1 flex flex-wrap gap-1">
+        <label className="text-xs font-bold text-slate-400 sm:col-span-2">Invoice title<input className={`${inputCls} mt-1`} placeholder="Professional services invoice" value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+        <div className="sm:col-span-2">
+          <p className="mb-1 text-xs font-bold text-slate-400">Due date</p>
+          <div className="mb-2 grid grid-cols-4 gap-1.5">
             {DUE_SHORTCUTS.map(([days, label]) => (
-              <button key={label} type="button" onClick={() => setDueDate(invoicePlusDays(days))} className="rounded border border-white/10 px-2 py-0.5 text-[10px] text-slate-400 hover:border-gold/30 hover:text-gold">{label}</button>
+              <button key={label} type="button" onClick={() => setDueDate(invoicePlusDays(days))} className="min-h-10 rounded-lg border border-white/10 px-1 py-2 text-[11px] font-semibold text-slate-400 hover:border-gold/30 hover:text-gold">{label}</button>
             ))}
           </div>
           <DateSelect value={dueDate} onChange={setDueDate} ariaLabel="Due date" />
         </div>
       </div>
-      <div className="mt-5 flex justify-end"><button className={btnPrimary} onClick={goPricing}>Continue to pricing</button></div>
+      <div className="mt-5"><button className={`${btnPrimary} min-h-12 w-full justify-center sm:ml-auto sm:w-auto`} onClick={goPricing}>Continue to pricing</button></div>
     </Panel>}
 
     {step === 2 && <Panel>
       <p className="mb-4 text-sm text-slate-400">Name, quantity, and price. Open extras only if you need a note, discount, or tax.</p>
       <LineItemsEditor lines={lines} setLines={setLines} shipping={shipping} setShipping={setShipping} />
-      <div className="mt-5 flex justify-between gap-2">
-        <button className={btnOutline} onClick={() => setStep(1)}>Back</button>
-        <button className={btnPrimary} onClick={goReview}>Review invoice</button>
+      <div className="mt-5 grid grid-cols-[auto_1fr] gap-2 sm:flex sm:justify-between">
+        <button className={`${btnOutline} min-h-11`} onClick={() => setStep(1)}>Back</button>
+        <button className={`${btnPrimary} min-h-11 justify-center`} onClick={goReview}>Review invoice</button>
       </div>
     </Panel>}
 
@@ -559,9 +582,9 @@ function InvoiceComposer({ clients, initialClientId, onClose, onSaved }: {
       {showAddresses && <div className="mt-3"><ContactFields value={billTo} onChange={setBillTo} /></div>}
       <div className="mt-5 flex flex-wrap justify-between gap-2">
         <button className={btnOutline} onClick={() => setStep(2)}>Back</button>
-        <div className="flex gap-2">
-          <button className={btnOutline} disabled={busy} onClick={() => void save(false)}>{busy ? 'Saving…' : 'Save without sending'}</button>
-          <button className={btnPrimary} disabled={busy} onClick={() => void save(true)}>{busy ? 'Working…' : 'Create and send'}</button>
+        <div className="grid w-full gap-2 sm:flex sm:w-auto">
+          <button className={`${btnOutline} min-h-11 justify-center`} disabled={busy} onClick={() => void save(false)}>{busy ? 'Saving…' : 'Save without sending'}</button>
+          <button className={`${btnPrimary} min-h-12 justify-center`} disabled={busy} onClick={() => void save(true)}>{busy ? 'Working…' : 'Create and send'}</button>
         </div>
       </div>
     </Panel>}
@@ -670,7 +693,7 @@ function InvoiceDetail({ invoiceId, onBack, onChanged, onOpen }: { invoiceId: st
     )}
 
     <div className="grid gap-5 lg:grid-cols-[1.35fr_.65fr]">
-      <div className="overflow-hidden rounded-xl border border-white/10">
+      <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-left text-sm">
           <thead className="bg-white/[.03] text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Line</th><th>Qty</th><th>Unit</th><th className="pr-4 text-right">Amount</th></tr></thead>
           <tbody className="divide-y divide-white/[.07]">
