@@ -5,3 +5,16 @@
   Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=()
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.pinnaclemanagementventures.com https://hq.pinnaclemanagementventures.com https://tile.openstreetmap.org; connect-src 'self'; frame-src https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+# Fingerprinted bundles never change once deployed - cache them hard
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML and version metadata must always revalidate so a new deploy is picked up
+# on the very next request instead of being pinned by an intermediate cache.
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+/version.json
+  Cache-Control: no-cache, no-store, must-revalidate

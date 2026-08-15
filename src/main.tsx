@@ -39,6 +39,7 @@ import { installAudioUnlock } from './lib/sound'
 import { AppToaster } from './components/kit/Toaster'
 import { LoadingScreen } from './components/LoadingScreen'
 import { ScrollToTop } from './components/ScrollToTop'
+import { NewVersionBanner } from './components/kit/NewVersionBanner'
 
 const PortalApp = lazy(() => import('./pages/portal/PortalApp'))
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'))
@@ -127,6 +128,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <ScrollToTop />
             <App />
             <AppToaster />
+            <NewVersionBanner />
           </MotionConfig>
         </AuthProvider>
       </ThemeProvider>
