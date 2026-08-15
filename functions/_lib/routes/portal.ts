@@ -5,7 +5,7 @@ import { uuid } from '../crypto'
 import { resolveClientId, loadScopedRow, scopeFilter, ScopeError } from '../scope'
 import { activityInsert, logActivity } from '../activity'
 import { sendEmail, escapeHtml } from '../email'
-import { calendarFeedUrls, signCalendarFeedToken } from '../calendarFeed'
+import { calendarFeedTokenForUser, calendarFeedUrls } from '../calendarFeed'
 import {
   defaultMilestonesForType,
   inferMilestoneStatus,
@@ -459,18 +459,9 @@ portalRoutes.post('/messages', async (c) => {
 
 // ---------------- Calendar (appointments) ----------------
 portalRoutes.get('/calendar/feed', async (c) => {
-  // Wrapped so we surface a real diagnostic instead of the generic
-  // "internal error" from the global onError handler when SESSION_SECRET
-  // is missing or HMAC signing fails.
   try {
     const user = c.get('user')
-    const secret = String(c.env.SESSION_SECRET || '').trim()
-    if (!secret) {
-      return c.json({
-        error: 'Calendar subscription is not configured yet - the SESSION_SECRET environment variable is missing on the deployment.',
-      }, 503)
-    }
-    const token = await signCalendarFeedToken(user.id, secret)
+    const token = await calendarFeedTokenForUser(c.env.DB, user.id)
     const origin = new URL(c.req.url).origin
     return c.json(calendarFeedUrls(origin, token))
   } catch (err) {
@@ -478,6 +469,12 @@ portalRoutes.get('/calendar/feed', async (c) => {
     console.error('[calendar-feed] token generation failed', err)
     return c.json({ error: `Could not create a calendar link: ${message}` }, 500)
   }
+})
+
+portalRoutes.post('/calendar/feed/rotate', async (c) => {
+  const user = c.get('user')
+  const token = await calendarFeedTokenForUser(c.env.DB, user.id, true)
+  return c.json(calendarFeedUrls(new URL(c.req.url).origin, token))
 })
 
 portalRoutes.get('/calendar', async (c) => c.json({ appointments: await listScoped(c, 'appointments', 'ORDER BY starts_at ASC') }))

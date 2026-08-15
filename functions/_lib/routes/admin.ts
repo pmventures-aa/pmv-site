@@ -10,7 +10,7 @@ import { hasCapability, requireCapability, type NamedPermission } from '../capab
 import { sendEmail, escapeHtml } from '../email'
 import { getService, getQuestions, prefillForQuestions, persistAnswers } from './serviceApplications'
 import { toDisplayCase } from '../../../shared/displayCase'
-import { calendarFeedUrls, signCalendarFeedToken } from '../calendarFeed'
+import { calendarFeedTokenForUser, calendarFeedUrls } from '../calendarFeed'
 import { loadStaffClientReference } from '../clientRef'
 
 export const adminRoutes = new Hono<AppEnv>()
@@ -65,17 +65,19 @@ adminRoutes.get('/my-capabilities', requireStaff, async (c) => {
 adminRoutes.get('/calendar/feed', requireStaff, async (c) => {
   try {
     const user = c.get('user')
-    const secret = String(c.env.SESSION_SECRET || '').trim()
-    if (!secret) {
-      return c.json({ error: 'Calendar subscription is not configured yet - SESSION_SECRET is missing on the deployment.' }, 503)
-    }
-    const token = await signCalendarFeedToken(user.id, secret)
+    const token = await calendarFeedTokenForUser(c.env.DB, user.id)
     const origin = new URL(c.req.url).origin
     return c.json(calendarFeedUrls(origin, token))
   } catch (err) {
     console.error('[calendar-feed:admin] token generation failed', err)
     return c.json({ error: `Could not create a calendar link: ${err instanceof Error ? err.message : 'unknown'}` }, 500)
   }
+})
+
+adminRoutes.post('/calendar/feed/rotate', requireStaff, async (c) => {
+  const user = c.get('user')
+  const token = await calendarFeedTokenForUser(c.env.DB, user.id, true)
+  return c.json(calendarFeedUrls(new URL(c.req.url).origin, token))
 })
 
 // ---------------- staff + admin: cross-client views ----------------

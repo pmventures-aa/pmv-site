@@ -2,35 +2,31 @@ import type { Env, SessionUser } from './types'
 import { scopeFilter } from './scope'
 import { buildIcs, type CalendarEvent } from '../../shared/ics'
 
-const encoder = new TextEncoder()
-
-async function hmacHex(secret: string, message: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret) as unknown as BufferSource,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(message) as unknown as BufferSource)
-  return [...new Uint8Array(sig)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+function randomFeedToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32))
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-export async function signCalendarFeedToken(userId: string, secret: string): Promise<string> {
-  const sig = await hmacHex(secret, `calv1:${userId}`)
-  return `${userId}.${sig.slice(0, 32)}`
+export async function calendarFeedTokenForUser(db: D1Database, userId: string, rotate = false): Promise<string> {
+  if (!rotate) {
+    const current = await db.prepare('SELECT token FROM calendar_feed_tokens WHERE user_id = ?')
+      .bind(userId).first<{ token: string }>()
+    if (current?.token) return current.token
+  }
+  const token = randomFeedToken()
+  await db.prepare(
+    `INSERT INTO calendar_feed_tokens (user_id, token, rotated_at)
+     VALUES (?, ?, CASE WHEN ? THEN datetime('now') ELSE NULL END)
+     ON CONFLICT(user_id) DO UPDATE SET token = excluded.token, rotated_at = datetime('now')`,
+  ).bind(userId, token, rotate ? 1 : 0).run()
+  return token
 }
 
-export async function verifyCalendarFeedToken(token: string, secret: string): Promise<string | null> {
-  const dot = token.indexOf('.')
-  if (dot < 8) return null
-  const userId = token.slice(0, dot)
-  const given = token.slice(dot + 1)
-  const expected = (await hmacHex(secret, `calv1:${userId}`)).slice(0, 32)
-  if (given.length !== expected.length) return null
-  let mismatch = 0
-  for (let i = 0; i < expected.length; i += 1) mismatch |= given.charCodeAt(i) ^ expected.charCodeAt(i)
-  return mismatch === 0 ? userId : null
+export async function userIdForCalendarFeedToken(db: D1Database, token: string): Promise<string | null> {
+  if (!/^[a-f0-9]{64}$/.test(token)) return null
+  const row = await db.prepare('SELECT user_id FROM calendar_feed_tokens WHERE token = ?')
+    .bind(token).first<{ user_id: string }>()
+  return row?.user_id || null
 }
 
 export function calendarFeedUrls(origin: string, token: string) {
