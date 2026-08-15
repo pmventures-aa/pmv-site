@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Building2, FileText, HelpCircle, Users } from 'lucide-react'
+import { ArrowLeft, Building2, FileText, HelpCircle, Users, CheckCircle, Clock } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { Card, EmptyState, PageHeader, StatusBadge } from '../../components/ui'
@@ -135,7 +135,8 @@ export default function MatterDetail() {
         action={<StatusBadge tone={tone}>{banner.label}</StatusBadge>}
       />
 
-      <div className={`mb-4 rounded-md border px-3 py-2.5 ${banner.state === 'client' ? 'border-gold/30 bg-gold/[.06]' : banner.state === 'third_party' ? 'border-rose-400/25 bg-rose-400/[.05]' : banner.state === 'none' ? 'border-emerald-400/25 bg-emerald-400/[.05]' : 'border-white/10 bg-white/[.02]'}`}>
+      {/* Status & Action Banner */}
+      <div className={`mb-4 rounded-md border px-3 py-2.5 ${banner.state === 'client' ? 'border-gold/30 bg-gold/[.06]' : banner.state === 'third_party' ? 'border-rose-400/25 bg-rose-400/[.05]' : banner.state === 'none' ? 'border-emerald-400/25 bg-emerald-400/[.05]' : 'border-blue-400/25 bg-blue-400/[.05]'}`}>
         <p className="text-sm font-semibold text-white">{banner.label}</p>
         <p className="mt-1 text-sm leading-6 text-slate-300">{banner.body}</p>
         {banner.state === 'client' && nextLabel && (
@@ -160,48 +161,76 @@ export default function MatterDetail() {
         <div className="space-y-3">
           {matter.summary && (
             <Card>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">What this is</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overview</p>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">{matter.summary}</p>
             </Card>
           )}
 
-          <Card>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Milestones</p>
-            <ol className="mt-4 space-y-3">
-              {milestones.map((item) => (
-                <li key={item.id} className="grid grid-cols-[88px_1fr] items-start gap-3 text-sm">
-                  <StatusBadge tone={item.status === 'completed' ? 'green' : item.status === 'current' ? 'gold' : item.status === 'blocked' ? 'red' : 'slate'}>
-                    {milestoneStatusLabel(item.status)}
-                  </StatusBadge>
-                  <div>
-                    <p className="font-medium text-white">{item.name}</p>
-                    {item.target_at && <p className="mt-0.5 text-xs text-slate-500">Target {formatClientWhen(item.target_at)}</p>}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </Card>
+          {/* Timeline/Milestones */}
+          {milestones.length > 0 && (
+            <Card>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Timeline</p>
+              <ol className="space-y-3">
+                {milestones.map((item, idx) => {
+                  const isCompleted = item.status === 'completed'
+                  const isCurrent = item.status === 'current'
+                  const isBlocked = item.status === 'blocked'
+                  return (
+                    <li key={item.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        {isCompleted ? (
+                          <CheckCircle size={20} className="text-emerald-400 shrink-0" />
+                        ) : isCurrent ? (
+                          <Clock size={20} className="text-gold shrink-0" />
+                        ) : isBlocked ? (
+                          <div className="w-5 h-5 rounded-full border-2 border-red-400 shrink-0" />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border-2 border-slate-600 shrink-0" />
+                        )}
+                        {idx < milestones.length - 1 && (
+                          <div className={`w-0.5 h-8 mt-1 ${isCompleted ? 'bg-emerald-400' : 'bg-slate-700'}`} />
+                        )}
+                      </div>
+                      <div className="pt-0.5">
+                        <p className={`text-sm font-medium ${isCompleted ? 'text-emerald-300' : isCurrent ? 'text-gold' : 'text-slate-300'}`}>
+                          {item.name}
+                        </p>
+                        {item.target_at && (
+                          <p className="mt-0.5 text-xs text-slate-500">Target {formatClientWhen(item.target_at)}</p>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+            </Card>
+          )}
 
+          {/* Activity / Updates */}
           <Card>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Updates</p>
-            <form onSubmit={postUpdate} className="mt-3 space-y-2">
-              <textarea className={`${inputCls} min-h-[72px]`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Send an update on this work. You do not need a separate message thread." />
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Updates</p>
+            <form onSubmit={postUpdate} className="space-y-2 mb-4">
+              <textarea className={`${inputCls} min-h-[72px]`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Send an update on this work. You do not need a separate message…" />
               <button type="submit" disabled={busy || !note.trim()} className="btn-gold disabled:opacity-60">{busy ? 'Sending…' : 'Send an update'}</button>
             </form>
-            <ul className="mt-3 divide-y divide-white/10 border-t border-white/10">
-              {updates.length === 0 ? <li className="py-3 text-sm text-slate-500">No updates yet.</li> : updates.map((u) => (
-                <li key={u.id} className="py-2.5">
-                  <p className="text-sm leading-6 text-slate-200">{u.body}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">{u.author_name || 'Pinnacle'} · {new Date(u.created_at).toLocaleString()}</p>
-                </li>
-              ))}
+            <ul className="divide-y divide-white/10 border-t border-white/10">
+              {updates.length === 0 ? (
+                <li className="py-3 text-sm text-slate-500">No updates yet.</li>
+              ) : (
+                updates.map((u) => (
+                  <li key={u.id} className="py-2.5">
+                    <p className="text-sm leading-6 text-slate-200">{u.body}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">{u.author_name || 'Pinnacle'} · {new Date(u.created_at).toLocaleString()}</p>
+                  </li>
+                ))
+              )}
             </ul>
           </Card>
 
           {tasks.length > 0 && (
             <Card>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tasks</p>
-              <ul className="mt-3 divide-y divide-white/10">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Tasks</p>
+              <ul className="divide-y divide-white/10">
                 {tasks.map((t) => (
                   <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                     <span className="text-slate-200">{t.title}</span>
