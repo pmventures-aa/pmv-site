@@ -33,14 +33,17 @@ interface ClientOption {
   email: string
 }
 
-type MessageTab = 'inbox' | 'email' | 'staff' | 'pulse' | 'templates'
+type MessageTab = 'staff' | 'email' | 'templates' | 'pulse' | 'inbox'
 const TABS: { id: MessageTab; label: string }[] = [
-  { id: 'inbox', label: 'Client inbox' },
+  { id: 'staff', label: 'Direct messages' },
   { id: 'email', label: 'Email' },
-  { id: 'staff', label: 'Staff DMs' },
   { id: 'templates', label: 'Templates' },
   { id: 'pulse', label: 'Pulse' },
 ]
+
+// 'inbox' is kept in the type + component tree for bookmark backwards-compat
+// but is intentionally not in the tab list. The old Client Inbox has been
+// folded into Direct messages (compose the message and use "Link to client").
 
 function NewThreadDialog({ clients, initialClientId, onCreated }: { clients: ClientOption[]; initialClientId?: string | null; onCreated: (id: string) => void }) {
   const [open, setOpen] = useState(!!initialClientId)
@@ -178,7 +181,7 @@ export default function MessagesAdmin() {
   const p = useAppPath()
   const [searchParams, setSearchParams] = useSearchParams()
   const rawTab = searchParams.get('tab')
-  const tab: MessageTab = TABS.some((item) => item.id === rawTab) ? rawTab as MessageTab : 'inbox'
+  const tab: MessageTab = (rawTab === 'inbox' || TABS.some((item) => item.id === rawTab)) ? rawTab as MessageTab : 'staff'
   const initialClientId = searchParams.get('client')
   const { count: emailUnread } = useEmailUnreadCount()
 
@@ -189,7 +192,7 @@ export default function MessagesAdmin() {
   function setTab(next: MessageTab) {
     setSearchParams((current) => {
       const params = new URLSearchParams(current)
-      if (next === 'inbox') params.delete('tab')
+      if (next === 'staff') params.delete('tab')
       else params.set('tab', next)
       if (next !== 'email') params.delete('thread')
       if (next !== 'staff') params.delete('conv')
