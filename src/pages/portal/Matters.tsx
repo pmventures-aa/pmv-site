@@ -5,7 +5,7 @@ import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { Card, EmptyState, PageHeader, StatusBadge } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
-import { MATTER_TYPES, matterTypeLabel, responsibilityBanner, responsibilityRank } from '../../../shared/matterWorkspace'
+import { MATTER_TYPES, matterTypeLabel, responsibilityBanner, responsibilityRank, matterStatusTone } from '../../../shared/matterWorkspace'
 import { propertyDisplayName } from '../../../shared/propertyProfile'
 
 interface MatterRow {
@@ -86,11 +86,7 @@ export default function Matters() {
   }
 
   function tone(status: string, responsibility?: string | null) {
-    const banner = responsibilityBanner(responsibility, status)
-    if (banner.state === 'none') return 'green' as const
-    if (banner.state === 'client') return 'gold' as const
-    if (banner.state === 'third_party') return 'red' as const
-    return 'blue' as const
+    return matterStatusTone(responsibility, status)
   }
 
   function list(rows: MatterRow[]) {

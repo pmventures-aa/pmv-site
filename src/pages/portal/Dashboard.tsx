@@ -11,7 +11,7 @@ import { SlaClock } from '../../components/kit/SlaClock'
 import { GetStartedPrompt } from '../../components/portal/GetStartedPrompt'
 import { pmvFadeUp, pmvStagger } from '../../lib/motionTheme'
 import { clientWorkspace } from '../../lib/workspace'
-import { nextActionHref, responsibilityBanner } from '../../../shared/matterWorkspace'
+import { nextActionHref, responsibilityBanner, matterPresentation } from '../../../shared/matterWorkspace'
 import { AddToCalendarButton } from '../../components/kit/AddToCalendar'
 import { DashboardWelcome } from '../../components/DashboardWelcome'
 
@@ -77,8 +77,8 @@ export default function Dashboard() {
   const cases = data?.active_cases ?? []
   const matters = data?.active_matters ?? []
   const needsYou = cases.filter((item) => waitingOnYou(item.waiting_on))
-  const waitingOnClient = matters.filter((item) => responsibilityBanner(item.responsibility_state, item.status).state === 'client')
-  const pinnacleWorking = matters.filter((item) => responsibilityBanner(item.responsibility_state, item.status).state === 'pinnacle')
+  const waitingOnClient = matters.filter((item) => matterPresentation(item.responsibility_state, item.status).state === 'client')
+  const pinnacleWorking = matters.filter((item) => matterPresentation(item.responsibility_state, item.status).state === 'pinnacle')
   const nextAppointment = data?.upcoming_appointments?.[0]
   const clientActions = (stats?.pending_documents ?? 0) + (stats?.open_invoices ?? 0) + (stats?.open_tasks ?? 0) + (stats?.pending_quotes ?? 0) + needsYou.length + waitingOnClient.length
 
@@ -213,18 +213,18 @@ export default function Dashboard() {
             ) : (
               <ul className="divide-y divide-white/[.08] border-y border-white/[.08]">
                 {[...waitingOnClient, ...pinnacleWorking, ...matters.filter((item) => !waitingOnClient.includes(item) && !pinnacleWorking.includes(item))].slice(0, 4).map((item) => {
-                  const banner = responsibilityBanner(item.responsibility_state, item.status, item.blocked_reason_client_safe)
+                  const pres = matterPresentation(item.responsibility_state, item.status, item.blocked_reason_client_safe)
                   return (
                     <li key={item.id}>
-                      <Link to={p(`matters/${item.id}`)} className="grid gap-2 py-4 sm:grid-cols-[1fr_150px] sm:items-center">
+                      <Link to={p(`matters/${item.id}`)} className="grid gap-2 py-3 sm:grid-cols-1 sm:items-start">
                         <span>
                           <strong className="block text-sm font-semibold text-white">{item.title}</strong>
-                          <span className="mt-0.5 block text-xs text-slate-500">
-                            {banner.label}{item.owner_name ? ` · ${item.owner_name}` : ''}{item.next_action_label ? ` · ${item.next_action_label}` : ''}
+                          <span className="mt-1 block text-xs text-slate-500">
+                            {pres.banner.label}{item.owner_name ? ` · ${item.owner_name}` : ''}{item.next_action_label ? ` · ${item.next_action_label}` : ''}
                           </span>
                         </span>
-                        <span className={`text-xs ${banner.state === 'client' ? 'font-semibold text-gold' : 'text-slate-400'}`}>
-                          {banner.state === 'client' ? 'Action needed' : banner.label}
+                        <span className={`text-xs ${pres.banner.state === 'client' ? 'font-semibold text-gold' : 'text-slate-400'}`}>
+                          {pres.banner.state === 'client' ? 'Action needed' : pres.banner.label}
                         </span>
                       </Link>
                     </li>

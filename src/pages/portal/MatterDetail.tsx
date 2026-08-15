@@ -14,6 +14,7 @@ import {
   nextActionButtonLabel,
   nextActionHref,
   responsibilityBanner,
+  matterPresentation,
 } from '../../../shared/matterWorkspace'
 import { propertyDisplayName } from '../../../shared/propertyProfile'
 
@@ -103,20 +104,28 @@ export default function MatterDetail() {
     } finally { setBusy(false) }
   }
 
-  const banner = useMemo(
-    () => matter ? responsibilityBanner(matter.responsibility_state, matter.status, matter.blocked_reason_client_safe) : null,
+  const presentation = useMemo(
+    () => matter ? matterPresentation(
+      matter.responsibility_state,
+      matter.status,
+      matter.blocked_reason_client_safe,
+      matter.next_action_type,
+      matter.next_action_label,
+      matter.id,
+    ) : null,
     [matter],
   )
   const openTask = tasks.find((task) => task.status !== 'done')
-  const nextLabel = matter?.next_action_label || openTask?.title || null
   const nextDue = formatClientWhen(matter?.next_action_due_at || openTask?.due_date || matter?.target_date || matter?.due_date)
   const lastUpdate = formatClientWhen(matter?.last_client_update_at || updates[0]?.created_at)
 
   if (loading) return <Card><p className="text-sm text-slate-400">Loading this work…</p></Card>
-  if (!matter || !banner) return <Card><EmptyState label="This work could not be found." /></Card>
+  if (!matter || !presentation) return <Card><EmptyState label="This work could not be found." /></Card>
 
-  const tone = banner.state === 'none' ? 'green' : banner.state === 'client' ? 'gold' : banner.state === 'third_party' ? 'red' : 'blue'
-  const actionTo = p(nextActionHref(matter.next_action_type || (openTask ? 'task' : 'other'), matter.id))
+  const banner = presentation.banner
+  const tone = presentation.tone
+  const actionTo = p(presentation.nextAction.href)
+  const nextLabel = matter.next_action_label || presentation.nextAction.label
 
   return (
     <div>
@@ -142,7 +151,7 @@ export default function MatterDetail() {
         {banner.state === 'client' && nextLabel && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <p className="text-sm text-slate-200">{nextLabel}{nextDue ? ` · due ${nextDue}` : ''}</p>
-            <Link to={actionTo} className="btn-gold">{nextActionButtonLabel(matter.next_action_type)}</Link>
+            <Link to={actionTo} className="btn-gold">{presentation.nextAction.label}</Link>
           </div>
         )}
         {banner.state === 'third_party' && (

@@ -180,3 +180,40 @@ export function formatClientWhen(value: string | null | undefined): string | nul
   if (Number.isNaN(date.getTime())) return null
   return date.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: value.length > 10 ? 'numeric' : undefined, minute: value.length > 10 ? '2-digit' : undefined })
 }
+
+export function matterStatusTone(state: string | null | undefined, status: string | null | undefined): 'green' | 'gold' | 'red' | 'blue' {
+  if (state === 'none' || status === 'closed') return 'green'
+  if (state === 'client') return 'gold'
+  if (state === 'third_party') return 'red'
+  return 'blue'
+}
+
+export function matterPresentation(
+  responsibilityState: string | null | undefined,
+  status: string | null | undefined,
+  blockedReason?: string | null,
+  nextActionType?: string | null,
+  nextActionLabel?: string | null,
+  matterId?: string | null,
+) {
+  const resolved = resolveResponsibility(responsibilityState, status)
+  const banner = responsibilityBanner(responsibilityState, status, blockedReason)
+  const tone = matterStatusTone(resolved, status)
+  const nextHref = nextActionType ? nextActionHref(nextActionType, matterId || '') : ''
+  const nextLabel = nextActionLabel || (resolved === 'client' ? nextActionButtonLabel(nextActionType || 'other') : '')
+
+  return {
+    state: resolved,
+    banner: {
+      state: banner.state,
+      label: banner.label,
+      body: banner.body,
+    },
+    tone,
+    nextAction: {
+      type: nextActionType,
+      label: nextLabel,
+      href: nextHref,
+    },
+  }
+}

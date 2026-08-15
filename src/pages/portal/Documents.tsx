@@ -45,7 +45,6 @@ function reviewStatusDisplay(status: string): StatusDisplay {
     case 'pending_review':
       return { tone: 'gold', label: 'Pending Review' }
     default:
-      // For unknown statuses, use neutral tone with capitalized label
       return { tone: 'slate', label: status.replace(/_/g, ' ').charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ') }
   }
 }
@@ -72,10 +71,15 @@ export default function Documents() {
 
   useEffect(() => { load() }, [load])
 
-  // Organize documents without duplication
-  // Action required: requested documents not yet approved
-  const actionRequired = useMemo(() => 
-    docs.filter(d => d.source === 'requested' && d.review_status !== 'approved'),
+  // Organize documents without duplication.
+  // Action needed means the client currently owes Pinnacle a document or a
+  // replacement/correction:
+  //   - review_status === 'rejected'          → update/replacement requested
+  //   - review_status !== 'approved' && no r2_key → requested, not yet provided
+  // A document the client has already uploaded (r2_key set) is under Pinnacle
+  // review and is NOT a client action, even while review_status is 'pending'.
+  const actionRequired = useMemo(() =>
+    docs.filter(d => d.review_status === 'rejected' || (d.review_status !== 'approved' && !d.r2_key)),
     [docs]
   )
 
@@ -111,9 +115,7 @@ export default function Documents() {
               Added {new Date(doc.created_at).toLocaleDateString()}
             </p>
           </div>
-          <StatusBadge tone={statusDisplay.tone} className="shrink-0">
-            {statusDisplay.label}
-          </StatusBadge>
+          <StatusBadge tone={statusDisplay.tone}>{statusDisplay.label}</StatusBadge>
         </div>
 
         {/* Download action */}
