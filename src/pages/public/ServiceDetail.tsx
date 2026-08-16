@@ -1,10 +1,15 @@
+import { useEffect } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { OfferingLibrary } from '../../components/public/OfferingLibrary'
 import { btnOutline, btnPrimary, panelCls, ServiceList, TagLine } from '../../components/public/ui'
+import { Breadcrumbs, BreadcrumbSlot } from '../../components/public/Breadcrumbs'
+import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { getServiceBySlug, services } from '../../data/services'
 import { usePageMeta } from '../../lib/usePageMeta'
+import { usePublicVisitor } from '../../lib/publicContext'
+import { worldFromPublicParams } from '../../lib/workspace'
 import { PriceAnchor } from '../../components/public/PriceAnchor'
 import { CaseStudyStrip } from '../../components/public/Proof'
 
@@ -31,7 +36,11 @@ function PlanCrossSell({ family }: { family: 'property'|'ops'|'legal' }) {
 export default function ServiceDetail() {
   const { slug } = useParams<{ slug: string }>()
   const service = getServiceBySlug(slug)
+  const visitor = usePublicVisitor()
   usePageMeta(service?.title ?? 'Services', service?.shortDescription)
+
+  const world = service?.intakeJob ? worldFromPublicParams({ job: service.intakeJob }) : 'general'
+  useEffect(() => { if (service && world !== 'general') visitor.setWorld(world) }, [service?.slug])
 
   if (!service) return <Navigate to="/services" replace />
 
@@ -41,15 +50,20 @@ export default function ServiceDetail() {
   return (
     <div className="min-h-screen bg-navy-950">
       <Header />
-      <div className="border-b border-white/[.06] bg-navy-900/40"><div className="container-pmv flex flex-wrap items-center justify-between gap-3 py-3 text-xs"><Link to="/services" className="inline-flex items-center gap-1.5 font-semibold text-slate-400 transition hover:text-gold"><span aria-hidden="true">←</span> All services</Link><Link to={requestUrl} className="font-semibold text-gold hover:text-gold-300">Start a request for this service →</Link></div></div>
+      <BreadcrumbSlot>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Breadcrumbs items={[{ label: 'Services', to: '/services' }, { label: service.title }]} />
+          <ViewTransitionLink to={requestUrl} className="font-semibold text-gold hover:text-gold-300">Start a request for this service →</ViewTransitionLink>
+        </div>
+      </BreadcrumbSlot>
       <section className="container-pmv py-12 sm:py-16">
         <div><TagLine tag={service.tag} popular={service.popular} /></div>
-        <h1 className="mt-3 max-w-4xl font-display text-4xl font-bold leading-[1.05] tracking-[-.03em] text-white sm:text-5xl lg:text-6xl">{service.title}</h1>
+        <h1 className="pmv-h1 mt-3 max-w-4xl">{service.title}</h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-300">{service.heroDescription}</p>
         <PriceAnchor serviceKey={service.key} offeringPrefixes={service.offeringPrefixes} />
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link to={requestUrl} className={btnPrimary}>Request this service</Link>
-          <Link to={`/instant-quote?service=${encodeURIComponent(service.key)}`} className={btnOutline}>Get an instant estimate</Link>
+          <ViewTransitionLink to={requestUrl} className={btnPrimary}>Request this service</ViewTransitionLink>
+          <ViewTransitionLink to={`/instant-quote?service=${encodeURIComponent(service.key)}`} className={btnOutline}>Get an instant estimate</ViewTransitionLink>
           <a href="tel:+15613887879" className={btnOutline}>Call (561) 388-7879</a>
         </div>
         <p className="mt-4 flex max-w-2xl items-center gap-2 text-xs leading-5 text-slate-400"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"/>No account required to start. A real person replies within two business hours.</p>

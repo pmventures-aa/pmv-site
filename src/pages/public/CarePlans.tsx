@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
@@ -43,7 +44,7 @@ export default function CarePlans(){
       <AnimatePresence mode="wait">
         <motion.div key={family} initial={reduceMotion?false:{opacity:0,y:12}} animate={{opacity:1,y:0}} exit={reduceMotion?undefined:{opacity:0,y:-8}} transition={panelTransition} className="max-w-4xl">
           <p className="eyebrow">{familyDef.eyebrow}</p>
-          <h1 className="mt-4 font-display text-4xl font-extrabold leading-[1.04] tracking-[-.03em] text-white sm:text-6xl">{familyDef.headline}</h1>
+          <h1 className="pmv-h1 mt-4">{familyDef.headline}</h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">{familyDef.intro}</p>
           <p className="mt-4 max-w-3xl text-sm font-semibold leading-6 text-gold/90">{familyDef.promise}</p>
           <div className="mt-8 flex flex-wrap gap-3">
@@ -61,7 +62,7 @@ export default function CarePlans(){
         <motion.div key={family} initial={reduceMotion?false:{opacity:0,y:15}} animate={{opacity:1,y:0}} exit={reduceMotion?undefined:{opacity:0,y:-10}} transition={panelTransition} style={reduceMotion?undefined:{willChange:'transform, opacity'}}>
           <section className="container-pmv py-12 sm:py-16">
             <div className="grid gap-4 md:grid-cols-3">{familyDef.moments.map((moment, index)=><Reveal key={moment.title} delay={index*0.05} distance={12}><article className="h-full rounded-2xl border border-white/10 bg-white/[.025] p-5"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">0{index+1}</p><h2 className="mt-3 font-display text-xl font-bold text-white">{moment.title}</h2><p className="mt-2 text-sm leading-6 text-slate-400">{moment.body}</p></article></Reveal>)}</div>
-            {familyDef.paths&&<div className="mt-8 grid gap-4 lg:grid-cols-2">{familyDef.paths.map(path=><Reveal key={path.title} distance={12}><article className="flex h-full flex-col rounded-2xl border border-gold/20 bg-gold/[.04] p-6"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">How owners work with us</p><h3 className="mt-3 font-display text-2xl font-bold text-white">{path.title}</h3><p className="mt-3 flex-1 text-sm leading-7 text-slate-300">{path.body}</p>{path.to.startsWith('#')?<a href={path.to} className="mt-5 inline-flex text-sm font-bold text-gold hover:underline">{path.cta} →</a>:<Link to={path.to} className="mt-5 inline-flex text-sm font-bold text-gold hover:underline">{path.cta} →</Link>}</article></Reveal>)}</div>}
+            {familyDef.paths&&<div className="mt-8 grid gap-4 lg:grid-cols-2">{familyDef.paths.map(path=><Reveal key={path.title} distance={12}><article className="flex h-full flex-col rounded-2xl border border-gold/20 bg-gold/[.04] p-6"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">How owners work with us</p><h3 className="mt-3 font-display text-2xl font-bold text-white">{path.title}</h3><p className="mt-3 flex-1 text-sm leading-7 text-slate-300">{path.body}</p>{path.to.startsWith('#')?<a href={path.to} className="mt-5 inline-flex text-sm font-bold text-gold hover:underline">{path.cta} →</a>:<ViewTransitionLink to={path.to} className="mt-5 inline-flex text-sm font-bold text-gold hover:underline">{path.cta} →</ViewTransitionLink>}</article></Reveal>)}</div>}
             <p className="mt-6 max-w-3xl text-xs leading-6 text-slate-500">{familyDef.benchmark}</p>
           </section>
 
@@ -221,5 +222,5 @@ export function CarePlansConfirmation(){
   const [params]=useSearchParams()
   const token=params.get('token')||''
   usePageMeta('Care Plan intake received - Pinnacle','Your care plan intake has been received. A Pinnacle team member replies within two business hours.')
-  return <div className="min-h-screen bg-navy-950"><Header/><main className="container-pmv py-16 sm:py-24"><Reveal className="max-w-2xl" distance={15}><p className="eyebrow">Intake received</p><h1 className="mt-3 font-display text-4xl font-bold text-white sm:text-5xl">Got it. A person is on this.</h1><p className="mt-5 text-base leading-7 text-slate-300">Your care plan intake was received and every service you selected is on the request. A Pinnacle team member reviews it and replies within two business hours with next-step pricing and scheduling.</p><p className="mt-4 text-sm text-slate-500">Reference token: <code className="text-gold">{token||'(pending)'}</code></p><div className="mt-8 flex flex-wrap gap-3"><Link to="/care-plans" className="rounded-lg border border-white/15 px-4 py-2.5 text-sm font-bold text-white hover:border-gold/40 hover:text-gold">Back to Care Plans</Link><Link to="/services" className="rounded-lg border border-white/15 px-4 py-2.5 text-sm font-bold text-white hover:border-gold/40 hover:text-gold">Explore other services</Link></div></Reveal></main><Footer/></div>
+  return <div className="min-h-screen bg-navy-950"><Header/><main className="container-pmv py-16 sm:py-24"><Reveal className="max-w-2xl" distance={15}><p className="eyebrow">Intake received</p><h1 className="mt-3 font-display text-4xl font-bold text-white sm:text-5xl">Got it. A person is on this.</h1><p className="mt-5 text-base leading-7 text-slate-300">Your care plan intake was received and every service you selected is on the request. A Pinnacle team member reviews it and replies within two business hours with next-step pricing and scheduling.</p><p className="mt-4 text-sm text-slate-500">Reference token: <code className="text-gold">{token||'(pending)'}</code></p><div className="mt-8 flex flex-wrap gap-3"><ViewTransitionLink to="/care-plans" className="rounded-lg border border-white/15 px-4 py-2.5 text-sm font-bold text-white hover:border-gold/40 hover:text-gold">Back to Care Plans</ViewTransitionLink><ViewTransitionLink to="/services" className="rounded-lg border border-white/15 px-4 py-2.5 text-sm font-bold text-white hover:border-gold/40 hover:text-gold">Explore other services</ViewTransitionLink></div></Reveal></main><Footer/></div>
 }

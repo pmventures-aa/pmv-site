@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { Reveal } from '../../components/public/motion'
@@ -77,8 +78,8 @@ export default function StrQuote() {
               <h2 className="mt-3 font-display text-3xl font-bold tracking-[-.03em] text-white">A person will take it from here.</h2>
               <p className="mt-4 text-sm leading-6 text-slate-300">We received your turnover quote request. Pinnacle will review the scope and reply within two business hours with pricing in writing.</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link to="/" className={btnPrimary}>Back to home</Link>
-                <Link to="/short-term-rental-support" className={btnOutline}>Learn about turnover support</Link>
+                <ViewTransitionLink to="/" className={btnPrimary}>Back to home</ViewTransitionLink>
+                <ViewTransitionLink to="/short-term-rental-support" className={btnOutline}>Learn about turnover support</ViewTransitionLink>
               </div>
             </Reveal>
           ) : (
@@ -104,7 +105,7 @@ export default function StrQuote() {
                   </div>
                   {error && <p className="mt-4 rounded-md border border-red-400/25 bg-red-400/[.06] px-3 py-2 text-sm text-red-100">{error}</p>}
                   <button type="submit" disabled={busy} className={`${btnPrimary} mt-6 disabled:opacity-60`}>{busy ? 'Sending…' : 'Get my turnover quote'}</button>
-                  <p className="mt-3 text-xs leading-5 text-slate-500">A real person reviews every request, not an autoresponder maze. By submitting, you agree to our <Link to="/privacy" className="text-gold hover:underline">privacy policy</Link>.</p>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">A real person reviews every request, not an autoresponder maze. By submitting, you agree to our <ViewTransitionLink to="/privacy" className="text-gold hover:underline">privacy policy</ViewTransitionLink>.</p>
                 </form>
               </Reveal>
               <aside className="space-y-3">

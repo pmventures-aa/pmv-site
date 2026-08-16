@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
 import { Logo } from '../ui'
 import { MobileConversionBar } from './MobileConversionBar'
+import { ViewTransitionLink } from './ViewTransitionLink'
 import { CLIENT_LOGIN, GET_HELP } from '../../data/publicSite'
 
 export function Footer() {
@@ -17,46 +17,46 @@ export function Footer() {
               <div className="mt-5 flex flex-col gap-1.5 text-sm">
                 <a href="mailto:support@pinnaclemanagementventures.com" className="break-all font-medium text-slate-300 hover:text-gold">support@pinnaclemanagementventures.com</a>
                 <a href="tel:+15613887879" className="font-medium text-slate-300 hover:text-gold">(561) 388-7879</a>
-                <Link to={GET_HELP} className="mt-1 font-bold text-gold hover:text-gold-300">Get Help →</Link>
+                <ViewTransitionLink to={GET_HELP} className="mt-1 font-bold text-gold hover:text-gold-300">Get Help →</ViewTransitionLink>
               </div>
             </div>
 
             <div>
               <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Pinnacle</p>
               <ul className="space-y-2.5 text-sm font-medium text-slate-400">
-                <li><Link to="/about" className="hover:text-gold">About</Link></li>
-                <li><Link to="/how-it-works" className="hover:text-gold">How It Works</Link></li>
-                <li><Link to="/contact" className="hover:text-gold">Contact</Link></li>
-                <li><Link to="/professionals" className="hover:text-gold">Professional Network</Link></li>
+                <li><ViewTransitionLink to="/about" className="hover:text-gold">About</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/how-it-works" className="hover:text-gold">How It Works</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/contact" className="hover:text-gold">Contact</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/professionals" className="hover:text-gold">Professional Network</ViewTransitionLink></li>
               </ul>
             </div>
 
             <div>
               <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Business</p>
               <ul className="space-y-2.5 text-sm font-medium text-slate-400">
-                <li><Link to="/services/consulting" className="hover:text-gold">Consulting</Link></li>
-                <li><Link to="/services/administrative-support" className="hover:text-gold">Administrative Support</Link></li>
-                <li><Link to="/services/merchant-services" className="hover:text-gold">Payments &amp; Systems</Link></li>
-                <li><Link to="/services/funding" className="hover:text-gold">Funding Support</Link></li>
+                <li><ViewTransitionLink to="/services/consulting" className="hover:text-gold">Consulting</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/services/administrative-support" className="hover:text-gold">Administrative Support</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/services/merchant-services" className="hover:text-gold">Payments &amp; Systems</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/services/funding" className="hover:text-gold">Funding Support</ViewTransitionLink></li>
               </ul>
             </div>
 
             <div>
               <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Property</p>
               <ul className="space-y-2.5 text-sm font-medium text-slate-400">
-                <li><Link to="/services/property-field" className="hover:text-gold">Property Support</Link></li>
-                <li><Link to="/short-term-rental-support" className="hover:text-gold">STR Turnover Support</Link></li>
-                <li><Link to="/services/property-inspections" className="hover:text-gold">Inspections</Link></li>
-                <li><Link to="/services/property-field" className="hover:text-gold">Vendor Coordination</Link></li>
+                <li><ViewTransitionLink to="/services/property-field" className="hover:text-gold">Property Support</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/short-term-rental-support" className="hover:text-gold">STR Turnover Support</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/services/property-inspections" className="hover:text-gold">Inspections</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/services/property-field" className="hover:text-gold">Vendor Coordination</ViewTransitionLink></li>
               </ul>
             </div>
 
             <div>
               <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Administrative</p>
               <ul className="space-y-2.5 text-sm font-medium text-slate-400">
-                <li><Link to="/services/mobile-notary" className="hover:text-gold">Mobile Notary</Link></li>
-                <li><Link to="/services/document-courier" className="hover:text-gold">Document Courier</Link></li>
-                <li><Link to="/services/administrative-support" className="hover:text-gold">Administrative Assistance</Link></li>
+                <li><ViewTransitionLink to="/services/mobile-notary" className="hover:text-gold">Mobile Notary</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/services/document-courier" className="hover:text-gold">Document Courier</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/services/administrative-support" className="hover:text-gold">Administrative Assistance</ViewTransitionLink></li>
               </ul>
             </div>
           </div>
@@ -66,18 +66,18 @@ export function Footer() {
               <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Clients</p>
               <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-slate-400">
                 <a href={CLIENT_LOGIN} className="hover:text-gold">Client Login</a>
-                <Link to={GET_HELP} className="hover:text-gold">Get Help</Link>
-                <Link to="/care-plans" className="hover:text-gold">Monthly Plans</Link>
+                <ViewTransitionLink to={GET_HELP} className="hover:text-gold">Get Help</ViewTransitionLink>
+                <ViewTransitionLink to="/care-plans" className="hover:text-gold">Monthly Plans</ViewTransitionLink>
               </nav>
             </div>
             <div>
               <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Legal</p>
               <nav className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-slate-500">
-                <Link to="/privacy" className="hover:text-gold">Privacy</Link>
-                <Link to="/terms" className="hover:text-gold">Terms</Link>
-                <Link to="/accessibility" className="hover:text-gold">Accessibility</Link>
-                <Link to="/electronic-communications" className="hover:text-gold">Electronic Records</Link>
-                <Link to="/provider-agreement" className="hover:text-gold">Provider Agreement</Link>
+                <ViewTransitionLink to="/privacy" className="hover:text-gold">Privacy</ViewTransitionLink>
+                <ViewTransitionLink to="/terms" className="hover:text-gold">Terms</ViewTransitionLink>
+                <ViewTransitionLink to="/accessibility" className="hover:text-gold">Accessibility</ViewTransitionLink>
+                <ViewTransitionLink to="/electronic-communications" className="hover:text-gold">Electronic Records</ViewTransitionLink>
+                <ViewTransitionLink to="/provider-agreement" className="hover:text-gold">Provider Agreement</ViewTransitionLink>
               </nav>
             </div>
           </div>

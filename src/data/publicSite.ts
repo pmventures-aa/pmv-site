@@ -28,6 +28,40 @@ export const pathways = [
   },
 ] as const
 
+// Small intent-based links used inside the Services menus so visitors can jump
+// straight to a recognizable situation instead of a taxonomy.
+export const pathwayLinks: Record<string, { label: string; to: string }[]> = {
+  business: [
+    { label: 'Business & operations consulting', to: '/services/consulting' },
+    { label: 'Administrative & operational support', to: '/services/administrative-support' },
+    { label: 'POS & payment transitions', to: '/services/merchant-services' },
+    { label: 'Funding readiness', to: '/services/funding' },
+  ],
+  property: [
+    { label: 'Property operations', to: '/services/property-field' },
+    { label: 'STR turnover support', to: '/short-term-rental-support' },
+    { label: 'Inspections & condition reports', to: '/services/property-inspections' },
+    { label: 'Cleaning & turnovers', to: '/services/property-cleaning' },
+  ],
+  personal: [
+    { label: 'Mobile notary & loan signings', to: '/services/mobile-notary' },
+    { label: 'Remote Online Notarization (RON)', to: '/services/remote-online-notary' },
+    { label: 'Document courier & filing runs', to: '/services/document-courier' },
+    { label: 'Document preparation', to: '/services/document-preparation' },
+  ],
+}
+
+// Intent-first "Who We Help" paths. Each deep-links into a contextual service
+// combination rather than duplicating the whole service taxonomy.
+export const whoWeHelp = [
+  { audience: 'Business Owners', title: 'Operations, systems, and follow-through for the business.', body: 'Consulting, admin capacity, POS and payment transitions, and funding readiness.', to: '/scope-request?world=business&source=who-we-help' },
+  { audience: 'Landlords & Investors', title: 'Oversight without being on site.', body: 'Cleaning, inspections, turnovers, eviction support, and documented field visits.', to: '/services/property-field' },
+  { audience: 'Short-Term Rental Hosts', title: 'Verified turnovers between guests.', body: 'Tracked checklists, required photos, issue flagging, and a guest-ready report.', to: '/short-term-rental-support' },
+  { audience: 'Property Managers', title: 'Coordinated field work under your direction.', body: 'Vendor visits, inspections, access, preservation, and documented completion.', to: '/services/property-field' },
+  { audience: 'Real Estate Professionals', title: 'Field photos, BPO sets, and verification.', body: 'Reliable local photo coverage and licensed Broker Price Opinions when needed.', to: '/services/field-photos-bpo' },
+  { audience: 'Individuals', title: 'Professional help when something needs handling.', body: 'Documents, mobile notary, RON, courier, and administrative tasks.', to: '/services/mobile-documents' },
+] as const
+
 export const howItWorks = [
   ['Tell Us What\'s Going On', 'Start with the situation, the address, the document, or the deadline. You do not need the correct service name.'],
   ['We Review the Matter', 'We confirm what Pinnacle can handle directly, what needs a qualified provider, and what the work will involve.'],

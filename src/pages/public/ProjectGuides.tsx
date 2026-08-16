@@ -1,4 +1,5 @@
-import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { AmbientGlow, Reveal } from '../../components/public/motion'
@@ -114,7 +115,7 @@ function GuidePage({guide}:{guide:ProjectGuide}){
   const audience=params.get('audience')||undefined
   const requestUrl=`/scope-request?guide=${encodeURIComponent(guide.slug)}${audience?`&audience=${encodeURIComponent(audience)}`:''}&source=project-${encodeURIComponent(guide.slug)}`
   return <div className="min-h-screen bg-navy-950"><Header/><main>
-    <section className="pmv-hero-story relative overflow-hidden border-b border-white/10"><AmbientGlow/><div className="pmv-hero-gold" aria-hidden="true"/><div className="container-pmv relative z-10 py-16 sm:py-20 lg:py-24"><Reveal className="max-w-4xl"><p className="eyebrow">{guide.eyebrow}</p><h1 className="mt-4 font-display text-4xl font-semibold leading-[1.05] tracking-[-.025em] text-white sm:text-6xl">{guide.title}</h1><p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">{guide.summary}</p><div className="mt-8 flex flex-wrap gap-3"><Link className={btnPrimary} to={requestUrl}>Scope This Project</Link><Link className={btnOutline} to="/contact">Talk With Pinnacle</Link></div></Reveal></div></section>
+    <section className="pmv-hero-story relative overflow-hidden border-b border-white/10"><AmbientGlow/><div className="pmv-hero-gold" aria-hidden="true"/><div className="container-pmv relative z-10 py-16 sm:py-20 lg:py-24"><Reveal className="max-w-4xl"><p className="eyebrow">{guide.eyebrow}</p><h1 className="pmv-h1 mt-4">{guide.title}</h1><p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">{guide.summary}</p><div className="mt-8 flex flex-wrap gap-3"><ViewTransitionLink className={btnPrimary} to={requestUrl}>Scope This Project</ViewTransitionLink><ViewTransitionLink className={btnOutline} to="/contact">Talk With Pinnacle</ViewTransitionLink></div></Reveal></div></section>
 
     <section className="container-pmv py-14 sm:py-18"><div className="grid gap-10 lg:grid-cols-[.72fr_1.28fr]"><Reveal><p className="eyebrow">A good fit when</p><h2 className="mt-3 font-display text-3xl font-semibold text-white">You know something needs to move, but the handoffs are the hard part.</h2></Reveal><Reveal><div className="divide-y divide-white/10 border-y border-white/10">{guide.fit.map((item,i)=><div key={item} className="flex gap-4 py-5"><span className="font-display text-xs text-gold/70">0{i+1}</span><p className="text-sm leading-7 text-slate-300">{item}</p></div>)}</div></Reveal></div></section>
 
@@ -122,7 +123,7 @@ function GuidePage({guide}:{guide:ProjectGuide}){
 
     <section className="container-pmv py-14 sm:py-18"><Reveal className="grid gap-10 lg:grid-cols-[.72fr_1.28fr]"><div><p className="eyebrow">Typical engagement</p><h2 className="mt-3 font-display text-3xl font-semibold text-white">Enough structure to keep the project moving. No extra ceremony.</h2></div><div className="pmv-process-line">{guide.steps.map(([title,body],i)=><div key={title} className="pmv-process-step"><span>0{i+1}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}</div></Reveal></section>
 
-    <section className="container-pmv pb-14 sm:pb-18"><Reveal className="flex flex-col gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-center sm:justify-between"><div><p className="eyebrow">Related capabilities</p><div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">{guide.related.map(item=><Link key={item.to} to={item.to} className="text-sm font-semibold text-gold hover:underline">{item.label} →</Link>)}</div></div><Link to="/services" className={btnOutline}>View All Services</Link></Reveal></section>
+    <section className="container-pmv pb-14 sm:pb-18"><Reveal className="flex flex-col gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-center sm:justify-between"><div><p className="eyebrow">Related capabilities</p><div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">{guide.related.map(item=><ViewTransitionLink key={item.to} to={item.to} className="text-sm font-semibold text-gold hover:underline">{item.label} →</ViewTransitionLink>)}</div></div><ViewTransitionLink to="/services" className={btnOutline}>View All Services</ViewTransitionLink></Reveal></section>
 
     <CaseStudyStrip serviceKey={guideServiceKey[guide.slug]} audience={audience} className="border-t border-white/10"/>
     <CtaBand title="Have a version of this project on your desk right now?" body="Start with the situation. We will help define the right scope and next move." primary={{to:requestUrl,label:'Scope This Project'}} secondary={{to:'/contact',label:'Talk With Pinnacle'}}/>

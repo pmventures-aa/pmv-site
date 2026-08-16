@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useInView, useMotionValue, useReducedMotion, useSpring, type HTMLMotionProps, type Variants } from 'motion/react'
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import type { ServiceInfo } from '../../data/services'
+import { ViewTransitionLink } from './ViewTransitionLink'
 import { pmvFadeUp, pmvMotion, pmvStagger } from '../../lib/motionTheme'
 
 // Editorial helpers for the public site. Shared product transitions live in
@@ -109,9 +109,9 @@ export function ServiceRotator({ items }: { items: ServiceInfo[] }) {
           />
         ))}
       </div>
-      <Link to={`/services/${current.slug}`} className="mt-5 inline-block text-sm font-medium text-gold hover:underline">
+      <ViewTransitionLink to={`/services/${current.slug}`} className="mt-5 inline-block text-sm font-medium text-gold hover:underline">
         Learn more about {current.title} →
-      </Link>
+      </ViewTransitionLink>
     </div>
   )
 }
@@ -172,9 +172,9 @@ export function SpecialtyRotator({ items }: { items: SpecialtySpotlightItem[] })
           </AnimatePresence>
 
           <div className="flex items-center gap-4 lg:flex-col lg:items-end">
-            <Link to={current.to} className="shrink-0 text-sm font-semibold text-gold hover:underline">
+            <ViewTransitionLink to={current.to} className="shrink-0 text-sm font-semibold text-gold hover:underline">
               {current.linkLabel} →
-            </Link>
+            </ViewTransitionLink>
             <div className="flex gap-1.5" role="tablist" aria-label="Featured specialties">
               {items.map((item, index) => (
                 <button

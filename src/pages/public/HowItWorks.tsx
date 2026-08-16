@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { CtaBand, btnOutline, btnPrimary } from '../../components/public/ui'
@@ -21,13 +21,13 @@ export default function HowItWorks() {
           <div className="container-pmv py-16 sm:py-20">
             <Reveal className="max-w-3xl">
               <p className="eyebrow">How It Works</p>
-              <h1 className="mt-4 font-display text-4xl font-bold text-white sm:text-6xl">You do not need to diagnose the service first.</h1>
+              <h1 className="pmv-h1 mt-4">You do not need to diagnose the service first.</h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
                 Start with the situation. We review the matter, establish ownership, coordinate what is needed, and follow through until the agreed work is complete.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link to={GET_HELP} className={btnPrimary}>Tell Us What You Need Help With</Link>
-                <Link to="/services" className={btnOutline}>Explore Services</Link>
+                <ViewTransitionLink to={GET_HELP} className={btnPrimary}>Tell Us What You Need Help With</ViewTransitionLink>
+                <ViewTransitionLink to="/services" className={btnOutline}>Explore Services</ViewTransitionLink>
               </div>
             </Reveal>
           </div>

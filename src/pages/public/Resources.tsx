@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { CtaBand, PageIntro } from '../../components/public/ui'
@@ -26,14 +26,14 @@ export default function Resources() {
           <div className="mt-12 divide-y divide-white/10 border-y border-white/10">
             {projectGuides.map((guide) => (
               <Reveal key={guide.slug}>
-                <Link to={`/projects/${guide.slug}`} className="group grid gap-3 py-6 sm:grid-cols-[160px_1fr_auto] sm:items-start">
+                <ViewTransitionLink to={`/projects/${guide.slug}`} className="group grid gap-3 py-6 sm:grid-cols-[160px_1fr_auto] sm:items-start">
                   <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold">{guide.eyebrow}</p>
                   <div>
                     <h2 className="text-lg font-semibold text-white group-hover:text-gold">{guide.title}</h2>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{guide.summary}</p>
                   </div>
                   <span className="text-sm font-semibold text-gold">Read →</span>
-                </Link>
+                </ViewTransitionLink>
               </Reveal>
             ))}
           </div>

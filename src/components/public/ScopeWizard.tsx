@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { LocateFixed } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
+import { usePublicVisitor } from '../../lib/publicContext'
+import { playPublicSound } from '../../lib/sound'
 import { Icon, type IconName } from '../kit/Icon'
 import { AddressAutocomplete } from '../kit/AddressAutocomplete'
 import { jobsForWorld, publicIntakeCopy, worldFromPublicParams } from '../../lib/workspace'
+import type { OperatingWorld } from '../../../shared/workspace'
 import { resolveScopeEntry, visibleQuestions, type ScopeQuestion } from '../../../shared/scopeEntries'
 import type { GeoHit } from '../../../shared/geocode'
 
@@ -96,6 +99,31 @@ const serviceJobs:Record<string,string>={
 }
 const timings=['As soon as possible','Within 2-3 business days','This week','I have a specific date','Flexible / planning ahead']
 
+// Session-only draft autosave. Nothing here is sensitive beyond what the
+// visitor typed voluntarily, and it never leaves the tab.
+const DRAFT_KEY='pmv_scope_draft'
+function readScopeDraft(key:string):{form:Form;step:number}|null{
+  if(typeof window==='undefined')return null
+  try{
+    const raw=window.sessionStorage.getItem(DRAFT_KEY)
+    if(!raw)return null
+    const parsed=JSON.parse(raw) as {key?:unknown;form?:unknown;step?:unknown}
+    if(!parsed||parsed.key!==key||!parsed.form||typeof parsed.step!=='number')return null
+    return {form:parsed.form as Form,step:parsed.step}
+  }catch{return null}
+}
+function writeScopeDraft(key:string,form:Form,step:number){
+  if(typeof window==='undefined')return
+  try{window.sessionStorage.setItem(DRAFT_KEY,JSON.stringify({key,form,step}))}catch{/* private mode */}
+}
+function clearScopeDraft(){
+  if(typeof window==='undefined')return
+  try{window.sessionStorage.removeItem(DRAFT_KEY)}catch{/* private mode */}
+}
+
+const WORLD_DEFAULT_JOB: Partial<Record<OperatingWorld,string>>={property:'cleaning_turnover',documents:'documents_notary',business:'business_operations',funding:'business_operations'}
+const WORLD_LABEL: Record<string,string>={property:'property',documents:'document',business:'business',funding:'funding'}
+
 function optionButtonCls(selected:boolean){
   return `rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${selected?'border-gold/50 bg-gold/[.07] text-white':'border-white/10 text-slate-300 hover:border-white/25'}`
 }
@@ -127,6 +155,7 @@ function QuestionField({q,val,onChange}:{q:ScopeQuestion;val:string|string[]|und
 
 export function ScopeWizard({source='scope-page',compact=false}:{source?:string;compact?:boolean}){
   const navigate=useNavigate();const [params]=useSearchParams()
+  const visitor=usePublicVisitor()
   const serviceKey=params.get('service')||''
   const offeringId=params.get('offering')||''
   const requestSource=params.get('source')||source
@@ -138,6 +167,8 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     offering:offeringId,
     source:requestSource,
   }),[params,serviceKey,offeringId,requestSource])
+  const hasExplicitIntent=!!(params.get('world')||params.get('service')||params.get('job')||params.get('entry')||params.get('guide')||params.get('family')||params.get('audience'))
+  const draftKey=[serviceKey,offeringId,params.get('job'),entry?.id].filter(Boolean).join('|')||'general'
   const world=worldFromPublicParams({
     world:params.get('world'),
     service:serviceKey,
@@ -151,16 +182,32 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
   const copy=publicIntakeCopy(world)
   const visibleJobs=jobs.filter((job)=>jobsForWorld(world).includes(job.value))
   const preselected=entry?.job||params.get('job')||serviceJobs[serviceKey]||(visibleJobs.length===1?visibleJobs[0].value:'')
-  const initialJob=visibleJobs.some((job)=>job.value===preselected)?preselected:(entry?.job||'')
+  const rememberedWorld=!hasExplicitIntent?visitor.state.world:''
+  const worldDefaultJob=rememberedWorld&&rememberedWorld!=='general'?(WORLD_DEFAULT_JOB[rememberedWorld]??''):''
+  const initialJob=visibleJobs.some((job)=>job.value===preselected)?preselected:(worldDefaultJob&&visibleJobs.some((job)=>job.value===worldDefaultJob)?worldDefaultJob:(entry?.job||''))
+  const restoredDraft=readScopeDraft(draftKey)
   const [locked,setLocked]=useState(!!entry)
-  const [step,setStep]=useState(initialJob?1:0);const [busy,setBusy]=useState(false);const [error,setError]=useState('')
-  const [form,setForm]=useState<Form>({
-    job_type:initialJob,
-    location_type:(entry?.remoteDefault||remoteJobs.has(initialJob))?'remote':'onsite',
-    address:'',city:'',state:'',postal_code:'',timing:'',details:'',
-    contact_name:'',email:'',phone:'',follow_up_opt_in:false,website:'',
-    service_answers:{},
+  const [step,setStep]=useState<number>(()=>restoredDraft?restoredDraft.step:(initialJob?1:0));const [busy,setBusy]=useState(false);const [error,setError]=useState('')
+  const [form,setForm]=useState<Form>(()=>{
+    if(restoredDraft)return restoredDraft.form
+    return {
+      job_type:initialJob,
+      location_type:(entry?.remoteDefault||remoteJobs.has(initialJob))?'remote':'onsite',
+      address:visitor.state.address.address||'',
+      city:visitor.state.address.city||'',
+      state:visitor.state.address.state||'',
+      postal_code:visitor.state.address.postal_code||'',
+      timing:visitor.state.urgency||'',
+      details:visitor.state.description||'',
+      contact_name:'',email:'',phone:'',follow_up_opt_in:false,website:'',
+      service_answers:{},
+    }
   })
+  const draftHydrated=useRef(false)
+  useEffect(()=>{
+    if(!draftHydrated.current){draftHydrated.current=true;return}
+    writeScopeDraft(draftKey,form,step)
+  },[form,step,draftKey])
 
   const catalogQuestions: ScopeQuestion[] = useMemo(() => {
     if(entry && form.job_type===entry.job) return entry.questions
@@ -176,6 +223,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     setForm(current=>({...current,job_type:value,location_type:remoteJobs.has(value)?'remote':'onsite',service_answers:{}}))
     setError('')
     setStep(1)
+    playPublicSound('step')
   }
 
   function next(){
@@ -184,7 +232,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
       if(form.location_type==='onsite'&&(!form.city.trim()||!form.state.trim()))return setError('Enter the city and state for the on-site work.')
       if(!form.timing)return setError('Choose the timing that is closest to what you need.')
     }
-    setError('');setStep(value=>Math.min(2,value+1))
+    setError('');setStep(value=>Math.min(2,value+1));playPublicSound('step')
   }
   async function submit(){
     if(!form.contact_name.trim())return setError('Enter your name.')
@@ -204,6 +252,13 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
       if(response.setup_url&&response.request_token){
         try{sessionStorage.setItem(`pmv_scope_setup_${response.request_token}`,response.setup_url)}catch{/* private mode */}
       }
+      clearScopeDraft()
+      visitor.rememberAddress({address:form.address,city:form.city,state:form.state,postal_code:form.postal_code})
+      visitor.rememberUrgency(form.timing)
+      visitor.rememberDescription(form.details)
+      const submitWorld=worldFromPublicParams({job:form.job_type,service:entry?.serviceKey||serviceKey})
+      if(submitWorld!=='general')visitor.setWorld(submitWorld)
+      playPublicSound('success')
       navigate(response.confirmation_url)
     }catch(err){setError(err instanceof ApiError?err.message:'We could not submit the request. Call (561) 388-7879 if the need is urgent.')}
     finally{setBusy(false)}
@@ -248,6 +303,15 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
         </div>}
 
         {step===0 && <div>
+          {rememberedWorld&&rememberedWorld!=='general'&&(
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/25 bg-gold/[.06] px-4 py-3">
+              <p className="text-sm text-white"><span className="text-[10px] font-bold uppercase tracking-[.14em] text-gold">Remembered</span><span className="mt-0.5 block font-semibold">Earlier you were looking at {WORLD_LABEL[rememberedWorld]??rememberedWorld} support.</span></p>
+              <div className="flex items-center gap-3">
+                <button type="button" className="text-xs font-bold text-gold hover:underline" onClick={()=>{if(worldDefaultJob)chooseJob(worldDefaultJob)}}>Start there</button>
+                <button type="button" className="text-xs font-bold text-slate-400 hover:text-gold hover:underline" onClick={()=>{visitor.clear();setError('')}}>Start fresh</button>
+              </div>
+            </div>
+          )}
           <h3 className="text-xl font-bold text-white">{copy.pickerTitle}</h3>
           <p className="mt-1 text-sm text-slate-400">{world==='general'?'Pick the closest fit. The next screen is the questions for that work.':'These options stay inside this operating world. The next screen is the questions for that work.'}</p>
           <div className="mt-5 grid gap-2 sm:grid-cols-2">{visibleJobs.map(job=>
