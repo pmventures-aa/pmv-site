@@ -4,6 +4,23 @@ import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { requireUser } from '../mid'
 import { sendEmail, escapeHtml } from '../email'
+import { buildDocx, sanitizeFilename } from '../officeExport'
+import { buildPdf } from '../documentExport'
+import { protectPdf } from '../pdfSecurity'
+import { htmlToPlainText } from '../../../shared/emailSignatureHtml'
+import { CREST_ABSOLUTE_URL } from '../../../shared/letterhead'
+
+const EXPORT_MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+async function crestBytes(): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(CREST_ABSOLUTE_URL)
+    if (!res.ok) return null
+    return new Uint8Array(await res.arrayBuffer())
+  } catch {
+    return null
+  }
+}
 
 export const internalDocumentAdminRoutes = new Hono<AppEnv>()
 export const internalDocumentPublicRoutes = new Hono<AppEnv>()
@@ -127,6 +144,63 @@ internalDocumentAdminRoutes.get('/documents-workspace/:id/file', async (c) => {
   if (row.document_type === 'text') return new Response(row.text_content || '', { headers:{'Content-Type':'text/plain; charset=utf-8','Content-Disposition':`inline; filename="${String(row.title).replace(/"/g,'')}.txt"`} })
   const obj=await c.env.UPLOADS.get(row.storage_key); if(!obj) return c.json({error:'file missing'},404)
   return new Response(obj.body,{headers:{'Content-Type':row.mime_type||'application/octet-stream','Content-Disposition':`inline; filename="${String(row.original_name||row.title).replace(/"/g,'')}"`}})
+})
+
+internalDocumentAdminRoutes.post('/documents-workspace/:id/export', async (c) => {
+  const id = c.req.param('id')
+  const b = await c.req.json<any>().catch(() => null)
+  const format = ['docx', 'pdf', 'protected_pdf', 'txt'].includes(String(b?.format)) ? String(b.format) : 'pdf'
+  const doc = await c.env.DB.prepare('SELECT * FROM internal_documents WHERE id=?').bind(id).first<any>()
+  if (!doc) return c.json({ error: 'not found' }, 404)
+  const base = sanitizeFilename(doc.title || 'document')
+  const disposition = (name: string) => `attachment; filename="${name}"`
+  const passwordOk = (): string | null => {
+    const pw = String(b?.password || '')
+    return pw.length >= 8 ? pw.slice(0, 128) : null
+  }
+  try {
+    if (doc.document_type === 'text') {
+      const logo = doc.is_branded === 0 ? null : await crestBytes()
+      if (format === 'txt') {
+        return new Response(htmlToPlainText(doc.text_content || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': disposition(`${base}.txt`) } })
+      }
+      if (format === 'docx') {
+        const bytes = await buildDocx({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo })
+        return new Response(bytes, { headers: { 'Content-Type': EXPORT_MIME_DOCX, 'Content-Disposition': disposition(`${base}.docx`) } })
+      }
+      const bytes = await buildPdf({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo })
+      if (format === 'protected_pdf') {
+        const pw = passwordOk()
+        if (!pw) return c.json({ error: 'Password must be at least 8 characters.' }, 400)
+        const protectedBytes = await protectPdf(bytes, pw)
+        return new Response(protectedBytes, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': disposition(`${base} (Protected).pdf`) } })
+      }
+      return new Response(bytes, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': disposition(`${base}.pdf`) } })
+    }
+    // File documents: the export IS the faithful original — signed/executed
+    // files are never regenerated from editable content.
+    if (format === 'txt') return c.json({ error: 'Plain text export is only available for editable documents. Download the original file instead.' }, 400)
+    const f = doc.current_file_id ? await c.env.DB.prepare('SELECT * FROM document_files WHERE id=?').bind(doc.current_file_id).first<any>() : null
+    const mime = String(doc.mime_type || f?.mime_type || '').toLowerCase()
+    const name = String(doc.original_name || f?.original_name || '').toLowerCase()
+    const isPdf = mime === 'application/pdf' || name.endsWith('.pdf')
+    const isDocx = mime.includes('wordprocessingml') || name.endsWith('.docx')
+    if (format === 'docx' && !isDocx) return c.json({ error: 'Word export is only available for editable documents. Download the original file to work with this format.' }, 400)
+    if ((format === 'pdf' || format === 'protected_pdf') && !isPdf) return c.json({ error: 'PDF export is only available for editable documents or PDF files. Download the original file for other formats.' }, 400)
+    if (!f || !c.env.UPLOADS) return c.json({ error: 'file missing' }, 404)
+    const obj = await c.env.UPLOADS.get(f.storage_key)
+    if (!obj) return c.json({ error: 'file missing' }, 404)
+    const original = new Uint8Array(await obj.arrayBuffer())
+    if (format === 'protected_pdf') {
+      const pw = passwordOk()
+      if (!pw) return c.json({ error: 'Password must be at least 8 characters.' }, 400)
+      const protectedBytes = await protectPdf(original, pw)
+      return new Response(protectedBytes, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': disposition(`${base} (Protected).pdf`) } })
+    }
+    return new Response(original, { headers: { 'Content-Type': isPdf ? 'application/pdf' : EXPORT_MIME_DOCX, 'Content-Disposition': disposition(isPdf ? `${base}.pdf` : `${base}.docx`) } })
+  } catch (e) {
+    return c.json({ error: "We couldn't prepare this document. Your original has not been changed." }, 500)
+  }
 })
 
 internalDocumentAdminRoutes.post('/documents-workspace/:id/share', async (c) => {
