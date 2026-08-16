@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Crest } from '../ui'
+import { ViewTransitionLink } from './ViewTransitionLink'
 import { pmvMotion } from '../../lib/motionTheme'
 
 const CYCLE_MS = 5600
@@ -67,9 +67,9 @@ export function HeroGuideRail() {
           >
             <p className="mt-7 text-xs font-bold uppercase tracking-[.13em] text-slate-500">{guide.eyebrow}</p>
             <h2 className="mt-3 font-display text-3xl font-bold leading-tight tracking-[-.03em] text-white">{guide.title}</h2>
-            <Link to={guide.to} className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-gold">
+            <ViewTransitionLink to={guide.to} className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-gold">
               Open this guide <span>→</span>
-            </Link>
+            </ViewTransitionLink>
           </motion.div>
         </AnimatePresence>
       </div>

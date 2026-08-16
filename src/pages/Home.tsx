@@ -4,17 +4,35 @@ import { Header } from '../components/public/Header'
 import { Footer } from '../components/public/Footer'
 import { btnOutline, btnPrimary, CtaBand, MotionStage } from '../components/public/ui'
 import { AmbientGlow, Reveal, StaggerGroup, StaggerOnMount, staggerItem } from '../components/public/motion'
+import { ViewTransitionLink } from '../components/public/ViewTransitionLink'
 import { usePageMeta } from '../lib/usePageMeta'
+import { usePublicVisitor } from '../lib/publicContext'
+import type { OperatingWorld } from '../../shared/workspace'
 import { HeroGuideRail } from '../components/public/HeroGuideRail'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
 import { CLIENT_LOGIN, GET_HELP, founder, howItWorks, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 
+const WORLD_BY_PATHWAY: Record<string, OperatingWorld> = { business: 'business', property: 'property', personal: 'documents' }
+const WORLD_LABEL: Record<string, string> = { property: 'Property', documents: 'Document', business: 'Business', funding: 'Funding' }
+
+function worldFromQuery(to: string): OperatingWorld | '' {
+  const match = to.match(/[?&]world=([a-z]+)/)
+  if (!match) return ''
+  const value = match[1]
+  if (value === 'property' || value === 'business' || value === 'documents' || value === 'funding') return value
+  return ''
+}
+
 export default function Home() {
+  const visitor = usePublicVisitor()
   usePageMeta(
     'Professional Support. One Call Away.',
     'Pinnacle Management Ventures helps businesses, property owners, and individuals get business, property, and administrative matters handled through one trusted point of contact.',
   )
+  const heroCtaLabel = visitor.state.returning && visitor.state.world && visitor.state.world !== 'general'
+    ? `Continue Your ${WORLD_LABEL[visitor.state.world] ?? 'Help'} Request`
+    : 'Tell Us What You Need Help With'
 
   return (
     <div className="min-h-screen bg-navy-950">
@@ -25,7 +43,7 @@ export default function Home() {
           <div className="container-pmv relative z-10 grid min-h-[calc(100vh-68px)] gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
             <StaggerOnMount>
               <motion.p variants={staggerItem} className="eyebrow">Nationwide professional support · South Florida field services</motion.p>
-              <motion.h1 variants={staggerItem} className="mt-6 max-w-4xl font-display text-5xl font-extrabold leading-[1.02] tracking-[-.05em] text-white sm:text-6xl lg:text-[3.75rem] xl:text-[4rem]">
+              <motion.h1 variants={staggerItem} className="pmv-h1 mt-6">
                 <span className="block">Professional Support.</span>
                 <span className="pmv-gold-text block">One Call Away.</span>
               </motion.h1>
@@ -36,11 +54,11 @@ export default function Home() {
                 Not sure which service you need? That is okay. Start with the situation and we will help determine the next step.
               </motion.p>
               <motion.div variants={staggerItem} className="mt-9 flex flex-wrap gap-3">
-                <Link to={GET_HELP} className={btnPrimary}>Tell Us What You Need Help With</Link>
-                <Link to="/services" className={btnOutline}>Explore Services</Link>
+                <ViewTransitionLink to={GET_HELP} className={btnPrimary}>{heroCtaLabel}</ViewTransitionLink>
+                <ViewTransitionLink to="/services" className={btnOutline}>Explore Services</ViewTransitionLink>
               </motion.div>
               <motion.p variants={staggerItem} className="mt-4 text-sm text-slate-500">
-                Need a cleaning or inspection number first? <Link to="/instant-quote" className="font-semibold text-gold hover:underline">Get an instant estimate</Link>
+                Need a cleaning or inspection number first? <ViewTransitionLink to="/instant-quote" className="font-semibold text-gold hover:underline">Get an instant estimate</ViewTransitionLink>
               </motion.p>
             </StaggerOnMount>
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.18 }} className="relative lg:min-h-[520px]">
@@ -69,14 +87,14 @@ export default function Home() {
                 <ul className="mt-5 space-y-1.5 text-sm text-slate-300">
                   {item.items.map((capability) => <li key={capability}>{capability}</li>)}
                 </ul>
-                <Link to={item.to} className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">Explore {item.label} →</Link>
+                <ViewTransitionLink to={item.to} onClick={() => visitor.setWorld(WORLD_BY_PATHWAY[item.key])} className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">Explore {item.label} →</ViewTransitionLink>
               </motion.article>
             ))}
           </StaggerGroup>
           <Reveal className="mt-8">
-            <Link to={GET_HELP} className="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-gold">
+            <ViewTransitionLink to={GET_HELP} className="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-gold">
               Doesn&apos;t fit neatly into one of these? Tell us what&apos;s going on. <span aria-hidden="true">→</span>
-            </Link>
+            </ViewTransitionLink>
           </Reveal>
         </section>
 
@@ -88,7 +106,7 @@ export default function Home() {
               <p className="mt-5 max-w-lg text-base leading-8 text-slate-400">
                 Tell us what is going on. We review the matter, name who is handling it, and stay with the work through completion.
               </p>
-              <Link to="/how-it-works" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-gold">See the full process <span>→</span></Link>
+              <ViewTransitionLink to="/how-it-works" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-gold">See the full process <span>→</span></ViewTransitionLink>
             </Reveal>
             <div className="divide-y divide-white/10 border-y border-white/10">
               {howItWorks.map(([title, body], i) => (
@@ -125,10 +143,10 @@ export default function Home() {
             </Reveal>
             <div className="mt-10 grid gap-3 md:grid-cols-2">
               {useCases.map((item) => (
-                <Link key={item.title} to={item.to} className="group rounded-lg border border-white/10 bg-white/[.02] px-5 py-5 transition hover:border-gold/40 hover:bg-white/[.04]">
+                <ViewTransitionLink key={item.title} to={item.to} onClick={() => { const w = worldFromQuery(item.to); if (w) visitor.setWorld(w) }} className="group rounded-lg border border-white/10 bg-white/[.02] px-5 py-5 transition hover:border-gold/40 hover:bg-white/[.04]">
                   <h3 className="font-display text-lg font-semibold text-white group-hover:text-gold">{item.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-400">{item.body}</p>
-                </Link>
+                </ViewTransitionLink>
               ))}
             </div>
           </div>
@@ -148,8 +166,8 @@ export default function Home() {
                 ))}
               </ul>
               <div className="mt-8 flex flex-wrap gap-3">
-                <a href={CLIENT_LOGIN} className={btnPrimary}>Existing Client? Sign In</a>
-                <Link to={GET_HELP} className={btnOutline}>Not a client yet?</Link>
+                <ViewTransitionLink to={CLIENT_LOGIN} className={btnPrimary}>Existing Client? Sign In</ViewTransitionLink>
+                <ViewTransitionLink to={GET_HELP} className={btnOutline}>Not a client yet?</ViewTransitionLink>
               </div>
             </Reveal>
             <Reveal>
@@ -170,7 +188,7 @@ export default function Home() {
             <Reveal>
               <p className="text-base leading-8 text-slate-300">{founder.lead}</p>
               <p className="mt-4 text-base leading-8 text-slate-400">{founder.close}</p>
-              <Link to="/about" className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">About Pinnacle →</Link>
+              <ViewTransitionLink to="/about" className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">About Pinnacle →</ViewTransitionLink>
             </Reveal>
           </div>
         </section>
@@ -194,7 +212,7 @@ export default function Home() {
                 <p className="eyebrow">Monthly plans</p>
                 <h2 className="mt-4 max-w-2xl font-display text-3xl font-bold text-white sm:text-4xl">When the work repeats, put it on a plan.</h2>
               </div>
-              <Link to="/care-plans" className="text-sm font-semibold text-gold hover:underline">See monthly plans →</Link>
+              <ViewTransitionLink to="/care-plans" className="text-sm font-semibold text-gold hover:underline">See monthly plans →</ViewTransitionLink>
             </Reveal>
             <div className="mt-8 grid gap-3 lg:grid-cols-3">
               {[
@@ -202,12 +220,12 @@ export default function Home() {
                 { name: 'Ops-on-Call', price: 'From $199/mo', to: '/care-plans?family=ops' },
                 { name: 'Legal & Notary Pass', price: 'From $99/mo', to: '/care-plans?family=legal' },
               ].map((plan) => (
-                <Link key={plan.name} to={plan.to} className="rounded-lg border border-white/10 bg-white/[.02] px-5 py-4 transition hover:border-gold/40">
+                <ViewTransitionLink key={plan.name} to={plan.to} className="rounded-lg border border-white/10 bg-white/[.02] px-5 py-4 transition hover:border-gold/40">
                   <div className="flex items-baseline justify-between gap-3">
                     <h3 className="font-semibold text-white">{plan.name}</h3>
                     <span className="text-sm font-bold text-gold">{plan.price}</span>
                   </div>
-                </Link>
+                </ViewTransitionLink>
               ))}
             </div>
           </div>

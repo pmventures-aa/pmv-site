@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { Reveal } from '../../components/public/motion'
@@ -75,13 +75,13 @@ export default function StrTurnover() {
           <div className="container-pmv relative z-10 py-14 sm:py-20 lg:py-24">
             <Reveal distance={14}>
               <p className="eyebrow">STR Turnover &amp; Property Support</p>
-              <h1 className="mt-4 max-w-4xl font-display text-4xl font-extrabold leading-[1.04] tracking-[-.03em] text-white sm:text-6xl">YOUR PROPERTY. GUEST READY. WITHOUT THE RUNAROUND.</h1>
+              <h1 className="pmv-h1 mt-4 max-w-4xl">YOUR PROPERTY. GUEST READY. WITHOUT THE RUNAROUND.</h1>
               <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
                 One accountable team handles the turnover, verifies the work, and puts the proof in your portal, so the next guest walks into a property you know was checked, not a property you hope was.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link to="/str-quote" className="rounded-lg bg-gold px-5 py-2.5 text-sm font-bold text-navy-950 hover:bg-gold-300">GET A TURNOVER QUOTE</Link>
-                <Link to="/str-quote?managed=1" className="rounded-lg border border-white/15 px-5 py-2.5 text-sm font-bold text-white hover:border-gold/40 hover:text-gold">MANAGE MULTIPLE PROPERTIES? TALK WITH PINNACLE</Link>
+                <ViewTransitionLink to="/str-quote" className="rounded-lg bg-gold px-5 py-2.5 text-sm font-bold text-navy-950 hover:bg-gold-300">GET A TURNOVER QUOTE</ViewTransitionLink>
+                <ViewTransitionLink to="/str-quote?managed=1" className="rounded-lg border border-white/15 px-5 py-2.5 text-sm font-bold text-white hover:border-gold/40 hover:text-gold">MANAGE MULTIPLE PROPERTIES? TALK WITH PINNACLE</ViewTransitionLink>
               </div>
             </Reveal>
           </div>
@@ -109,7 +109,7 @@ export default function StrTurnover() {
                   <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">Start here</p>
                   <h3 className="mt-3 font-display text-lg font-bold text-white">Ready for a guest-ready property?</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-400">Get your turnover price in writing today.</p>
-                  <Link to="/str-quote" className="mt-4 inline-flex text-sm font-bold text-gold hover:underline">Get a turnover quote →</Link>
+                  <ViewTransitionLink to="/str-quote" className="mt-4 inline-flex text-sm font-bold text-gold hover:underline">Get a turnover quote →</ViewTransitionLink>
                 </li>
               </Reveal>
             </ol>
@@ -136,7 +136,7 @@ export default function StrTurnover() {
                       ))}
                     </ul>
                     <p className="mt-5 rounded-lg border border-white/10 bg-navy-950/40 p-3 text-[11px] leading-5 text-slate-400">{pkg.note}</p>
-                    <Link to={pkg.key === 'managed' ? '/str-quote?managed=1' : '/str-quote'} className={`mt-6 rounded-lg px-4 py-2.5 text-center text-sm font-bold ${pkg.featured ? 'bg-gold text-navy-950 hover:bg-gold-300' : 'border border-white/15 text-white hover:border-gold/40 hover:text-gold'}`}>Get a quote</Link>
+                    <ViewTransitionLink to={pkg.key === 'managed' ? '/str-quote?managed=1' : '/str-quote'} className={`mt-6 rounded-lg px-4 py-2.5 text-center text-sm font-bold ${pkg.featured ? 'bg-gold text-navy-950 hover:bg-gold-300' : 'border border-white/15 text-white hover:border-gold/40 hover:text-gold'}`}>Get a quote</ViewTransitionLink>
                   </article>
                 </Reveal>
               ))}
@@ -187,8 +187,8 @@ export default function StrTurnover() {
               <h2 className="mt-3 font-display text-3xl font-bold tracking-[-.03em] text-white sm:text-4xl">Your next guest should never see your last turnover.</h2>
               <p className="mt-4 text-base leading-7 text-slate-400">Tell us about the property and how often it turns over. A real person replies within two business hours with your pricing in writing.</p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
-                <Link to="/str-quote" className="rounded-lg bg-gold px-6 py-3 text-sm font-bold text-navy-950 hover:bg-gold-300">GET A TURNOVER QUOTE</Link>
-                <Link to="/contact" className="rounded-lg border border-white/15 px-6 py-3 text-sm font-bold text-white hover:border-gold/40 hover:text-gold">Talk to Pinnacle</Link>
+                <ViewTransitionLink to="/str-quote" className="rounded-lg bg-gold px-6 py-3 text-sm font-bold text-navy-950 hover:bg-gold-300">GET A TURNOVER QUOTE</ViewTransitionLink>
+                <ViewTransitionLink to="/contact" className="rounded-lg border border-white/15 px-6 py-3 text-sm font-bold text-white hover:border-gold/40 hover:text-gold">Talk to Pinnacle</ViewTransitionLink>
               </div>
             </Reveal>
           </div>

@@ -1,12 +1,19 @@
-import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { Reveal } from '../../components/public/motion'
 import { btnOutline, btnPrimary } from '../../components/public/ui'
+import { Breadcrumbs, BreadcrumbSlot } from '../../components/public/Breadcrumbs'
+import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { BrandMark3D } from '../../components/ui'
 import { services, type ServiceInfo } from '../../data/services'
 import { usePageMeta } from '../../lib/usePageMeta'
+import { usePublicVisitor } from '../../lib/publicContext'
+import type { OperatingWorld } from '../../../shared/workspace'
 import { CaseStudyStrip } from '../../components/public/Proof'
+
+const HUB_WORLD: Record<'business'|'property'|'mobile', OperatingWorld> = { business: 'business', property: 'property', mobile: 'documents' }
+const HUB_LABEL: Record<'business'|'property'|'mobile', string> = { business: 'Business Support', property: 'Property Support', mobile: 'Document & Signing Support' }
 
 const HUB_INTAKE: Record<'business'|'property'|'mobile', { to: string; cta: string; secondaryCta: string }> = {
   business: { to: '/scope-request?world=business&source=business-hub', cta: 'Request operations support', secondaryCta: 'Start an operations request' },
@@ -76,35 +83,39 @@ const HUBS: Record<'business'|'property'|'mobile', HubConfig> = {
   },
 }
 
-function ServiceRow({ service }: { service: ServiceInfo }) {
+function ServiceRow({ service, world }: { service: ServiceInfo; world: OperatingWorld }) {
+  const visitor = usePublicVisitor()
   return (
-    <Link to={`/services/${service.slug}`} className="group grid gap-4 border-t border-white/10 py-6 transition-colors hover:border-gold/35 sm:grid-cols-[minmax(180px,.65fr)_1.35fr_auto] sm:items-center">
+    <ViewTransitionLink to={`/services/${service.slug}`} onClick={() => { if (world !== 'general') visitor.setWorld(world) }} className="group grid gap-4 border-t border-white/10 py-6 transition-colors hover:border-gold/35 sm:grid-cols-[minmax(180px,.65fr)_1.35fr_auto] sm:items-center">
       <div><p className="text-xs font-semibold uppercase tracking-[.13em] text-gold/75">{service.tag}</p><h3 className="mt-2 text-lg font-semibold text-white transition group-hover:text-gold">{service.title}</h3></div>
       <p className="max-w-2xl text-sm leading-6 text-slate-400">{service.shortDescription}</p>
       <span className="text-sm font-medium text-gold">View service <span className="inline-block transition-transform group-hover:translate-x-1">→</span></span>
-    </Link>
+    </ViewTransitionLink>
   )
 }
 
 function HubPage({ hub }: { hub: keyof typeof HUBS }) {
   const cfg = HUBS[hub]
   const hubServices = cfg.serviceSlugs.map((slug) => services.find((service) => service.slug === slug)).filter(Boolean) as ServiceInfo[]
+  const visitor = usePublicVisitor()
+  useEffect(() => { visitor.setWorld(HUB_WORLD[hub]) }, [hub])
   usePageMeta(cfg.metaTitle, cfg.metaDescription)
 
   return <div className="min-h-screen bg-navy-950"><Header/><main>
+    <BreadcrumbSlot><Breadcrumbs items={[{ label: HUB_LABEL[hub] }]} /></BreadcrumbSlot>
     <section className="pmv-hero-story relative overflow-hidden border-b border-white/[.08]">
       <div className="pmv-hero-gold" aria-hidden="true" />
-      <div className="container-pmv grid gap-10 py-16 sm:py-20 lg:grid-cols-[1.12fr_.88fr] lg:items-center lg:py-24">
-        <Reveal><p className="eyebrow">{cfg.eyebrow}</p><h1 className="mt-4 max-w-4xl font-display text-4xl font-medium leading-[1.06] tracking-[-.03em] text-white sm:text-6xl">{cfg.title}</h1><p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{cfg.intro}</p><p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">{cfg.statement}</p><div className="mt-8 flex flex-wrap gap-3"><Link to={HUB_INTAKE[hub].to} className={btnPrimary}>{HUB_INTAKE[hub].cta}</Link>{hub==='property'&&<Link to="/instant-quote" className={btnOutline}>Instant Cleaning / Inspection Estimate</Link>}<Link to="/services" className={btnOutline}>All Services</Link></div></Reveal>
+      <div className="container-pmv grid gap-10 py-12 sm:py-16 lg:grid-cols-[1.12fr_.88fr] lg:items-center lg:py-20">
+        <Reveal><p className="eyebrow">{cfg.eyebrow}</p><h1 className="pmv-h1 mt-4 max-w-4xl">{cfg.title}</h1><p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{cfg.intro}</p><p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">{cfg.statement}</p><div className="mt-8 flex flex-wrap gap-3"><ViewTransitionLink to={HUB_INTAKE[hub].to} className={btnPrimary}>{HUB_INTAKE[hub].cta}</ViewTransitionLink>{hub==='property'&&<ViewTransitionLink to="/instant-quote" className={btnOutline}>Instant Cleaning / Inspection Estimate</ViewTransitionLink>}<ViewTransitionLink to="/services" className={btnOutline}>All Services</ViewTransitionLink></div></Reveal>
         <Reveal className="relative flex min-h-[300px] items-center justify-center"><BrandMark3D size={200} decorative variant="quiet" className="relative z-10"/></Reveal>
       </div>
     </section>
 
     <section className="container-pmv py-14 sm:py-18"><Reveal className="grid gap-10 lg:grid-cols-[.7fr_1.3fr]"><div><p className="eyebrow">Where we help</p><h2 className="mt-3 font-display text-3xl font-medium text-white">Common reasons clients bring this work to Pinnacle.</h2></div><div className="grid gap-x-10 sm:grid-cols-2">{cfg.themes.map(([title,body])=><div key={title} className="border-t border-gold/25 py-5"><h3 className="font-semibold text-white">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{body}</p></div>)}</div></Reveal></section>
 
-    <section className="border-y border-white/[.08] bg-navy-900/30"><div className="container-pmv py-14 sm:py-18"><Reveal className="mb-7 max-w-3xl"><p className="eyebrow">Services</p><h2 className="mt-3 font-display text-3xl font-medium text-white sm:text-4xl">Choose a service, or start with the situation.</h2><p className="mt-4 text-sm leading-7 text-slate-400">These pages explain the typical scope in more detail. If your need crosses categories, start a request and we can help organize it.</p></Reveal><div className="border-b border-white/10">{hubServices.map((service)=><ServiceRow key={service.slug} service={service}/>)}</div></div></section>
+    <section className="border-y border-white/[.08] bg-navy-900/30"><div className="container-pmv py-14 sm:py-18"><Reveal className="mb-7 max-w-3xl"><p className="eyebrow">Services</p><h2 className="mt-3 font-display text-3xl font-medium text-white sm:text-4xl">Choose a service, or start with the situation.</h2><p className="mt-4 text-sm leading-7 text-slate-400">These pages explain the typical scope in more detail. If your need crosses categories, start a request and we can help organize it.</p></Reveal><div className="border-b border-white/10">{hubServices.map((service)=><ServiceRow key={service.slug} service={service} world={HUB_WORLD[hub]}/>)}</div></div></section>
 
-    <section className="container-pmv py-14 sm:py-18"><Reveal className="grid gap-8 border-y border-gold/20 py-9 lg:grid-cols-[1fr_auto] lg:items-center"><div><p className="eyebrow">Ready to start this work?</p><h2 className="mt-2 font-display text-3xl font-medium text-white">This path stays in {cfg.eyebrow.toLowerCase()}.</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">You will not be sent through a generic catch-all form. The questions, portal, and follow-through match this operating world.</p></div><Link to={`${HUB_INTAKE[hub].to}-bottom`} className={btnPrimary}>{HUB_INTAKE[hub].secondaryCta}</Link></Reveal></section>
+    <section className="container-pmv py-14 sm:py-18"><Reveal className="grid gap-8 border-y border-gold/20 py-9 lg:grid-cols-[1fr_auto] lg:items-center"><div><p className="eyebrow">Ready to start this work?</p><h2 className="mt-2 font-display text-3xl font-medium text-white">This path stays in {cfg.eyebrow.toLowerCase()}.</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">You will not be sent through a generic catch-all form. The questions, portal, and follow-through match this operating world.</p></div><ViewTransitionLink to={`${HUB_INTAKE[hub].to}-bottom`} className={btnPrimary}>{HUB_INTAKE[hub].secondaryCta}</ViewTransitionLink></Reveal></section>
     <CaseStudyStrip serviceKey={HUB_PROOF_SERVICE[hub]} className="border-t border-white/10"/>
   </main><Footer/></div>
 }

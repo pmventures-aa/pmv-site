@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { btnOutline, btnPrimary, PageIntro, panelCls } from '../../components/public/ui'
@@ -47,7 +47,7 @@ export default function Contact() {
         />
 
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link to={GET_HELP} className={btnPrimary}>Start a Request</Link>
+          <ViewTransitionLink to={GET_HELP} className={btnPrimary}>Start a Request</ViewTransitionLink>
           <a href="/portal/login" className={btnOutline}>Existing Client? Sign In</a>
         </div>
 

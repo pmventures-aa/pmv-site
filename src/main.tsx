@@ -35,8 +35,10 @@ import QuoteView from './pages/public/QuoteView'
 import CarePlans, { CarePlansConfirmation } from './pages/public/CarePlans'
 import StrTurnover from './pages/public/StrTurnover'
 import StrQuote from './pages/public/StrQuote'
+import NotFound from './pages/public/NotFound'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
+import { PublicVisitorProvider } from './lib/publicContext'
 import { installAudioUnlock } from './lib/sound'
 import { AppToaster } from './components/kit/Toaster'
 import { LoadingScreen } from './components/LoadingScreen'
@@ -82,44 +84,46 @@ function App() {
     return <Suspense fallback={<SurfaceFallback variant="orb" label="Loading your portal…" />}><Routes><Route path="/*" element={<PortalApp basePath="" />} /></Routes></Suspense>
   }
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/services" element={<ServicesOverview />} />
-      <Route path="/services/business-operations" element={<BusinessOperationsHub />} />
-      <Route path="/services/property-field" element={<PropertyFieldHub />} />
-      <Route path="/services/mobile-documents" element={<MobileDocumentHub />} />
-      <Route path="/services/:slug" element={<ServiceDetail />} />
-      <Route path="/projects/:slug" element={<ProjectGuidePage />} />
-      <Route path="/scope-request" element={<ScopeRequest />} />
-      <Route path="/scope-request/confirmation" element={<ScopeConfirmation />} />
-      <Route path="/start" element={<Navigate to="/scope-request" replace />} />
-      <Route path="/start-a-request" element={<Navigate to="/scope-request" replace />} />
-      <Route path="/request-assistance" element={<Navigate to="/scope-request" replace />} />
-      <Route path="/how-it-works" element={<HowItWorks />} />
-      <Route path="/resources" element={<Resources />} />
-      <Route path="/instant-quote" element={<InstantQuote />} />
-      <Route path="/quote/:token" element={<QuoteView />} />
-      <Route path="/care-plans" element={<CarePlans />} />
-      <Route path="/care-plans/confirmation" element={<CarePlansConfirmation />} />
-      <Route path="/short-term-rental-support" element={<StrTurnover />} />
-      <Route path="/str-quote" element={<StrQuote />} />
-      <Route path="/about" element={<About />} />
-      <Route path="/service-area" element={<ServiceArea />} />
-      <Route path="/professionals" element={<Professionals />} />
-      <Route path="/work-with-pinnacle" element={<Navigate to="/professionals" replace />} />
-      <Route path="/contact" element={<Contact />} />
-      <Route path="/terms" element={<Terms />} />
-      <Route path="/privacy" element={<Privacy />} />
-      <Route path="/electronic-communications" element={<ElectronicCommunications />} />
-      <Route path="/accessibility" element={<Accessibility />} />
-      <Route path="/provider-agreement" element={<ProviderAgreement />} />
-      <Route path="/verify" element={<VerifyDocument />} />
-      <Route path="/sign/:token" element={<SignerExperience />} />
-      <Route path="/shared/:token" element={<SharedDocument />} />
-      <Route path="/portal/*" element={<Suspense fallback={<SurfaceFallback />}><PortalApp basePath="/portal" /></Suspense>} />
-      <Route path="/admin/*" element={<Suspense fallback={<SurfaceFallback />}><AdminApp basePath="/admin" /></Suspense>} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <PublicVisitorProvider>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/services" element={<ServicesOverview />} />
+        <Route path="/services/business-operations" element={<BusinessOperationsHub />} />
+        <Route path="/services/property-field" element={<PropertyFieldHub />} />
+        <Route path="/services/mobile-documents" element={<MobileDocumentHub />} />
+        <Route path="/services/:slug" element={<ServiceDetail />} />
+        <Route path="/projects/:slug" element={<ProjectGuidePage />} />
+        <Route path="/scope-request" element={<ScopeRequest />} />
+        <Route path="/scope-request/confirmation" element={<ScopeConfirmation />} />
+        <Route path="/start" element={<Navigate to="/scope-request" replace />} />
+        <Route path="/start-a-request" element={<Navigate to="/scope-request" replace />} />
+        <Route path="/request-assistance" element={<Navigate to="/scope-request" replace />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/resources" element={<Resources />} />
+        <Route path="/instant-quote" element={<InstantQuote />} />
+        <Route path="/quote/:token" element={<QuoteView />} />
+        <Route path="/care-plans" element={<CarePlans />} />
+        <Route path="/care-plans/confirmation" element={<CarePlansConfirmation />} />
+        <Route path="/short-term-rental-support" element={<StrTurnover />} />
+        <Route path="/str-quote" element={<StrQuote />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/service-area" element={<ServiceArea />} />
+        <Route path="/professionals" element={<Professionals />} />
+        <Route path="/work-with-pinnacle" element={<Navigate to="/professionals" replace />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/electronic-communications" element={<ElectronicCommunications />} />
+        <Route path="/accessibility" element={<Accessibility />} />
+        <Route path="/provider-agreement" element={<ProviderAgreement />} />
+        <Route path="/verify" element={<VerifyDocument />} />
+        <Route path="/sign/:token" element={<SignerExperience />} />
+        <Route path="/shared/:token" element={<SharedDocument />} />
+        <Route path="/portal/*" element={<Suspense fallback={<SurfaceFallback />}><PortalApp basePath="/portal" /></Suspense>} />
+        <Route path="/admin/*" element={<Suspense fallback={<SurfaceFallback />}><AdminApp basePath="/admin" /></Suspense>} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </PublicVisitorProvider>
   )
 }
 

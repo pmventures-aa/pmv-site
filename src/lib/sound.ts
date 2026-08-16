@@ -95,3 +95,32 @@ export function playWelcomeSound(surface: 'client' | 'staff' = 'client') {
     tone([587.33, 739.99, 880], 0.1, 0.085, 0.31)
   }
 }
+
+// Optional public micro-sound feedback. Defaults to OFF. Only meaningful
+// direct interactions play sound (step complete, request submitted) and the
+// preference is persisted locally. Audio is never required: if it fails or is
+// disabled the UI behaves identically.
+const PUBLIC_SOUND_KEY = 'pmv_sound_effects'
+
+export function publicSoundEnabled(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(PUBLIC_SOUND_KEY) === 'on'
+}
+
+export function setPublicSoundEnabled(enabled: boolean) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(PUBLIC_SOUND_KEY, enabled ? 'on' : 'off')
+}
+
+export type PublicSoundKind = 'step' | 'success'
+
+export function playPublicSound(kind: PublicSoundKind) {
+  if (!publicSoundEnabled()) return
+  primeAudio()
+  if (kind === 'success') {
+    tone([659.25, 880, 1108.73], 0.07, 0.1, 0.3)
+    pulseDevice(40)
+  } else {
+    tone([587.33], 0, 0.06, 0.12)
+  }
+}

@@ -28,3 +28,20 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Subtle cross-fade for same-document navigation (View Transition API).
+ * Purely progressive: unsupported browsers never see these styles. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) {
+    animation: pmv-vt-out 180ms cubic-bezier(.25, 1, .5, 1) both;
+  }
+  ::view-transition-new(root) {
+    animation: pmv-vt-in 300ms cubic-bezier(.25, 1, .5, 1) both;
+  }
+}
+@keyframes pmv-vt-out {
+  to { opacity: 0; transform: translateY(-4px); }
+}
+@keyframes pmv-vt-in {
+  from { opacity: 0; transform: translateY(6px); }
+}

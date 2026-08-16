@@ -60,6 +60,40 @@ select option, select optgroup { background: #081525; color: #f1f5f9; }
   .enterprise-grid { background-image:none; }
 }
 
+/* Shared public typography scale. Fluid clamps keep hero/h1 sizes readable
+ * across 375px through wide desktop without per-page pixel hacks. */
+.pmv-h1 {
+  font-family: Manrope, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-size: clamp(2.3rem, 7vw, 4.5rem);
+  color: #fff;
+  text-wrap: balance;
+}
+.pmv-h2 {
+  font-family: Manrope, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  font-size: clamp(1.85rem, 4.6vw, 3rem);
+  color: #fff;
+  text-wrap: balance;
+}
+.pmv-h3 {
+  font-family: Manrope, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  font-size: clamp(1.2rem, 2.6vw, 1.5rem);
+  color: #fff;
+}
+.pmv-lede {
+  font-size: clamp(1rem, 2vw, 1.22rem);
+  line-height: 1.7;
+  color: #cbd5e1;
+}
+
 .theme-toggle { display:inline-flex; align-items:center; gap:2px; padding:3px; border:1px solid rgba(255,255,255,.12); border-radius:10px; background:rgba(255,255,255,.035); }
 .theme-toggle button { border:0; border-radius:7px; padding:5px 8px; background:transparent; color:#94a3b8; font-size:11px; font-weight:600; cursor:pointer; }
 .theme-toggle button:hover { color:#f8fafc; }
