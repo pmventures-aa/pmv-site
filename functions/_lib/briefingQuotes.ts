@@ -1,6 +1,14 @@
 import { quotes as localQuotes, quoteFromSeed, type Quote as LocalQuote } from '../../src/data/quotes'
 
-const QUOTABLE_BASE = 'https://api.quotable.io'
+// Live briefing quote source. Quotable.io went dark late 2024, so we now
+// call ZenQuotes (https://zenquotes.io/api) which is free, no auth, and
+// returns a batch of 50 quotes in one call. We cache that batch in KV for
+// 24h so a single fetch serves every user for the day. If ZenQuotes is
+// unreachable we fall back to a well-known public dataset (DummyJSON)
+// before finally falling back to the local Pinnacle library. The local
+// library is only ever seen on total network failure.
+const ZEN_BATCH_URL = 'https://zenquotes.io/api/quotes'
+const DUMMY_BATCH_URL = 'https://dummyjson.com/quotes?limit=100'
 const POOL_CACHE_KEY_PREFIX = 'briefing-quote-pool:'
 const POOL_TTL_SECONDS = 86_400
 
@@ -9,14 +17,11 @@ export type BriefingQuote = {
   author: string
   theme: string
   prompt?: string
-  source: 'quotable' | 'local'
+  source: 'zenquotes' | 'dummyjson' | 'local'
 }
 
-type QuotableResponse = {
-  content?: string
-  author?: string
-  tags?: string[]
-}
+type ZenQuote = { q?: string; a?: string }
+type DummyQuote = { quote?: string; author?: string }
 
 function poolCacheKey(date = new Date()): string {
   return `${POOL_CACHE_KEY_PREFIX}${date.toISOString().slice(0, 10)}`
@@ -41,27 +46,37 @@ function localToBriefing(quote: LocalQuote): BriefingQuote {
   }
 }
 
-function mapQuotable(item: QuotableResponse): BriefingQuote | null {
-  const text = typeof item.content === 'string' ? item.content.trim() : ''
-  const author = typeof item.author === 'string' ? item.author.trim() : ''
+function mapZen(item: ZenQuote): BriefingQuote | null {
+  const text = typeof item.q === 'string' ? item.q.trim() : ''
+  const author = typeof item.a === 'string' ? item.a.trim() : ''
   if (!text || !author) return null
-  const theme = Array.isArray(item.tags) && item.tags.length ? item.tags[0] : 'wisdom'
-  return {
-    text,
-    author,
-    theme,
-    source: 'quotable',
-  }
+  return { text, author, theme: 'wisdom', source: 'zenquotes' }
 }
 
-async function fetchQuotablePool(): Promise<BriefingQuote[]> {
-  const url = `${QUOTABLE_BASE}/quotes/random?limit=24&tags=business|wisdom|success|inspirational|motivational`
-  const res = await fetch(url, { headers: { accept: 'application/json' } })
-  if (!res.ok) throw new Error(`quotable ${res.status}`)
-  const payload = await res.json() as QuotableResponse[] | QuotableResponse
-  const rows = Array.isArray(payload) ? payload : [payload]
-  const mapped = rows.map(mapQuotable).filter((item): item is BriefingQuote => !!item)
-  if (!mapped.length) throw new Error('quotable returned no quotes')
+function mapDummy(item: DummyQuote): BriefingQuote | null {
+  const text = typeof item.quote === 'string' ? item.quote.trim() : ''
+  const author = typeof item.author === 'string' ? item.author.trim() : ''
+  if (!text || !author) return null
+  return { text, author, theme: 'wisdom', source: 'dummyjson' }
+}
+
+async function fetchZenQuotesPool(): Promise<BriefingQuote[]> {
+  const res = await fetch(ZEN_BATCH_URL, { headers: { accept: 'application/json' } })
+  if (!res.ok) throw new Error(`zenquotes ${res.status}`)
+  const payload = await res.json() as ZenQuote[]
+  const rows = Array.isArray(payload) ? payload : []
+  const mapped = rows.map(mapZen).filter((item): item is BriefingQuote => !!item)
+  if (!mapped.length) throw new Error('zenquotes returned no quotes')
+  return mapped
+}
+
+async function fetchDummyJsonPool(): Promise<BriefingQuote[]> {
+  const res = await fetch(DUMMY_BATCH_URL, { headers: { accept: 'application/json' } })
+  if (!res.ok) throw new Error(`dummyjson ${res.status}`)
+  const payload = await res.json() as { quotes?: DummyQuote[] }
+  const rows = Array.isArray(payload?.quotes) ? payload.quotes : []
+  const mapped = rows.map(mapDummy).filter((item): item is BriefingQuote => !!item)
+  if (!mapped.length) throw new Error('dummyjson returned no quotes')
   return mapped
 }
 
@@ -74,17 +89,22 @@ async function loadQuotePool(env: { SESSIONS: KVNamespace }): Promise<BriefingQu
     // KV read issues should not block the endpoint.
   }
 
-  try {
-    const fresh = await fetchQuotablePool()
+  // Preferred source first, then a documented public fallback, then finally
+  // the local Pinnacle library. Every successful upstream fetch is cached
+  // in KV for 24h so the outbound network cost is one call per day per
+  // deployment.
+  for (const fetchFn of [fetchZenQuotesPool, fetchDummyJsonPool]) {
     try {
-      await env.SESSIONS.put(cacheKey, JSON.stringify(fresh), { expirationTtl: POOL_TTL_SECONDS })
-    } catch {
-      // Cache write failure is non-fatal.
+      const fresh = await fetchFn()
+      try {
+        await env.SESSIONS.put(cacheKey, JSON.stringify(fresh), { expirationTtl: POOL_TTL_SECONDS })
+      } catch {}
+      return fresh
+    } catch (err) {
+      console.warn('[briefing-quote] upstream failed', err)
     }
-    return fresh
-  } catch {
-    return localQuotes.map(localToBriefing)
   }
+  return localQuotes.map(localToBriefing)
 }
 
 export async function getBriefingQuote(env: { SESSIONS: KVNamespace }, seed = ''): Promise<BriefingQuote> {

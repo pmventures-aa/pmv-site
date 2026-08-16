@@ -233,9 +233,7 @@ select.input {
 
 .pmv-sky-mark {
   display: block;
-  width: 168px;
-  height: 112px;
-  border-radius: 18px;
+  border-radius: 14px;
   overflow: hidden;
 }
 
@@ -244,6 +242,13 @@ select.input {
   transform-origin: center;
   animation: pmv-sky-breathe 16s ease-in-out infinite;
 }
+/* Time-of-day: the sun moves along a subtle arc so the mark is visibly
+   alive instead of a static square. Motion is muted (a few vertical
+   pixels) so it feels ambient and never distracts. */
+.pmv-sky-sun-sunrise { animation: pmv-sky-rise 14s ease-in-out infinite; }
+.pmv-sky-sun-day     { animation: pmv-sky-cruise 22s ease-in-out infinite; }
+.pmv-sky-sun-sunset  { animation: pmv-sky-set 14s ease-in-out infinite; }
+.pmv-sky-sun-night   { animation: pmv-sky-drift-slow 26s ease-in-out infinite; }
 
 .pmv-sky-haze {
   animation: pmv-sky-drift 22s ease-in-out infinite;
@@ -276,6 +281,25 @@ select.input {
 @keyframes pmv-sky-breathe {
   0%, 100% { transform: translate3d(0,0,0) scale(1); opacity: 1; }
   50% { transform: translate3d(0,-2px,0) scale(1.04); opacity: .92; }
+}
+@keyframes pmv-sky-rise {
+  0% { transform: translate3d(0,10px,0); opacity: .55; }
+  50% { transform: translate3d(2px,-6px,0); opacity: 1; }
+  100% { transform: translate3d(4px,-2px,0); opacity: .92; }
+}
+@keyframes pmv-sky-cruise {
+  0% { transform: translate3d(-6px,2px,0); }
+  50% { transform: translate3d(0,-3px,0); }
+  100% { transform: translate3d(6px,2px,0); }
+}
+@keyframes pmv-sky-set {
+  0% { transform: translate3d(0,-4px,0); opacity: 1; }
+  50% { transform: translate3d(-2px,4px,0); opacity: .95; }
+  100% { transform: translate3d(-6px,10px,0); opacity: .55; }
+}
+@keyframes pmv-sky-drift-slow {
+  0%, 100% { transform: translate3d(0,0,0); opacity: .95; }
+  50% { transform: translate3d(4px,-2px,0); opacity: 1; }
 }
 
 @keyframes pmv-sky-drift {

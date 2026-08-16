@@ -88,7 +88,7 @@ export function DashboardWelcome({
       <div className={`pointer-events-none absolute inset-0 pmv-welcome-wash pmv-welcome-wash-${time.period}`} />
       <div className="relative grid gap-6 p-5 sm:p-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(280px,.95fr)] xl:items-center xl:gap-10">
         <div className="flex items-center gap-4 sm:gap-5">
-          <SkyMark period={time.period} className="h-[88px] w-[132px] shrink-0 shadow-[0_18px_40px_rgba(0,0,0,.28)] sm:h-[112px] sm:w-[168px]" />
+          <SkyMark period={time.period} className="h-14 w-[84px] shrink-0 shadow-[0_10px_24px_rgba(0,0,0,.24)] sm:h-[72px] sm:w-[108px] xl:h-[88px] xl:w-[132px]" />
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gold/85">{time.label}</p>
             <h1 className="mt-1.5 font-display text-3xl font-medium tracking-[-.03em] text-white sm:text-[2.15rem]">
