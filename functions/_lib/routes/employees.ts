@@ -1,14 +1,14 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
-import { requireNamedPermission } from '../capabilities'
+import { requireNamedPermission, hasNamedPermission } from '../capabilities'
 import { uuid } from '../crypto'
 
 export const employeeRoutes = new Hono<AppEnv>()
 
 employeeRoutes.get('/staff-directory', requireStaff, async (c) => {
   const res = await c.env.DB.prepare(
-    `SELECT u.id, u.full_name, u.email, tm.party_type, tm.vendor_category
+    `SELECT u.id, u.full_name, u.email, tm.party_type, tm.vendor_category, tm.availability_status
      FROM users u
      LEFT JOIN team_members tm ON tm.user_id = u.id
      WHERE u.role IN ('staff', 'admin') AND u.status = 'active'
@@ -118,8 +118,9 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
   })
 })
 
-employeeRoutes.patch('/employees/:id/network', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+employeeRoutes.patch('/employees/:id/network', requireStaff, async (c) => {
   const id = c.req.param('id') || ''
+  const me = c.get('user')
   const target = await c.env.DB.prepare(
     `SELECT u.id, u.role, tm.network_status, tm.availability_status, tm.is_preferred_provider, tm.service_area_summary, tm.staff_role, tm.party_type
      FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE u.id = ?`,
@@ -128,6 +129,9 @@ employeeRoutes.patch('/employees/:id/network', requireStaff, requireNamedPermiss
     is_preferred_provider: number | null; service_area_summary: string | null; staff_role: string | null; party_type: string | null
   }>()
   if (!target || !['staff', 'admin'].includes(target.role)) return c.json({ error: 'provider not found' }, 404)
+  const isSelf = id === me.id
+  const selfServiceVendor = isSelf && target.party_type === 'vendor'
+  if (!selfServiceVendor && !(await hasNamedPermission(c.env, me, 'manage_team'))) return c.json({ error: 'forbidden' }, 403)
   const body: Record<string, unknown> = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
   const networkStatus = body.network_status != null ? String(body.network_status) : (target.network_status || 'active')
   const availability = body.availability_status != null ? String(body.availability_status) : (target.availability_status || 'available')
@@ -135,6 +139,19 @@ employeeRoutes.patch('/employees/:id/network', requireStaff, requireNamedPermiss
   if (!['available','limited','unavailable'].includes(availability)) return c.json({ error: 'invalid availability status' }, 400)
   const preferred = body.is_preferred_provider != null ? (body.is_preferred_provider ? 1 : 0) : (target.is_preferred_provider ? 1 : 0)
   const area = body.service_area_summary != null ? (String(body.service_area_summary).slice(0,500) || null) : target.service_area_summary
+  // A vendor may only flip their own availability. Everything else in their
+  // network record (network status, preferred flag, service area) is owned by
+  // Network & Dispatch and stays untouched during self-service.
+  if (selfServiceVendor) {
+    const update = body.availability_status != null ? String(body.availability_status) : (target.availability_status || 'available')
+    if (!['available','limited','unavailable'].includes(update)) return c.json({ error: 'invalid availability status' }, 400)
+    await c.env.DB.prepare(
+      `INSERT INTO team_members(id,user_id,staff_role,party_type,network_status,availability_status,is_preferred_provider,service_area_summary)
+       VALUES(?,?,?,?,?,?,?,?)
+       ON CONFLICT(user_id) DO UPDATE SET availability_status = excluded.availability_status`,
+    ).bind(uuid(), id, target.staff_role || 'representative', target.party_type || 'employee', networkStatus, update, preferred, area).run()
+    return c.json({ ok: true })
+  }
   await c.env.DB.prepare(
     `INSERT INTO team_members(id,user_id,staff_role,party_type,network_status,availability_status,is_preferred_provider,service_area_summary)
      VALUES(?,?,?,?,?,?,?,?)
