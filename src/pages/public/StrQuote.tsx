@@ -99,12 +99,12 @@ export default function StrQuote() {
                     <label className="sm:col-span-2"><span className={labelCls}>Anything else we should know?</span><textarea className={`${inputCls} min-h-[80px]`} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Number of bedrooms, access details, scheduling needs…" /></label>
                   </div>
                   <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
-                    <label className="flex items-start gap-3 text-sm text-slate-200"><input type="checkbox" className="mt-0.5" checked={guestReadyPlus} onChange={(e) => setGuestReadyPlus(e.target.checked)} /><span><strong className="text-white">Guest Ready+</strong> — approved extras handled, supply restock tracked to par, priority scheduling.</span></label>
-                    <label className="flex items-start gap-3 text-sm text-slate-200"><input type="checkbox" className="mt-0.5" checked={managed} onChange={(e) => setManaged(e.target.checked)} /><span><strong className="text-white">Pinnacle Managed</strong> — month-to-month support with reservation feeds, auto-created turnovers, and supplies kept in stock.</span></label>
+                    <label className="flex items-start gap-3 text-sm text-slate-200"><input type="checkbox" className="mt-0.5" checked={guestReadyPlus} onChange={(e) => setGuestReadyPlus(e.target.checked)} /><span><strong className="text-white">Guest Ready+</strong> handles approved extras, tracks supply restock to par, and offers priority scheduling.</span></label>
+                    <label className="flex items-start gap-3 text-sm text-slate-200"><input type="checkbox" className="mt-0.5" checked={managed} onChange={(e) => setManaged(e.target.checked)} /><span><strong className="text-white">Pinnacle Managed</strong> provides month-to-month support with reservation feeds, auto-created turnovers, and supplies kept in stock.</span></label>
                   </div>
                   {error && <p className="mt-4 rounded-md border border-red-400/25 bg-red-400/[.06] px-3 py-2 text-sm text-red-100">{error}</p>}
                   <button type="submit" disabled={busy} className={`${btnPrimary} mt-6 disabled:opacity-60`}>{busy ? 'Sending…' : 'Get my turnover quote'}</button>
-                  <p className="mt-3 text-xs leading-5 text-slate-500">A real person reviews every request — no autoresponder maze. By submitting, you agree to our <Link to="/privacy" className="text-gold hover:underline">privacy policy</Link>.</p>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">A real person reviews every request, not an autoresponder maze. By submitting, you agree to our <Link to="/privacy" className="text-gold hover:underline">privacy policy</Link>.</p>
                 </form>
               </Reveal>
               <aside className="space-y-3">

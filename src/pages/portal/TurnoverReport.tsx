@@ -134,7 +134,7 @@ export default function TurnoverReport() {
             <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
               <div className="flex items-center gap-2 text-slate-300"><MapPin size={13} className="text-slate-500" />{t.property.address}</div>
               <div className="flex items-center gap-2 text-slate-300"><UserRound size={13} className="text-slate-500" />{t.provider_name}</div>
-              <div className="text-slate-300">{t.property.bedrooms != null ? `${t.property.bedrooms} bed${t.property.bedrooms === 1 ? '' : 's'}` : '—'} · {t.property.bathrooms || '—'} bath{t.property.bathrooms === '1' ? '' : 's'} · up to {t.property.max_guests ?? '—'} guests</div>
+              <div className="text-slate-300">{t.property.bedrooms != null ? `${t.property.bedrooms} bed${t.property.bedrooms === 1 ? '' : 's'}` : '–'} · {t.property.bathrooms || '–'} bath{t.property.bathrooms === '1' ? '' : 's'} · up to {t.property.max_guests ?? '–'} guests</div>
               <div className="text-slate-300">{t.property.platform || 'Direct'}</div>
             </dl>
           </Card>
@@ -158,7 +158,7 @@ export default function TurnoverReport() {
                               {i.status === 'not_applicable' && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-slate-500" />}
                               {i.label}
                               {i.required && <span className="ml-1.5 text-[10px] font-semibold uppercase text-slate-600">required</span>}
-                              {i.status === 'not_applicable' && i.not_applicable_reason && <span className="block text-xs text-slate-500">— {i.not_applicable_reason}</span>}
+                              {i.status === 'not_applicable' && i.not_applicable_reason && <span className="block text-xs text-slate-500">– {i.not_applicable_reason}</span>}
                             </span>
                             <span className="shrink-0 text-xs text-slate-500">
                               {i.status === 'complete' ? 'Done' : i.status === 'not_applicable' ? 'N/A' : 'Pending'}
@@ -208,7 +208,7 @@ export default function TurnoverReport() {
                 ))}
               </ul>
               {pendingDecisions.length > 0 && (
-                <p className="mt-3 text-xs leading-5 text-slate-500">Approving adds the agreed amount to your next turnover invoice. Declining means the work will not be billed — tell your Pinnacle contact if the issue itself still needs attention.</p>
+                <p className="mt-3 text-xs leading-5 text-slate-500">Approving adds the agreed amount to your next turnover invoice. Declining means the work will not be billed. Tell your Pinnacle contact if the issue itself still needs attention.</p>
               )}
             </Card>
           )}

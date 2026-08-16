@@ -53,7 +53,7 @@ export default function StrProviderTurnovers() {
     setBusyId(`${decision}-${id}`)
     try {
       await api.post(`/admin/str/turnovers/${id}/offer/${decision}`)
-      toast.success(decision === 'accept' ? 'Offer accepted — you are assigned.' : 'Offer declined.')
+      toast.success(decision === 'accept' ? 'Offer accepted. You are assigned.' : 'Offer declined.')
       await load()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not update the offer.')

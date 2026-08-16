@@ -33,7 +33,7 @@ export const services: ServiceInfo[] = [
     highlights: [
       'Tracked room-by-room checklist matched to your property',
       'Required completion photos and a verified finish before the next guest',
-      'Issues flagged with photos and approved extras — never surprise charges',
+      'Issues flagged with photos and approved extras, never surprise charges',
       'Reservation feeds and monthly managed support for busy calendars',
     ],
     idealFor: ['Short-term rental hosts and property owners', 'Out-of-area owners who want documented, verified turnovers', 'Hosts managing several calendars who want it to just work'],

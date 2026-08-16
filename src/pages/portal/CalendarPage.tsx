@@ -81,7 +81,7 @@ export default function CalendarPage() {
       <PageHeader
         eyebrow="Schedule"
         title="Calendar"
-        subtitle="Everything coming up — appointments, deadlines, and visits in one view."
+        subtitle="Everything coming up: appointments, deadlines, and visits in one view."
         action={(
           <RequestAppointmentDialog onCreated={() => void load()} />
         )}
@@ -154,7 +154,7 @@ function RequestAppointmentDialog({ onCreated }: { onCreated: () => void }) {
           <CalendarPlus size={15} /> Request appointment
         </button>
       </DialogTrigger>
-      <DialogContent title="Request an appointment" description="Tell Pinnacle a time that works for you — we will confirm or suggest an alternative.">
+      <DialogContent title="Request an appointment" description="Tell Pinnacle a time that works for you. We will confirm or suggest an alternative.">
         <div className="space-y-3">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-400">What is this about?</span>

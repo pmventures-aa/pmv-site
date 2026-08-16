@@ -118,7 +118,7 @@ export default function AdminCalendar() {
       <PageIntro
         kicker="Schedule"
         title="Calendar"
-        subtitle="Every appointment, deadline, visit, and signature window across your book of business — unified from the domain records that own them."
+        subtitle="Every appointment, deadline, visit, and signature window across your book of business, unified from the domain records that own them."
         action={<CreateEventDialog clients={clients} staff={staff} onCreated={() => void load()} />}
       />
 
@@ -272,11 +272,11 @@ function CreateEventDialog({ clients, staff, onCreated }: { clients: ClientOptio
       <button type="button" onClick={() => setOpen(true)} className={btnPrimary}>
         <Plus size={15} /> New event
       </button>
-      <DialogContent title="Create event" description="Schedule an appointment, meeting, or visit. Linked events stay read-only in the calendar — edit them where they live." size="lg">
+      <DialogContent title="Create event" description="Schedule an appointment, meeting, or visit. Linked events stay read-only in the calendar; edit them where they live." size="lg">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block sm:col-span-2">
             <span className="mb-1 block text-xs font-medium text-slate-400">Title</span>
-            <input className={inputCls} value={form.title} onChange={set('title')} placeholder="e.g. Property inspection — Boca rental" maxLength={300} />
+            <input className={inputCls} value={form.title} onChange={set('title')} placeholder="e.g. Property inspection, Boca rental" maxLength={300} />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-400">Starts</span>
