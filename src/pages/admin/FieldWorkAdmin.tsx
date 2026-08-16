@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Loader2, Plus, MapPin } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline, SkeletonTable } from '../../components/admin/ui'
 import { WizardProgress, WizardStep, WizardError, WizardFooter } from '../../components/admin/wizard'
 import { AddressAutocomplete } from '../../components/kit/AddressAutocomplete'
 import { useAppPath } from '../../lib/basePath'
@@ -190,9 +190,14 @@ export default function FieldWorkAdmin({ mode = 'field' }: { mode?: 'field' | 'r
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <Panel><SkeletonTable rows={5} cols={3} /></Panel>
       ) : filtered.length === 0 ? (
-        <Panel><EmptyState label="No assignments yet." /></Panel>
+        <Panel>
+          <EmptyState label={isRon ? 'No RON sessions yet.' : 'No field assignments yet.'} />
+          <div className="mt-4 flex justify-center">
+            <button type="button" onClick={() => setShowCreate(true)} className={btnPrimary}><Plus size={14} /> {isRon ? 'Create a RON session' : 'Create your first assignment'}</button>
+          </div>
+        </Panel>
       ) : (
         <Panel className="divide-y divide-white/5 !p-0">
           {filtered.map((a) => (

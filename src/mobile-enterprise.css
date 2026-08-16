@@ -139,6 +139,14 @@ body { -webkit-text-size-adjust: 100%; }
     -webkit-overflow-scrolling: touch;
   }
   .pmv-mobile-action-strip > * { flex: 0 0 auto; }
+  .pmv-mobile-action-strip::-webkit-scrollbar { display: none; }
+  .pmv-mobile-action-strip { scrollbar-width: none; }
+
+  /* Stacked mobile columns never spill the viewport */
+  .pmv-stack-mobile > * {
+    min-width: 0;
+    max-width: 100%;
+  }
 
   /* Sticky/fixed banners (impersonation, login notice) push page content
      down so they don't overlap the mobile header row */

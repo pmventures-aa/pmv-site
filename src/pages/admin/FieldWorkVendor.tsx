@@ -14,7 +14,7 @@ import {
   Type,
 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline, SkeletonTable } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
 import { Avatar } from '../../components/kit/Avatar'
@@ -213,7 +213,7 @@ export function FieldWorkList() {
         </button>
       </div>
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <Panel><SkeletonTable rows={5} cols={2} /></Panel>
       ) : list.length === 0 ? (
         <Panel>
           <EmptyState label={tab === 'active' ? 'No active assignments right now.' : 'No completed assignments yet.'} />
