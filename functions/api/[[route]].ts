@@ -77,6 +77,7 @@ import { loadWorkspaceContext } from '../_lib/workspaceContext'
 import { logAuth0StartupWarnings } from '../_lib/routes/auth0'
 import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
 import { portalCalendarRoutes, adminCalendarRoutes } from '../_lib/routes/calendarRoutes'
+import { strPublicRoutes, strAdminRoutes, strPortalRoutes } from '../_lib/routes/strRoutes'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -117,6 +118,7 @@ app.route('/', scopeFunnelPublicRoutes)
 app.route('/', quotePublicRoutes)
 app.route('/', carePlanPublicRoutes)
 app.route('/', managedTemplatePublicRoutes)
+app.route('/', strPublicRoutes)
 
 app.get('/me', requireUser, async (c) => {
   const user = c.get('user')
@@ -133,6 +135,7 @@ app.route('/portal', trustedContactRoutes)
 app.route('/portal', selfRoutes)
 app.route('/portal', portalRoutes)
 app.route('/portal', portalCalendarRoutes)
+app.route('/portal', strPortalRoutes)
 app.route('/portal', messageRoutes)
 app.route('/portal', presenceRoutes)
 
@@ -184,6 +187,7 @@ app.route('/admin', crmRoutes)
 app.route('/admin', fieldWorkRoutes)
 app.route('/admin', workAssignmentRoutes)
 app.route('/admin', adminCalendarRoutes)
+app.route('/admin', strAdminRoutes)
 app.route('/admin', casesRoutes)
 app.route('/admin', communicationBrandingAdminRoutes)
 app.route('/admin', presenceRoutes)

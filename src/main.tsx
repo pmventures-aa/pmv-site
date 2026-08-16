@@ -33,6 +33,8 @@ import ScopeConfirmation from './pages/public/ScopeConfirmation'
 import InstantQuote from './pages/public/InstantQuote'
 import QuoteView from './pages/public/QuoteView'
 import CarePlans, { CarePlansConfirmation } from './pages/public/CarePlans'
+import StrTurnover from './pages/public/StrTurnover'
+import StrQuote from './pages/public/StrQuote'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
 import { installAudioUnlock } from './lib/sound'
@@ -99,6 +101,8 @@ function App() {
       <Route path="/quote/:token" element={<QuoteView />} />
       <Route path="/care-plans" element={<CarePlans />} />
       <Route path="/care-plans/confirmation" element={<CarePlansConfirmation />} />
+      <Route path="/short-term-rental-support" element={<StrTurnover />} />
+      <Route path="/str-quote" element={<StrQuote />} />
       <Route path="/about" element={<About />} />
       <Route path="/service-area" element={<ServiceArea />} />
       <Route path="/professionals" element={<Professionals />} />

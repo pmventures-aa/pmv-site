@@ -500,6 +500,61 @@ const departmentPerformance: ReportDef = {
   },
 }
 
+const strOperations: ReportDef = {
+  key: 'str_operations',
+  label: 'STR Turnover Operations',
+  category: 'operations',
+  description: 'Turnover completions, on-time rate, average duration, at-risk count, issues, revenue, provider payout, and gross margin for the selected date range.',
+  run: async (ctx) => {
+    const s = scope(ctx, 't.client_user_id')
+    const base = `FROM turnovers t
+                  JOIN str_properties sp ON sp.property_id = t.property_id
+                  WHERE t.turnover_date BETWEEN ? AND ? AND ${s.where}`
+    const [totals, issues, byStatus, onTime] = await Promise.all([
+      ctx.env.DB.prepare(
+        `SELECT COUNT(*) AS completed,
+                COUNT(DISTINCT t.property_id) AS properties,
+                COALESCE(SUM(t.client_charge_cents), 0) AS revenue_cents,
+                COALESCE(SUM(t.provider_payout_cents), 0) AS payout_cents,
+                COALESCE(SUM(t.client_charge_cents) - SUM(t.provider_payout_cents), 0) AS margin_cents
+         ${base} AND t.status = 'completed'`,
+      ).bind(ctx.from, ctx.to, ...s.params).first(),
+      ctx.env.DB.prepare(
+        `SELECT COUNT(*) AS open_issues
+         FROM turnover_issues i JOIN turnovers t ON t.id = i.turnover_id
+         WHERE i.status = 'open' AND t.turnover_date BETWEEN ? AND ? AND ${s.where.replace(/t\.client_user_id/g, 't.client_user_id')}`,
+      ).bind(ctx.from, ctx.to, ...s.params).first(),
+      ctx.env.DB.prepare(
+        `SELECT t.status, COUNT(*) AS n ${base} GROUP BY t.status`,
+      ).bind(ctx.from, ctx.to, ...s.params).all(),
+      ctx.env.DB.prepare(
+        `SELECT COUNT(*) AS completed, COUNT(*) FILTER (WHERE t.required_complete_at IS NOT NULL AND t.completed_at IS NOT NULL AND t.completed_at <= t.required_complete_at) AS on_time
+         ${base} AND t.status = 'completed'`,
+      ).bind(ctx.from, ctx.to, ...s.params).first(),
+    ])
+    const completed = Number((totals as any)?.completed ?? 0)
+    const onTimeCompleted = Number((onTime as any)?.on_time ?? 0)
+    const revenue = Number((totals as any)?.revenue_cents ?? 0)
+    const payout = Number((totals as any)?.payout_cents ?? 0)
+    const margin = Number((totals as any)?.margin_cents ?? 0)
+    const atRisk = Number(((byStatus.results ?? []).find((r: any) => r.status === 'at_risk'))?.n ?? 0)
+    const onTimeRate = completed > 0 ? Math.round((onTimeCompleted / completed) * 1000) / 10 : 0
+    return {
+      columns: [
+        { key: 'completed', label: 'Turnovers completed' },
+        { key: 'properties', label: 'Properties served' },
+        { key: 'on_time_rate', label: 'On-time rate', type: 'percent' },
+        { key: 'at_risk', label: 'At-risk', type: 'number' },
+        { key: 'open_issues', label: 'Open issues', type: 'number' },
+        { key: 'revenue_cents', label: 'Revenue', type: 'money' },
+        { key: 'payout_cents', label: 'Provider payout', type: 'money' },
+        { key: 'margin_cents', label: 'Gross margin', type: 'money' },
+      ],
+      rows: [{ completed, properties: (totals as any)?.properties ?? 0, on_time_rate: onTimeRate, at_risk: atRisk, open_issues: (issues as any)?.open_issues ?? 0, revenue_cents: revenue, payout_cents: payout, margin_cents: margin }],
+    }
+  },
+}
+
 export const REPORTS: ReportDef[] = [
   totalLeads,
   newLeads,
@@ -531,6 +586,7 @@ export const REPORTS: ReportDef[] = [
   openProjects,
   projectCompletionRate,
   departmentPerformance,
+  strOperations,
 ]
 
 export const REPORTS_BY_KEY: Record<string, ReportDef> = Object.fromEntries(REPORTS.map((r) => [r.key, r]))

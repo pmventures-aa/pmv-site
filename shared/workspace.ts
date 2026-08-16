@@ -3,6 +3,7 @@ export type OperatingWorld = 'property' | 'documents' | 'business' | 'funding' |
 export const SERVICE_WORLD: Record<string, OperatingWorld> = {
   property_management: 'property',
   property_inspections: 'property',
+  str_turnover: 'property',
   mobile_notary: 'documents',
   remote_online_notary: 'documents',
   document_courier: 'documents',

@@ -129,6 +129,15 @@ const PHOTO_QUESTIONS: ScopeQuestion[] = propertyCore([
   q('access', 'Access for interior work', 'text', { hint: 'Lockbox, occupied appointment, vacant, or exterior only' }),
 ])
 
+const STR_QUESTIONS: ScopeQuestion[] = propertyCore([
+  q('property_type', 'Property type', 'select', { options: ['Vacation / STR', 'Single-family', 'Condo', 'Townhome', 'Multi-unit', 'Other'] }),
+  q('bedrooms', 'How many bedrooms?', 'select', { options: ['1', '2', '3', '4', '5+'] }),
+  q('frequency', 'How often are turnovers needed?', 'select', { options: ['One-time', '1-2 per month', '3-6 per month', '7+ per month', 'Managed calendar'] }),
+  q('turnover_date', 'Turnover or completion date', 'text', { hint: 'Check-out and next check-in window, if you know it' }),
+  q('guest_ready', 'How finished does it need to be?', 'select', { options: ['Guest ready with verified checklist', 'Clean only', 'Clean + move-in / move-out condition report'] }),
+  q('access', 'Access instructions', 'text', { when: { location: 'onsite' } }),
+])
+
 const EVICTION_QUESTIONS: ScopeQuestion[] = propertyCore([
   q('stage', 'Current stage', 'select', { options: ['Pre-notice', 'Notice served', 'Filed / awaiting hearing', 'Judgment entered', 'Writ / lockout scheduled', 'Post-possession'] }),
   q('county', 'Florida county', 'select', { options: ['Broward', 'Palm Beach', 'Miami-Dade', 'Other Florida county'] }),
@@ -363,6 +372,12 @@ export const SERVICE_ENTRIES: Record<string, ScopeEntry> = {
     body: 'Exterior verification, a BPO photo package, or a licensed Broker Price Opinion. Direct local coverage, not a national platform reseller.',
     pickerLabel: 'Field photos, verification, or a BPO',
   }, PHOTO_QUESTIONS),
+  'short-term-rental-support': entry('short-term-rental-support', 'cleaning_turnover', 'str_turnover', {
+    eyebrow: 'STR turnover support',
+    title: 'Tell us about the short-term rental turnover.',
+    body: 'Checklist, completion photos, issue handling, and guest-ready verification for every gap between checkout and check-in.',
+    pickerLabel: 'Clean or make a property rent-ready',
+  }, STR_QUESTIONS),
   'document-preparation': entry('document-preparation', 'documents_notary', 'admin_support', {
     eyebrow: 'Document preparation',
     title: 'Tell us about the document that needs to be prepared or filed.',

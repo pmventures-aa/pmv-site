@@ -45,6 +45,7 @@ export function Footer() {
               <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-gold">Property</p>
               <ul className="space-y-2.5 text-sm font-medium text-slate-400">
                 <li><Link to="/services/property-field" className="hover:text-gold">Property Support</Link></li>
+                <li><Link to="/short-term-rental-support" className="hover:text-gold">STR Turnover Support</Link></li>
                 <li><Link to="/services/property-inspections" className="hover:text-gold">Inspections</Link></li>
                 <li><Link to="/services/property-field" className="hover:text-gold">Vendor Coordination</Link></li>
               </ul>

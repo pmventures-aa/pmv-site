@@ -1,7 +1,7 @@
 import {
   Home, Layers, FileText, MessageSquare, Calendar, Receipt, HelpCircle, Building2, Users,
   Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned,
-  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, type LucideIcon,
+  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, type LucideIcon,
 } from 'lucide-react'
 import { clientWorkspace, type OperatingWorld } from '../../lib/workspace'
 
@@ -26,14 +26,18 @@ export function clientPortalNav(serviceKeys: string[]): NavItem[] {
   if (keys.has('property_management') || keys.has('property_inspections')) {
     extras.push({key:'properties',label:'Properties',to:'property-management',icon:Building2,section:'Your work'})
   }
+  if (keys.has('str_turnover')) {
+    extras.push({key:'turnovers',label:'Turnovers',to:'str/turnovers',icon:ClipboardCheck,section:'Your work'})
+  }
   if (keys.has('funding')) extras.push({key:'funding',label:'Funding',to:'funding',icon:Gauge,section:'Your work'})
 
   const home = portalNav[0]
   const work = portalNav.filter((item) => item.section === 'Your work')
   const account = portalNav.filter((item) => item.section === 'Account')
   const properties = extras.filter((item) => item.key === 'properties')
+  const turnovers = extras.filter((item) => item.key === 'turnovers')
   const funding = extras.filter((item) => item.key === 'funding')
-  return [home, work[0], ...properties, ...funding, ...work.slice(1), ...account]
+  return [home, work[0], ...properties, ...turnovers, ...funding, ...work.slice(1), ...account]
 }
 
 export function clientMobilePrimary(serviceKeys: string[]): string[] {
@@ -53,6 +57,7 @@ export const adminNav: NavItem[] = [
   {key:'cases',label:'Cases & SLA',to:'cases',icon:HelpCircle,section:'Operations'},
   {key:'calendar',label:'Calendar',to:'calendar',icon:Calendar,section:'Operations'},
   {key:'field-work',label:'Field Work & RON',to:'field-work',icon:MapPinned,section:'Operations'},
+  {key:'str-operations',label:'STR Turnovers',to:'str/operations',icon:DoorOpen,section:'Operations'},
   {key:'service-assignments',label:'Service Assignments',to:'service-assignments',icon:Wrench,section:'Operations'},
   {key:'document-center',label:'Documents',to:'document-center',icon:FileText,section:'Operations'},
   {key:'automation-center',label:'Automation Center',to:'automation-center',icon:Bot,section:'Operations'},
@@ -76,11 +81,15 @@ export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
     : world === 'documents'
       ? 'Signing assignments'
       : 'My assignments'
-  return [
+  const items: NavItem[] = [
     {key:'assignments',label:assignmentLabel,to:'field-work/mine',icon:MapPinned},
     {key:'messages',label:'Inbox',to:'messages',icon:MessageSquare,section:'Work'},
     {key:'security-center',label:'Security',to:'security-center',icon:ShieldCheck,section:'Account'},
   ]
+  if (world === 'property') {
+    items.splice(1, 0, {key:'str-turnovers',label:'STR Turnovers',to:'str/mine',icon:DoorOpen,section:'Work'})
+  }
+  return items
 }
 
 export const vendorNav: NavItem[] = vendorNavForWorld('general')

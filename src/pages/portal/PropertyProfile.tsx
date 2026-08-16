@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, HelpCircle, Wrench } from 'lucide-react'
+import { ArrowLeft, FileText, HelpCircle, Sparkles, Wrench } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { Card, EmptyState, PageHeader, StatusBadge } from '../../components/ui'
@@ -34,6 +34,7 @@ interface Property {
 interface RelatedMatter { id: string; title: string; type: string | null; status: string; due_date: string | null }
 interface RelatedTicket { id: string; subject: string; status: string; priority: string; waiting_on: string | null }
 interface RelatedDoc { id: string; file_name: string | null; category: string | null; review_status: string }
+interface RelatedTurnover { id: string; turnover_date: string; required_complete_at: string | null; client_status: string; client_description: string }
 
 export default function PropertyProfile() {
   const { id } = useParams()
@@ -42,6 +43,7 @@ export default function PropertyProfile() {
   const [matters, setMatters] = useState<RelatedMatter[]>([])
   const [tickets, setTickets] = useState<RelatedTicket[]>([])
   const [documents, setDocuments] = useState<RelatedDoc[]>([])
+  const [turnovers, setTurnovers] = useState<RelatedTurnover[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
@@ -50,11 +52,12 @@ export default function PropertyProfile() {
     if (!id) return
     setLoading(true)
     try {
-      const res = await api.get<{ property: Property; matters: RelatedMatter[]; tickets: RelatedTicket[]; documents: RelatedDoc[] }>(`/portal/property/${id}`)
+      const res = await api.get<{ property: Property; matters: RelatedMatter[]; tickets: RelatedTicket[]; documents: RelatedDoc[]; turnovers: RelatedTurnover[] }>(`/portal/property/${id}`)
       setProperty(res.property)
       setMatters(res.matters)
       setTickets(res.tickets)
       setDocuments(res.documents)
+      setTurnovers(res.turnovers ?? [])
       const row = res.property
       setForm({
         name: row.name || '',
@@ -141,6 +144,22 @@ export default function PropertyProfile() {
         </form>
 
         <aside className="space-y-3">
+          <Card className="!p-0">
+            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><Sparkles size={13} /> STR turnovers</p>
+              <Link to={p('str/turnovers')} className="text-xs font-semibold text-gold hover:underline">All</Link>
+            </div>
+            {turnovers.length === 0 ? <div className="p-3"><EmptyState label="No turnover reports for this property yet." /></div> : (
+              <ul className="divide-y divide-white/10">
+                {turnovers.map((t) => (
+                  <li key={t.id}><Link to={p(`str/turnovers/${t.id}`)} className="block px-3 py-2 hover:bg-white/[.03]">
+                    <p className="flex items-center justify-between gap-2 text-sm font-medium text-white">{t.turnover_date}<StatusBadge tone={t.client_status === 'Guest Ready' || t.client_status === 'Completed' ? 'green' : t.client_status === 'At Risk' ? 'red' : 'gold'}>{t.client_status}</StatusBadge></p>
+                    <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{t.client_description}</p>
+                  </Link></li>
+                ))}
+              </ul>
+            )}
+          </Card>
           <Card className="!p-0">
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><Wrench size={13} /> Work</p>

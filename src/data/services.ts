@@ -21,6 +21,26 @@ export interface ServiceInfo {
 // eviction - without a schema migration.
 export const services: ServiceInfo[] = [
   {
+    slug: 'short-term-rental-support',
+    key: 'str_turnover',
+    title: 'Short-Term Rental Turnover Support',
+    tag: 'Property Services',
+    popular: true,
+    planFamily: 'property',
+    shortDescription: 'Verified STR turnovers: tracked checklists, required photos, issue flagging, and a guest-ready report in your portal. Per-turnover pricing quoted in writing.',
+    heroDescription:
+      'A short-term rental lives or dies on the gap between checkout and check-in. Pinnacle runs that gap as one owned process: a tracked checklist, required completion photos, issues flagged the moment they appear, independent verification before the property is released, and a guest-ready report in your portal.',
+    highlights: [
+      'Tracked room-by-room checklist matched to your property',
+      'Required completion photos and a verified finish before the next guest',
+      'Issues flagged with photos and approved extras — never surprise charges',
+      'Reservation feeds and monthly managed support for busy calendars',
+    ],
+    idealFor: ['Short-term rental hosts and property owners', 'Out-of-area owners who want documented, verified turnovers', 'Hosts managing several calendars who want it to just work'],
+    offeringPrefixes: ['str-turnover'],
+    intakeJob: 'cleaning_turnover',
+  },
+  {
     slug: 'consulting',
     key: 'consulting',
     title: 'Business & Operations Consulting',

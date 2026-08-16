@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import {
-  ArrowRight, Building2, Calendar, FileText, Gauge, MessageSquare, Receipt, ShieldCheck, Users,
+  ArrowRight, Building2, Calendar, DoorOpen, FileText, Gauge, MessageSquare, Receipt, ShieldCheck, Users,
 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
@@ -44,6 +44,20 @@ interface DashboardData {
     last_client_update_at: string | null
     owner_name: string | null
   }[]
+  turnover_actions?: {
+    id: string
+    status: string
+    client_status: string
+    client_description: string
+    turnover_date: string
+    required_complete_at: string | null
+    property_address: string
+    property_nickname: string | null
+    bedrooms: number | null
+    bathrooms: number | null
+    max_guests: number | null
+    href: string
+  }[]
 }
 
 interface CatalogItem { key: string; name: string; category: string }
@@ -76,11 +90,13 @@ export default function Dashboard() {
   const stats = data?.stats
   const cases = data?.active_cases ?? []
   const matters = data?.active_matters ?? []
+  const turnovers = data?.turnover_actions ?? []
   const needsYou = cases.filter((item) => waitingOnYou(item.waiting_on))
   const waitingOnClient = matters.filter((item) => matterPresentation(item.responsibility_state, item.status).state === 'client')
   const pinnacleWorking = matters.filter((item) => matterPresentation(item.responsibility_state, item.status).state === 'pinnacle')
   const nextAppointment = data?.upcoming_appointments?.[0]
-  const clientActions = (stats?.pending_documents ?? 0) + (stats?.open_invoices ?? 0) + (stats?.open_tasks ?? 0) + (stats?.pending_quotes ?? 0) + needsYou.length + waitingOnClient.length
+  const turnoverAttention = turnovers.filter((t) => t.status === 'at_risk' || t.status === 'issue_reported')
+  const clientActions = (stats?.pending_documents ?? 0) + (stats?.open_invoices ?? 0) + (stats?.open_tasks ?? 0) + (stats?.pending_quotes ?? 0) + needsYou.length + waitingOnClient.length + turnoverAttention.length
 
   const nextMove = useMemo(() => {
     if (!loaded) return null
@@ -101,6 +117,16 @@ export default function Dashboard() {
         body: 'Pinnacle cannot move this request forward until you respond or send what was asked for.',
         to: p('support'),
         label: 'Open request',
+      }
+    }
+    if (turnoverAttention[0]) {
+      const t = turnoverAttention[0]
+      return {
+        eyebrow: 'Turnover needs attention',
+        title: `${t.property_nickname || t.property_address} — ${t.client_status}`,
+        body: t.client_description,
+        to: p(`str/turnovers/${t.id}`),
+        label: 'View turnover',
       }
     }
     if ((stats?.pending_quotes ?? 0) > 0) {
@@ -155,11 +181,12 @@ export default function Dashboard() {
       to: p('support'),
       label: 'Start a request',
     }
-  }, [loaded, waitingOnClient, needsYou, stats, nextAppointment, p])
+  }, [loaded, waitingOnClient, needsYou, turnoverAttention, stats, nextAppointment, p])
 
   const shortcutCatalog = {
     work: { label: 'Work', to: p('matters'), icon: Gauge, note: stats?.open_matters },
     properties: { label: 'Properties', to: p('property-management'), icon: Building2, note: data?.properties.length },
+    turnovers: { label: 'Turnovers', to: p('str/turnovers'), icon: DoorOpen, note: turnovers.length || undefined },
     documents: { label: 'Documents', to: p('documents'), icon: FileText, note: stats?.pending_documents },
     messages: { label: 'Messages', to: p('messages'), icon: MessageSquare, note: undefined as number | undefined },
     billing: { label: 'Billing', to: p('billing'), icon: Receipt, note: (stats?.pending_quotes || 0) + (stats?.open_invoices || 0) || undefined },
@@ -252,6 +279,36 @@ export default function Dashboard() {
               </ul>
             )}
           </motion.section>
+
+          {turnovers.length > 0 && (
+            <motion.section variants={pmvFadeUp}>
+              <div className="mb-3 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-slate-500">STR Turnovers</p>
+                  <h2 className="mt-1 text-lg font-semibold text-white">Upcoming & in progress</h2>
+                </div>
+                <Link to={p('str/turnovers')} className="text-xs font-semibold text-gold hover:underline">View all</Link>
+              </div>
+              <ul className="divide-y divide-white/[.08] border-y border-white/[.08]">
+                {turnovers.slice(0, 4).map((t) => (
+                  <li key={t.id}>
+                    <Link to={p(`str/turnovers/${t.id}`)} className="flex items-center justify-between gap-3 py-2.5">
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2 text-sm font-medium text-white">
+                          <DoorOpen size={14} className="shrink-0 text-gold/80" />
+                          <span className="truncate">{t.property_nickname || t.property_address}</span>
+                        </span>
+                        <span className="mt-0.5 block pl-6 text-xs text-slate-500">{t.turnover_date} · {t.client_description}</span>
+                      </span>
+                      <span className={`shrink-0 text-xs ${t.status === 'at_risk' || t.status === 'issue_reported' ? 'font-semibold text-gold' : 'text-slate-400'}`}>
+                        {t.client_status}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </motion.section>
+          )}
 
           {!!data?.properties?.length && (
             <motion.section variants={pmvFadeUp}>

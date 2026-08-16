@@ -7,6 +7,9 @@ import { runDueScheduledReports } from '../scheduledReports'
 import { uuid } from '../crypto'
 import { runDueScopeFollowups } from '../scopeFunnel'
 import { runDocumentAutomation } from './documentPlatformV2'
+import { pushNotification } from '../notificationFeed'
+import { notifyClientEvent } from '../clientNotifications'
+import { activityInsert } from '../activity'
 
 export const relationshipAutomationRoutes = new Hono<AppEnv>()
 export const relationshipAutomationAdminRoutes = new Hono<AppEnv>()
@@ -17,6 +20,7 @@ const AUTOMATIONS = {
   scheduled_reports: { label: 'Scheduled management reports', cadence: 'Hourly', intervalMinutes: 60, description: 'Generates due saved reports, emails authorized recipients, and records report-delivery outcomes.' },
   scope_followup: { label: 'Public request follow-up', cadence: 'Daily at 10:40 AM ET', intervalMinutes: 1440, description: 'Sends the three-step, opt-in follow-up sequence for unbooked public scope requests and stops after booking or account creation.' },
   document_envelopes: { label: 'Document envelope lifecycle', cadence: 'Every 10 minutes', intervalMinutes: 10, description: 'Sends e-sign reminders, expires overdue envelopes, and applies retention disposition while respecting legal holds.' },
+  str_operations: { label: 'STR turnover operations', cadence: 'Every 10 minutes', intervalMinutes: 10, description: 'Monitors STR turnover dispatch: flags unassigned/at-risk turnovers and low supplies.' },
 } as const
 
 type AutomationKey = keyof typeof AUTOMATIONS
@@ -73,6 +77,121 @@ async function controlFor(env: any, key: string) {
   }
 }
 
+// STR turnover dispatch monitoring. Runs every 10 minutes:
+//   1. Flags scheduled turnovers with no coverage within 3 days (staff alert).
+//   2. Flags working turnovers past their completion deadline as at_risk
+//      (staff + client alert, one-time on the transition).
+//   3. Surfaces low/out supplies as client tasks when supply tracking is on.
+async function runStrOperations(env: any): Promise<{ processed: number; unassigned: number; at_risk: number; supply_tasks: number }> {
+  let unassigned = 0
+  let atRisk = 0
+  let supplyTasks = 0
+  const now = new Date()
+  const todayKey = now.toISOString().slice(0, 10)
+  const inThreeDays = new Date(now.getTime() + 3 * 86400000).toISOString().slice(0, 10)
+
+  // 1) Unassigned and approaching.
+  const unassignedRows = await env.DB.prepare(
+    `SELECT t.id, t.turnover_date, t.client_user_id, t.property_id,
+            p.address, sp.nickname
+     FROM turnovers t
+     JOIN str_properties sp ON sp.property_id = t.property_id
+     JOIN properties p ON p.id = t.property_id
+     WHERE t.status = 'scheduled' AND t.turnover_date BETWEEN ? AND ?`,
+  ).bind(todayKey, inThreeDays).all()
+  for (const row of unassignedRows.results || []) {
+    const staff = await env.DB.prepare("SELECT id FROM users WHERE role IN ('staff','admin') AND status='active' LIMIT 50").all()
+    for (const member of staff.results || []) {
+      await pushNotification(env, {
+        userId: member.id,
+        kind: 'str.unassigned',
+        subjectType: 'turnover',
+        subjectId: row.id,
+        title: 'Turnover needs a provider',
+        body: `${row.nickname || row.address} — ${row.turnover_date}`,
+        deepLinkPath: '/admin/str/operations',
+        dedupeWindowSeconds: 86400,
+      })
+    }
+    unassigned++
+  }
+
+  // 2) Working but past the completion deadline -> at_risk.
+  const atRiskCandidates = await env.DB.prepare(
+    `SELECT t.id, t.turnover_date, t.client_user_id, t.required_complete_at, t.status,
+            p.address, sp.nickname
+     FROM turnovers t
+     JOIN str_properties sp ON sp.property_id = t.property_id
+     JOIN properties p ON p.id = t.property_id
+     WHERE t.status IN ('accepted','en_route','in_progress','issue_reported')
+       AND t.required_complete_at IS NOT NULL AND t.required_complete_at < ?`,
+  ).bind(now.toISOString()).all()
+  for (const row of atRiskCandidates.results || []) {
+    await env.DB.prepare(
+      "UPDATE turnovers SET status='at_risk', updated_at=datetime('now') WHERE id=?",
+    ).bind(row.id).run()
+    const propLabel = row.nickname || row.address
+    await notifyClientEvent(env, {
+      clientUserId: row.client_user_id,
+      eventKey: 'str.turnover_at_risk',
+      subject: 'Your turnover needs attention to stay on schedule',
+      title: `Turnover at risk — ${propLabel}`,
+      body: `Your turnover for ${row.turnover_date} is running late. Pinnacle is on it and will keep you posted.`,
+      ctaLabel: 'View turnover',
+      ctaPath: `/portal/str/turnovers/${row.id}`,
+    })
+    const staff = await env.DB.prepare("SELECT id FROM users WHERE role IN ('staff','admin') AND status='active' LIMIT 50").all()
+    for (const member of staff.results || []) {
+      await pushNotification(env, {
+        userId: member.id,
+        kind: 'str.at_risk',
+        subjectType: 'turnover',
+        subjectId: row.id,
+        title: 'Turnover at risk',
+        body: `${propLabel} — ${row.turnover_date}`,
+        deepLinkPath: `/admin/str/turnovers/${row.id}`,
+        dedupeWindowSeconds: 86400,
+      })
+    }
+    atRisk++
+  }
+
+  // 3) Low/out supplies with supply tracking enabled -> client task.
+  const lowSupplies = await env.DB.prepare(
+    `SELECT s.id, s.name, s.stock, s.par_level, s.property_id, sp.client_user_id, p.address, sp.nickname
+     FROM str_supplies s
+     JOIN str_properties sp ON sp.property_id = s.property_id
+     JOIN properties p ON p.id = s.property_id
+     WHERE s.active = 1 AND s.stock < s.par_level AND sp.supply_tracking_enabled = 1`,
+  ).all()
+  for (const row of lowSupplies.results || []) {
+    const title = `Restock ${row.name} (${row.nickname || row.address})`
+    const existing = await env.DB.prepare(
+      "SELECT id FROM client_tasks WHERE client_user_id=? AND title=? AND status='pending' AND created_at > datetime('now','-14 days') LIMIT 1",
+    ).bind(row.client_user_id, title).first()
+    if (existing) continue
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO client_tasks (id, client_user_id, title, status, due_date)
+         VALUES (?, ?, ?, 'pending', date('now','+7 days'))`,
+      ).bind(uuid(), row.client_user_id, title),
+      activityInsert(env, { clientUserId: row.client_user_id, kind: 'str_restock_task', detail: { supply: row.name, property_id: row.property_id } }),
+    ])
+    await notifyClientEvent(env, {
+      clientUserId: row.client_user_id,
+      eventKey: 'str.supply_low',
+      subject: 'A property supply needs restocking',
+      title: `${row.name} is running low`,
+      body: `We flagged ${row.name} at ${row.nickname || row.address} and added restocking to your task list.`,
+      ctaLabel: 'View tasks',
+      ctaPath: '/portal/dashboard',
+    })
+    supplyTasks++
+  }
+
+  return { processed: unassigned + atRisk + supplyTasks, unassigned, at_risk: atRisk, supply_tasks: supplyTasks }
+}
+
 async function executeAutomation(c: any, key: AutomationKey, triggerType: 'scheduled'|'manual', actorUserId?: string) {
   await sweepStaleRuns(c.env, key)
   const control = await controlFor(c.env, key)
@@ -97,7 +216,9 @@ async function executeAutomation(c: any, key: AutomationKey, triggerType: 'sched
         ? await runDueClientNurture(c.env, 50)
         : key === 'scheduled_reports'
           ? await runDueScheduledReports(c.env, 20)
-          : await runDueScopeFollowups(c.env, 50)
+          : key === 'str_operations'
+            ? await runStrOperations(c.env)
+            : await runDueScopeFollowups(c.env, 50)
     const processed = Number(result.processed || 0)
     const succeeded = Number((result as any).sent || 0)
     const failed = Number((result as any).failed || 0)

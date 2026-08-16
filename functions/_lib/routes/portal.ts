@@ -20,6 +20,7 @@ import {
   isPropertyOccupancy, isPropertyStatus, optionalInt, trimPropertyField,
 } from '../../../shared/propertyProfile'
 import { billingCompliance, maskPaymentMethod, rejectCardPayload } from '../../../shared/cardBrandCompliance'
+import { turnoverClientStatus, turnoverClientDescription } from '../../../shared/strWorkspace'
 
 export const portalRoutes = new Hono<AppEnv>()
 portalRoutes.use('*', requireUser)
@@ -57,7 +58,7 @@ portalRoutes.get('/dashboard', async (c) => {
   const p2 = () => [...params]
 
   const matterWhere = where.replace(/client_user_id/g, 'm.client_user_id')
-  const [matters, tasks, docs, invoices, tickets, calls, appts, msgs, services, properties, activeCases, pendingQuotes, activeMatters] = await Promise.all([
+  const [matters, tasks, docs, invoices, tickets, calls, appts, msgs, services, properties, activeCases, pendingQuotes, activeMatters, turnoverActions] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) n FROM matters WHERE ${where} AND status != 'closed'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM client_tasks WHERE ${where} AND status != 'done'`).bind(...p2()).first<{ n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) n FROM document_requests WHERE ${where} AND status = 'requested'`).bind(...p2()).first<{ n: number }>(),
@@ -78,6 +79,15 @@ portalRoutes.get('/dashboard', async (c) => {
        ORDER BY CASE m.responsibility_state WHEN 'client' THEN 0 WHEN 'third_party' THEN 1 ELSE 2 END, m.created_at DESC
        LIMIT 8`,
     ).bind(...p2()).all(),
+    c.env.DB.prepare(
+      `SELECT t.id, t.status, t.turnover_date, t.required_complete_at, t.client_charge_cents,
+              p.address AS property_address, sp.nickname AS property_nickname, sp.bedrooms, sp.bathrooms, sp.max_guests
+       FROM turnovers t
+       JOIN str_properties sp ON sp.property_id = t.property_id
+       JOIN properties p ON p.id = t.property_id
+       WHERE ${where.replace(/client_user_id/g, 't.client_user_id')} AND t.status NOT IN ('completed','cancelled')
+       ORDER BY t.turnover_date ASC, t.required_complete_at ASC LIMIT 8`,
+    ).bind(...p2()).all(),
   ])
 
   return c.json({
@@ -96,6 +106,20 @@ portalRoutes.get('/dashboard', async (c) => {
     properties: properties.results ?? [],
     active_cases: activeCases.results ?? [],
     active_matters: activeMatters.results ?? [],
+    turnover_actions: (turnoverActions.results ?? []).map((t: any) => ({
+      id: t.id,
+      status: t.status,
+      client_status: turnoverClientStatus(t.status),
+      client_description: turnoverClientDescription(t.status),
+      turnover_date: t.turnover_date,
+      required_complete_at: t.required_complete_at,
+      property_address: t.property_address,
+      property_nickname: t.property_nickname,
+      bedrooms: t.bedrooms,
+      bathrooms: t.bathrooms,
+      max_guests: t.max_guests,
+      href: `/portal/str/turnovers/${t.id}`,
+    })),
   })
 })
 
@@ -761,19 +785,28 @@ portalRoutes.get('/property', async (c) => c.json({ properties: await listScoped
 portalRoutes.get('/property/:id', async (c) => {
   const user = c.get('user')
   const property = await loadScopedRow<any>(c.env, user, 'properties', c.req.param('id'))
-  const [matters, tickets, documents] = await Promise.all([
+  const [matters, tickets, documents, turnovers] = await Promise.all([
     c.env.DB.prepare('SELECT id, title, type, status, due_date, created_at FROM matters WHERE property_id = ? AND client_user_id = ? ORDER BY created_at DESC')
       .bind(property.id, property.client_user_id).all(),
     c.env.DB.prepare('SELECT id, subject, status, priority, waiting_on, created_at FROM support_tickets WHERE property_id = ? AND client_user_id = ? ORDER BY created_at DESC')
       .bind(property.id, property.client_user_id).all(),
     c.env.DB.prepare('SELECT id, file_name, category, review_status, created_at FROM client_documents WHERE property_id = ? AND client_user_id = ? ORDER BY created_at DESC')
       .bind(property.id, property.client_user_id).all(),
+    c.env.DB.prepare('SELECT id, turnover_date, status, required_complete_at FROM turnovers WHERE property_id = ? AND client_user_id = ? ORDER BY turnover_date DESC LIMIT 10')
+      .bind(property.id, property.client_user_id).all<any>(),
   ])
   return c.json({
     property,
     matters: matters.results ?? [],
     tickets: tickets.results ?? [],
     documents: documents.results ?? [],
+    turnovers: (turnovers.results ?? []).map((t: any) => ({
+      id: t.id,
+      turnover_date: t.turnover_date,
+      required_complete_at: t.required_complete_at,
+      client_status: turnoverClientStatus(t.status),
+      client_description: turnoverClientDescription(t.status),
+    })),
   })
 })
 

@@ -33,6 +33,8 @@ import Properties from './Properties'
 import PropertyProfile from './PropertyProfile'
 import Matters from './Matters'
 import MatterDetail from './MatterDetail'
+import Turnovers from './Turnovers'
+import TurnoverReport from './TurnoverReport'
 
 function ClientShell() {
   const { workspace } = useAuth()
@@ -88,6 +90,8 @@ export default function PortalApp({ basePath }: { basePath: string }) {
             <Route path="funding" element={<ModulePage config={fundingConfig} />} />
             <Route path="property-management" element={<Properties />} />
             <Route path="property-management/:id" element={<PropertyProfile />} />
+            <Route path="str/turnovers" element={<Turnovers />} />
+            <Route path="str/turnovers/:id" element={<TurnoverReport />} />
             <Route path="tax-filings" element={<ModulePage config={taxConfig} />} />
             <Route path="support" element={<Support />} />
             <Route path="business-profile" element={<BusinessProfile />} />

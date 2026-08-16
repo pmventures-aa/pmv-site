@@ -22,7 +22,7 @@ export interface ClientWorkspaceCopy {
   discoveryTitle: string
   discoveryBody: string
   mobilePrimary: string[]
-  shortcutKeys: Array<'work' | 'properties' | 'documents' | 'messages' | 'billing' | 'calendar' | 'team' | 'account' | 'funding'>
+  shortcutKeys: Array<'work' | 'properties' | 'turnovers' | 'documents' | 'messages' | 'billing' | 'calendar' | 'team' | 'account' | 'funding'>
 }
 
 const CLIENT_COPY: Record<OperatingWorld, ClientWorkspaceCopy> = {
@@ -42,7 +42,7 @@ const CLIENT_COPY: Record<OperatingWorld, ClientWorkspaceCopy> = {
     discoveryTitle: 'Add another property need without starting over',
     discoveryBody: 'Cleaning, inspections, turnovers, and preservation stay in this same workspace.',
     mobilePrimary: ['dashboard', 'work', 'messages', 'documents'],
-    shortcutKeys: ['work', 'properties', 'documents', 'calendar', 'billing', 'team', 'account'],
+    shortcutKeys: ['work', 'properties', 'turnovers', 'documents', 'calendar', 'billing', 'team', 'account'],
   },
   documents: {
     world: 'documents',
