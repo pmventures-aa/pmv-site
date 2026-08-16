@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Loader2, Plus, MapPin } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { WizardProgress, WizardStep, WizardError, WizardFooter } from '../../components/admin/wizard'
 import { AddressAutocomplete } from '../../components/kit/AddressAutocomplete'
 import { useAppPath } from '../../lib/basePath'
 import { useLiveRefresh } from '../../lib/liveRefresh'
@@ -265,6 +266,8 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId, initialKind, l
   const [feeManual, setFeeManual] = useState('')
   const [feeLoading, setFeeLoading] = useState(false)
   const pinnedQueryRef = useRef('')
+  const [step, setStep] = useState(0)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     api.get<{ clients: ClientOption[] }>('/admin/clients').then((r) => setClients(r.clients ?? [])).catch((err) => {
@@ -356,27 +359,30 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId, initialKind, l
     }
   }, [form.service_key, form.site_postal_code, form.site_city, form.site_state])
 
+  const STEP_TITLES = ['Service & scheduling', 'Who requested the work', 'Job location', 'Provider & payout']
+
+  function validateStep(stepToCheck: number): string | null {
+    if (stepToCheck === 0 && !form.service_key.trim()) return 'Enter the service for this assignment.'
+    if (stepToCheck === 1) {
+      if (clientMode === 'existing' && !form.client_user_id) return 'Choose an existing client or add the new caller.'
+      if (clientMode === 'new' && (!newClient.full_name.trim() || !newClient.email.trim())) return 'Add the new client’s name and email so Pinnacle can create their profile.'
+    }
+    if (stepToCheck === 3) {
+      if (providerMode === 'existing' && !form.vendor_user_id) return 'Choose a provider or add a new one.'
+      if (providerMode === 'new' && (!newProvider.full_name.trim() || !newProvider.email.trim())) return 'Add the provider’s name and email so Pinnacle can create their profile.'
+    }
+    return null
+  }
+
+  function goNext() {
+    const problem = validateStep(step)
+    if (problem) { setError(problem); return }
+    setError(null)
+    if (step < STEP_TITLES.length - 1) { setStep((s) => s + 1); return }
+    void submit()
+  }
+
   async function submit() {
-    if (!form.service_key) {
-      toast.error('Enter the service for this assignment.')
-      return
-    }
-    if (providerMode === 'existing' && !form.vendor_user_id) {
-      toast.error('Choose a provider or add a new one.')
-      return
-    }
-    if (providerMode === 'new' && (!newProvider.full_name.trim() || !newProvider.email.trim())) {
-      toast.error('Add the provider’s name and email so Pinnacle can create their profile.')
-      return
-    }
-    if (clientMode === 'existing' && !form.client_user_id) {
-      toast.error('Choose an existing client or add the new caller.')
-      return
-    }
-    if (clientMode === 'new' && (!newClient.full_name.trim() || !newClient.email.trim())) {
-      toast.error('Add the new client’s name and email so Pinnacle can create their profile.')
-      return
-    }
     setSaving(true)
     try {
       let vendorUserId = form.vendor_user_id
@@ -502,110 +508,150 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId, initialKind, l
           }}
         />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {!lockKind && <label><span className="mb-1 block text-xs text-slate-400">Assignment kind</span><select className={inputCls} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as 'field' | 'ron', service_key: e.target.value === 'ron' ? 'ron' : form.service_key })}><option value="field">Field visit (Property Management / Mobile Notary)</option><option value="ron">Remote Online Notarization</option></select></label>}
-        <label><span className="mb-1 block text-xs text-slate-400">Service</span><input className={inputCls} placeholder="e.g. mobile_notary, property_management, ron" value={form.service_key} onChange={(e) => setForm({ ...form, service_key: e.target.value })}/></label>
-        <div className="sm:col-span-2 rounded-xl border border-white/10 bg-white/[.018] p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div><span className="block text-xs font-semibold text-slate-200">Who requested the work?</span><p className="mt-1 text-xs leading-5 text-slate-500">Use a client already in Pinnacle, or create the caller’s profile without leaving this assignment.</p></div>
-            <div className="inline-flex w-fit rounded-lg border border-white/10 bg-navy-950/45 p-1">
-              <button type="button" onClick={() => setClientMode('existing')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${clientMode === 'existing' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>Existing client</button>
-              <button type="button" onClick={() => setClientMode('new')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${clientMode === 'new' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>New caller</button>
+
+      <WizardProgress step={step + 1} total={STEP_TITLES.length} />
+
+      <WizardStep step={step}>
+        {step === 0 && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <h3 className="text-lg font-bold text-white">Start with the service</h3>
+              <p className="mt-1 text-sm text-slate-400">What kind of work is this, and when should it happen?</p>
             </div>
+            {!lockKind && <label><span className="mb-1 block text-xs text-slate-400">Assignment kind</span><select className={inputCls} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as 'field' | 'ron', service_key: e.target.value === 'ron' ? 'ron' : form.service_key })}><option value="field">Field visit (Property Management / Mobile Notary)</option><option value="ron">Remote Online Notarization</option></select></label>}
+            <label><span className="mb-1 block text-xs text-slate-400">Service</span><input className={inputCls} placeholder="e.g. mobile_notary, property_management, ron" value={form.service_key} onChange={(e) => setForm({ ...form, service_key: e.target.value })}/></label>
+            <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Title</span><input className={inputCls} placeholder='e.g. "Loan signing: Boca Raton office"' value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}/></label>
+            <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Scheduled for</span><input className={inputCls} type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}/></label>
           </div>
-          {clientMode === 'existing' ? (
-            <label className="mt-4 block"><span className="mb-1 block text-xs text-slate-400">Client profile</span><select className={inputCls} value={form.client_user_id} onChange={(e) => setForm({ ...form, client_user_id: e.target.value })}><option value="">Choose a client…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.full_name || c.email}{c.business_name ? `: ${c.business_name}` : ''}</option>)}</select></label>
-          ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label><span className="mb-1 block text-xs text-slate-400">Name</span><input className={inputCls} required value={newClient.full_name} onChange={(e) => setNewClient((current) => ({ ...current, full_name: e.target.value }))} placeholder="Caller’s full name" /></label>
-              <label><span className="mb-1 block text-xs text-slate-400">Email</span><input className={inputCls} type="email" required value={newClient.email} onChange={(e) => setNewClient((current) => ({ ...current, email: e.target.value }))} placeholder="For their secure client access" /></label>
-              <label><span className="mb-1 block text-xs text-slate-400">Phone <span className="text-slate-600">(optional)</span></span><input className={inputCls} type="tel" value={newClient.phone} onChange={(e) => setNewClient((current) => ({ ...current, phone: e.target.value }))} /></label>
-              <label><span className="mb-1 block text-xs text-slate-400">Business / property entity <span className="text-slate-600">(optional)</span></span><input className={inputCls} value={newClient.business_name} onChange={(e) => setNewClient((current) => ({ ...current, business_name: e.target.value }))} /></label>
-              <p className="text-xs leading-5 text-slate-500 sm:col-span-2">Pinnacle will create the client profile, connect this assignment to it, and send secure portal setup. More details can be added later.</p>
-            </div>
-          )}
-        </div>
-        <div className="sm:col-span-2 rounded-xl border border-white/10 bg-white/[.018] p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <span className="block text-xs font-semibold text-slate-200">Who is doing the work?</span>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Choose a provider already in Pinnacle, or create a profile for someone new without leaving this assignment.</p>
-            </div>
-            <div className="inline-flex w-fit rounded-lg border border-white/10 bg-navy-950/45 p-1">
-              <button type="button" onClick={() => setProviderMode('existing')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${providerMode === 'existing' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>Existing provider</button>
-              <button type="button" onClick={() => setProviderMode('new')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${providerMode === 'new' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>New provider</button>
-            </div>
-          </div>
-          {providerMode === 'existing' ? (
-            <label className="mt-4 block">
-              <span className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-400">
-                <span>Provider</span>
-                {user && <button type="button" onClick={() => setForm({ ...form, vendor_user_id: user.id })} className="font-semibold text-gold hover:underline">Assign to me</button>}
-              </span>
-              <select className={inputCls} value={form.vendor_user_id} onChange={(e) => setForm({ ...form, vendor_user_id: e.target.value })}>
-                <option value="">Choose a provider…</option>
-                {availableVendors.map((v) => <option key={v.id} value={v.id}>{v.full_name || v.email}{v.id === user?.id ? ' (me)' : v.vendor_category ? `: ${v.vendor_category}` : ''}</option>)}
-              </select>
-            </label>
-          ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label><span className="mb-1 block text-xs text-slate-400">Name</span><input className={inputCls} required value={newProvider.full_name} onChange={(e) => setNewProvider((current) => ({ ...current, full_name: e.target.value }))} placeholder="Provider’s full name" /></label>
-              <label><span className="mb-1 block text-xs text-slate-400">Email</span><input className={inputCls} type="email" required value={newProvider.email} onChange={(e) => setNewProvider((current) => ({ ...current, email: e.target.value }))} placeholder="For their provider profile" /></label>
-              <label><span className="mb-1 block text-xs text-slate-400">Phone <span className="text-slate-600">(optional)</span></span><input className={inputCls} type="tel" value={newProvider.phone} onChange={(e) => setNewProvider((current) => ({ ...current, phone: e.target.value }))} /></label>
-              <label><span className="mb-1 block text-xs text-slate-400">Specialty <span className="text-slate-600">(optional)</span></span><input className={inputCls} value={newProvider.vendor_category} onChange={(e) => setNewProvider((current) => ({ ...current, vendor_category: e.target.value }))} placeholder="Mobile notary, inspector…" /></label>
-              <p className="text-xs leading-5 text-slate-500 sm:col-span-2">Pinnacle will create the provider profile, connect this assignment to it, and add them to Network & Dispatch. You can finish vetting later.</p>
-            </div>
-          )}
-        </div>
-        <div className="sm:col-span-2 rounded-xl border border-gold/15 bg-gold/[.03] p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <span className="block text-xs font-semibold text-slate-200">Provider payout offer</span>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Snapdocs-style local adjustment uses recent payouts near the job ZIP to suggest a fee providers are more likely to accept.</p>
-            </div>
-            {feeLoading && <span className="text-xs text-slate-500">Calculating…</span>}
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,180px)_1fr]">
-            <label>
-              <span className="mb-1 block text-xs text-slate-400">Offered fee</span>
-              <input
-                className={inputCls}
-                type="number"
-                min="0"
-                step="0.01"
-                value={feeManual}
-                onChange={(e) => setFeeManual(e.target.value)}
-                placeholder="0.00"
-              />
-            </label>
-            <div className="text-xs leading-5 text-slate-400">
-              {feeEstimate ? (
-                <>
-                  <p>
-                    Base catalog payout: <span className="text-slate-200">{formatVendorFee(feeEstimate.baseCents)}</span>
-                    {feeEstimate.marketMedianCents ? (
-                      <> · Recent local median: <span className="text-slate-200">{formatVendorFee(feeEstimate.marketMedianCents)}</span> ({feeEstimate.sampleSize} jobs)</>
-                    ) : null}
-                  </p>
-                  <p className="mt-1">{feeEstimate.reason}</p>
-                </>
+        )}
+
+        {step === 1 && (
+          <div>
+            <h3 className="text-lg font-bold text-white">Who requested the work?</h3>
+            <p className="mt-1 text-sm text-slate-400">Use a client already in Pinnacle, or create the caller’s profile without leaving this assignment.</p>
+            <div className="mt-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="inline-flex w-fit rounded-lg border border-white/10 bg-navy-950/45 p-1">
+                  <button type="button" onClick={() => setClientMode('existing')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${clientMode === 'existing' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>Existing client</button>
+                  <button type="button" onClick={() => setClientMode('new')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${clientMode === 'new' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>New caller</button>
+                </div>
+              </div>
+              {clientMode === 'existing' ? (
+                <label className="mt-4 block"><span className="mb-1 block text-xs text-slate-400">Client profile</span><select className={inputCls} value={form.client_user_id} onChange={(e) => setForm({ ...form, client_user_id: e.target.value })}><option value="">Choose a client…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.full_name || c.email}{c.business_name ? `: ${c.business_name}` : ''}</option>)}</select></label>
               ) : (
-                <p>Enter a service and ZIP to calculate a suggested provider fee.</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label><span className="mb-1 block text-xs text-slate-400">Name</span><input className={inputCls} required value={newClient.full_name} onChange={(e) => setNewClient((current) => ({ ...current, full_name: e.target.value }))} placeholder="Caller’s full name" /></label>
+                  <label><span className="mb-1 block text-xs text-slate-400">Email</span><input className={inputCls} type="email" required value={newClient.email} onChange={(e) => setNewClient((current) => ({ ...current, email: e.target.value }))} placeholder="For their secure client access" /></label>
+                  <label><span className="mb-1 block text-xs text-slate-400">Phone <span className="text-slate-600">(optional)</span></span><input className={inputCls} type="tel" value={newClient.phone} onChange={(e) => setNewClient((current) => ({ ...current, phone: e.target.value }))} /></label>
+                  <label><span className="mb-1 block text-xs text-slate-400">Business / property entity <span className="text-slate-600">(optional)</span></span><input className={inputCls} value={newClient.business_name} onChange={(e) => setNewClient((current) => ({ ...current, business_name: e.target.value }))} /></label>
+                  <p className="text-xs leading-5 text-slate-500 sm:col-span-2">Pinnacle will create the client profile, connect this assignment to it, and send secure portal setup. More details can be added later.</p>
+                </div>
               )}
             </div>
           </div>
-        </div>
-        <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Title</span><input className={inputCls} placeholder='e.g. "Loan signing: Boca Raton office"' value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}/></label>
-        <label><span className="mb-1 block text-xs text-slate-400">Scheduled for</span><input className={inputCls} type="datetime-local" value={form.scheduled_at} onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}/></label>
-        <label><span className="mb-1 block text-xs text-slate-400">Site label (optional)</span><input className={inputCls} placeholder="Client home, conference room…" value={form.site_label} onChange={(e) => setForm({ ...form, site_label: e.target.value })}/></label>
-        {form.kind === 'field' && <div className="sm:col-span-2 space-y-3"><div><span className="mb-1 block text-xs text-slate-400">Site address</span><AddressAutocomplete value={form.site_address} inputClassName={inputCls} onChange={(line1) => { pinnedQueryRef.current = ''; setForm({ ...form, site_address: line1, site_lat: '', site_lng: '' }) }} onSelect={(address) => { const next = { ...form, site_address: address.line1, site_city: address.city || form.site_city, site_state: address.state || form.site_state, site_postal_code: address.postal_code || form.site_postal_code, site_lat: address.lat != null ? String(address.lat) : '', site_lng: address.lng != null ? String(address.lng) : '' }; pinnedQueryRef.current = composeAddressQuery({ line1: next.site_address, city: next.site_city, state: next.site_state, postal: next.site_postal_code }); setGeoStatus(next.site_lat && next.site_lng ? 'pinned' : 'looking'); setForm(next) }}/></div><div className="grid gap-3 sm:grid-cols-3"><label><span className="mb-1 block text-xs text-slate-400">City</span><input className={inputCls} value={form.site_city} onChange={(e) => { pinnedQueryRef.current = ''; setForm({ ...form, site_city: e.target.value, site_lat: '', site_lng: '' }) }}/></label><label><span className="mb-1 block text-xs text-slate-400">State</span><input className={inputCls} value={form.site_state} onChange={(e) => { pinnedQueryRef.current = ''; setForm({ ...form, site_state: e.target.value, site_lat: '', site_lng: '' }) }}/></label><label><span className="mb-1 block text-xs text-slate-400">Postal code</span><input className={inputCls} value={form.site_postal_code} onChange={(e) => { pinnedQueryRef.current = ''; setForm({ ...form, site_postal_code: e.target.value, site_lat: '', site_lng: '' }) }}/></label></div>
-          {geoStatus === 'looking' && <p className="flex items-center gap-1 text-xs text-slate-500"><Loader2 size={12} className="animate-spin"/> Looking up the map pin from this address…</p>}
-          {geoStatus === 'pinned' && form.site_lat && form.site_lng && <p className="flex items-center gap-1 text-xs text-emerald-300"><MapPin size={12}/> Map pin set from address ({Number(form.site_lat).toFixed(5)}, {Number(form.site_lng).toFixed(5)}). Vendor phones auto-arrive within 150 m.</p>}
-          {geoStatus === 'miss' && <p className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12}/> No pin yet. Pick an address from the suggestions so the live map and auto-arrive can use it.</p>}
-          {geoStatus === 'idle' && <p className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12}/> Start typing a street address. The map pin fills in from the public address database.</p>}</div>}
-        <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Notes for the provider (optional)</span><textarea className={`${inputCls} min-h-20`} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}/></label>
-      </div>
-      <div className="mt-4 flex gap-2"><button type="button" onClick={onCancel} className={btnOutline}>Cancel</button><button type="button" onClick={submit} disabled={saving} className={`${btnPrimary} disabled:opacity-60`}>{saving ? <Loader2 size={14} className="animate-spin"/> : <Plus size={14}/>} Create assignment</button></div>
+        )}
+
+        {step === 2 && (
+          <div>
+            <h3 className="text-lg font-bold text-white">Where does the work happen?</h3>
+            <p className="mt-1 text-sm text-slate-400">A pinned map address lets the provider’s phone auto-arrive within 150 m of the site.</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Site label (optional)</span><input className={inputCls} placeholder="Client home, conference room…" value={form.site_label} onChange={(e) => setForm({ ...form, site_label: e.target.value })}/></label>
+              {form.kind === 'field' && <div className="sm:col-span-2 space-y-3"><div><span className="mb-1 block text-xs text-slate-400">Site address</span><AddressAutocomplete value={form.site_address} inputClassName={inputCls} onChange={(line1) => { pinnedQueryRef.current = ''; setForm({ ...form, site_address: line1, site_lat: '', site_lng: '' }) }} onSelect={(address) => { const next = { ...form, site_address: address.line1, site_city: address.city || form.site_city, site_state: address.state || form.site_state, site_postal_code: address.postal_code || form.site_postal_code, site_lat: address.lat != null ? String(address.lat) : '', site_lng: address.lng != null ? String(address.lng) : '' }; pinnedQueryRef.current = composeAddressQuery({ line1: next.site_address, city: next.site_city, state: next.site_state, postal: next.site_postal_code }); setGeoStatus(next.site_lat && next.site_lng ? 'pinned' : 'looking'); setForm(next) }}/></div><div className="grid gap-3 sm:grid-cols-3"><label><span className="mb-1 block text-xs text-slate-400">City</span><input className={inputCls} value={form.site_city} onChange={(e) => { pinnedQueryRef.current = ''; setForm({ ...form, site_city: e.target.value, site_lat: '', site_lng: '' }) }}/></label><label><span className="mb-1 block text-xs text-slate-400">State</span><input className={inputCls} value={form.site_state} onChange={(e) => { pinnedQueryRef.current = ''; setForm({ ...form, site_state: e.target.value, site_lat: '', site_lng: '' }) }}/></label><label><span className="mb-1 block text-xs text-slate-400">Postal code</span><input className={inputCls} value={form.site_postal_code} onChange={(e) => { pinnedQueryRef.current = ''; setForm({ ...form, site_postal_code: e.target.value, site_lat: '', site_lng: '' }) }}/></label></div>
+                {geoStatus === 'looking' && <p className="flex items-center gap-1 text-xs text-slate-500"><Loader2 size={12} className="animate-spin"/> Looking up the map pin from this address…</p>}
+                {geoStatus === 'pinned' && form.site_lat && form.site_lng && <p className="flex items-center gap-1 text-xs text-emerald-300"><MapPin size={12}/> Map pin set from address ({Number(form.site_lat).toFixed(5)}, {Number(form.site_lng).toFixed(5)}). Vendor phones auto-arrive within 150 m.</p>}
+                {geoStatus === 'miss' && <p className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12}/> No pin yet. Pick an address from the suggestions so the live map and auto-arrive can use it.</p>}
+                {geoStatus === 'idle' && <p className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12}/> Start typing a street address. The map pin fills in from the public address database.</p>}</div>}
+              <label className="sm:col-span-2"><span className="mb-1 block text-xs text-slate-400">Notes for the provider (optional)</span><textarea className={`${inputCls} min-h-20`} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}/></label>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div>
+            <h3 className="text-lg font-bold text-white">Provider & payout</h3>
+            <p className="mt-1 text-sm text-slate-400">Who is doing the work, and what is the offered fee?</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2 rounded-xl border border-white/10 bg-white/[.018] p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="inline-flex w-fit rounded-lg border border-white/10 bg-navy-950/45 p-1">
+                    <button type="button" onClick={() => setProviderMode('existing')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${providerMode === 'existing' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>Existing provider</button>
+                    <button type="button" onClick={() => setProviderMode('new')} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${providerMode === 'new' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}>New provider</button>
+                  </div>
+                </div>
+                {providerMode === 'existing' ? (
+                  <label className="mt-4 block">
+                    <span className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-400">
+                      <span>Provider</span>
+                      {user && <button type="button" onClick={() => setForm({ ...form, vendor_user_id: user.id })} className="font-semibold text-gold hover:underline">Assign to me</button>}
+                    </span>
+                    <select className={inputCls} value={form.vendor_user_id} onChange={(e) => setForm({ ...form, vendor_user_id: e.target.value })}>
+                      <option value="">Choose a provider…</option>
+                      {availableVendors.map((v) => <option key={v.id} value={v.id}>{v.full_name || v.email}{v.id === user?.id ? ' (me)' : v.vendor_category ? `: ${v.vendor_category}` : ''}</option>)}
+                    </select>
+                  </label>
+                ) : (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label><span className="mb-1 block text-xs text-slate-400">Name</span><input className={inputCls} required value={newProvider.full_name} onChange={(e) => setNewProvider((current) => ({ ...current, full_name: e.target.value }))} placeholder="Provider’s full name" /></label>
+                    <label><span className="mb-1 block text-xs text-slate-400">Email</span><input className={inputCls} type="email" required value={newProvider.email} onChange={(e) => setNewProvider((current) => ({ ...current, email: e.target.value }))} placeholder="For their provider profile" /></label>
+                    <label><span className="mb-1 block text-xs text-slate-400">Phone <span className="text-slate-600">(optional)</span></span><input className={inputCls} type="tel" value={newProvider.phone} onChange={(e) => setNewProvider((current) => ({ ...current, phone: e.target.value }))} /></label>
+                    <label><span className="mb-1 block text-xs text-slate-400">Specialty <span className="text-slate-600">(optional)</span></span><input className={inputCls} value={newProvider.vendor_category} onChange={(e) => setNewProvider((current) => ({ ...current, vendor_category: e.target.value }))} placeholder="Mobile notary, inspector…" /></label>
+                    <p className="text-xs leading-5 text-slate-500 sm:col-span-2">Pinnacle will create the provider profile, connect this assignment to it, and add them to Network & Dispatch. You can finish vetting later.</p>
+                  </div>
+                )}
+              </div>
+              <div className="sm:col-span-2 rounded-xl border border-gold/15 bg-gold/[.03] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-200">Provider payout offer</span>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">Snapdocs-style local adjustment uses recent payouts near the job ZIP to suggest a fee providers are more likely to accept.</p>
+                  </div>
+                  {feeLoading && <span className="text-xs text-slate-500">Calculating…</span>}
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,180px)_1fr]">
+                  <label>
+                    <span className="mb-1 block text-xs text-slate-400">Offered fee</span>
+                    <input
+                      className={inputCls}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={feeManual}
+                      onChange={(e) => setFeeManual(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </label>
+                  <div className="text-xs leading-5 text-slate-400">
+                    {feeEstimate ? (
+                      <>
+                        <p>
+                          Base catalog payout: <span className="text-slate-200">{formatVendorFee(feeEstimate.baseCents)}</span>
+                          {feeEstimate.marketMedianCents ? (
+                            <> · Recent local median: <span className="text-slate-200">{formatVendorFee(feeEstimate.marketMedianCents)}</span> ({feeEstimate.sampleSize} jobs)</>
+                          ) : null}
+                        </p>
+                        <p className="mt-1">{feeEstimate.reason}</p>
+                      </>
+                    ) : (
+                      <p>Enter a service and ZIP to calculate a suggested provider fee.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </WizardStep>
+
+      <WizardError message={error} />
+
+      <WizardFooter
+        onBack={step === 0 ? onCancel : () => setStep((s) => s - 1)}
+        onNext={goNext}
+        busy={saving}
+        nextLabel={step === STEP_TITLES.length - 1 ? (saving ? 'Creating…' : 'Create assignment') : 'Continue'}
+        backLabel={step === 0 ? 'Cancel' : 'Back'}
+      />
     </Panel>
   )
 }

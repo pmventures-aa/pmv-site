@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { PageIntro, Panel, Tag, EmptyState, NoAccess, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { WizardProgress, WizardStep, WizardError, WizardFooter } from '../../components/admin/wizard'
 import { services } from '../../data/services'
 import { toast } from '../../components/kit/toast'
 import { ImpersonateButton } from '../../components/kit/ImpersonateButton'
@@ -82,6 +83,7 @@ export default function UsersAdmin() {
   const [showForm, setShowForm] = useState(() => prefill !== null)
   const [form, setForm] = useState(prefill ?? emptyForm)
   const [busy, setBusy] = useState(false)
+  const [step, setStep] = useState(0)
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [setupLink, setSetupLink] = useState<{ email: string; url: string; delivery?: EmailDelivery | null } | null>(null)
@@ -114,8 +116,30 @@ export default function UsersAdmin() {
     }))
   }
 
-  async function onCreate(e: React.FormEvent) {
-    e.preventDefault()
+  const isClient = form.role === 'client'
+  const totalSteps = isClient ? 3 : 2
+
+  useEffect(() => {
+    setStep((s) => Math.max(0, Math.min(s, (form.role === 'client' ? 3 : 2) - 1)))
+  }, [form.role])
+
+  function goNext() {
+    setError(null)
+    if (step === 0) {
+      if (!form.first_name.trim() || !form.last_name.trim() || !form.email.trim()) {
+        setError('First name, last name, and email are required.')
+        return
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim())) {
+        setError('Enter a valid email address.')
+        return
+      }
+    }
+    if (step < totalSteps - 1) { setStep((s) => s + 1); return }
+    void onCreate()
+  }
+
+  async function onCreate() {
     setError(null)
     setBusy(true)
     try {
@@ -208,15 +232,66 @@ export default function UsersAdmin() {
 
       {showForm && (
         <Panel className="mb-6">
-          <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-3">
-            <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">First name</span><input className={inputCls} required value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} /></label>
-            <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Last name</span><input className={inputCls} required value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} /></label>
-            <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Role</span><select className={inputCls} value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}><option value="client">Client</option><option value="staff">Staff</option><option value="admin">Admin</option></select></label>
-            <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Email</span><input className={inputCls} type="email" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></label>
-            <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Phone</span><input className={inputCls} type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></label>
-            {form.role === 'client' && <><div className="sm:col-span-3 mt-2 border-t border-white/10 pt-4"><p className="eyebrow">Client business profile</p></div><label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Business name</span><input className={inputCls} value={form.business_name} onChange={(e) => setForm((f) => ({ ...f, business_name: e.target.value }))} /></label><label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Entity type</span><input className={inputCls} placeholder="LLC, S-Corp, Sole Prop…" value={form.entity_type} onChange={(e) => setForm((f) => ({ ...f, entity_type: e.target.value }))} /></label><label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">State</span><input className={inputCls} value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} /></label><label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">EIN</span><input className={inputCls} value={form.ein} onChange={(e) => setForm((f) => ({ ...f, ein: e.target.value }))} /></label><div className="sm:col-span-3"><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Services enrolled</span><div className="flex flex-wrap gap-2">{services.map((s) => <label key={s.key} className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs font-medium transition ${form.services_enrolled.includes(s.key) ? 'border-gold/60 bg-gold/10 text-gold' : 'border-white/10 bg-white/[0.02] text-slate-300'}`}><input type="checkbox" className="hidden" checked={form.services_enrolled.includes(s.key)} onChange={() => toggleService(s.key)} />{s.title}</label>)}</div></div></>}
-            <div className="flex items-center gap-3 sm:col-span-3"><button type="submit" disabled={busy} className={btnPrimary}>{busy ? 'Creating & sending…' : 'Create user & send setup'}</button>{error && <span className="text-sm text-rose-300">{error}</span>}</div>
-          </form>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-white">New user</h3>
+              <p className="mt-1 text-sm text-slate-400">Provision a client or HQ account and send the secure setup link.</p>
+            </div>
+            {step > 0 && <button type="button" onClick={() => setStep((s) => s - 1)} className="text-xs font-semibold text-gold hover:underline">Back</button>}
+          </div>
+          <WizardProgress step={step + 1} total={totalSteps} />
+          <WizardStep step={step}>
+            {step === 0 && (
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">First name</span><input className={inputCls} required value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} /></label>
+                <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Last name</span><input className={inputCls} required value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} /></label>
+                <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Role</span><select className={inputCls} value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}><option value="client">Client</option><option value="staff">Staff</option><option value="admin">Admin</option></select></label>
+                <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Email</span><input className={inputCls} type="email" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></label>
+                <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Phone</span><input className={inputCls} type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></label>
+              </div>
+            )}
+
+            {step === 1 && isClient && (
+              <div>
+                <h4 className="eyebrow">Client business profile</h4>
+                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                  <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Business name</span><input className={inputCls} value={form.business_name} onChange={(e) => setForm((f) => ({ ...f, business_name: e.target.value }))} /></label>
+                  <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Entity type</span><input className={inputCls} placeholder="LLC, S-Corp, Sole Prop…" value={form.entity_type} onChange={(e) => setForm((f) => ({ ...f, entity_type: e.target.value }))} /></label>
+                  <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">State</span><input className={inputCls} value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} /></label>
+                  <label><span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">EIN</span><input className={inputCls} value={form.ein} onChange={(e) => setForm((f) => ({ ...f, ein: e.target.value }))} /></label>
+                </div>
+                <div className="mt-5">
+                  <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Services enrolled</span>
+                  <div className="flex flex-wrap gap-2">{services.map((s) => <label key={s.key} className={`cursor-pointer rounded-md border px-3 py-2 text-xs font-medium transition ${form.services_enrolled.includes(s.key) ? 'border-gold/60 bg-gold/10 text-gold' : 'border-white/10 bg-white/[0.02] text-slate-300'}`}><input type="checkbox" className="hidden" checked={form.services_enrolled.includes(s.key)} onChange={() => toggleService(s.key)} />{s.title}</label>)}</div>
+                </div>
+              </div>
+            )}
+
+            {step === totalSteps - 1 && (
+              <div className="rounded-xl border border-white/10 bg-white/[.018] p-4">
+                <h4 className="text-sm font-semibold text-white">Review before creating</h4>
+                <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                  <div><dt className="text-xs text-slate-500">Name</dt><dd className="mt-0.5 text-white">{form.first_name} {form.last_name}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Email</dt><dd className="mt-0.5 text-white">{form.email}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Role</dt><dd className="mt-0.5 capitalize text-white">{form.role}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Phone</dt><dd className="mt-0.5 text-white">{form.phone || 'Not provided'}</dd></div>
+                  {isClient && <div className="sm:col-span-2"><dt className="text-xs text-slate-500">Business profile</dt><dd className="mt-0.5 text-white">{form.business_name || 'Not provided'}{form.entity_type ? ` · ${form.entity_type}` : ''}{form.state ? ` · ${form.state}` : ''}</dd></div>}
+                  {isClient && <div className="sm:col-span-2"><dt className="text-xs text-slate-500">Services enrolled</dt><dd className="mt-0.5 text-white">{form.services_enrolled.length ? form.services_enrolled.join(', ') : 'None yet'}</dd></div>}
+                </dl>
+                <p className="mt-4 text-xs leading-5 text-slate-500">Creating this account sends a one-time secure setup link. If the automated email fails, the fallback link appears below so you can send it manually.</p>
+              </div>
+            )}
+          </WizardStep>
+
+          <WizardError message={error} />
+
+          <WizardFooter
+            onBack={step === 0 ? () => setShowForm(false) : () => setStep((s) => s - 1)}
+            onNext={goNext}
+            busy={busy}
+            nextLabel={step === totalSteps - 1 ? (busy ? 'Creating…' : 'Create user & send setup') : 'Continue'}
+            backLabel={step === 0 ? 'Cancel' : 'Back'}
+          />
         </Panel>
       )}
 
