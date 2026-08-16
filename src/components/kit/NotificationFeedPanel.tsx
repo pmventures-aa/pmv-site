@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { AtSign, Bell, Check, Mail, MessageSquare, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
@@ -37,6 +38,28 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
   const [loading, setLoading] = useState(false)
   const base = surface === 'portal' ? '/portal' : '/admin'
   const p = useAppPath()
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null)
+
+  // Recompute the popover anchor whenever it opens or the window changes.
+  // Using position:fixed via a portal escapes any ancestor overflow:hidden
+  // (Messages workspace, etc.) that would otherwise clip the panel.
+  useEffect(() => {
+    if (!open) return
+    function measure() {
+      const el = btnRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      setAnchor({ top: rect.bottom + 8, right: Math.max(12, window.innerWidth - rect.right) })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
+    }
+  }, [open])
 
   const loadCount = useCallback(async () => {
     try {
@@ -88,15 +111,18 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:border-gold/40 hover:bg-gold/5 hover:text-gold" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}>
+      <button ref={btnRef} onClick={() => setOpen((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:border-gold/40 hover:bg-gold/5 hover:text-gold" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}>
         <Bell size={16}/>
         {unread > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{unread > 99 ? '99+' : unread}</span>}
       </button>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)}/>
-          <div className="absolute right-0 top-11 z-50 w-[380px] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-white/10 bg-navy-900 shadow-2xl">
+          <div className="fixed inset-0 z-[70]" onClick={() => setOpen(false)}/>
+          <div
+            className="fixed z-[71] w-[380px] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-white/10 bg-navy-900 shadow-2xl"
+            style={{ top: anchor?.top ?? 56, right: anchor?.right ?? 12 }}
+          >
             <div className="flex items-center justify-between border-b border-white/10 p-3">
               <p className="text-sm font-extrabold text-white">Notifications</p>
               <div className="flex items-center gap-2">
@@ -127,7 +153,8 @@ export function NotificationFeedPanel({ surface = 'admin' }: { surface?: 'admin'
               ))}
             </div>
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   )

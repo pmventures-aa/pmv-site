@@ -93,8 +93,10 @@ export function SkyMark({ period, className = '' }: { period: SkyPeriod; classNa
           <circle className="pmv-sky-star pmv-sky-star-late" cx="148" cy="18" r="0.9" />
         </g>
       )}
-      <circle className="pmv-sky-sun" cx={sun.cx} cy={sun.cy} r={sun.r + 10} fill={sky.glow} opacity={isNight ? 0.18 : 0.28} filter={`url(#${uid}-soft)`} />
-      <circle className="pmv-sky-sun" cx={sun.cx} cy={sun.cy} r={sun.r} fill={isNight ? '#e8eef8' : sky.glow} />
+      <g className={`pmv-sky-sun pmv-sky-sun-${period}`}>
+        <circle cx={sun.cx} cy={sun.cy} r={sun.r + 10} fill={sky.glow} opacity={isNight ? 0.18 : 0.28} filter={`url(#${uid}-soft)`} />
+        <circle cx={sun.cx} cy={sun.cy} r={sun.r} fill={isNight ? '#e8eef8' : sky.glow} />
+      </g>
       <path d="M0 86 C 28 78, 48 92, 78 84 C 108 76, 128 90, 168 80 L 168 112 L 0 112 Z" fill={sky.landFar} opacity="0.92" />
       <path d="M0 94 C 36 88, 58 102, 92 93 C 122 85, 142 100, 168 92 L 168 112 L 0 112 Z" fill={sky.land} />
       <rect x="0" y="78" width="168" height="1" fill={sky.horizon} opacity="0.28" />
