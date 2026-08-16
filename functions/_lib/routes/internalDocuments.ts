@@ -50,9 +50,9 @@ internalDocumentAdminRoutes.post('/documents-workspace/text', async (c) => {
   const b = await c.req.json<any>().catch(() => null)
   const title = String(b?.title || '').trim().slice(0, 200)
   if (!title) return c.json({ error: 'title is required' }, 400)
-  const id = uuid(); const versionId = uuid(); const user = c.get('user'); const content = String(b?.text_content || '')
+  const id = uuid(); const versionId = uuid(); const user = c.get('user'); const content = String(b?.text_content || ''); const isBranded = b?.is_branded === 0 ? 0 : 1
   await c.env.DB.batch([
-    c.env.DB.prepare(`INSERT INTO internal_documents (id,title,description,folder,document_type,status,text_content,mime_type,tags_json,created_by_user_id,updated_by_user_id,created_at,updated_at) VALUES (?,?,?,?, 'text','active',?,'text/plain',?,?,?,?,?)`).bind(id,title,b?.description||null,String(b?.folder||'General').slice(0,100),content,JSON.stringify(Array.isArray(b?.tags)?b.tags:[]),user.id,user.id,now(),now()),
+    c.env.DB.prepare(`INSERT INTO internal_documents (id,title,description,folder,document_type,status,text_content,mime_type,is_branded,tags_json,created_by_user_id,updated_by_user_id,created_at,updated_at) VALUES (?,?,?,?, 'text','active',?,'text/plain',?,?,?,?,?,?)`).bind(id,title,b?.description||null,String(b?.folder||'General').slice(0,100),content,isBranded,JSON.stringify(Array.isArray(b?.tags)?b.tags:[]),user.id,user.id,now(),now()),
     c.env.DB.prepare(`INSERT INTO internal_document_versions (id,document_id,version_number,text_content,change_note,created_by_user_id,created_at) VALUES (?,?,1,?,?,?,?)`).bind(versionId,id,content,'Initial version',user.id,now()),
   ])
   return c.json({ id }, 201)
