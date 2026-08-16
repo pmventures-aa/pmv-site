@@ -227,9 +227,9 @@ function CreateTurnover({ properties, staff, packages, onClose, onCreated }: {
         <label><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">STR property</span>
           <select className={inputCls} value={form.property_id} onChange={(e) => setForm((f) => ({ ...f, property_id: e.target.value }))}>
             <option value="">Select…</option>
-            {eligible.map((pr) => <option key={pr.id} value={pr.id}>{pr.name || pr.address} — {pr.client_business || pr.client_name || 'Client'}</option>)}
+            {eligible.map((pr) => <option key={pr.id} value={pr.id}>{pr.name || pr.address} - {pr.client_business || pr.client_name || 'Client'}</option>)}
           </select>
-          {eligible.length === 0 && <span className="mt-1 block text-xs text-slate-500">No STR profiles yet — set one up in STR Properties first.</span>}
+          {eligible.length === 0 && <span className="mt-1 block text-xs text-slate-500">No STR profiles yet - set one up in STR Properties first.</span>}
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Arrival date</span>
@@ -249,7 +249,7 @@ function CreateTurnover({ properties, staff, packages, onClose, onCreated }: {
             </select>
           </label>
         </div>
-        <label><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Provider (optional — assign later)</span>
+        <label><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Provider (optional - assign later)</span>
           <select className={inputCls} value={form.assigned_provider_user_id} onChange={(e) => setForm((f) => ({ ...f, assigned_provider_user_id: e.target.value }))}>
             <option value="">Unassigned</option>
             {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name || s.email}</option>)}
@@ -441,7 +441,7 @@ export function TurnoverDetail() {
           )}
         </div>
         {t.guest_ready_override === 1 && (
-          <p className="mt-2 text-xs text-slate-500">Guest-ready gate was overridden{t.guest_ready_override_reason ? ` — ${t.guest_ready_override_reason}` : ''}.</p>
+          <p className="mt-2 text-xs text-slate-500">Guest-ready gate was overridden{t.guest_ready_override_reason ? ` - ${t.guest_ready_override_reason}` : ''}.</p>
         )}
       </Panel>
 
@@ -449,7 +449,7 @@ export function TurnoverDetail() {
         <StatCard label="Client charge" value={money(t.client_charge_cents)} />
         <StatCard label="Provider payout" value={money(t.provider_payout_cents)} />
         <StatCard label="Payout status" value={payoutStatusLabel(t.payout_status)} />
-        <StatCard label="Ready by" value={t.required_complete_at ? new Date(t.required_complete_at.replace(' ', 'T')).toLocaleString() : '—'} />
+        <StatCard label="Ready by" value={t.required_complete_at ? new Date(t.required_complete_at.replace(' ', 'T')).toLocaleString() : '-'} />
       </div>
 
       {data.gate.requiredItems > 0 && (
@@ -562,7 +562,7 @@ export function TurnoverDetail() {
               <ul className="mt-2 divide-y divide-white/[.06]">
                 {data.supplies.map((s, idx) => (
                   <li key={idx} className="flex items-center justify-between gap-3 py-1.5 text-sm">
-                    <span className="text-slate-200">{s.supply_name} — {s.observed_stock}</span>
+                    <span className="text-slate-200">{s.supply_name} - {s.observed_stock}</span>
                     <Tag tone={s.flag === 'out' ? 'red' : s.flag === 'low' ? 'gold' : 'green'}>{s.flag}</Tag>
                   </li>
                 ))}
@@ -578,7 +578,7 @@ export function TurnoverDetail() {
                   <li key={a.id} className="rounded-md border border-white/10 bg-white/[.02] p-2.5 text-sm text-slate-200">
                     <p className="font-semibold">{a.label}</p>
                     {(a.entry_method || a.code_value) && <p className="mt-0.5 text-xs text-slate-400">{a.entry_method} · {a.code_value}</p>}
-                    {(a.lockbox_location || a.instructions) && <p className="mt-0.5 text-xs text-slate-500">{a.lockbox_location}{a.instructions ? ` — ${a.instructions}` : ''}</p>}
+                    {(a.lockbox_location || a.instructions) && <p className="mt-0.5 text-xs text-slate-500">{a.lockbox_location}{a.instructions ? ` - ${a.instructions}` : ''}</p>}
                   </li>
                 ))}
               </ul>
@@ -691,7 +691,7 @@ function IssueModal({ turnoverId, onClose, onDone }: { turnoverId: string; onClo
         <label><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Internal notes (never client-visible)</span>
           <input className={inputCls} value={form.internal_notes} onChange={(e) => setForm((f) => ({ ...f, internal_notes: e.target.value }))} />
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-200"><input type="checkbox" checked={excess} onChange={(e) => { setExcess(e.target.checked); if (e.target.checked) setAffectsReadiness(false) }} /> Excess condition (extra work — needs client approval)</label>
+        <label className="flex items-center gap-2 text-sm text-slate-200"><input type="checkbox" checked={excess} onChange={(e) => { setExcess(e.target.checked); if (e.target.checked) setAffectsReadiness(false) }} /> Excess condition (extra work - needs client approval)</label>
         <label className="flex items-center gap-2 text-sm text-slate-200"><input type="checkbox" checked={affectsReadiness} onChange={(e) => setAffectsReadiness(e.target.checked)} disabled={excess} /> Affects guest readiness</label>
         <label className="flex items-center gap-2 text-sm text-slate-200"><input type="checkbox" checked={!canContinue} onChange={(e) => setCanContinue(!e.target.checked)} /> Work is blocked</label>
         <div className="flex justify-end gap-2">

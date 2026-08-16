@@ -123,7 +123,7 @@ export default function Dashboard() {
       const t = turnoverAttention[0]
       return {
         eyebrow: 'Turnover needs attention',
-        title: `${t.property_nickname || t.property_address} — ${t.client_status}`,
+        title: `${t.property_nickname || t.property_address} - ${t.client_status}`,
         body: t.client_description,
         to: p(`str/turnovers/${t.id}`),
         label: 'View turnover',

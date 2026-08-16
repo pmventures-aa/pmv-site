@@ -327,7 +327,7 @@ function PropertyPanel({ detail, staff, packages, p, onRefresh }: {
     setBusy(`sync-${id}`)
     try {
       const res = await api.post<{ ok: boolean; events_found: number; created_turnovers: number; updated: number }>(`/admin/str/reservation-calendars/${id}/sync`)
-      toast.success(`Synced — ${res.events_found} reservations${res.created_turnovers ? `, ${res.created_turnovers} turnover(s) auto-created` : ''}.`)
+      toast.success(`Synced - ${res.events_found} reservations${res.created_turnovers ? `, ${res.created_turnovers} turnover(s) auto-created` : ''}.`)
       await onRefresh()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Sync failed.')
@@ -550,7 +550,7 @@ function CreateProfileModal({ picker, staff, packages, onClose, onCreated }: {
           <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Property</span>
             <select className={inputCls} value={form.property_id} onChange={(e) => setForm((f) => ({ ...f, property_id: e.target.value }))}>
               <option value="">Select…</option>
-              {eligible.map((pr) => <option key={pr.id} value={pr.id}>{pr.name || pr.address} — {pr.client_business || pr.client_name || 'Client'}</option>)}
+              {eligible.map((pr) => <option key={pr.id} value={pr.id}>{pr.name || pr.address} - {pr.client_business || pr.client_name || 'Client'}</option>)}
             </select>
             {eligible.length === 0 && <span className="mt-1 block text-xs text-slate-500">Every property already has a profile.</span>}
           </label>

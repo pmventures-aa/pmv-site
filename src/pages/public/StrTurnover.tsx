@@ -6,11 +6,11 @@ import { usePageMeta } from '../../lib/usePageMeta'
 import { strPackageLabel } from '../../../shared/strWorkspace'
 
 const STEPS = [
-  { title: 'Get a quote', body: 'Tell us about the property, its size, and how often it turns over. You get a per-turnover price in writing — no surprise fees, no per-supply invoices.' },
+  { title: 'Get a quote', body: 'Tell us about the property, its size, and how often it turns over. You get a per-turnover price in writing - no surprise fees, no per-supply invoices.' },
   { title: 'We schedule & dispatch', body: 'Your reservation feed or calendar sync tells us when the guest leaves. A vetted Pinnacle provider is assigned and arrives with the checklist and the clock already running.' },
-  { title: 'The checklist gets done', body: 'Every room on a tracked checklist, required photos, and a final walkthrough. Issues are flagged the moment they show up — with photos, not surprises later.' },
+  { title: 'The checklist gets done', body: 'Every room on a tracked checklist, required photos, and a final walkthrough. Issues are flagged the moment they show up - with photos, not surprises later.' },
   { title: 'A gatekeeper verifies', body: 'No turnover is marked guest ready on trust alone. Pinnacle reviews the checklist, photos, and issues before your property is released to the next guest.' },
-  { title: 'The report lands in your portal', body: 'Guest-ready status, checklist, photos, and any approved extras — all in one place. You know what happened without making a single call.' },
+  { title: 'The report lands in your portal', body: 'Guest-ready status, checklist, photos, and any approved extras - all in one place. You know what happened without making a single call.' },
 ]
 
 const PACKAGES = [
@@ -52,11 +52,11 @@ const PACKAGES = [
 ]
 
 const FAQ = [
-  ['What actually gets done during a turnover?', 'The checklist is built per property from a global standard: kitchen, bathrooms, bedrooms, living areas, laundry, supplies, and a final walkthrough. Your provider works the checklist, takes the required photos, and flags anything that needs your attention — with a photo and a plain-language summary.'],
+  ['What actually gets done during a turnover?', 'The checklist is built per property from a global standard: kitchen, bathrooms, bedrooms, living areas, laundry, supplies, and a final walkthrough. Your provider works the checklist, takes the required photos, and flags anything that needs your attention - with a photo and a plain-language summary.'],
   ['How do I know it actually happened?', 'Every turnover is reviewed by Pinnacle before it is marked guest ready. The checklist progress, completion photos, and any issues live in your portal, so the evidence is there before the next guest checks in.'],
   ['Can you connect to my Airbnb or VRBO calendar?', 'Yes. Connect your iCal feed once and we import the guest windows. Turnovers can even be auto-created from the feed when the profile is set up that way.'],
-  ['What happens when something is broken or damaged?', 'It gets flagged during the turnover with photos. Standard conditions are handled in the work. Larger or excess conditions are sent to you for approval before we proceed — and any extra charge is itemized and approved before it appears on your bill.'],
-  ['How is pricing decided?', 'Pricing comes from your property size, the package, and the number of turnovers. It is quoted in writing before you commit — no hidden per-supply fees, no surprise line items.'],
+  ['What happens when something is broken or damaged?', 'It gets flagged during the turnover with photos. Standard conditions are handled in the work. Larger or excess conditions are sent to you for approval before we proceed - and any extra charge is itemized and approved before it appears on your bill.'],
+  ['How is pricing decided?', 'Pricing comes from your property size, the package, and the number of turnovers. It is quoted in writing before you commit - no hidden per-supply fees, no surprise line items.'],
   ['Who does the work?', 'Vetted Pinnacle providers who operate under our checklist and verification process. You always see who is assigned and when the work happened.'],
 ]
 
@@ -77,7 +77,7 @@ export default function StrTurnover() {
               <p className="eyebrow">STR Turnover &amp; Property Support</p>
               <h1 className="mt-4 max-w-4xl font-display text-4xl font-extrabold leading-[1.04] tracking-[-.03em] text-white sm:text-6xl">YOUR PROPERTY. GUEST READY. WITHOUT THE RUNAROUND.</h1>
               <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-                One accountable team handles the turnover, verifies the work, and puts the proof in your portal — so the next guest walks into a property you know was checked, not a property you hope was.
+                One accountable team handles the turnover, verifies the work, and puts the proof in your portal - so the next guest walks into a property you know was checked, not a property you hope was.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link to="/str-quote" className="rounded-lg bg-gold px-5 py-2.5 text-sm font-bold text-navy-950 hover:bg-gold-300">GET A TURNOVER QUOTE</Link>
@@ -121,7 +121,7 @@ export default function StrTurnover() {
             <Reveal className="max-w-3xl" distance={14}>
               <p className="eyebrow">Packages</p>
               <h2 className="mt-3 font-display text-3xl font-bold tracking-[-.03em] text-white sm:text-4xl">A verified turnover, in three shapes.</h2>
-              <p className="mt-4 text-sm leading-7 text-slate-400">Every package includes the tracked checklist, required photos, issue flagging, independent verification, and the portal report. Pricing is quoted in writing for your property — no hidden per-supply fees.</p>
+              <p className="mt-4 text-sm leading-7 text-slate-400">Every package includes the tracked checklist, required photos, issue flagging, independent verification, and the portal report. Pricing is quoted in writing for your property - no hidden per-supply fees.</p>
             </Reveal>
             <div className="mt-10 grid gap-4 lg:grid-cols-3">
               {PACKAGES.map((pkg, index) => (
