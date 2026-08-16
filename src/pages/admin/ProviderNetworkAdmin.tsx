@@ -33,6 +33,7 @@ import { DispatchFeeSettingsPanel } from '../../components/admin/DispatchFeeSett
 import { useAuth } from '../../lib/auth'
 import { locationAgeLabel, locationFreshness } from '../../../shared/operations'
 import { useGeolocationPermission } from '../../lib/useGeolocationPermission'
+import { useLiveLocationShare } from '../../lib/useLiveLocationShare'
 
 type NetworkMapPerson = {
   user_id: string
@@ -75,9 +76,6 @@ export default function ProviderNetworkAdmin() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [mapPeople, setMapPeople] = useState<NetworkMapPerson[]>([])
   const [viewerUserId, setViewerUserId] = useState('')
-  const [sharing, setSharing] = useState<'idle' | 'starting' | 'live' | 'error'>('idle')
-  const watchId = useRef<number | null>(null)
-  const lastLocationSend = useRef(0)
   const geoPerm = useGeolocationPermission()
   const autoStartedRef = useRef(false)
 
@@ -98,6 +96,8 @@ export default function ProviderNetworkAdmin() {
       setLoading(false)
     }
   }, [])
+
+  const { sharing, start: startLocationSharing, stop: stopLocationSharing } = useLiveLocationShare({ onChanged: load })
 
   useEffect(() => { void load() }, [load])
   useLiveRefresh(load)
@@ -145,63 +145,13 @@ export default function ProviderNetworkAdmin() {
     [filtered, mapPeople],
   )
 
-  function startLocationSharing() {
-    if (!navigator.geolocation) {
-      setSharing('error')
-      toast.error('This browser does not support location sharing.')
-      return
-    }
-    if (watchId.current != null) return
-    setSharing('starting')
-    watchId.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const now = Date.now()
-        if (now - lastLocationSend.current < 20_000) return
-        lastLocationSend.current = now
-        void api.post('/admin/location', {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy_m: position.coords.accuracy,
-        }).then(() => {
-          setSharing('live')
-          void load()
-        }).catch((err) => {
-          setSharing('error')
-          toast.error(err instanceof ApiError ? err.message : 'Could not share this location.')
-        })
-      },
-      (error) => {
-        setSharing('error')
-        toast.error(error.message || 'Location permission was not granted.')
-      },
-      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 20_000 },
-    )
-  }
-
-  async function stopLocationSharing() {
-    if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
-    watchId.current = null
-    lastLocationSend.current = 0
-    try {
-      await api.post('/admin/location/stop')
-      setSharing('idle')
-      await load()
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Could not stop location sharing.')
-    }
-  }
-
-  useEffect(() => () => {
-    if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
-  }, [])
-
   // Auto-start silently when the browser already remembers this device has
   // granted permission. Never re-prompts, never spins up a watch if the
   // caller already has one running. Runs once per mount.
   useEffect(() => {
     if (autoStartedRef.current) return
     if (geoPerm.permission !== 'granted') return
-    if (watchId.current != null || sharing !== 'idle') return
+    if (sharing !== 'idle') return
     autoStartedRef.current = true
     startLocationSharing()
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -14,7 +14,7 @@ import {
   Type,
 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline, SkeletonTable } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
 import { useAuth } from '../../lib/auth'
 import { Avatar } from '../../components/kit/Avatar'
@@ -123,6 +123,9 @@ export function FieldWorkList() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'active' | 'completed'>('active')
+  const [availability, setAvailability] = useState<'available' | 'limited' | 'unavailable'>('available')
+  const [availabilityBusy, setAvailabilityBusy] = useState(false)
+  const isVendor = workspace.party_type === 'vendor'
 
   useEffect(() => {
     api.get<{ assignments: Assignment[] }>('/admin/field-assignments')
@@ -130,6 +133,31 @@ export function FieldWorkList() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    api.get<{ staff: Array<{ id: string; party_type: string | null; availability_status: string | null }> }>('/admin/staff-directory')
+      .then((res) => {
+        const me = res.staff.find((s) => s.id === user.id)
+        if (me && me.availability_status) setAvailability(me.availability_status as 'available' | 'limited' | 'unavailable')
+      })
+      .catch(() => {})
+  }, [user])
+
+  async function toggleAvailability() {
+    if (!user || availabilityBusy) return
+    const next = availability === 'unavailable' ? 'available' : 'unavailable'
+    setAvailabilityBusy(true)
+    try {
+      await api.patch(`/admin/employees/${user.id}/network`, { availability_status: next })
+      setAvailability(next)
+      toast.success(next === 'available' ? 'You are now marked available for new work.' : 'You are marked unavailable for new work.')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update your availability.')
+    } finally {
+      setAvailabilityBusy(false)
+    }
+  }
 
   const mine = useMemo(() => assignments.filter((a) => a.vendor_user_id === user?.id), [assignments, user?.id])
   const list = useMemo(() => mine.filter((a) => (tab === 'active' ? a.status !== 'completed' && a.status !== 'cancelled' : a.status === 'completed')), [mine, tab])
@@ -142,6 +170,30 @@ export function FieldWorkList() {
         subtitle={copy.homeSubtitle}
         leading={user ? <Avatar userId={user.id} name={user.full_name} size={56} editable uploadPath="/me/avatar" /> : undefined}
       />
+      {isVendor && (
+        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-white/10 bg-white/[.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-white">Accepting new work</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">When unavailable, Pinnacle stops offering you new dispatch. Existing assignments stay on your list.</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className={`text-xs font-semibold ${availability === 'unavailable' ? 'text-slate-500' : 'text-emerald-300'}`}>
+              {availability === 'unavailable' ? 'Unavailable' : availability === 'limited' ? 'Limited' : 'Available'}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={availability !== 'unavailable'}
+              aria-label="Toggle availability for new work"
+              disabled={availabilityBusy}
+              onClick={() => void toggleAvailability()}
+              className={`relative h-6 w-11 shrink-0 rounded-full border transition disabled:opacity-60 ${availability === 'unavailable' ? 'border-white/15 bg-white/10' : 'border-emerald-400/50 bg-emerald-400/25'}`}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${availability === 'unavailable' ? 'left-0.5' : 'left-[22px]'}`} />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mb-4 flex gap-2">
         <button
           type="button"
@@ -161,7 +213,7 @@ export function FieldWorkList() {
         </button>
       </div>
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <Panel><SkeletonTable rows={5} cols={2} /></Panel>
       ) : list.length === 0 ? (
         <Panel>
           <EmptyState label={tab === 'active' ? 'No active assignments right now.' : 'No completed assignments yet.'} />
