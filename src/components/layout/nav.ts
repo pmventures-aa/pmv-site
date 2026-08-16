@@ -1,7 +1,7 @@
 import {
   Home, Layers, FileText, MessageSquare, Calendar, Receipt, HelpCircle, Building2, Users,
   Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned,
-  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, type LucideIcon,
+  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, Video, type LucideIcon,
 } from 'lucide-react'
 import { clientWorkspace, type OperatingWorld } from '../../lib/workspace'
 
@@ -46,6 +46,15 @@ export function clientMobilePrimary(serviceKeys: string[]): string[] {
 
 export const portalHiddenRoutes=['planned-calls','funding','property-management','tax-filings'] as const
 
+// HQ navigation, grouped by how staff actually think about the work:
+//   Revenue      -> anything that turns into a signed engagement or a paid
+//                   invoice: pipeline, quotes, invoices, clients, leads.
+//   Operations   -> the day-to-day work delivery surface: comms, cases,
+//                   calendar, field dispatch, RON, STR, service work,
+//                   documents, and the network of providers that ships it.
+//   Intelligence -> automation, reporting, activity, the analytics layer.
+//   Administration -> owner/admin controls: users, roles, security,
+//                   invitations, public website, and settings.
 export const adminNav: NavItem[] = [
   {key:'dashboard',label:'Overview',to:'',icon:Home},
   {key:'pipelines',label:'Pipeline',to:'pipelines',icon:Workflow,section:'Revenue'},
@@ -56,17 +65,22 @@ export const adminNav: NavItem[] = [
   {key:'messages',label:'Messages',to:'messages',icon:MessageSquare,section:'Operations'},
   {key:'cases',label:'Cases & SLA',to:'cases',icon:HelpCircle,section:'Operations'},
   {key:'calendar',label:'Calendar',to:'calendar',icon:Calendar,section:'Operations'},
-  {key:'field-work',label:'Field Work & RON',to:'field-work',icon:MapPinned,section:'Operations'},
+  {key:'field-work',label:'Field Work',to:'field-work',icon:MapPinned,section:'Operations'},
+  // Remote Online Notarization is a document-signing session, not a
+  // property visit. It shares the same field_assignments backend so it can
+  // reuse the audit-trail plumbing, but the operational surface is
+  // separate and should not share a nav tab with field visits.
+  {key:'ron',label:'Remote Notarization',to:'ron',icon:Video,section:'Operations'},
   {key:'str-operations',label:'STR Turnovers',to:'str/operations',icon:DoorOpen,section:'Operations'},
   {key:'service-assignments',label:'Service Assignments',to:'service-assignments',icon:Wrench,section:'Operations'},
+  {key:'network',label:'Network & Dispatch',to:'network',icon:UsersRound,section:'Operations'},
   {key:'document-center',label:'Documents',to:'document-center',icon:FileText,section:'Operations'},
-  {key:'automation-center',label:'Automation Center',to:'automation-center',icon:Bot,section:'Operations'},
+  {key:'automation-center',label:'Automation Center',to:'automation-center',icon:Bot,section:'Intelligence'},
   {key:'management',label:'Management',to:'management',icon:Gauge,section:'Intelligence'},
   {key:'reports',label:'Reports',to:'reports',icon:BarChart3,section:'Intelligence'},
   {key:'activity',label:'Activity',to:'activity',icon:Activity,section:'Intelligence'},
   {key:'security-center',label:'Security Center',to:'security-center',icon:ShieldCheck,section:'Administration'},
   {key:'audit-log',label:'Audit Log',to:'audit-log',icon:ClipboardList,section:'Administration'},
-  {key:'network',label:'Network & Dispatch',to:'network',icon:UsersRound,section:'Administration'},
   {key:'users',label:'Users',to:'users',icon:UserCog,section:'Administration'},
   {key:'assignments',label:'Staff Coverage',to:'assignments',icon:ArrowLeftRight,section:'Administration'},
   {key:'invitations',label:'Invitations',to:'invitations',icon:MailPlus,section:'Administration'},
