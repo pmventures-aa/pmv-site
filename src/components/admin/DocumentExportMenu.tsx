@@ -132,7 +132,7 @@ export function DocumentExportMenu({ documentId, title, documentType, mimeType, 
       await doExport(pending, password)
       setProtectedOpen(false)
       setOpen(false)
-      toast.success('Protected PDF downloaded — the password is not stored anywhere')
+      toast.success('Protected PDF downloaded - the password is not stored anywhere')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : EXPORT_ERROR, { action: { label: 'Try Again', onClick: () => void createProtected() } })
     } finally {
@@ -186,7 +186,7 @@ export function DocumentExportMenu({ documentId, title, documentType, mimeType, 
         </div>
       )}
       <Dialog open={protectedOpen} onOpenChange={(o) => { setProtectedOpen(o); if (!o) setPwError('') }}>
-        <DialogContent title="Create Protected PDF" description="Lock this document with a password. The password is never stored by Pinnacle — keep it somewhere safe." size="sm">
+        <DialogContent title="Create Protected PDF" description="Lock this document with a password. The password is never stored by Pinnacle - keep it somewhere safe." size="sm">
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-300" htmlFor="pdf-password">Password</label>
