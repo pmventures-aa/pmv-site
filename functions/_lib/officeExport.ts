@@ -141,7 +141,7 @@ export function parseHtml(html: string): ExportBlock[] {
   }
   const pushText = (raw: string) => {
     if (!cur) return
-    const text = decodeHtmlEntities(raw).replace(/\s+/g, ' ')
+    const text = raw === '\n' ? '\n' : decodeHtmlEntities(raw).replace(/\s+/g, ' ')
     if (!text) return
     const a = attrs()
     const last = cur.runs[cur.runs.length - 1]
@@ -175,11 +175,11 @@ export function parseHtml(html: string): ExportBlock[] {
   const re = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:\s[^<>]*)?)>|([^<]+)/g
   let m: RegExpExecArray | null
   while ((m = re.exec(String(html || '')))) {
+    const text = m[4]
+    if (text !== undefined) { pushText(text); continue }
     const closing = !!m[1]
     const tag = m[2].toLowerCase()
     const attrsRaw = m[3] || ''
-    const text = m[4]
-    if (text !== undefined) { pushText(text); continue }
     if (closing) {
       if (tag === 'ol' || tag === 'ul') { listMode = null; liIndex = 0 }
       else if (tag === 'li') flush()

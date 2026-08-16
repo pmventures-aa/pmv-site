@@ -101,7 +101,7 @@ export default function DocumentFullPage() {
         </div>
       </header>
       <main className="flex-1 p-3 sm:p-5">
-        <DocumentCanvas document={d} text={editText} onTextChange={(v) => { setEditText(v); setDirty(true) }} fullPage tall />
+        <DocumentCanvas document={d} text={editText} onTextChange={(v) => { setEditText(v); setDirty(true) }} fullPage />
       </main>
     </div>
   )

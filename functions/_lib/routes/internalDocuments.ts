@@ -166,16 +166,16 @@ internalDocumentAdminRoutes.post('/documents-workspace/:id/export', async (c) =>
       }
       if (format === 'docx') {
         const bytes = await buildDocx({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo })
-        return new Response(bytes, { headers: { 'Content-Type': EXPORT_MIME_DOCX, 'Content-Disposition': disposition(`${base}.docx`) } })
+        return new Response(bytes as unknown as ArrayBuffer, { headers: { 'Content-Type': EXPORT_MIME_DOCX, 'Content-Disposition': disposition(`${base}.docx`) } })
       }
       const bytes = await buildPdf({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo })
       if (format === 'protected_pdf') {
         const pw = passwordOk()
         if (!pw) return c.json({ error: 'Password must be at least 8 characters.' }, 400)
         const protectedBytes = await protectPdf(bytes, pw)
-        return new Response(protectedBytes, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': disposition(`${base} (Protected).pdf`) } })
+        return new Response(protectedBytes as unknown as ArrayBuffer, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': disposition(`${base} (Protected).pdf`) } })
       }
-      return new Response(bytes, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': disposition(`${base}.pdf`) } })
+      return new Response(bytes as unknown as ArrayBuffer, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': disposition(`${base}.pdf`) } })
     }
     // File documents: the export IS the faithful original — signed/executed
     // files are never regenerated from editable content.
@@ -195,9 +195,9 @@ internalDocumentAdminRoutes.post('/documents-workspace/:id/export', async (c) =>
       const pw = passwordOk()
       if (!pw) return c.json({ error: 'Password must be at least 8 characters.' }, 400)
       const protectedBytes = await protectPdf(original, pw)
-      return new Response(protectedBytes, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': disposition(`${base} (Protected).pdf`) } })
+      return new Response(protectedBytes as unknown as ArrayBuffer, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': disposition(`${base} (Protected).pdf`) } })
     }
-    return new Response(original, { headers: { 'Content-Type': isPdf ? 'application/pdf' : EXPORT_MIME_DOCX, 'Content-Disposition': disposition(isPdf ? `${base}.pdf` : `${base}.docx`) } })
+    return new Response(original as unknown as ArrayBuffer, { headers: { 'Content-Type': isPdf ? 'application/pdf' : EXPORT_MIME_DOCX, 'Content-Disposition': disposition(isPdf ? `${base}.pdf` : `${base}.docx`) } })
   } catch (e) {
     return c.json({ error: "We couldn't prepare this document. Your original has not been changed." }, 500)
   }

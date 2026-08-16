@@ -52,7 +52,7 @@ export function md5(data: Uint8Array): Uint8Array {
       else if (i < 32) { f = (d & b) | (~d & c); g = (5 * i + 1) % 16 }
       else if (i < 48) { f = b ^ c ^ d; g = (3 * i + 5) % 16 }
       else { f = c ^ (b | ~d); g = (7 * i) % 16 }
-      const tmp = (d + f + MD5_K[i] + w[g]) >>> 0
+      const tmp = (f + MD5_K[i] + w[g]) >>> 0
       const rot = (a + tmp) >>> 0
       const shifted = (rot << MD5_S[i]) | (rot >>> (32 - MD5_S[i]))
       const next = (b + shifted) >>> 0
@@ -152,14 +152,13 @@ function random16(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(16))
 }
 
-// WebCrypto AES-CBC always PKCS#7 pads, but PDF AES does its own padding
-// (no padding when the plaintext already fills the final block). Because the
-// caller passes data already padded to a 16-byte multiple, PKCS#7 adds
-// exactly one block — encrypt, then drop that block from the ciphertext.
+// PDF AES does its own padding: plaintext is passed already padded to a
+// 16-byte multiple and the final block must not be padded again. WebCrypto
+// AES-CBC always appends a PKCS#7 block even to aligned input, so encrypt the
+// aligned bytes as-is and drop that last block from the ciphertext.
 async function aesCbc(key: Uint8Array, iv: Uint8Array, plain: Uint8Array): Promise<Uint8Array> {
-  const padded = concat(plain, new Uint8Array(16).fill(16))
-  const k = await crypto.subtle.importKey('raw', key, { name: 'AES-CBC' }, false, ['encrypt'])
-  const out = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, k, padded))
+  const k = await crypto.subtle.importKey('raw', key as unknown as ArrayBuffer, { name: 'AES-CBC' }, false, ['encrypt'])
+  const out = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv: iv as unknown as ArrayBuffer }, k, plain as unknown as ArrayBuffer))
   return out.slice(0, out.length - 16)
 }
 
@@ -196,29 +195,38 @@ function unescapeLiteral(s: string): Uint8Array {
 }
 
 async function processObject(k: Uint8Array, num: number, gen: number, body: string): Promise<string> {
-  const streamRe = /stream\r?\n([\s\S]*?)endstream/
-  const sm = body.match(streamRe)
-  let dict = body
-  if (sm) {
-    const streamBytes = latin1Encode(sm[1])
-    const enc = await encryptBytes(k, num, gen, streamBytes)
-    dict = body.slice(0, sm.index) + 'stream\r\n' + latin1Decode(enc) + '\r\nendstream'
-    dict = dict.replace(/\/Length\s+\d+/, `/Length ${enc.length}`)
+  // Stream data is sliced by the dict's /Length — never by scanning for
+  // "endstream" inside binary data, which could appear in the ciphertext.
+  let head = body
+  let streamOut = ''
+  const sm = body.match(/stream\r?\n/)
+  if (sm && sm.index !== undefined) {
+    const lenMatch = body.match(/\/Length\s+(\d+)/)
+    if (lenMatch) {
+      const start = sm.index + sm[0].length
+      const streamBytes = latin1Encode(body.slice(start, start + Number(lenMatch[1])))
+      const enc = await encryptBytes(k, num, gen, streamBytes)
+      head = body.slice(0, sm.index).replace(/\/Length\s+\d+/, `/Length ${enc.length}`)
+      streamOut = 'stream\r\n' + latin1Decode(enc) + '\r\nendstream'
+    }
   }
+  // Strings are scanned only in the dict portion (head) — the encrypted stream
+  // bytes must never be re-scanned, or random binary could be mistaken for
+  // literal/hex strings and corrupt the stream.
   const strRe = /\(((?:\\.|[^\\()])*)\)|<([0-9a-fA-F]{2}(?:\s*[0-9a-fA-F]{2})*)>/g
   let out = ''
   let last = 0
   let m: RegExpExecArray | null
-  while ((m = strRe.exec(dict))) {
+  while ((m = strRe.exec(head))) {
     const literal = m[1] !== undefined
     const raw = literal ? m[1] : m[2]
     const bytes = literal ? unescapeLiteral(raw) : Uint8Array.from((raw || '').replace(/\s/g, '').match(/.{2}/g) || [], (h) => parseInt(h, 16))
     const enc = await encryptBytes(k, num, gen, bytes)
-    out += dict.slice(last, m.index) + `<${toHex(enc)}>`
+    out += head.slice(last, m.index) + `<${toHex(enc)}>`
     last = m.index + m[0].length
   }
-  out += dict.slice(last)
-  return out
+  out += head.slice(last)
+  return out + streamOut
 }
 
 // ---------------------------------------------------------------------------
@@ -228,9 +236,11 @@ async function processObject(k: Uint8Array, num: number, gen: number, body: stri
 export async function protectPdf(plain: Uint8Array, userPassword: string, ownerPassword?: string): Promise<Uint8Array> {
   const text = latin1Decode(plain)
   const startxrefIdx = text.lastIndexOf('startxref')
+  const trailerIdx = text.lastIndexOf('trailer')
   if (startxrefIdx < 0) throw new Error('Invalid PDF: startxref not found')
+  if (trailerIdx < 0) throw new Error('Invalid PDF: trailer not found')
   const objectsPart = text.slice(0, startxrefIdx)
-  const trailerPart = text.slice(startxrefIdx)
+  const trailerPart = text.slice(trailerIdx)
 
   const rootMatch = trailerPart.match(/\/Root\s+(\d+\s+\d+\s+R)/)
   const infoMatch = trailerPart.match(/\/Info\s+(\d+\s+\d+\s+R)/)
@@ -243,11 +253,15 @@ export async function protectPdf(plain: Uint8Array, userPassword: string, ownerP
   const k = intermediateKey(paddedUser, oRaw, -4, id0)
   const k16 = k.slice(0, 16)
   const zeros = new Uint8Array(16)
-  const oEnc = await aesCbc(k16, zeros, oRaw)
+  // Algorithm 2 (R=4): O = AES-128-EBC(key, PAD32(MD5(pad(owner)))), zero IV.
+  // The 16-byte hash is padded with PAD to 32 bytes before the EBC step;
+  // the result is exactly 32 bytes — no trailing pad.
+  const oEnc = await aesCbc(k16, zeros, concat(oRaw, PAD_STR.slice(0, 16)))
+  // Algorithm 4 (R=4): U = AES-128-CBC(key, IV=hash, PAD32(hash)) + PAD(16).
   const uHash = md5(concat(paddedUser, k)).slice(0, 16)
-  const uEnc = await aesCbc(k16, zeros, uHash)
-  const O = concat(oEnc, PAD_STR.slice(0, 16))
-  const U = concat(uEnc, PAD_STR.slice(0, 16), PAD_STR.slice(0, 16))
+  const uEnc = await aesCbc(k16, uHash, concat(uHash, PAD_STR.slice(0, 16)))
+  const O = oEnc
+  const U = concat(uEnc, PAD_STR.slice(0, 16))
 
   const objects: { num: number; gen: number; body: string; start: number }[] = []
   const headRe = /(\d+)\s+(\d+)\s+obj\b/g
@@ -263,6 +277,15 @@ export async function protectPdf(plain: Uint8Array, userPassword: string, ownerP
       const endObjIdx = text.indexOf('endobj', scan)
       if (endObjIdx === -1) break
       if (streamIdx !== -1 && streamIdx < endObjIdx && /^\r?\n/.test(text.slice(streamIdx + 6, streamIdx + 8))) {
+        // Prefer the dict's /Length (binary stream data could contain the
+        // ASCII sequence "endstream" and truncate a naive scan).
+        const dictPart = text.slice(scan, streamIdx)
+        const lenMatch = dictPart.match(/\/Length\s+(\d+)/)
+        if (lenMatch) {
+          const afterLf = text[streamIdx + 6] === '\r' ? streamIdx + 8 : streamIdx + 7
+          scan = afterLf + Number(lenMatch[1])
+          continue
+        }
         const afterLf = text[streamIdx + 6] === '\r' ? streamIdx + 8 : streamIdx + 7
         const es = text.indexOf('endstream', afterLf)
         if (es === -1) { bodyEnd = endObjIdx; break }

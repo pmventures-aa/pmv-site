@@ -82,7 +82,7 @@ export function DocumentExportMenu({ documentId, title, documentType, mimeType, 
       body: JSON.stringify({ format: f.key, ...(passwordValue ? { password: passwordValue } : {}) }),
     })
     if (!res.ok) {
-      const body = await res.json().catch(() => null)
+      const body = (await res.json().catch(() => null)) as { error?: string } | null
       throw new Error(body?.error || EXPORT_ERROR)
     }
     const blob = await res.blob()

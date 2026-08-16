@@ -3,7 +3,7 @@
 // gold rule, and a confidentiality footer on every page. Preserves headings,
 // bold/italic/underline, links, lists, quotes and horizontal rules.
 
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, type Color, type PDFFont } from 'pdf-lib'
 import { FIRM_NAME, FIRM_PHONE, FIRM_REGION, FIRM_SITE_HOST, FIRM_TAGLINE, SUPPORT_EMAIL } from '../../shared/letterhead'
 import { parseHtml, type ExportRun } from './officeExport'
 
@@ -24,7 +24,7 @@ function toWinAnsi(text: string): string {
   return out
 }
 
-type Word = { text: string; font: PDFFont; size: number; color: { r: number; g: number; b: number }; underline: boolean; spaceBefore: boolean; br?: boolean }
+type Word = { text: string; font: PDFFont; size: number; color: Color; underline: boolean; spaceBefore: boolean; br?: boolean }
 
 export async function buildPdf(input: { title: string; html: string; branded?: boolean; logoBytes?: Uint8Array | ArrayBuffer | null }): Promise<Uint8Array> {
   const branded = !!input.branded
@@ -103,9 +103,11 @@ export async function buildPdf(input: { title: string; html: string; branded?: b
   const drawRuns = (runs: ExportRun[], size: number, x0: number, right: number, lineHeight: number, gap: number) => {
     if (!runs.length) return
     let x = x0
+    let drew = false
     for (const w of wordsFor(runs, size)) {
-      if (w.br) { x = x0; y -= lineHeight; if (y < 44) { footer(); newPage(); x = x0 } continue }
+      if (w.br) { x = x0; y -= lineHeight; drew = true; if (y < 44) { footer(); newPage(); x = x0 } continue }
       if (!w.text) continue
+      drew = true
       const ww = w.font.widthOfTextAtSize(w.text, size)
       const spaceW = w.spaceBefore ? regular.widthOfTextAtSize(' ', size) : 0
       if (x + spaceW + ww > right && x > x0) { x = x0; y -= lineHeight; if (y < 44) { footer(); newPage() } }
@@ -114,7 +116,7 @@ export async function buildPdf(input: { title: string; html: string; branded?: b
       if (w.underline) page.drawLine({ start: { x, y: y - 1.6 }, end: { x: x + ww, y: y - 1.6 }, thickness: 0.6, color: w.color })
       x += ww
     }
-    y -= gap
+    if (drew) y -= lineHeight + gap
   }
 
   for (const b of blocks) {
@@ -140,7 +142,6 @@ export async function buildPdf(input: { title: string; html: string; branded?: b
       ensure(20)
       const marker = b.ordered ? `${b.index}.` : '•'
       drawRuns([{ text: marker, bold: true }], 11, PAD, 612 - PAD, 15.4, 0)
-      y -= 15.4
       if (y < 44) { footer(); newPage() }
       drawRuns(b.runs, 11, PAD + 20, 612 - PAD, 15.4, 4)
       continue
