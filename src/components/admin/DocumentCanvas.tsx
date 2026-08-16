@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Download, FileText, Indent, Italic,
   Link2, List, ListOrdered, Maximize2, Minus, Outdent, Plus, Redo2, RemoveFormatting, RotateCw,
   Strikethrough, Underline, Undo2,
 } from 'lucide-react'
 import { LetterheadCrest } from './LetterheadCrest'
+import { DocumentExportMenu } from './DocumentExportMenu'
 import { DOC_FONTS, DOC_HIGHLIGHT, DOC_INK, DOC_SIZES, toEditorHtml } from '../../../shared/docHtml'
 import { FIRM_NAME, FIRM_PHONE, FIRM_REGION, FIRM_SITE_HOST, FIRM_TAGLINE, SUPPORT_EMAIL } from '../../../shared/letterhead'
 import './documentCanvas.css'
@@ -77,7 +79,7 @@ async function parseDocx(bytes:ArrayBuffer):Promise<DocxBlock[]>{
   return blocks
 }
 
-export function DocumentCanvas({document,text,onTextChange,readOnly=false}:{document:CanvasDocument;text:string;onTextChange:(v:string)=>void;readOnly?:boolean}){
+export function DocumentCanvas({document,text,onTextChange,readOnly=false,fullPage=false,fullPageHref}:{document:CanvasDocument;text:string;onTextChange:(v:string)=>void;readOnly?:boolean;fullPage?:boolean;fullPageHref?:string}){
   const [zoom,setZoom]=useState(100),[docx,setDocx]=useState<DocxBlock[]|null>(null),[docxError,setDocxError]=useState(''),[loading,setLoading]=useState(false),[reloadKey,setReloadKey]=useState(0)
   const ext=extension(document.original_name), mime=document.mime_type||''
   const url=`/api/admin/documents-workspace/${document.id}/file?v=${reloadKey}`
@@ -98,11 +100,16 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false}:{docu
       <div className="flex items-center gap-1.5">
         <button className="doc-tool" onClick={()=>setZoom(v=>Math.max(60,v-10))} title="Zoom out"><Minus size={15}/></button><span className="w-12 text-center text-[11px] tabular-nums text-slate-400">{zoom}%</span><button className="doc-tool" onClick={()=>setZoom(v=>Math.min(180,v+10))} title="Zoom in"><Plus size={15}/></button>
         <button className="doc-tool" onClick={()=>{setZoom(100);setReloadKey(v=>v+1)}} title="Refresh document"><RotateCw size={14}/></button>
-        <a className="doc-tool" href={url} target="_blank" rel="noreferrer" title="Open full screen"><Maximize2 size={14}/></a><a className="doc-tool" href={url} download title="Download"><Download size={14}/></a>
+        {fullPageHref
+          ? <Link className="doc-tool" to={fullPageHref} title="Open full page"><Maximize2 size={14}/></Link>
+          : <a className="doc-tool" href={url} target="_blank" rel="noreferrer" title="Open full screen"><Maximize2 size={14}/></a>}
+        {document.document_type==='text'
+          ? <DocumentExportMenu compact documentId={document.id} title={document.title} documentType="text" align="right"/>
+          : <a className="doc-tool" href={url} download title="Download"><Download size={14}/></a>}
       </div>
     </div>
     {editableText && <FormatRibbon onChange={onTextChange}/>}
-    <div className="relative h-[calc(100vh-255px)] min-h-[600px] overflow-auto bg-[#2a3037] p-4 sm:p-7">
+    <div className={`relative overflow-auto bg-[#2a3037] p-4 sm:p-7 ${fullPage?'h-[calc(100vh-138px)] min-h-[540px]':'h-[calc(100vh-255px)] min-h-[600px]'}`}>
       {isPdf&&<div className="mx-auto h-full min-h-[560px] w-full overflow-hidden bg-white shadow-2xl" style={{maxWidth:`${Math.round(900*zoom/100)}px`}}><iframe key={reloadKey} title={document.title} src={`${url}#toolbar=0&navpanes=1&view=FitH`} className="h-full w-full bg-white"/></div>}
       {document.document_type==='text'&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center',marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}><article className="doc-paper">{branded&&<PaperBrand/>}<div className="doc-body"><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</article></div>}
       {isImage&&<div className="mx-auto flex min-h-[500px] items-start justify-center"><img src={url} alt={document.title} style={{width:`${zoom}%`,maxWidth:'none'}} className="bg-white shadow-2xl"/></div>}
@@ -228,7 +235,7 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
         )}
         <button type="button" className="doc-ribbon-btn" title="Clear formatting" onClick={() => run('removeFormat')}><RemoveFormatting size={14}/></button>
       </div>
-      <p className="doc-ribbon-hint">Select text first, then use this bar. Zoom and download stay in the title row so they never sit on the letterhead.</p>
+      <p className="doc-ribbon-hint">Select text first, then use this bar. Zoom and export stay in the title row so they never sit on the letterhead.</p>
     </div>
   )
 }
