@@ -563,8 +563,13 @@ fieldWorkRoutes.post('/location/stop', requireStaff, async (c) => {
 })
 
 fieldWorkRoutes.get('/network-map', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  // Include vendors alongside staff/admin so a field provider that is actively
+  // sharing location shows up on the dispatch map. Also union the caller so
+  // the viewer's own marker cannot be excluded by role/team filters.
+  const viewerId = c.get('user').id
   const rows = await c.env.DB.prepare(
     `SELECT u.id AS user_id, u.full_name, u.email, u.last_seen_at, u.status,
+            u.role,
             tm.party_type, tm.vendor_category, tm.title,
             loc.assignment_id, loc.lat, loc.lng, loc.accuracy_m, loc.source,
             loc.sharing_active, loc.updated_at,
@@ -573,10 +578,10 @@ fieldWorkRoutes.get('/network-map', requireStaff, requireNamedPermission('manage
      LEFT JOIN team_members tm ON tm.user_id = u.id
      LEFT JOIN field_agent_locations loc ON loc.user_id = u.id
      LEFT JOIN field_assignments fa ON fa.id = loc.assignment_id
-     WHERE u.role IN ('staff','admin') AND u.status = 'active'
+     WHERE u.status = 'active' AND (u.role IN ('staff','admin','vendor') OR u.id = ?)
      ORDER BY u.full_name, u.email`,
-  ).all()
-  return c.json({ people: rows.results ?? [], viewer_user_id: c.get('user').id })
+  ).bind(viewerId).all()
+  return c.json({ people: rows.results ?? [], viewer_user_id: viewerId })
 })
 
 fieldWorkRoutes.get('/field-map', requireStaff, async (c) => {

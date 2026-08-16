@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { MapPin, Navigation, Radio } from 'lucide-react'
+import { LocateFixed, MapPin, Navigation, Radio } from 'lucide-react'
 import { useAppPath } from '../../lib/basePath'
 
 export type FieldMapPin = {
@@ -59,13 +59,32 @@ export function FieldLiveMap({
     return () => observer.disconnect()
   }, [])
 
+  // Manual center override lets "My Location" recenter regardless of the
+  // computed group centroid; null falls back to the auto-fit centroid.
+  const [manualCenter, setManualCenter] = useState<{ lat: number; lng: number } | null>(null)
+
   const view = useMemo(() => {
     const valid = pins.filter((pin) => Number.isFinite(pin.lat) && Number.isFinite(pin.lng))
-    const center = valid.length
+    const auto = valid.length
       ? { lat: valid.reduce((sum, pin) => sum + pin.lat, 0) / valid.length, lng: valid.reduce((sum, pin) => sum + pin.lng, 0) / valid.length }
       : DEFAULT_CENTER
-    return { center, pins: valid }
-  }, [pins])
+    return { center: manualCenter || auto, pins: valid }
+  }, [pins, manualCenter])
+
+  const mePin = view.pins.find((pin) => pin.kind === 'me')
+  const canRecenter = !!mePin || (typeof navigator !== 'undefined' && !!navigator.geolocation)
+
+  function recenterMe() {
+    if (mePin) { setManualCenter({ lat: mePin.lat, lng: mePin.lng }); setSelected(mePin.id); return }
+    // No cached "me" pin - ask the browser for a one-shot fix. Silent when
+    // permission is already granted, prompts otherwise, no-op if denied.
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      (p) => setManualCenter({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => setManualCenter(null),
+      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 15_000 },
+    )
+  }
 
   const tileSize = 256
   const centerX = lngToX(view.center.lng, TILE_ZOOM)
@@ -100,7 +119,20 @@ export function FieldLiveMap({
           <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold/80">{title}</p>
           <p className="mt-0.5 text-xs text-slate-400">{view.pins.length ? `${people.length} people · ${view.pins.filter((pin) => pin.kind === 'site').length} job sites · ${livePeople.length} live` : 'Waiting for a team member to share a location'}</p>
         </div>
-        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide ${livePeople.length ? 'text-emerald-300' : 'text-slate-400'}`}><Radio size={11} /> {livePeople.length ? `${livePeople.length} live` : 'Last known'}</span>
+        <div className="flex items-center gap-2">
+          {canRecenter && (
+            <button
+              type="button"
+              onClick={recenterMe}
+              className="inline-flex items-center gap-1 rounded-md border border-white/12 px-2 py-1 text-[10px] font-semibold text-slate-300 hover:border-gold/40 hover:text-gold"
+              title={mePin ? 'Recenter on my location' : 'Show my current location'}
+              aria-label="Recenter map on my location"
+            >
+              <LocateFixed size={11} /> My location
+            </button>
+          )}
+          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide ${livePeople.length ? 'text-emerald-300' : 'text-slate-400'}`}><Radio size={11} /> {livePeople.length ? `${livePeople.length} live` : 'Last known'}</span>
+        </div>
       </div>
       <div ref={boxRef} className="relative h-[360px] overflow-hidden bg-[#1b2838]">
         {tiles.map((tile) => (

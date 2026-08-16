@@ -1,11 +1,52 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
+import { LocateFixed } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { Icon, type IconName } from '../kit/Icon'
 import { AddressAutocomplete } from '../kit/AddressAutocomplete'
 import { jobsForWorld, publicIntakeCopy, worldFromPublicParams } from '../../lib/workspace'
 import { resolveScopeEntry, visibleQuestions, type ScopeQuestion } from '../../../shared/scopeEntries'
+import type { GeoHit } from '../../../shared/geocode'
+
+function UseMyLocationButton({ onResolved }: { onResolved: (a: GeoHit) => void }) {
+  const [state, setState] = useState<'idle' | 'locating' | 'ok' | 'error'>('idle')
+  const [message, setMessage] = useState('')
+
+  async function run() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setState('error'); setMessage('This browser does not support location.')
+      return
+    }
+    setState('locating'); setMessage('')
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      try {
+        const res = await fetch(`/api/geo/reverse?lat=${p.coords.latitude}&lng=${p.coords.longitude}`)
+        const data = await res.json().catch(() => ({})) as { result?: GeoHit; error?: string }
+        if (!res.ok || !data.result) throw new Error(data.error || 'reverse geocode failed')
+        onResolved(data.result)
+        setState('ok'); setMessage('')
+      } catch (err) {
+        setState('error')
+        setMessage(err instanceof Error ? err.message : 'Could not resolve address from location.')
+      }
+    }, (err) => {
+      setState('error')
+      // PermissionDeniedError.code === 1
+      setMessage(err.code === 1 ? 'Location permission was not granted.' : (err.message || 'Location unavailable.'))
+    }, { enableHighAccuracy: true, maximumAge: 60_000, timeout: 15_000 })
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button type="button" onClick={run} disabled={state === 'locating'} className="inline-flex items-center gap-1.5 rounded-md border border-white/12 px-2.5 py-1 text-[11px] font-semibold text-slate-300 hover:border-gold/40 hover:text-gold disabled:opacity-60">
+        <LocateFixed size={12} />
+        {state === 'locating' ? 'Locating...' : 'Use my current location'}
+      </button>
+      {state === 'error' && message && <span className="text-[10px] text-amber-300">{message}</span>}
+    </div>
+  )
+}
 
 type ScopeResponse = { confirmation_url:string; request_token?:string; setup_url?:string|null; account_status?:string }
 type Form = {
@@ -227,7 +268,17 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
           </div>}
 
           {showAddress && <div className="mt-5 space-y-3">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">{addressLabel}</label>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">{addressLabel}</label>
+              <UseMyLocationButton
+                onResolved={(a) => {
+                  update('address', a.line1 || '')
+                  if (a.city) update('city', a.city)
+                  if (a.state) update('state', a.state.slice(0, 2).toUpperCase())
+                  if (a.postal_code) update('postal_code', a.postal_code)
+                }}
+              />
+            </div>
             <AddressAutocomplete
               value={form.address}
               onChange={(v)=>update('address',v)}
@@ -245,6 +296,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
               <input className="input" placeholder="State" maxLength={2} value={form.state} onChange={e=>update('state',e.target.value.toUpperCase())}/>
               <input className="input" placeholder="ZIP code" value={form.postal_code} onChange={e=>update('postal_code',e.target.value)}/>
             </div>
+            <p className="text-[11px] text-slate-500">Use My Current Location prefills the address you are standing at right now. You can still search or type a different service address instead.</p>
           </div>}
 
           <div className="mt-6 space-y-5">{activeQuestions.map((q)=>

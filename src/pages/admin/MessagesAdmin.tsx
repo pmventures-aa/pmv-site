@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Search, Mail, MailOpen, ChevronLeft, Plus } from 'lucide-react'
-import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Panel, EmptyState, inputCls, btnPrimary } from '../../components/admin/ui'
@@ -17,6 +17,7 @@ import { EmailTemplatesPanel } from './EmailTemplatesPanel'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 import { OverviewTab, ReportingTab } from './CommunicationsHub'
 import { SessionWho } from '../../components/kit/WhoSection'
+import CommunicationsCRMAdmin from './CommunicationsCRMAdmin'
 
 interface ThreadRow {
   id: string
@@ -33,11 +34,12 @@ interface ClientOption {
   email: string
 }
 
-type MessageTab = 'staff' | 'email' | 'templates' | 'pulse' | 'inbox'
+type MessageTab = 'staff' | 'email' | 'templates' | 'campaigns' | 'pulse' | 'inbox'
 const TABS: { id: MessageTab; label: string }[] = [
   { id: 'staff', label: 'Direct messages' },
   { id: 'email', label: 'Email' },
   { id: 'templates', label: 'Templates' },
+  { id: 'campaigns', label: 'Campaigns' },
   { id: 'pulse', label: 'Pulse' },
 ]
 
@@ -179,6 +181,7 @@ function PulseTab() {
 
 export default function MessagesAdmin() {
   const p = useAppPath()
+  void p
   const [searchParams, setSearchParams] = useSearchParams()
   const rawTab = searchParams.get('tab')
   const tab: MessageTab = (rawTab === 'inbox' || TABS.some((item) => item.id === rawTab)) ? rawTab as MessageTab : 'staff'
@@ -198,6 +201,7 @@ export default function MessagesAdmin() {
       if (next !== 'staff') params.delete('conv')
       if (next !== 'inbox') params.delete('inbox')
       if (next !== 'templates') { params.delete('template'); params.delete('slug') }
+      if (next !== 'campaigns') { params.delete('campaign') }
       return params
     }, { replace: true })
   }
@@ -213,15 +217,16 @@ export default function MessagesAdmin() {
             )}
           </button>
         ))}
-        <Link to={p('communications/email')} className="mb-1 ml-0 inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-400 hover:text-gold sm:ml-auto">Campaigns</Link>
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3">
         {tab === 'inbox' && <ClientInbox initialClientId={initialClientId} initialThreadId={searchParams.get('inbox')} onClearClient={() => setSearchParams((current) => { const params = new URLSearchParams(current); params.delete('client'); return params }, { replace: true })} />}
         {tab === 'email' && <EmailThreadsPanel />}
         {tab === 'templates' && <EmailTemplatesPanel />}
         {tab === 'staff' && <ConversationsPanel />}
+        {tab === 'campaigns' && <div className="min-h-0 flex-1 overflow-y-auto"><CommunicationsCRMAdmin /></div>}
         {tab === 'pulse' && <PulseTab />}
       </div>
     </div>
   )
 }
+
