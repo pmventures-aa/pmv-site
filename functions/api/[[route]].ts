@@ -77,6 +77,7 @@ import { loadWorkspaceContext } from '../_lib/workspaceContext'
 import { logAuth0StartupWarnings } from '../_lib/routes/auth0'
 import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
 import { portalCalendarRoutes, adminCalendarRoutes } from '../_lib/routes/calendarRoutes'
+import { externalCalendarRoutes, externalCalendarWebhookRoutes } from '../_lib/routes/externalCalendar'
 import { strPublicRoutes, strAdminRoutes, strPortalRoutes } from '../_lib/routes/strRoutes'
 
 const app = new Hono<AppEnv>().basePath('/api')
@@ -187,6 +188,11 @@ app.route('/admin', crmRoutes)
 app.route('/admin', fieldWorkRoutes)
 app.route('/admin', workAssignmentRoutes)
 app.route('/admin', adminCalendarRoutes)
+// External calendar (Google, later Microsoft) OAuth + sync surface. Kept
+// under /admin so it inherits the requireUser middleware chain; webhook
+// endpoint below is public because the provider posts to it unauthenticated.
+app.route('/admin', externalCalendarRoutes)
+app.route('/', externalCalendarWebhookRoutes)
 app.route('/admin', strAdminRoutes)
 app.route('/admin', casesRoutes)
 app.route('/admin', communicationBrandingAdminRoutes)

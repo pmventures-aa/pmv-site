@@ -32,6 +32,7 @@ import { FieldLiveMap, type FieldMapPin } from '../../components/admin/FieldLive
 import { DispatchFeeSettingsPanel } from '../../components/admin/DispatchFeeSettingsPanel'
 import { useAuth } from '../../lib/auth'
 import { locationAgeLabel, locationFreshness } from '../../../shared/operations'
+import { useGeolocationPermission } from '../../lib/useGeolocationPermission'
 
 type NetworkMapPerson = {
   user_id: string
@@ -77,6 +78,8 @@ export default function ProviderNetworkAdmin() {
   const [sharing, setSharing] = useState<'idle' | 'starting' | 'live' | 'error'>('idle')
   const watchId = useRef<number | null>(null)
   const lastLocationSend = useRef(0)
+  const geoPerm = useGeolocationPermission()
+  const autoStartedRef = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -116,11 +119,16 @@ export default function ProviderNetworkAdmin() {
   const presence = usePresence(filtered.map((row) => row.id), 'admin')
   const providers = rows.filter(isProvider)
   const groups = view === 'roster' ? null : groupNetworkPeople(filtered, view === 'specialty' ? 'specialty' : 'coverage')
-  const visibleIds = useMemo(() => new Set(filtered.map((row) => row.id)), [filtered])
+  const meId = viewerUserId || user?.id || ''
+  const visibleIds = useMemo(() => {
+    const s = new Set(filtered.map((row) => row.id))
+    if (meId) s.add(meId) // never let team/filter chips exclude the viewer's own marker
+    return s
+  }, [filtered, meId])
   const mapPins = useMemo<FieldMapPin[]>(() => mapPeople.flatMap((person) => {
     if (!visibleIds.has(person.user_id) || person.lat == null || person.lng == null) return []
     const freshness = locationFreshness(person.updated_at, person.sharing_active)
-    const isMe = person.user_id === (viewerUserId || user?.id)
+    const isMe = person.user_id === meId
     return [{
       id: `network-${person.user_id}`,
       kind: isMe ? 'me' : person.party_type === 'vendor' ? 'vendor' : 'staff',
@@ -187,6 +195,18 @@ export default function ProviderNetworkAdmin() {
     if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
   }, [])
 
+  // Auto-start silently when the browser already remembers this device has
+  // granted permission. Never re-prompts, never spins up a watch if the
+  // caller already has one running. Runs once per mount.
+  useEffect(() => {
+    if (autoStartedRef.current) return
+    if (geoPerm.permission !== 'granted') return
+    if (watchId.current != null || sharing !== 'idle') return
+    autoStartedRef.current = true
+    startLocationSharing()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geoPerm.permission])
+
   async function patchRow(row: NetworkPerson, patch: Partial<Pick<NetworkPerson, 'availability_status' | 'is_preferred_provider'>>) {
     setBusyId(row.id)
     try {
@@ -231,6 +251,25 @@ export default function ProviderNetworkAdmin() {
       </div>
 
       <DispatchFeeSettingsPanel className="mb-4" />
+
+      {geoPerm.permission === 'prompt' && !geoPerm.ctaHidden && sharing !== 'live' && (
+        <div className="mb-3 flex flex-col gap-3 rounded-lg border border-gold/25 bg-gold/[.06] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-white">Enable location for Field & Dispatch</p>
+            <p className="mt-1 text-xs text-slate-300">Pinnacle uses your location to show you correctly on dispatch maps, improve nearby assignment matching, and support field check-in. We ask once and reuse your choice after.</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" onClick={() => { geoPerm.request(); startLocationSharing() }} className={btnOutline}><LocateFixed size={14} /> Allow location</button>
+            <button type="button" onClick={geoPerm.hideCta} className="rounded-md px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white">Not now</button>
+          </div>
+        </div>
+      )}
+      {geoPerm.permission === 'denied' && sharing !== 'live' && (
+        <div className="mb-3 flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[.02] p-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-400">Location is off. Your marker will not appear until this device grants location permission for HQ.</p>
+          <a href="https://support.google.com/chrome/answer/142065" target="_blank" rel="noreferrer" className="shrink-0 text-xs font-semibold text-gold hover:underline">Enable in browser settings</a>
+        </div>
+      )}
 
       <FieldLiveMap
         pins={mapPins}
