@@ -79,14 +79,17 @@ function toneFor(status: string) {
 
 const KIND_LABEL = { field: 'Field visit', ron: 'RON session' } as const
 
-export default function FieldWorkAdmin() {
+export default function FieldWorkAdmin({ mode = 'field' }: { mode?: 'field' | 'ron' } = {}) {
   const p = useAppPath()
   const [searchParams] = useSearchParams()
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [mapPins, setMapPins] = useState<FieldMapPin[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(() => searchParams.get('dispatch') === '1')
-  const [kindFilter, setKindFilter] = useState<'all' | 'field' | 'ron'>('all')
+  // "mode" locks the surface to one kind: /field-work shows field visits,
+  // /ron shows Remote Online Notarization sessions. Legacy combined view is
+  // retired since Field and RON are operationally distinct.
+  const kindFilter = mode
   const dispatchVendorId = searchParams.get('vendor') || ''
 
   const load = useCallback(async (silent = false) => {
@@ -148,48 +151,42 @@ export default function FieldWorkAdmin() {
   const backgroundLoad = useCallback(() => load(true), [load])
   useLiveRefresh(backgroundLoad)
 
-  const filtered = useMemo(() => assignments.filter((a) => kindFilter === 'all' || a.kind === kindFilter), [assignments, kindFilter])
+  const filtered = useMemo(() => assignments.filter((a) => a.kind === kindFilter), [assignments, kindFilter])
+
+  const isRon = mode === 'ron'
 
   return (
     <div>
       <PageIntro
-        kicker="Field & mobile work"
-        title="Field assignments"
-        subtitle="Property visits, mobile notary jobs, and Remote Online Notarizations. Live map shows vendor GPS and job sites."
+        kicker={isRon ? 'Remote notarization' : 'Field & mobile work'}
+        title={isRon ? 'RON sessions' : 'Field assignments'}
+        subtitle={isRon
+          ? 'Remote Online Notarization sessions. Track scheduling, signer participation, and audit trail without leaving HQ.'
+          : 'Property visits and mobile notary jobs. Live map shows vendor GPS and job sites.'}
         action={
           <div className="flex flex-wrap gap-2">
-            <Link to={p('service-assignments')} className={btnOutline}>Client services</Link>
+            {!isRon && <Link to={p('service-assignments')} className={btnOutline}>Client services</Link>}
+            {isRon && <Link to={p('esign-platform')} className={btnOutline}>E-sign platform</Link>}
             <button type="button" onClick={() => setShowCreate((v) => !v)} className={btnPrimary}>
-              <Plus size={14} /> New assignment
+              <Plus size={14} /> {isRon ? 'New RON session' : 'New assignment'}
             </button>
           </div>
         }
       />
 
-      <FieldLiveMap pins={mapPins} className="mb-4" />
+      {!isRon && <FieldLiveMap pins={mapPins} className="mb-4" />}
 
-      {!showCreate && <DispatchFeeSettingsPanel className="mb-4" />}
+      {!showCreate && !isRon && <DispatchFeeSettingsPanel className="mb-4" />}
 
       {showCreate && (
         <CreateAssignment
           initialVendorId={dispatchVendorId}
+          initialKind={mode}
+          lockKind
           onCreated={() => { setShowCreate(false); void load() }}
           onCancel={() => setShowCreate(false)}
         />
       )}
-
-      <div className="mb-4 flex gap-2">
-        {(['all', 'field', 'ron'] as const).map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setKindFilter(k)}
-            className={`rounded-md border px-3 py-1.5 text-xs font-medium ${kindFilter === k ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-300 hover:border-white/25'}`}
-          >
-            {k === 'all' ? 'All' : k === 'field' ? 'Field visits' : 'RON'}
-          </button>
-        ))}
-      </div>
 
       {loading ? (
         <p className="text-sm text-slate-400">Loading…</p>
@@ -237,7 +234,7 @@ export default function FieldWorkAdmin() {
   )
 }
 
-function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated: () => void; onCancel: () => void; initialVendorId?: string }) {
+function CreateAssignment({ onCreated, onCancel, initialVendorId, initialKind, lockKind }: { onCreated: () => void; onCancel: () => void; initialVendorId?: string; initialKind?: 'field' | 'ron'; lockKind?: boolean }) {
   const { user } = useAuth()
   const [clients, setClients] = useState<ClientOption[]>([])
   const [vendors, setVendors] = useState<StaffOption[]>([])
@@ -245,9 +242,10 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
   const [providerMode, setProviderMode] = useState<'existing' | 'new'>(initialVendorId ? 'existing' : 'existing')
   const [newClient, setNewClient] = useState({ full_name: '', email: '', phone: '', business_name: '' })
   const [newProvider, setNewProvider] = useState({ full_name: '', email: '', phone: '', vendor_category: '' })
+  const startKind: 'field' | 'ron' = initialKind || 'field'
   const [form, setForm] = useState({
-    kind: 'field' as 'field' | 'ron',
-    service_key: 'mobile_notary',
+    kind: startKind,
+    service_key: startKind === 'ron' ? 'ron' : 'mobile_notary',
     client_user_id: '',
     vendor_user_id: initialVendorId || '',
     title: '',
@@ -505,7 +503,7 @@ function CreateAssignment({ onCreated, onCancel, initialVendorId }: { onCreated:
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <label><span className="mb-1 block text-xs text-slate-400">Assignment kind</span><select className={inputCls} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as 'field' | 'ron', service_key: e.target.value === 'ron' ? 'ron' : form.service_key })}><option value="field">Field visit (Property Management / Mobile Notary)</option><option value="ron">Remote Online Notarization</option></select></label>
+        {!lockKind && <label><span className="mb-1 block text-xs text-slate-400">Assignment kind</span><select className={inputCls} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as 'field' | 'ron', service_key: e.target.value === 'ron' ? 'ron' : form.service_key })}><option value="field">Field visit (Property Management / Mobile Notary)</option><option value="ron">Remote Online Notarization</option></select></label>}
         <label><span className="mb-1 block text-xs text-slate-400">Service</span><input className={inputCls} placeholder="e.g. mobile_notary, property_management, ron" value={form.service_key} onChange={(e) => setForm({ ...form, service_key: e.target.value })}/></label>
         <div className="sm:col-span-2 rounded-xl border border-white/10 bg-white/[.018] p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

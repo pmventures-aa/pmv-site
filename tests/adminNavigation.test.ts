@@ -39,4 +39,22 @@ describe('HQ navigation contract', () => {
     expect(keys.has('communications')).toBe(false)
     expect(keys.has('client-banners')).toBe(false)
   })
+
+  it('keeps Field Work and Remote Notarization as separate operational tabs', () => {
+    const field = adminNav.find((item) => item.key === 'field-work')
+    const ron = adminNav.find((item) => item.key === 'ron')
+    expect(field?.label).toBe('Field Work')
+    expect(field?.section).toBe('Operations')
+    expect(ron?.label).toBe('Remote Notarization')
+    expect(ron?.section).toBe('Operations')
+    // Neither tab should carry the combined 'Field Work & RON' label.
+    expect(adminNav.some((item) => /field.*ron/i.test(item.label))).toBe(false)
+  })
+
+  it('moves dispatch surfaces (network) into Operations so revenue vs administration stays clean', () => {
+    const network = adminNav.find((item) => item.key === 'network')
+    expect(network?.section).toBe('Operations')
+    const automation = adminNav.find((item) => item.key === 'automation-center')
+    expect(automation?.section).toBe('Intelligence')
+  })
 })
