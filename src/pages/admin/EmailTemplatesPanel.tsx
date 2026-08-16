@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ChevronLeft, Copy, Loader2, Plus, RotateCcw, Save, Send, Trash2 } from 'lucide-react'
+import { ChevronLeft, Copy, Loader2, Plus, RotateCcw, Save, Search, Send, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { toast } from '../../components/kit/toast'
 import { SessionWho } from '../../components/kit/WhoSection'
@@ -8,6 +8,7 @@ import { RichTextComposer } from '../../components/admin/RichTextComposer'
 import { HQ_EMAIL_CATEGORY_LABEL, type HqEmailTemplate } from '../../lib/hqEmailTemplates'
 import { LetterheadCrest } from '../../components/admin/LetterheadCrest'
 import { FIRM_NAME, FIRM_TAGLINE } from '../../../shared/letterhead'
+import { emailVariablesByCategory, isKnownEmailVariable, extractAllReferencedTokens } from '../../../shared/emailVariables'
 
 const CATEGORY_ORDER = ['account', 'invite', 'billing', 'nurture', 'field', 'notification', 'custom'] as const
 
@@ -199,6 +200,21 @@ export function EmailTemplatesPanel() {
     setDraft({ ...draft, body_html: `${draft.body_html}${draft.body_html ? ' ' : ''}${chip}` })
   }
 
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const referencedTokens = useMemo(() => {
+    if (!draft) return [] as string[]
+    return Array.from(new Set([
+      ...extractAllReferencedTokens(draft.subject),
+      ...extractAllReferencedTokens(draft.preheader),
+      ...extractAllReferencedTokens(draft.title),
+      ...extractAllReferencedTokens(draft.body_html),
+      ...extractAllReferencedTokens(draft.cta_label),
+      ...extractAllReferencedTokens(draft.security_note),
+    ]))
+  }, [draft])
+  const unknownReferences = referencedTokens.filter((t) => !isKnownEmailVariable(t))
+  const applicableSet = useMemo(() => new Set(selected?.tokens || []), [selected])
+
   async function uploadImage(file: File) {
     const res = await api.upload<{ ok: boolean; url: string }>('/admin/comms/images', file)
     return res.url
@@ -315,7 +331,10 @@ export function EmailTemplatesPanel() {
                   <input className={fieldInput} placeholder="Button label" value={draft.cta_label} onChange={(e) => setDraft({ ...draft, cta_label: e.target.value })} />
                 </FieldRow>
                 <div className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-[#eeeae2] bg-white px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:overflow-visible lg:px-4">
-                  <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#7b8492]">Insert</span>
+                  <button type="button" onClick={() => setPickerOpen(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[#c9a227] bg-[#c9a227] px-2.5 py-1 text-[11px] font-bold text-[#07111f] hover:bg-[#d9b84a]">
+                    <Plus size={12}/> Insert Variable
+                  </button>
+                  <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#7b8492]">Common</span>
                   {(selected.tokens || []).map((token) => (
                     <button key={token} type="button" onClick={() => insertToken(token)} className="rounded-full border border-[#ddd6c8] bg-[#f7f4ee] px-2 py-0.5 font-mono text-[11px] text-[#0a1728] hover:border-[#c9a227]">
                       {`{{${token}}}`}
@@ -330,6 +349,11 @@ export function EmailTemplatesPanel() {
                     Active
                   </label>
                 </div>
+                {unknownReferences.length > 0 && (
+                  <div className="border-b border-[#eeeae2] bg-[#fff8e1] px-4 py-2 text-[11px] text-[#7a5b00]">
+                    Unknown variables in this template: {unknownReferences.map((t) => `{{${t}}}`).join(', ')}. These render as empty strings when sent.
+                  </div>
+                )}
                 <RichTextComposer
                   fill
                   surface="letter"
@@ -366,6 +390,86 @@ export function EmailTemplatesPanel() {
             </div>
           </div>
         </section>
+      </div>
+      {pickerOpen && (
+        <VariablePicker
+          onClose={() => setPickerOpen(false)}
+          applicable={applicableSet}
+          onInsert={(key) => { insertToken(key); setPickerOpen(false) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function VariablePicker({ onClose, onInsert, applicable }: {
+  onClose: () => void
+  onInsert: (key: string) => void
+  applicable: Set<string>
+}) {
+  const [q, setQ] = useState('')
+  const groups = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    return emailVariablesByCategory().map((g) => ({
+      ...g,
+      items: g.items.filter((v) => !term
+        || v.key.toLowerCase().includes(term)
+        || v.label.toLowerCase().includes(term)
+        || v.description.toLowerCase().includes(term)),
+    })).filter((g) => g.items.length)
+  }, [q])
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-navy-950/70 p-4" role="dialog" aria-modal="true" aria-label="Insert template variable">
+      <div className="flex max-h-[86dvh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0d1220] shadow-2xl">
+        <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
+          <Search size={14} className="text-slate-400"/>
+          <input
+            autoFocus
+            className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+            placeholder="Search variables (try 'invoice', 'property', 'client')"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white" aria-label="Close variable picker">
+            <X size={16}/>
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {groups.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No variables match "{q}".</p>}
+          {groups.map((group) => (
+            <div key={group.category} className="border-b border-white/5">
+              <p className="sticky top-0 z-10 border-b border-white/5 bg-[#0d1220]/95 px-4 py-2 text-[10px] font-bold uppercase tracking-[.16em] text-gold/80 backdrop-blur">{group.label}</p>
+              <ul>
+                {group.items.map((v) => {
+                  const notApplicable = applicable.size > 0 && !applicable.has(v.key)
+                  return (
+                    <li key={v.key}>
+                      <button
+                        type="button"
+                        onClick={() => onInsert(v.key)}
+                        className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-white/[.04]"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-baseline gap-2">
+                            <span className="text-sm font-semibold text-white">{v.label}</span>
+                            <span className="font-mono text-[11px] text-gold/80">{`{{${v.key}}}`}</span>
+                            {notApplicable && <span className="rounded-full border border-amber-400/25 bg-amber-400/[.08] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-200">Not standard for this template</span>}
+                          </div>
+                          <p className="mt-0.5 text-[12px] leading-5 text-slate-400">{v.description}</p>
+                          <p className="mt-1 text-[11px] text-slate-500">Example: {v.example}</p>
+                        </div>
+                        <Plus size={14} className="mt-1 shrink-0 text-gold"/>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-white/10 bg-black/20 px-4 py-2 text-[11px] text-slate-500">
+          Variables render with real values when the email actually sends. Unknown or unresolved variables always render as an empty string so nothing like <span className="font-mono">{'{{token}}'}</span> leaks to a real recipient.
+        </div>
       </div>
     </div>
   )
