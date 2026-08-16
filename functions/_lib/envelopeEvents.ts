@@ -80,13 +80,23 @@ export async function appendEnvelopeEvent(
   })
   const hash = await sha256Hex(canonical)
 
+  // Spec §4: each event is additionally signed by the server (HMAC-SHA256
+  // with SESSION_SECRET) so the ledger detects silent mutation even if the
+  // hash-chain rows were somehow rewritten. The signature covers the chain
+  // hash, which itself covers the full canonical payload.
+  const sigKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.SESSION_SECRET || 'pmv-dev-secret') as unknown as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const sigBytes = new Uint8Array(await crypto.subtle.sign('HMAC', sigKey, new TextEncoder().encode(`envelope-event:${hash}`) as unknown as BufferSource))
+  let serverSignature = ''
+  for (const b of sigBytes) serverSignature += String.fromCharCode(b)
+  const serverSignatureB64 = btoa(serverSignature)
+
   await env.DB.prepare(
     `INSERT INTO envelope_events (
       id, envelope_id, recipient_id, actor_type, actor_id, event_type, occurred_at_utc,
       ip_address, geo_city, geo_region, geo_country, geo_lat_approx, geo_lon_approx,
       user_agent, browser_family, os_family, device_class, request_id, metadata_json,
-      prev_event_hash, event_hash
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      prev_event_hash, event_hash, server_signature
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).bind(
     id,
     input.envelopeId,
@@ -109,6 +119,7 @@ export async function appendEnvelopeEvent(
     JSON.stringify(metadata),
     prevHash,
     hash,
+    serverSignatureB64,
   ).run()
 
   return hash

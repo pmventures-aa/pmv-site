@@ -4,6 +4,9 @@ import { uuid } from '../crypto'
 import { requireUser } from '../mid'
 import { escapeHtml, sendEmail } from '../email'
 import { sha256Hex } from '../documentSealing'
+import { ensureConsentPolicy, latestConsentPolicyVersion } from '../consentPolicies'
+import { requireFreshMfa } from './mfa'
+import { adapterFor } from '../ron/adapter'
 
 export const documentOperationsAdminRoutes = new Hono<AppEnv>()
 
@@ -117,7 +120,46 @@ documentOperationsAdminRoutes.post('/document-ops/envelopes/:id/remind',async c=
   return c.json({ok:true,recipient_count:rows.results.length})
 })
 
-documentOperationsAdminRoutes.post('/document-ops/envelopes/:id/void',async c=>{
+documentOperationsAdminRoutes.get('/document-ops/signing-keys',async c=>{
+  const keys=await c.env.DB.prepare(`SELECT key_id,algorithm,status,public_key_b64,valid_from,valid_to FROM signing_keys ORDER BY valid_from DESC`).all() as any
+  const usage=await c.env.DB.prepare(`SELECT public_key_id,COUNT(*) n FROM envelope_seals WHERE public_key_id IS NOT NULL GROUP BY public_key_id`).all() as any
+  const usageByKey=new Map((usage.results||[]).map((u:any)=>[u.public_key_id,u.n]))
+  return c.json({keys:(keys.results||[]).map((k:any)=>({...k,seal_count:usageByKey.get(k.key_id)||0}))})
+})
+
+documentOperationsAdminRoutes.post('/document-ops/envelopes/:id/ron', async c=>{
+  const id=c.req.param('id'),b=await c.req.json<any>().catch(()=>null)
+  const env=await c.env.DB.prepare('SELECT * FROM envelopes WHERE id=?').bind(id).first() as any
+  if(!env)return c.json({error:'not found'},404)
+  if(!['draft','sent','viewed','in_progress'].includes(env.status))return c.json({error:'Remote notarization requires an active envelope.'},409)
+  const provider=await c.env.DB.prepare(`SELECT * FROM ron_providers WHERE status='active' ORDER BY created_at ASC LIMIT 1`).first() as any
+  if(!provider)return c.json({error:'No active RON provider. Provision the sandbox or a contracted provider first.'},409)
+  const signer=await c.env.DB.prepare(`SELECT r.* FROM envelope_recipients r WHERE r.envelope_id=? AND r.role='signer' ORDER BY r.routing_order,created_at LIMIT 1`).bind(id).first() as any
+  if(!signer)return c.json({error:'Add a signer before requesting remote notarization.'},400)
+  const adapter=adapterFor(provider.code,provider.base_url,provider.api_key_encrypted)
+  let result
+  try{result=await adapter.createTransaction({envelopeId:env.id,envelopePublicId:env.public_id,title:env.title,signer:{name:signer.name,email:signer.email,phone_e164:signer.phone_e164},identityMethods:JSON.parse(provider.capabilities_json||'[]'),callbackUrl:`https://www.pinnaclemanagementventures.com/api/webhooks/ron/${provider.code}`})}catch(err:any){return c.json({error:String(err.message||'provider request failed')},502)}
+  const pricing=await c.env.DB.prepare(`SELECT * FROM ron_pricing WHERE provider_id=? AND is_active=1 AND (effective_to IS NULL OR effective_to>=?) ORDER BY effective_from DESC LIMIT 1`).bind(provider.id,now()).first() as any
+  const marginCents=pricing?Number(pricing.pinnacle_markup_cents||0):0
+  const txId=uuid()
+  await c.env.DB.prepare(`INSERT INTO ron_remote_transactions (id,provider_id,envelope_id,remote_transaction_id,provider_session_url,status,requested_identity_methods_json,signer_journal_entries_json,fee_currency,fee_amount_cents,margin_amount_cents,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(txId,provider.id,env.id,result.remoteTransactionId,result.sessionUrl,result.status,JSON.stringify(JSON.parse(provider.capabilities_json||'[]')),'[]',result.currency,result.providerFeesCents,marginCents,now(),now()).run()
+  if(pricing){
+    await c.env.DB.prepare(`INSERT INTO ron_charges (id,ron_transaction_id,envelope_id,service_code,name,currency,provider_fee_cents,pinnacle_markup_cents,total_cents,billed_to_client,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .bind(uuid(),txId,env.id,pricing.service_code,pricing.name,pricing.currency,Number(pricing.provider_fee_cents||0),marginCents,marginCents+Number(result.providerFeesCents||0),1,now()).run()
+  }
+  await appendEvent(c,env.id,'ron.transaction_created',null,{provider:provider.code,remote_transaction_id:result.remoteTransactionId,status:result.status})
+  return c.json({ok:true,transaction_id:txId,remote_transaction_id:result.remoteTransactionId,session_url:result.sessionUrl,status:result.status,fees_cents:result.providerFeesCents,margin_cents:marginCents},201)
+})
+
+// RON margin economics report (spec §42): provider fees vs. Pinnacle markup.
+documentOperationsAdminRoutes.get('/document-ops/ron/margin',async c=>{
+  const rows=await c.env.DB.prepare(`SELECT rp.name provider, COUNT(rt.id) transactions, COALESCE(SUM(rt.fee_amount_cents),0) provider_fees_cents, COALESCE(SUM(rt.margin_amount_cents),0) margin_cents FROM ron_remote_transactions rt JOIN ron_providers rp ON rp.id=rt.provider_id GROUP BY rp.id ORDER BY margin_cents DESC`).all() as any
+  const charges=await c.env.DB.prepare(`SELECT service_code,COUNT(*) n,COALESCE(SUM(total_cents),0) total_cents FROM ron_charges GROUP BY service_code ORDER BY total_cents DESC`).all() as any
+  return c.json({providers:rows.results||[],charges:charges.results||[]})
+})
+
+documentOperationsAdminRoutes.post('/document-ops/envelopes/:id/void', requireFreshMfa, async c=>{
   const id=c.req.param('id'),b=await c.req.json<any>().catch(()=>null),reason=String(b?.reason||'').trim(),env=await c.env.DB.prepare('SELECT status FROM envelopes WHERE id=?').bind(id).first() as any
   if(!env)return c.json({error:'not found'},404); if(['completed','voided'].includes(env.status))return c.json({error:'This envelope can no longer be voided.'},409); if(reason.length<5)return c.json({error:'A void reason is required.'},400)
   await c.env.DB.prepare(`UPDATE envelopes SET status='voided',voided_at=?,void_reason=?,updated_at=? WHERE id=?`).bind(now(),reason.slice(0,1000),now(),id).run()
@@ -146,9 +188,10 @@ documentOperationsAdminRoutes.post('/envelopes/:id/send',async c=>{
   const rs=await c.env.DB.prepare(`SELECT * FROM envelope_recipients WHERE envelope_id=? AND role IN ('signer','approver','witness','notary') ORDER BY routing_order,created_at`).bind(envId).all() as any; if(!rs.results.length)return c.json({error:'Add at least one signing recipient.'},400)
   const fieldCounts=await c.env.DB.prepare(`SELECT recipient_id,COUNT(*) n FROM document_fields WHERE envelope_id=? AND required=1 GROUP BY recipient_id`).bind(envId).all() as any,withFields=new Set(fieldCounts.results.map((r:any)=>r.recipient_id))
   const missing=rs.results.filter((r:any)=>r.role==='signer'&&!withFields.has(r.id)); if(missing.length)return c.json({error:`Required fields are missing for ${missing.map((r:any)=>r.name).join(', ')}.`},400)
-  const stamp=now(); await c.env.DB.prepare(`UPDATE envelopes SET status='sent',sent_at=?,last_activity_at=?,updated_at=? WHERE id=?`).bind(stamp,stamp,stamp,envId).run()
+  const stamp=now(); const policy=await latestConsentPolicyVersion(c.env,'standard')??await ensureConsentPolicy(c.env,'standard')
+  await c.env.DB.prepare(`UPDATE envelopes SET status='sent',sent_at=?,last_activity_at=?,updated_at=?,consent_policy_version_id=COALESCE(consent_policy_version_id,?) WHERE id=?`).bind(stamp,stamp,stamp,policy.versionId,envId).run()
   const active=env.signing_order_mode==='sequential'?rs.results.filter((r:any)=>r.routing_order===Math.min(...rs.results.map((x:any)=>Number(x.routing_order||1)))):rs.results
   for(const r of active)await sendInvitation(c,env,r,'send')
-  await appendEvent(c,envId,'envelope.sent',null,{recipient_count:rs.results.length,invited_now:active.length,signing_order_mode:env.signing_order_mode})
+  await appendEvent(c,envId,'envelope.sent',null,{recipient_count:rs.results.length,invited_now:active.length,signing_order_mode:env.signing_order_mode,consent_policy_version_id:policy.versionId})
   return c.json({ok:true})
 })

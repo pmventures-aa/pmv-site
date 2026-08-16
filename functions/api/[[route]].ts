@@ -49,11 +49,13 @@ import { fieldWorkRoutes } from '../_lib/routes/fieldWork'
 import { casesRoutes } from '../_lib/routes/cases'
 import { communicationBrandingAdminRoutes, communicationBrandingPublicRoutes } from '../_lib/routes/communicationBranding'
 import { presenceRoutes } from '../_lib/routes/presence'
+import { mfaRoutes } from '../_lib/routes/mfa'
 import { documentVerificationRoutes } from '../_lib/routes/documentVerification'
 import { documentLifecycleAdminRoutes, documentLifecyclePublicRoutes } from '../_lib/routes/documentLifecycle'
 import { documentOperationsAdminRoutes } from '../_lib/routes/documentOperations'
 import { documentPlatformV2AdminRoutes, documentPlatformV2AutomationRoutes, documentPlatformV2PublicRoutes } from '../_lib/routes/documentPlatformV2'
 import { documentSignerSecurityRoutes } from '../_lib/routes/documentSignerSecurity'
+import { ronRoutes } from '../_lib/routes/ron'
 import { documentSignerFileRoutes } from '../_lib/routes/documentSignerFiles'
 import { internalDocumentAdminRoutes, internalDocumentPublicRoutes } from '../_lib/routes/internalDocuments'
 import { documentWorkspaceExtraRoutes } from '../_lib/routes/documentWorkspaceExtras'
@@ -114,6 +116,7 @@ app.route('/', documentSignerFileRoutes)
 app.route('/', documentSignerSecurityRoutes)
 app.route('/', documentPlatformV2PublicRoutes)
 app.route('/', documentLifecyclePublicRoutes)
+app.route('/', ronRoutes)
 app.route('/', internalDocumentPublicRoutes)
 app.route('/', scopeFunnelPublicRoutes)
 app.route('/', quotePublicRoutes)
@@ -139,6 +142,7 @@ app.route('/portal', portalCalendarRoutes)
 app.route('/portal', strPortalRoutes)
 app.route('/portal', messageRoutes)
 app.route('/portal', presenceRoutes)
+app.route('/portal', mfaRoutes)
 
 app.route('/admin', relationshipAutomationAdminRoutes)
 app.route('/admin', communicationsHubRoutes)

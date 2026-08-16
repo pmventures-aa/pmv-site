@@ -30,6 +30,10 @@ export interface AuditCertificateContext {
   initializedSnapshot: string | null
   finalizedSnapshot: string | null
   sourceFileName: string
+  sealAlgorithm?: string
+  sealKeyId?: string
+  sealSignature?: string
+  verificationId?: string
 }
 
 function safe(v: unknown, max = 3000): string {
@@ -179,6 +183,7 @@ export async function renderOfficialAuditCertificate(
   labelValue(page, regular, bold, 'Initialized', `${formatAuditTimestamp(initializedAt)}  ${initializedSnapshot}`, y); y -= 28
   labelValue(page, regular, bold, 'Finalized', `${formatAuditTimestamp(envelope.completed_at || sealedAt)}  ${finalizedSnapshot}`, y); y -= 28
   labelValue(page, regular, bold, 'Unique Url', context.verifyUrl, y); y -= 36
+  if (context.verificationId) { labelValue(page, regular, bold, 'Verification ID', context.verificationId, y); y -= 36 }
   labelValue(page, regular, bold, 'Page Count', String(context.pageCount), y); y -= 40
 
   sectionTitle(page, bold, 'Signers', y)
@@ -187,7 +192,14 @@ export async function renderOfficialAuditCertificate(
     if (y < 180) break
     const status = String(recipient.status || '').toUpperCase()
     const recipientEvents = events.filter((event) => event.recipient_id === recipient.id)
-    const consent = recipientEvents.some((event) => event.event_type === 'consent.esign_accepted')
+    const consent = recipientEvents.find((event) => event.event_type === 'consent.esign_accepted')
+    let consentText = 'Verified consent to Esign'
+    if (consent) {
+      try {
+        const meta = JSON.parse(String(consent.metadata_json || '{}'))
+        if (meta.policy_version) consentText += ` (policy v${meta.policy_version})`
+      } catch { /* keep base text */ }
+    }
     const auth = recipientEvents.find((event) => event.event_type === 'authentication.passed')
     const locationEvent = [...recipientEvents].reverse().find((event) => event.geo_lat_approx != null || event.event_type === 'location.reported')
     const ip = recipientEvents.find((event) => event.ip_address)?.ip_address
@@ -200,7 +212,8 @@ export async function renderOfficialAuditCertificate(
     y -= 12
     const signerEvidence = [
       ip ? `Verified IP ${safe(ip, 120)}` : null,
-      consent ? 'Verified consent to Esign' : null,
+      consent ? consentText : null,
+      auth ? `Auth method: ${safe((() => { try { return JSON.parse(String(auth.metadata_json || '{}')).method } catch { return null } })(), 40) || 'verified'}` : null,
     ].filter(Boolean).join('   ')
     if (signerEvidence) {
       page.drawText(signerEvidence, { x: 42, y, size: 6.8, font: regular, color: muted, maxWidth: 528 })
@@ -309,6 +322,20 @@ export async function renderOfficialAuditCertificate(
     y -= 67
   }
 
+  sectionTitle(page, bold, 'Digital Seal', y)
+  y -= 18
+  const sealRows: Array<[string, string]> = [
+    ['Algorithm', context.sealAlgorithm || 'Not recorded'],
+    ['Key ID', context.sealKeyId || 'Not recorded'],
+    ['Seal Signature', context.sealSignature ? `Base64 (${context.sealSignature.length} chars), prefix ${context.sealSignature.slice(0, 24)}…` : 'Not recorded'],
+  ]
+  for (const [label, value] of sealRows) {
+    page.drawText(label.toUpperCase(), { x: 42, y, size: 6.2, font: bold, color: muted })
+    page.drawText(safe(value, 300), { x: 130, y, size: 7.3, font: bold, color: navy, maxWidth: 440 })
+    y -= 16
+  }
+  y -= 8
+
   sectionTitle(page, bold, 'Integrity Method', y)
   y -= 18
   const integrity = 'Each recorded evidence event is linked to the preceding event using SHA-256. The completed PDF, audit trail, evidence manifest, and final event-chain head are then bound by the Pinnacle Document Integrity System. Any change to a sealed artifact or any insertion, removal, or reordering of events changes the expected cryptographic fingerprints.'
@@ -323,6 +350,7 @@ export async function renderOfficialAuditCertificate(
   page.drawText('electronic-signature workflow and that the associated evidence artifacts were sealed together', { x: 58, y: 197, size: 7.6, font: regular, color: white, maxWidth: 488 })
   page.drawText('by the Pinnacle Document Integrity System.', { x: 58, y: 183, size: 7.6, font: regular, color: white, maxWidth: 488 })
   page.drawText(`Certificate generated ${formatAuditTimestamp(sealedAt)}`, { x: 58, y: 162, size: 6.4, font: regular, color: rgb(0.78, 0.81, 0.84) })
+  page.drawText(`Verification ID: ${safe(context.verificationId || publicId, 90)}`, { x: 58, y: 150, size: 6.4, font: regular, color: gold })
 
   const legalLines = wrap(legal, 118).slice(0, 5)
   let ly = 123

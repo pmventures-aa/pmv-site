@@ -7,6 +7,27 @@ const LAST_SEEN_THROTTLE_SECONDS = 5 * 60
 const ACTIVATION_TTL_SECONDS = 60 * 60 * 24
 const PASSWORD_RESET_TTL_SECONDS = 30 * 60
 
+export function sessionTokenFromRequest(request: Request): string | null {
+  return cookieToken(request)
+}
+
+export function sessionTtlSeconds(): number {
+  return TTL_SECONDS
+}
+
+export async function updateSessionUser(env: Env, request: Request, patch: Partial<SessionUser>): Promise<SessionUser | null> {
+  const token = cookieToken(request)
+  if (!token) return null
+  const raw = await env.SESSIONS.get(`sess:${token}`)
+  if (!raw) return null
+  let cached: SessionUser | null = null
+  try { cached = JSON.parse(raw) as SessionUser } catch { return null }
+  if (!cached) return null
+  const updated = { ...cached, ...patch }
+  await env.SESSIONS.put(`sess:${token}`, JSON.stringify(updated), { expirationTtl: TTL_SECONDS })
+  return updated
+}
+
 function cookieToken(request: Request): string | null {
   const cookie = request.headers.get('Cookie') ?? ''
   const match = cookie.match(new RegExp(`${COOKIE}=([^;]+)`))

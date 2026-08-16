@@ -4,6 +4,7 @@ import { uuid } from '../crypto'
 import { sealEnvelope, sha256Hex } from '../documentSealing'
 import { escapeHtml, sendEmail } from '../email'
 import { appendEnvelopeEventFromContext } from '../envelopeEvents'
+import { ensureConsentPolicy, latestConsentPolicyVersion, recordSignerConsent } from '../consentPolicies'
 
 export const documentSignerSecurityRoutes = new Hono<AppEnv>()
 const now = () => new Date().toISOString()
@@ -39,13 +40,35 @@ documentSignerSecurityRoutes.post('/sign/:token/consent', async (c) => {
   const body = await c.req.json<{ accepted?: boolean }>().catch(() => ({ accepted: false }))
   if (!body.accepted) return c.json({ error: 'electronic signature consent is required' }, 400)
 
+  // Bind the versioned consent policy in force at send time (spec §9). The
+  // envelope snapshot stays immutable for the signer even if a newer policy
+  // version is published later.
+  const bound = await c.env.DB.prepare('SELECT consent_policy_version_id FROM envelopes WHERE id=?').bind(ses.envelope_id).first<{ consent_policy_version_id: string | null }>()
+  let policy: { versionId: string; version: number; sha256: string } | null = null
+  if (bound?.consent_policy_version_id) {
+    const row = await c.env.DB.prepare(`SELECT cpv.id version_id, cpv.version, cpv.sha256 FROM consent_policy_versions cpv JOIN consent_policies cp ON cp.id=cpv.consent_policy_id WHERE cpv.id=?`).bind(bound.consent_policy_version_id).first<{ version_id: string; version: number; sha256: string }>()
+    if (row) policy = { versionId: row.version_id, version: row.version, sha256: row.sha256 }
+  }
+  if (!policy) {
+    const latest = await latestConsentPolicyVersion(c.env, 'standard')
+    if (latest) policy = { versionId: latest.versionId, version: latest.version, sha256: latest.sha256 }
+    else {
+      const seeded = await ensureConsentPolicy(c.env, 'standard')
+      policy = { versionId: seeded.versionId, version: seeded.version, sha256: seeded.sha256 }
+    }
+  }
+  if (!policy) return c.json({ error: 'consent policy not available' }, 500)
+
+  const sessionId = c.req.header('x-signing-session') || null
+  const ip = c.req.header('CF-Connecting-IP') || null
+  await recordSignerConsent(c.env, ses.recipient_id, policy.versionId, sessionId, ip)
   await appendEnvelopeEventFromContext(c, {
     envelopeId: ses.envelope_id,
     eventType: 'consent.esign_accepted',
     actorType: 'signer',
     actorId: ses.recipient_id,
     recipientId: ses.recipient_id,
-    metadata: { method: 'esign_disclosure' },
+    metadata: { method: 'esign_disclosure', policy_version_id: policy.versionId, policy_version: policy.version, policy_sha256: policy.sha256 },
   })
   await appendEnvelopeEventFromContext(c, {
     envelopeId: ses.envelope_id,
@@ -55,7 +78,7 @@ documentSignerSecurityRoutes.post('/sign/:token/consent', async (c) => {
     recipientId: ses.recipient_id,
     metadata: { source: 'request_headers' },
   })
-  return c.json({ ok: true })
+  return c.json({ ok: true, consent: { policy_version: policy.version, policy_sha256: policy.sha256 } })
 })
 
 documentSignerSecurityRoutes.post('/sign/:token/complete', async (c) => {
@@ -127,6 +150,10 @@ documentSignerSecurityRoutes.post('/sign/:token/complete', async (c) => {
   })
 
   try {
+    // Idempotent finalization (spec §52-53): a retry after a partial failure
+    // must never produce a second authoritative signed document.
+    const already = await c.env.DB.prepare('SELECT final_signed_file_id, status FROM envelopes WHERE id=?').bind(ses.envelope_id).first<{ final_signed_file_id: string | null; status: string }>()
+    if (already?.final_signed_file_id) return c.json({ ok: true, envelope_completed: true, already_sealed: true })
     const result = await sealEnvelope(c.env, ses.envelope_id)
     await appendEnvelopeEventFromContext(c, {
       envelopeId: ses.envelope_id,

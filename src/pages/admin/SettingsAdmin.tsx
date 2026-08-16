@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Bell, BriefcaseBusiness, Building2, CalendarCheck2, ChevronRight, Files, Palette, Search, Settings2, ShieldCheck, SlidersHorizontal, Trash2, Users } from 'lucide-react'
+import { Bell, BriefcaseBusiness, Building2, CalendarCheck2, ChevronRight, Files, KeyRound, Palette, Search, Settings2, ShieldCheck, SlidersHorizontal, Trash2, Users } from 'lucide-react'
 import { PageIntro, NoAccess, Panel, inputCls } from '../../components/admin/ui'
 import { useCapabilities } from '../../lib/capabilities'
 import { useAppPath } from '../../lib/basePath'
@@ -23,6 +23,7 @@ const TABS = [
   { key: 'notifications', label: 'Notifications', short: 'Choose how operational events reach you across HQ, email, desktop, and sound.', icon: Bell, terms: 'notifications email desktop sound alerts events' },
   { key: 'calendar', label: 'Calendar', short: 'Connect Google Calendar. Pinnacle stays authoritative; supported edits sync both ways.', icon: CalendarCheck2, terms: 'calendar google outlook microsoft sync ical external' },
   { key: 'templates', label: 'Templates', short: 'Create, version, duplicate, and publish agreements and reusable master copy.', icon: Files, terms: 'templates agreement provider version publish document legal create duplicate archive' },
+  { key: 'security', label: 'Security', short: 'Authenticator app enrollment for privileged steps, session challenge, and recovery codes.', icon: KeyRound, terms: 'mfa security authenticator totp two factor 2fa challenge recovery codes key' },
   { key: 'deletions', label: 'Permanent Deletions', short: 'Owner-only irreversible record deletion and impact review.', icon: Trash2, terms: 'delete danger purge permanent owner archive' },
 ] as const
 
@@ -49,6 +50,132 @@ function AppearanceSettings() {
           <li><strong className="text-slate-200">Dark</strong> is optimized for extended HQ sessions.</li>
           <li><strong className="text-slate-200">Light</strong> improves contrast in bright environments.</li>
           <li>Your selection is stored locally on this device.</li>
+        </ul>
+      </Panel>
+    </div>
+  )
+}
+
+function MfaSettings() {
+  const [status, setStatus] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [enrollData, setEnrollData] = useState<any>(null)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  async function refresh() {
+    setLoading(true); setError('')
+    try {
+      const r = await fetch('/api/portal/me/mfa/status', { headers: { Accept: 'application/json' } })
+      const j: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'Could not load MFA status')
+      setStatus(j)
+    } catch (e: any) { setError(e.message) } finally { setLoading(false) }
+  }
+
+  useEffect(() => { refresh() }, [])
+
+  async function enroll() {
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const r = await fetch('/api/portal/me/mfa/enroll', { method: 'POST', headers: { Accept: 'application/json' } })
+      const j: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'Could not start enrollment')
+      setEnrollData(j)
+    } catch (e: any) { setError(e.message) } finally { setBusy(false) }
+  }
+
+  async function confirm() {
+    setBusy(true); setError('')
+    try {
+      const r = await fetch('/api/portal/me/mfa/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ code }) })
+      const j: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'Could not confirm enrollment')
+      setEnrollData(null); setCode(''); setNotice('Authenticator app enrolled. A fresh code is now required for privileged steps such as voiding an envelope.')
+      await refresh()
+    } catch (e: any) { setError(e.message) } finally { setBusy(false) }
+  }
+
+  async function verifyNow() {
+    setBusy(true); setError('')
+    try {
+      const r = await fetch('/api/portal/me/mfa/verify', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ code }) })
+      const j: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'Could not verify code')
+      setCode(''); setNotice('Code verified. Privileged actions are unlocked for this session window.')
+      await refresh()
+    } catch (e: any) { setError(e.message) } finally { setBusy(false) }
+  }
+
+  async function disable() {
+    setBusy(true); setError('')
+    try {
+      const r = await fetch('/api/portal/me/mfa', { method: 'DELETE', headers: { Accept: 'application/json' } })
+      const j: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'Could not disable MFA')
+      setNotice('Authenticator app removed from this account.')
+      await refresh()
+    } catch (e: any) { setError(e.message) } finally { setBusy(false) }
+  }
+
+  if (loading) return <Panel><p className="text-sm text-slate-400">Checking security status…</p></Panel>
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <Panel>
+        <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/80">Privileged Step Security</p>
+        <h2 className="mt-2 text-xl font-extrabold tracking-tight text-white">Authenticator App</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Enrolling adds a time-based one-time code requirement before sensitive actions, including voiding a signed envelope. Codes are verified server-side; the shared secret is stored encrypted.</p>
+
+        <div className="mt-5 flex items-center gap-3 rounded-xl border border-white/[.08] bg-white/[.02] p-4">
+          <ShieldCheck size={18} className={status?.enabled ? 'text-emerald-300' : 'text-slate-500'} />
+          <div><p className="text-sm font-extrabold text-white">{status?.enabled ? 'Enabled' : 'Not enrolled'}</p><p className="text-xs text-slate-400">{status?.enabled ? `Enrolled ${new Date(status.enrolled_at).toLocaleString()} · ${status.mfa_ok ? 'unlocked now' : 'locked — enter a code to unlock'}` : 'Enrollment protects void actions and key rotation.'}</p></div>
+        </div>
+
+        {!status?.enabled && !enrollData && <button className="mt-5 rounded-xl bg-gold px-4 py-2.5 text-sm font-extrabold text-navy-950 transition hover:bg-gold/90" onClick={enroll} disabled={busy}>{busy ? 'Starting…' : 'Enroll Authenticator App'}</button>}
+
+        {enrollData && <div className="mt-5 rounded-xl border border-gold/25 bg-gold/[.045] p-4 sm:p-5">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-gold/80">Step 1 — Add to your authenticator</p>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Open your authenticator app and scan this setup URI (or enter the secret manually). You can also paste the URI into apps that import setup links.</p>
+          <div className="mt-4 rounded-lg bg-navy-950/60 p-3 font-mono text-[11px] leading-5 text-slate-300 break-all">{enrollData.otpauth_uri}</div>
+          <div className="mt-3 rounded-lg bg-navy-950/60 p-3 font-mono text-[11px] text-slate-300">Secret: {enrollData.secret_base32}</div>
+          <p className="mt-4 text-xs font-bold uppercase tracking-[.14em] text-rose-300/90">Save your recovery codes</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">{enrollData.recovery_codes.map((rc: string) => <code key={rc} className="rounded-lg border border-white/[.08] bg-white/[.02] px-3 py-2 text-center font-mono text-xs text-slate-200">{rc}</code>)}</div>
+          <p className="mt-3 text-xs leading-5 text-slate-500">Recovery codes are shown once and stored only as hashes. Keep them somewhere safe — they are the only way back in without the app.</p>
+          <p className="mt-4 text-xs font-bold uppercase tracking-[.14em] text-gold/80">Step 2 — Confirm a code</p>
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+            <input className={`${inputCls} w-full tracking-[.28em] sm:w-48`} value={code} maxLength={6} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" aria-label="Authenticator code" />
+            <button className="rounded-xl bg-gold px-4 py-2.5 text-sm font-extrabold text-navy-950 transition hover:bg-gold/90" onClick={confirm} disabled={busy || code.length < 6}>{busy ? 'Confirming…' : 'Confirm & Enable'}</button>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">This enrollment session expires in 10 minutes.</p>
+        </div>}
+
+        {status?.enabled && !status.mfa_ok && <div className="mt-5 rounded-xl border border-white/[.08] bg-white/[.02] p-4">
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500">Unlock privileged steps</p>
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+            <input className={`${inputCls} w-full tracking-[.28em] sm:w-48`} value={code} maxLength={6} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" aria-label="Authenticator code" />
+            <button className="rounded-xl bg-gold px-4 py-2.5 text-sm font-extrabold text-navy-950 transition hover:bg-gold/90" onClick={verifyNow} disabled={busy || code.length < 6}>{busy ? 'Verifying…' : 'Unlock'}</button>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">You can also enter a recovery code here.</p>
+        </div>}
+
+        {status?.enabled && <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-rose-400/15 bg-rose-400/[.025] p-4">
+          <p className="text-sm text-slate-400">Remove the authenticator from this account.</p>
+          <button className="rounded-xl border border-rose-400/25 px-3.5 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-400/10" onClick={disable} disabled={busy}>Disable MFA</button>
+        </div>}
+
+        {notice && <p className="mt-4 text-sm text-emerald-300">{notice}</p>}
+        {error && <p className="mt-4 text-sm text-rose-300">{error}</p>}
+      </Panel>
+      <Panel>
+        <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500">How it works</p>
+        <ul className="mt-4 space-y-3 text-sm leading-5 text-slate-400">
+          <li><strong className="text-slate-200">Privileged steps</strong> — voiding an envelope and future key rotation require a fresh code.</li>
+          <li><strong className="text-slate-200">Session window</strong> — a verified code unlocks privileged steps for 10 minutes.</li>
+          <li><strong className="text-slate-200">At rest</strong> — the shared secret is encrypted with the platform signing secret; recovery codes are stored as hashes only.</li>
+          <li><strong className="text-slate-200">Clock sync</strong> — if codes stop working, check the device time and use a recovery code once.</li>
         </ul>
       </Panel>
     </div>
@@ -147,6 +274,7 @@ export default function SettingsAdmin() {
           {tab === 'notifications' && <NotificationSettings />}
           {tab === 'calendar' && <CalendarSyncSettings />}
           {tab === 'templates' && (caps.is_owner ? <ManagedTemplatesSettings /> : <NoAccess label="Templates" />)}
+          {tab === 'security' && <MfaSettings />}
           {tab === 'deletions' && (caps.is_owner ? <div className="rounded-xl border border-rose-400/20 bg-rose-400/[.025] p-1"><div className="px-4 pb-2 pt-4"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-rose-300">Danger Zone</p><p className="mt-1 text-sm text-slate-400">Permanent deletion is restricted to the owner and requires dependency review before execution.</p></div><PermanentDeletions /></div> : <NoAccess label="Permanent Deletions" />)}
         </section>
       </div>

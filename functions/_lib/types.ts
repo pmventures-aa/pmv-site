@@ -46,6 +46,9 @@ export interface SessionUser {
   // during impersonation looks like the target user did it themselves.
   impersonated_by_user_id?: string | null
   impersonation_session_id?: string | null
+  // Privileged-step MFA: set by POST /me/mfa/verify and honored by
+  // requireFreshMfa (void envelope, key rotation, etc.). ISO timestamp.
+  mfa_ok_until?: string | null
 }
 
 export interface Vars {
