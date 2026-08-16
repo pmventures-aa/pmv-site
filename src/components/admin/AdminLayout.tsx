@@ -13,6 +13,7 @@ import { MailBell } from '../kit/MailBell'
 import { SlaAlertChip } from './SlaAlertChip'
 import { AdminPageBoundary } from './AdminPageBoundary'
 import { WhoMenu } from './WhoMenu'
+import { LocationAutoStart } from './LocationAutoStart'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
 
@@ -120,6 +121,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   return (
     <div className={`${hideHqNav ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-navy-950 lg:flex`}>
       <ImpersonationBanner />
+      <LocationAutoStart />
       <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-white/10 bg-navy-900/95 backdrop-blur transition-[width,padding] duration-200 lg:flex print:hidden ${!hideHqNav && sidebarOpen ? 'w-56 border-r p-3' : 'w-0 p-0'}`}>
         <div className="flex h-full w-56 min-h-0 shrink-0 flex-col">{sidebarContent}</div>
       </aside>
