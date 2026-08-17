@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { LayoutGrid, List, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { Panel, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
@@ -86,6 +86,7 @@ export function LeadPipelineBoard({
   onRefresh: () => Promise<unknown>
 }) {
   const p = useAppPath()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const [query, setQuery] = useState('')
   const [recordType, setRecordType] = useState('')
@@ -372,7 +373,7 @@ export function LeadPipelineBoard({
             toast.success(`${conversionTarget.name} is now a client.`)
             onLeadsChange((current) => current.filter((lead) => lead.id !== conversionTarget.id))
             setConversionTarget(null)
-            window.location.href = p(`clients/${clientUserId}`)
+            navigate(p(`clients/${clientUserId}`))
           }}
         />
       )}

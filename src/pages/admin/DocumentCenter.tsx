@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Archive, CheckCircle2, ChevronDown, ChevronRight, FilePlus2, FileText, Folder, History, Mail, PenLine, PenTool, Search, Send, ShieldCheck, Upload, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
@@ -46,6 +46,7 @@ const size=(bytes:number|null)=>!bytes?'Not provided':bytes<1048576?`${Math.max(
 
 export default function DocumentCenter(){
   const p=useAppPath()
+  const navigate=useNavigate()
   const [workspace,setWorkspace]=useState<WorkspaceDoc[]>([]),[archived,setArchived]=useState<WorkspaceDoc[]>([]),[selected,setSelected]=useState(''),[detail,setDetail]=useState<DocDetail|null>(null)
   const [clientDocs,setClientDocs]=useState<ClientDoc[]>([]),[reports,setReports]=useState<ReportExport[]>([]),[catalog,setCatalog]=useState<CatalogEntry[]>([]),[loading,setLoading]=useState(true)
   const [tab,setTab]=useState<'workspace'|'shared'|'needs_signature'|'completed'|'client'|'reports'|'archived'>('workspace'),[q,setQ]=useState(''),[composer,setComposer]=useState<'none'|'text'|'upload'>('none'),[picker,setPicker]=useState(false)
@@ -75,7 +76,7 @@ export default function DocumentCenter(){
   async function replaceVersion(){if(!detail||!versionFile)return;setBusy(true);try{const res=await fetch(`/api/admin/documents-workspace/${detail.document.id}/version`,{method:'POST',credentials:'include',headers:{'Content-Type':versionFile.type||'application/octet-stream','X-File-Name':encodeURIComponent(versionFile.name),'X-Change-Note':encodeURIComponent('New version uploaded in Document Hub')},body:versionFile});const d=await res.json() as UploadResponse;if(!res.ok)throw new Error(d.error||'Version upload failed');setVersionFile(null);toast.success(`Version ${d.version_number||''} saved`);await Promise.all([load(),openDoc(detail.document.id)])}catch(e){toast.error(e instanceof Error?e.message:'Could not save version')}finally{setBusy(false)}}
   async function share(){if(!detail||!shareEmail.trim())return;try{await api.post(`/admin/documents-workspace/${detail.document.id}/share`,{email:shareEmail,name:shareName,message:shareMessage,expires_days:7});setShareEmail('');setShareName('');setShareMessage('');toast.success('Secure document link sent');await openDoc(detail.document.id)}catch(e){toast.error(e instanceof ApiError?e.message:'Could not send document')}}
   async function archiveDoc(restore=false){if(!detail)return;try{await api.post(`/admin/documents-workspace/${detail.document.id}/archive${restore?'?restore=1':''}`,{});toast.success(restore?'Document restored':'Document archived');setSelected('');setDetail(null);await load()}catch(e){toast.error(e instanceof ApiError?e.message:'Could not update document')}}
-  async function sendForSignature(){if(!detail)return;try{const r=await api.post<{id:string}>(`/admin/documents-workspace/${detail.document.id}/envelope`,{});toast.success('Draft envelope created');window.location.href=p(`envelopes?open=${encodeURIComponent(r.id)}`)}catch(e){toast.error(e instanceof ApiError?e.message:'Could not create envelope')}}
+  async function sendForSignature(){if(!detail)return;try{const r=await api.post<{id:string}>(`/admin/documents-workspace/${detail.document.id}/envelope`,{});toast.success('Draft envelope created');navigate(p(`envelopes?open=${encodeURIComponent(r.id)}`))}catch(e){toast.error(e instanceof ApiError?e.message:'Could not create envelope')}}
   async function generate(){if(!reportKey)return;setGenerating(true);try{const r=await api.post<{export:{file_name:string}}>(`/admin/reports/${reportKey}/export.pdf?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,{});toast.success(`${r.export.file_name} created.`);setTab('reports');await load()}catch(e){toast.error(e instanceof ApiError?e.message:'Could not generate report PDF.')}finally{setGenerating(false)}}
 
   const sharedRows=useMemo(()=>workspace.filter(d=>(d.share_count||0)>0).filter(filter),[workspace,q])

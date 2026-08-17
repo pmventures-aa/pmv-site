@@ -59,6 +59,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 export default function StrOperations() {
   const p = useAppPath()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const [summary, setSummary] = useState<Summary | null>(null)
   const [turnovers, setTurnovers] = useState<TurnoverRow[]>([])
@@ -180,7 +181,7 @@ export default function StrOperations() {
           staff={staff}
           packages={packages}
           onClose={() => setCreateOpen(false)}
-          onCreated={(id) => { setCreateOpen(false); void load(); window.location.href = p(`str/turnovers/${id}`) }}
+          onCreated={(id) => { setCreateOpen(false); void load(); navigate(p(`str/turnovers/${id}`)) }}
         />
       )}
     </div>
