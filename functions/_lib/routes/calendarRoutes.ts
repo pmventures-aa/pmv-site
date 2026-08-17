@@ -6,6 +6,8 @@ import { uuid } from '../crypto'
 import { resolveClientId, ScopeError } from '../scope'
 import { canAccessClient } from '../access'
 import { activityInsert } from '../activity'
+import { dispatchCalendarInvites } from '../calendarInviteDispatch'
+import type { InviteTransition } from '../../../shared/calendarInvite'
 import { pushNotification } from '../notificationFeed'
 import { loadCalendarEvents, loadCalendarEventRow } from '../calendarQuery'
 import {
@@ -312,6 +314,18 @@ async function handlePatchEvent(c: Context<AppEnv>) {
       kind: 'calendar_event_updated',
       detail: { id: row.id, title: row.title, fields: patch.length },
     }).run()
+
+    // Calendar invite update, async + non-blocking. Only material
+    // changes (time/location/title/status) emit an invite; editing an
+    // internal note or description alone does not.
+    const materialChanged = ['title', 'starts_at', 'ends_at', 'all_day', 'location_type', 'location_name', 'address', 'meeting_url']
+      .some((f) => (body as Record<string, unknown>)[f] !== undefined)
+    const newStatus = body.status !== undefined ? String(body.status) : row.status
+    let transition: InviteTransition | null = null
+    if (newStatus === 'cancelled') transition = 'CANCEL'
+    else if (body.status === 'confirmed' && row.status !== 'confirmed') transition = 'CONFIRM'
+    else if (materialChanged) transition = newStatus === 'confirmed' ? 'RESCHEDULE' : 'REQUEST'
+    if (transition) void dispatchCalendarInvites(c.env, { eventId: row.id, transition, actorUserId: user.id })
   }
   return c.json({ ok: true })
 }
@@ -323,6 +337,9 @@ async function handleDeleteEvent(c: Context<AppEnv>) {
   const row = await loadCalendarEventRow(c.env, user, c.req.param('id') ?? '')
   if (!row) throw new ScopeError('not found', 404)
   if (user.role === 'client' && row.client_user_id !== user.id) throw new ScopeError('forbidden', 403)
+  // Emit the CANCEL invite while the event still exists (the dispatcher
+  // reads calendar_events), then delete. Best-effort — never blocks.
+  await dispatchCalendarInvites(c.env, { eventId: row.id, transition: 'CANCEL', actorUserId: user.id }).catch(() => {})
   await c.env.DB.prepare('DELETE FROM calendar_events WHERE id = ?').bind(row.id).run()
   await activityInsert(c.env, {
     actorUserId: user.id,
@@ -360,8 +377,29 @@ adminCalendarRoutes.post('/calendar/events', async (c) => {
   const body = await c.req.json<EventInput>().catch(() => null)
   if (!body) return c.json({ error: 'invalid request body' }, 400)
   const id = await applyCreate(c.env, user, body)
+  // Calendar invite rides along, async + non-blocking. A confirmed
+  // event created outright issues a CONFIRM; otherwise a REQUEST.
+  const transition: InviteTransition = body.status === 'confirmed' ? 'CONFIRM' : 'REQUEST'
+  void dispatchCalendarInvites(c.env, { eventId: id, transition, actorUserId: user.id })
   return c.json({ ok: true, id }, 201)
 })
 
 adminCalendarRoutes.patch('/calendar/events/:id', handlePatchEvent)
 adminCalendarRoutes.delete('/calendar/events/:id', handleDeleteEvent)
+
+// Admin visibility into calendar-invite delivery state for one event.
+// Read-only: no ICS payload, no filtered personal data — just the
+// per-recipient lifecycle/send status so staff can confirm an invite
+// went out (or see why it didn't).
+adminCalendarRoutes.get('/calendar/events/:id/invites', async (c) => {
+  const eventId = c.req.param('id')
+  const rows = await c.env.DB.prepare(
+    `SELECT ci.recipient_type, ci.sequence, ci.last_method, ci.last_status,
+            ci.send_status, ci.last_error_code, ci.last_sent_at, u.full_name AS recipient_name
+       FROM calendar_invites ci
+       LEFT JOIN users u ON u.id = ci.recipient_id
+      WHERE ci.pmv_event_id = ?
+      ORDER BY ci.recipient_type`,
+  ).bind(eventId).all()
+  return c.json({ invites: rows.results ?? [] })
+})

@@ -20,18 +20,34 @@ export interface CalendarEventLink {
   to: string
 }
 
+export interface CalendarInviteState {
+  recipient_type: string
+  recipient_name: string | null
+  send_status: string
+  last_status: string | null
+  last_error_code: string | null
+}
+
+const INVITE_TONE: Record<string, string> = {
+  SENT: 'text-emerald-300',
+  PENDING: 'text-amber-300',
+  FAILED: 'text-rose-300',
+}
+
 export function CalendarEventDetailPanel({
   event,
   links = [],
   onCancel,
   onConfirm,
   busy = false,
+  invites,
 }: {
   event: CalendarEventItem
   links?: CalendarEventLink[]
   onCancel?: () => void
   onConfirm?: () => void
   busy?: boolean
+  invites?: CalendarInviteState[] | null
 }) {
   const p = useAppPath()
   const tone: Tone = calendarEventTone(event.eventType)
@@ -108,6 +124,22 @@ export function CalendarEventDetailPanel({
 
       {event.description && (
         <div className="rounded-md border border-white/10 bg-white/[.03] p-3 text-sm leading-6 text-slate-300">{event.description}</div>
+      )}
+
+      {invites && invites.length > 0 && (
+        <div className="rounded-md border border-white/10 bg-white/[.02] p-3">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Calendar invites</p>
+          <ul className="space-y-1 text-xs">
+            {invites.map((iv) => (
+              <li key={iv.recipient_type} className="flex items-center justify-between gap-2">
+                <span className="text-slate-300">{iv.recipient_type === 'CLIENT' ? 'Client' : 'Vendor'}{iv.recipient_name ? ` · ${iv.recipient_name}` : ''}</span>
+                <span className={`font-semibold ${INVITE_TONE[iv.send_status] ?? 'text-slate-400'}`}>
+                  {iv.send_status === 'SENT' ? (iv.last_status === 'CANCELLED' ? 'Cancelled' : 'Sent') : iv.send_status === 'PENDING' ? 'Pending' : 'Failed'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {(links.length > 0 || canCancel || onConfirm) && (
