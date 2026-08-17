@@ -171,6 +171,17 @@ export type SecurityEventKey =
   | 'IMPERSONATION_ENDED'
   | 'STEP_UP_VERIFIED'
   | 'STEP_UP_FAILED'
+  // Field-work location tracking lifecycle. Raw GPS points live in
+  // field_location_points (migration 0080) and never touch the audit
+  // log - only meaningful lifecycle transitions and sensitive-history
+  // access are recorded here.
+  | 'FIELD_LOCATION_PERMISSION_GRANTED'
+  | 'FIELD_LOCATION_PERMISSION_DENIED'
+  | 'FIELD_LOCATION_SESSION_STARTED'
+  | 'FIELD_LOCATION_ARRIVAL_CONFIRMED'
+  | 'FIELD_LOCATION_SESSION_ENDED'
+  | 'FIELD_LOCATION_HISTORY_VIEWED'
+  | 'FIELD_LOCATION_HISTORY_EXPORTED'
 
 export type SecuritySeverity = 'info' | 'notice' | 'warning' | 'critical'
 
@@ -232,10 +243,12 @@ function defaultSeverityFor(event: SecurityEventKey): SecuritySeverity {
     case 'REFUND_PROCESSED':
     case 'IMPERSONATION_STARTED':
     case 'STEP_UP_FAILED':
+    case 'FIELD_LOCATION_HISTORY_EXPORTED':
       return 'warning'
     case 'USER_SUSPENDED':
     case 'VENDOR_SUSPENDED':
     case 'LOGIN_FAILED':
+    case 'FIELD_LOCATION_HISTORY_VIEWED':
       return 'notice'
     case 'PERMISSION_CHANGED':
     case 'ROLE_ASSIGNED':
