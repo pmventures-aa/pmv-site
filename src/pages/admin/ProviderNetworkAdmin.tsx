@@ -202,15 +202,24 @@ export default function ProviderNetworkAdmin() {
 
       <DispatchFeeSettingsPanel className="mb-4" />
 
-      {geoPerm.permission === 'prompt' && !geoPerm.ctaHidden && sharing !== 'live' && (
+      {((geoPerm.permission === 'prompt' && !geoPerm.ctaHidden) || geoPerm.permission === 'revoked') && sharing !== 'live' && (
         <div className="mb-3 flex flex-col gap-3 rounded-lg border border-gold/25 bg-gold/[.06] p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-white">Enable location for Field & Dispatch</p>
-            <p className="mt-1 text-xs text-slate-300">Pinnacle uses your location to show you correctly on dispatch maps, improve nearby assignment matching, and support field check-in. We ask once and reuse your choice after.</p>
+            {geoPerm.permission === 'revoked' ? (
+              <>
+                <p className="text-sm font-bold text-white">Location access was turned off</p>
+                <p className="mt-1 text-xs text-slate-300">This device previously granted location. It has since been revoked in browser or OS settings, so HQ can no longer see you or match nearby assignments. Re-allow to resume.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-white">Enable location for Field & Dispatch</p>
+                <p className="mt-1 text-xs text-slate-300">Pinnacle uses your location to show you correctly on dispatch maps, improve nearby assignment matching, and support field check-in. We ask once and reuse your choice after.</p>
+              </>
+            )}
           </div>
           <div className="flex shrink-0 gap-2">
-            <button type="button" onClick={() => { geoPerm.request(); startLocationSharing() }} className={btnOutline}><LocateFixed size={14} /> Allow location</button>
-            <button type="button" onClick={geoPerm.hideCta} className="rounded-md px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white">Not now</button>
+            <button type="button" onClick={() => { geoPerm.request(); startLocationSharing() }} className={btnOutline}><LocateFixed size={14} /> {geoPerm.permission === 'revoked' ? 'Re-enable location' : 'Allow location'}</button>
+            {geoPerm.permission === 'prompt' && <button type="button" onClick={geoPerm.hideCta} className="rounded-md px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white">Not now</button>}
           </div>
         </div>
       )}

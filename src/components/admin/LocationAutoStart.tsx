@@ -50,7 +50,12 @@ export function LocationAutoStart() {
 
   const showPrompt =
     isMobile && !onNetworkPage && !onActiveAssignment && sharing === 'idle'
-    && geoPerm.permission === 'prompt' && !geoPerm.ctaHidden
+    // Show for a first-time prompt OR when a previous grant has been
+    // revoked (browser settings / OS location off / permission reset).
+    // A ctaHidden dismissal is respected on 'prompt' but reset when we
+    // detect a fresh 'revoked' transition - the user needs to know
+    // location is no longer flowing.
+    && ((geoPerm.permission === 'prompt' && !geoPerm.ctaHidden) || geoPerm.permission === 'revoked')
 
   if (sharing === 'live') {
     return (
@@ -73,8 +78,17 @@ export function LocationAutoStart() {
     <div className="flex flex-col gap-2 border-b border-gold/20 bg-gold/[.05] px-3 py-2.5 sm:px-5 lg:hidden print:hidden">
       <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 flex-1 text-xs leading-5 text-slate-300">
-          <strong className="text-white">Let HQ find you while you work.</strong>{' '}
-          Sharing your location improves dispatch matching and the team map. Asked once, remembered after.
+          {geoPerm.permission === 'revoked' ? (
+            <>
+              <strong className="text-white">Location access was turned off.</strong>{' '}
+              HQ can no longer find you on the team map. Re-enable to resume sharing while you work.
+            </>
+          ) : (
+            <>
+              <strong className="text-white">Let HQ find you while you work.</strong>{' '}
+              Sharing your location improves dispatch matching and the team map. Asked once, remembered after.
+            </>
+          )}
         </p>
         <div className="flex shrink-0 gap-2">
           <button
