@@ -369,11 +369,15 @@ export default function FieldWorkDetail() {
     endReasonOnUnmount,
   })
 
-  // Auto-arrival: while we're in the 'traveling' state and we have a target
-  // pin, poll geolocation lightly and flip to on_site when the vendor gets
-  // within the geofence radius. Only runs while the tab is open.
+  // Geofence-based arrival suggestion. Per the field-location spec:
+  // "Do not automatically falsify or silently change status solely
+  // because GPS enters the radius. The user should confirm arrival."
+  // So instead of flipping status to on_site the moment we cross the
+  // geofence, we surface a "You appear to have arrived" hint that the
+  // vendor confirms with a tap.
+  const [arrivalSuggested, setArrivalSuggested] = useState(false)
   useEffect(() => {
-    if (!assignment || assignment.status !== 'traveling') return
+    if (!assignment || assignment.status !== 'traveling') { setArrivalSuggested(false); return }
     if (assignment.site_lat === null || assignment.site_lng === null) return
     if (typeof navigator === 'undefined' || !navigator.geolocation) return
     const target = { lat: assignment.site_lat, lng: assignment.site_lng }
@@ -381,7 +385,7 @@ export default function FieldWorkDetail() {
       (pos) => {
         const here = { lat: pos.coords.latitude, lng: pos.coords.longitude }
         if (distanceMeters(here, target) <= AUTO_ARRIVE_RADIUS_M) {
-          void markArrived('auto_geofence')
+          setArrivalSuggested(true)
         }
       },
       () => {},
@@ -554,8 +558,34 @@ export default function FieldWorkDetail() {
               </div>
               {assignment.status === 'traveling' && assignment.site_lat !== null && (
                 <p className="mt-2 text-xs text-slate-500">
-                  Auto-arrival watching within {AUTO_ARRIVE_RADIUS_M}m of the site pin. You can also tap "I have arrived" at any time.
+                  Watching within {AUTO_ARRIVE_RADIUS_M}m of the site pin. When you cross the geofence you will see a confirmation prompt; you can also tap "I have arrived" at any time.
                 </p>
+              )}
+              {arrivalSuggested && !assignment.arrived_at && assignment.status === 'traveling' && (
+                <div role="alert" className="mt-3 flex flex-col gap-2 rounded-lg border border-emerald-400/40 bg-emerald-400/[.07] p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-emerald-100">You appear to have arrived at the assignment location.</p>
+                    <p className="mt-0.5 text-xs text-emerald-200/80">Tap to confirm - HQ never flips arrival status on your behalf without your confirmation.</p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { void markArrived('auto_geofence'); setArrivalSuggested(false) }}
+                      disabled={busy === 'arrive'}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-400/15 px-3 py-1.5 text-xs font-semibold text-emerald-100 disabled:opacity-60"
+                    >
+                      {busy === 'arrive' ? <Loader2 size={13} className="animate-spin" /> : <MapPin size={13} />}
+                      Mark Arrived
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setArrivalSuggested(false)}
+                      className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-emerald-100/70 hover:text-white"
+                    >
+                      Not yet
+                    </button>
+                  </div>
+                </div>
               )}
             </Panel>
           )}
