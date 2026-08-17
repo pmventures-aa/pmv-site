@@ -136,7 +136,7 @@ export default function LeadDetail() {
     try {
       const res = await api.post<{ client_user_id: string; client_public_ref: string | null }>(`/admin/inquiries/${id}/convert`)
       toast.success('Converted to client.')
-      window.location.href = p(`clients/${res.client_public_ref || res.client_user_id}/overview`)
+      navigate(p(`clients/${res.client_public_ref || res.client_user_id}/overview`))
     } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Could not convert this record.') }
     finally { setBusy(false) }
   }

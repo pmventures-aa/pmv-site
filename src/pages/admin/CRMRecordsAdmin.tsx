@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { useLiveRefresh } from '../../lib/liveRefresh'
@@ -143,6 +143,7 @@ function lifecycleTone(stage: string): 'gold' | 'green' | 'blue' | 'slate' | 're
 
 export default function CRMRecordsAdmin() {
   const p = useAppPath()
+  const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('records')
   const [records, setRecords] = useState<CRMRecord[]>([])
   const [lists, setLists] = useState<CRMList[]>([])
@@ -216,7 +217,7 @@ export default function CRMRecordsAdmin() {
       toast.success('CRM record created.')
       setDraft(emptyRecord)
       setShowCreate(false)
-      window.location.href = p(`leads/${result.id}/overview`)
+      navigate(p(`leads/${result.id}/overview`))
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not create lead.')
     } finally { setBusy(false) }
