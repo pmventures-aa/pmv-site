@@ -94,10 +94,32 @@ export default function DocumentCenter(){
   ]
 
   return <div className="flex h-full min-h-0 flex-col lg:flex-row">
-    <aside className="flex shrink-0 flex-col border-b border-white/10 bg-navy-900/60 backdrop-blur lg:h-full lg:w-60 lg:border-b-0 lg:border-r">
+    {/* Mobile section chips: horizontally-scrolling bar to keep the
+        vertical footprint compact. The desktop vertical rail below
+        renders identically on lg+. */}
+    <div className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-navy-900/60 px-3 py-2 backdrop-blur lg:hidden">
+      <button type="button" className={`${btnPrimary} !py-1.5 !px-3 text-xs`} onClick={()=>{setTab('workspace');setPicker(true)}} aria-label="Create a new document"><FilePlus2 size={13}/> New</button>
+      <button type="button" className={`${btnSecondary} !py-1.5 !px-3 text-xs`} onClick={()=>{setTab('workspace');setComposer(composer==='upload'?'none':'upload')}} aria-label="Upload a document"><Upload size={13}/> Upload</button>
+      <nav role="tablist" aria-label="Document Center sections" className="ml-auto flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {sections.map(section=>{
+          const active=tab===section.key
+          return <button
+            key={section.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={()=>{setTab(section.key);setSelected('')}}
+            className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold transition ${active?'border-gold/50 bg-gold/10 text-gold':'border-white/10 text-slate-400 hover:border-white/25 hover:text-slate-200'}`}
+          >
+            {section.label}{section.count!=null && section.count>0 ? ` (${section.count})` : ''}
+          </button>
+        })}
+      </nav>
+    </div>
+    <aside className="hidden shrink-0 flex-col border-white/10 bg-navy-900/60 backdrop-blur lg:flex lg:h-full lg:w-60 lg:border-r">
       <div className="border-b border-white/10 px-4 py-3">
         <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/80">Documents</p>
-        <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-1">
+        <div className="mt-2 grid grid-cols-1 gap-2">
           <button type="button" className={`${btnPrimary} w-full justify-center`} onClick={()=>{setTab('workspace');setPicker(true)}}><FilePlus2 size={14}/> New</button>
           <button type="button" className={`${btnSecondary} w-full justify-center`} onClick={()=>{setTab('workspace');setComposer(composer==='upload'?'none':'upload')}}><Upload size={14}/> Upload</button>
         </div>
