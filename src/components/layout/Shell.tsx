@@ -13,6 +13,7 @@ import { ImpersonationBanner } from '../kit/ImpersonationBanner'
 import { portalMobilePrimary, type NavItem } from './nav'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { AdminPageBoundary } from '../admin/AdminPageBoundary'
+import { useNavDocumentTitle } from '../../lib/useNavDocumentTitle'
 
 export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: { nav: NavItem[]; badge: string; mobilePrimary?: string[] }) {
   const { user, logout } = useAuth()
@@ -31,6 +32,7 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
   })
   const p = useAppPath()
   const location = useLocation()
+  useNavDocumentTitle(nav, 'Pinnacle Portal')
 
   function toggleSidebar() {
     setSidebarOpen((open) => {

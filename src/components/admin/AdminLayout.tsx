@@ -16,6 +16,7 @@ import { WhoMenu } from './WhoMenu'
 import { LocationAutoStart } from './LocationAutoStart'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
+import { useNavDocumentTitle } from '../../lib/useNavDocumentTitle'
 
 // `badge` prop kept for callers that still pass it but no longer rendered
 // anywhere in the layout - it was showing as "STAFF CONSOLE" chrome the
@@ -41,6 +42,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   const location = useLocation()
   const canOpenSettings = nav.some((item) => item.key === 'settings')
   const { count: emailUnread } = useEmailUnreadCount()
+  useNavDocumentTitle(nav, 'Pinnacle HQ')
   const hideHqNav = /(^|\/)(messages|communications|document-center)(\/|$)/.test(location.pathname)
   const mailWorkspace = /(^|\/)messages(\/|$)/.test(location.pathname)
   const docWorkspace = /(^|\/)document-center(\/|$)/.test(location.pathname)
