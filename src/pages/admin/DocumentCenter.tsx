@@ -94,7 +94,7 @@ export default function DocumentCenter(){
     {key:'archived',label:'Archived',icon:Archive,count:archivedRows.length},
   ]
 
-  return <div className="flex h-full min-h-0 flex-col lg:flex-row">
+  return <div className="flex flex-col overflow-hidden rounded-xl border border-white/10 lg:h-[calc(100vh-11rem)] lg:flex-row">
     {/* Mobile section chips: horizontally-scrolling bar to keep the
         vertical footprint compact. The desktop vertical rail below
         renders identically on lg+. */}
