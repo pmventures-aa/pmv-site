@@ -265,7 +265,7 @@ export default function ClientDetailModern() {
     </header>
 
     <nav className="mt-5 flex gap-6 overflow-x-auto border-b border-white/10" aria-label="Client profile sections">
-      {([['overview','Overview'],['activity','Activity & Notes'],['services','Services'],['work','Work'],['documents','Documents'],['billing','Billing'],['relationships','People & Businesses'],['details','Profile']] as const).map(([key, label]) => <Link key={key} to={p(`clients/${account.public_ref}/${key}`)} className={`shrink-0 border-b-2 pb-3 text-sm font-medium transition ${tab === key ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{label}</Link>)}
+      {([['overview','Overview'],['activity','Activity & Notes'],['services','Services'],['work','Work'],['documents','Documents'],['billing','Billing'],['relationships','People & Businesses'],['details','Profile']] as const).map(([key, label]) => <Link key={key} to={p(`clients/${account.public_ref}/${key}`)} aria-current={tab === key ? 'page' : undefined} className={`shrink-0 border-b-2 pb-3 text-sm font-medium transition ${tab === key ? 'border-gold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>{label}</Link>)}
     </nav>
 
     {tab === 'overview' && <div className="mt-7 grid gap-9 xl:grid-cols-[minmax(0,1fr)_380px]">
