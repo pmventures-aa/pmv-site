@@ -11,6 +11,7 @@ import { adminRoutes } from '../_lib/routes/admin'
 import { processorReviewLoginRoutes } from '../_lib/routes/processorReviewLogin'
 import { publicRoutes } from '../_lib/routes/public'
 import { uploadRoutes } from '../_lib/routes/uploads'
+import { calendarInviteSettingsRoutes } from '../_lib/routes/calendarInviteSettings'
 import { unsubscribeRoutes } from '../_lib/routes/unsubscribe'
 import { deletionRoutes } from '../_lib/routes/deletion'
 import { conversionRoutes } from '../_lib/routes/conversion'
@@ -103,6 +104,7 @@ app.route('/auth', authRoutes)
 app.route('/', publicRoutes)
 app.route('/', serviceOfferingPublicRoutes)
 app.route('/', uploadRoutes)
+app.route('/', calendarInviteSettingsRoutes)
 app.route('/', unsubscribeRoutes)
 app.route('/', resendWebhookRoutes)
 app.route('/', invitationPublicRoutes)

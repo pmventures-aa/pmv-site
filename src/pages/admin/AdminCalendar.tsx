@@ -6,7 +6,7 @@ import { useAuth } from '../../lib/auth'
 import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary } from '../../components/admin/ui'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
 import { CalendarGrid, type CalendarMode } from '../../components/calendar/CalendarGrid'
-import { CalendarEventDetailPanel } from '../../components/calendar/CalendarEventDetail'
+import { CalendarEventDetailPanel, type CalendarInviteState } from '../../components/calendar/CalendarEventDetail'
 import {
   CALENDAR_EVENT_TYPES,
   CALENDAR_EVENT_STATUSES,
@@ -47,6 +47,7 @@ export default function AdminCalendar() {
   const [mode, setMode] = useState<CalendarMode>('month')
   const [date, setDate] = useState(() => new Date())
   const [selected, setSelected] = useState<CalendarEventItem | null>(null)
+  const [selectedInvites, setSelectedInvites] = useState<CalendarInviteState[] | null>(null)
   const [busy, setBusy] = useState(false)
 
   const [eventType, setEventType] = useState('')
@@ -99,6 +100,18 @@ export default function AdminCalendar() {
       setBusy(false)
     }
   }
+
+  useEffect(() => {
+    setSelectedInvites(null)
+    // Derived rows (field:/care:) have no stored calendar_events id, so
+    // there is no invite state to fetch for them.
+    if (!selected || selected.id.includes(':')) return
+    let active = true
+    api.get<{ invites: CalendarInviteState[] }>(`/admin/calendar/events/${selected.id}/invites`)
+      .then((r) => { if (active) setSelectedInvites(r.invites ?? []) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [selected])
 
   const hasFilters = !!(eventType || status || visibility || clientId || assignedUserId || mineOnly)
 
@@ -196,6 +209,7 @@ export default function AdminCalendar() {
               event={selected}
               busy={busy}
               links={detailLinks}
+              invites={selectedInvites}
               onCancel={() => void patchStatus('cancelled')}
               onConfirm={() => void patchStatus('confirmed')}
             />
