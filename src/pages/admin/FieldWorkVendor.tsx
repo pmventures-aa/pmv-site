@@ -70,6 +70,14 @@ interface DocumentRow {
   stamps_count: number
   notes: string | null
   created_at: string
+  // Migration 0081: optional Pinnacle-app location at the moment the
+  // record was created. Always labeled "Pinnacle app location at
+  // record" in the UI - never conflated with photo EXIF (which
+  // Pinnacle does not read).
+  app_captured_at?: string | null
+  app_capture_latitude?: number | null
+  app_capture_longitude?: number | null
+  app_capture_accuracy_m?: number | null
 }
 
 // Radius in meters within which auto-arrival counts as "yes, we're on site".
@@ -398,6 +406,12 @@ export default function FieldWorkDetail() {
   async function addDocument(form: DocumentDraft) {
     if (!assignment) return
     try {
+      // Best-effort Pinnacle-app-captured location to associate with
+      // the proof record (migration 0081). Silent on failure - we
+      // never block a record because location was slow. The columns
+      // are always labeled "Pinnacle app location at record" in the
+      // UI so they can never be confused with photo EXIF.
+      const capture = await getPosition().catch(() => null)
       await api.post(`/admin/field-assignments/${assignment.id}/documents`, {
         document_type: form.document_type,
         signer_names: form.signer_names.split(',').map((s) => s.trim()).filter(Boolean),
@@ -405,6 +419,10 @@ export default function FieldWorkDetail() {
         oath_administered: form.oath_administered,
         stamps_count: form.stamps_count,
         notes: form.notes || null,
+        app_captured_at: new Date().toISOString(),
+        app_capture_latitude: capture?.coords.latitude ?? null,
+        app_capture_longitude: capture?.coords.longitude ?? null,
+        app_capture_accuracy_m: capture?.coords.accuracy ?? null,
       })
       setAddingDoc(false)
       toast.success('Document recorded.')
@@ -622,6 +640,15 @@ export default function FieldWorkDetail() {
                           <span>Stamps: <strong className="text-slate-300">{doc.stamps_count}</strong></span>
                         </div>
                         {doc.notes && <p className="mt-1 text-xs text-slate-500">{doc.notes}</p>}
+                        {doc.app_capture_latitude != null && doc.app_capture_longitude != null && (
+                          <p className="mt-1 text-[10px] font-medium text-slate-500">
+                            Pinnacle app location at record:{' '}
+                            <span className="font-mono text-slate-400">
+                              {doc.app_capture_latitude.toFixed(5)}, {doc.app_capture_longitude.toFixed(5)}
+                            </span>
+                            {doc.app_capture_accuracy_m != null && <span className="text-slate-600"> · ±{Math.round(doc.app_capture_accuracy_m)}m</span>}
+                          </p>
+                        )}
                       </div>
                       {!done && (
                         <button
