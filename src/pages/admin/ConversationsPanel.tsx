@@ -91,13 +91,13 @@ export function ConversationsPanel() {
           <button className={btnPrimary} onClick={() => setComposerOpen(true)}><Plus size={14}/>New</button>
         </div>
         <div className="space-y-2 border-b border-white/10 p-3">
-          <input className={inputCls} placeholder="Search subject…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <div className="flex flex-wrap gap-1.5">
+          <input className={inputCls} type="search" aria-label="Search conversations by subject" placeholder="Search subject…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div role="group" aria-label="Conversation filters" className="flex flex-wrap gap-1.5">
             {(['open','closed','all'] as const).map((s) => (
-              <button key={s} onClick={() => setStatusFilter(s)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${statusFilter===s?'border-gold/50 bg-gold/10 text-gold':'border-white/10 text-slate-400'}`}>{s}</button>
+              <button key={s} type="button" aria-pressed={statusFilter===s} onClick={() => setStatusFilter(s)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${statusFilter===s?'border-gold/50 bg-gold/10 text-gold':'border-white/10 text-slate-400'}`}>{s}</button>
             ))}
             {(['all','dm','group_dm'] as const).map((k) => (
-              <button key={k} onClick={() => setKindFilter(k)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${kindFilter===k?'border-gold/50 bg-gold/10 text-gold':'border-white/10 text-slate-400'}`}>{k==='all'?'any type':k==='dm'?'1:1':'group'}</button>
+              <button key={k} type="button" aria-pressed={kindFilter===k} onClick={() => setKindFilter(k)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${kindFilter===k?'border-gold/50 bg-gold/10 text-gold':'border-white/10 text-slate-400'}`}>{k==='all'?'any type':k==='dm'?'1:1':'group'}</button>
             ))}
           </div>
         </div>

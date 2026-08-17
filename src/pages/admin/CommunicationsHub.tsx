@@ -59,9 +59,9 @@ export default function CommunicationsHub() {
       <PageIntro kicker="Communications Hub" title="One view. Every channel." subtitle="Client threads, staff DMs, and outbound email in one place. Day-to-day client messages stay in Inbox. Notification channels live in Settings." action={<Link to={p('messages')} className={btnSecondary}>Open Inbox</Link>} />
 
       <div className="border-b border-white/10">
-        <div className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div role="tablist" aria-label="Communications sections" className="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {TABS.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`relative shrink-0 px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'text-gold' : 'text-slate-400 hover:text-white'}`}>
+            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`relative shrink-0 px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'text-gold' : 'text-slate-400 hover:text-white'}`}>
               {t.label}
               {tab === t.id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-t-full bg-gold"/>}
             </button>
@@ -69,7 +69,7 @@ export default function CommunicationsHub() {
           <div className="ml-auto hidden shrink-0 items-center gap-2 sm:flex">
             <Link to={p('communications/email')} className={btnSecondary}><Send size={14}/>Email Center</Link>
             <Link to={p('messages')} className={btnSecondary}><Inbox size={14}/>Inbox</Link>
-            <button className={btnSecondary} onClick={() => { window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } })); void loadOverview() }}><RefreshCw size={14}/>Refresh</button>
+            <button type="button" className={btnSecondary} onClick={() => { window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } })); void loadOverview() }}><RefreshCw size={14}/>Refresh</button>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 pb-2 sm:hidden">
