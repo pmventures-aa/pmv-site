@@ -392,10 +392,24 @@ fieldWorkRoutes.post('/field-assignments/:id/documents', requireStaff, async (c)
   const documentType = typeof body.document_type === 'string' ? body.document_type.trim() : ''
   if (!documentType) return c.json({ error: 'document_type required' }, 400)
   const signers = Array.isArray(body.signer_names) ? body.signer_names.filter((n) => typeof n === 'string' && n.trim()).map((n) => (n as string).trim()) : []
+  // Optional Pinnacle-app-captured location associated with this
+  // proof record (migration 0081). Clamped through num() so a rogue
+  // client cannot smuggle non-numeric values into the coord columns.
+  // These fields are ALWAYS labeled "Pinnacle app location at record"
+  // in the UI - Pinnacle does not read photo EXIF today, so there is
+  // no possibility of conflating the two.
+  const captureLat = num(body.app_capture_latitude)
+  const captureLng = num(body.app_capture_longitude)
+  const capturedAt = typeof body.app_captured_at === 'string' ? body.app_captured_at.slice(0, 40) : null
+  const captureAccuracy = num(body.app_capture_accuracy_m)
+  const captureValid = captureLat != null && captureLng != null && captureLat >= -90 && captureLat <= 90 && captureLng >= -180 && captureLng <= 180
   const id = uuid()
   await c.env.DB.prepare(
-    `INSERT INTO field_assignment_documents (id, assignment_id, document_type, signer_names, witness_role, oath_administered, stamps_count, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO field_assignment_documents (
+       id, assignment_id, document_type, signer_names, witness_role, oath_administered, stamps_count, notes,
+       app_captured_at, app_capture_latitude, app_capture_longitude, app_capture_accuracy_m
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id,
     row.id,
@@ -405,6 +419,10 @@ fieldWorkRoutes.post('/field-assignments/:id/documents', requireStaff, async (c)
     body.oath_administered ? 1 : 0,
     Math.max(0, parseInt(String(body.stamps_count ?? 0), 10) || 0),
     typeof body.notes === 'string' ? body.notes.trim() || null : null,
+    captureValid ? capturedAt : null,
+    captureValid ? captureLat : null,
+    captureValid ? captureLng : null,
+    captureValid ? captureAccuracy : null,
   ).run()
   await c.env.DB.prepare(
     `UPDATE field_assignments SET status = CASE WHEN status IN ('assigned','traveling','on_site') THEN 'documented' ELSE status END, documented_at = COALESCE(documented_at, ?), updated_at = datetime('now') WHERE id = ?`,
