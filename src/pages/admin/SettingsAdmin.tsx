@@ -123,7 +123,7 @@ export default function SettingsAdmin() {
               {matchingTabs.map(item => {
                 const Icon = item.icon
                 const active = item.key === tab
-                return <button key={item.key} type="button" onClick={() => setTab(item.key)} className={`group w-full rounded-lg px-3 py-3 text-left transition ${active ? 'bg-gold/[.08] ring-1 ring-gold/20' : 'hover:bg-white/[.03]'}`}>
+                return <button key={item.key} type="button" aria-current={active ? 'page' : undefined} onClick={() => setTab(item.key)} className={`group w-full rounded-lg px-3 py-3 text-left transition ${active ? 'bg-gold/[.08] ring-1 ring-gold/20' : 'hover:bg-white/[.03]'}`}>
                   <div className="flex items-start gap-3"><span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${active ? 'bg-gold/10 text-gold' : 'bg-white/[.025] text-slate-500 group-hover:text-slate-300'}`}><Icon size={16} /></span><div className="min-w-0"><p className={`text-sm font-extrabold ${active ? 'text-white' : 'text-slate-300'}`}>{item.label}</p><p className="mt-1 text-[11px] leading-4 text-slate-500">{item.short}</p></div></div>
                 </button>
               })}

@@ -102,7 +102,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/[.025] text-slate-400 transition group-hover:text-gold"><item.icon size={15} strokeWidth={1.8} /></span>
                     <span className="truncate">{item.label}</span>
                     {item.key === 'messages' && emailUnread > 0 && (
-                      <span className="ml-auto grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{emailUnread > 99 ? '99+' : emailUnread}</span>
+                      <span aria-label={`${emailUnread} unread email${emailUnread === 1 ? '' : 's'}`} className="ml-auto grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{emailUnread > 99 ? '99+' : emailUnread}</span>
                     )}
                   </NavLink>
                 ))}

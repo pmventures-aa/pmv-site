@@ -208,12 +208,12 @@ export default function MessagesAdmin() {
 
   return (
     <div className="flex h-full min-h-0 flex-col px-3 pt-2 sm:px-5 lg:px-6">
-      <div className="mb-2 flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-white/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
+      <div role="tablist" aria-label="Inbox sections" className="mb-2 flex shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-white/10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
         {TABS.map((item) => (
-          <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`relative shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${tab === item.id ? 'border-gold font-semibold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>
+          <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`relative shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${tab === item.id ? 'border-gold font-semibold text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}>
             {item.label}
             {item.id === 'email' && emailUnread > 0 && (
-              <span className="ml-2 inline-grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{emailUnread > 99 ? '99+' : emailUnread}</span>
+              <span aria-label={`${emailUnread} unread email${emailUnread === 1 ? '' : 's'}`} className="ml-2 inline-grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{emailUnread > 99 ? '99+' : emailUnread}</span>
             )}
           </button>
         ))}
