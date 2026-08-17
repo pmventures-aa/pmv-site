@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { Card, EmptyState, PageHeader, StatusBadge } from '../../components/ui'
+import { Card, EmptyState, PageHeader, StatusBadge, SkeletonRows } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
 import { toast } from '../../components/kit/toast'
 
@@ -169,7 +169,7 @@ export default function TrustedContacts() {
         </Card>
       )}
 
-      {loading ? <p className="text-sm text-slate-400">Loading…</p> : contacts.length === 0 ? (
+      {loading ? <Card><SkeletonRows rows={3} cols={3} /></Card> : contacts.length === 0 ? (
         <Card><EmptyState label="No Trusted Contacts yet. Invite someone only when you want them to have delegated access to your account." /></Card>
       ) : (
         <div className="space-y-3">

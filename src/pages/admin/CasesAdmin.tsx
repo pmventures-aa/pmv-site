@@ -494,7 +494,7 @@ function SlaPolicyEditor({ readOnly, onClose }: { readOnly: boolean; onClose: ()
         <button type="button" onClick={onClose} className="text-xs text-slate-500 hover:text-white">Close</button>
       </div>
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <SkeletonTable rows={4} cols={4} />
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

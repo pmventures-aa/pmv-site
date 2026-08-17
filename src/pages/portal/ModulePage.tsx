@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../lib/auth'
 import { api, ApiError } from '../../lib/api'
-import { Card, EmptyState, PageHeader, StatusBadge, type Tone } from '../../components/ui'
+import { Card, EmptyState, PageHeader, StatusBadge, SkeletonRows, type Tone } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
 import { toast } from '../../components/kit/toast'
 
@@ -193,7 +193,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
 
       <Card className="overflow-x-auto !p-0">
         {loading ? (
-          <div className="p-4 text-sm text-slate-400">Loading…</div>
+          <div className="p-4"><SkeletonRows rows={5} cols={4} /></div>
         ) : loadError ? (
           <div className="space-y-2 p-4 text-sm text-slate-400">
             <p>Couldn't load this list.</p>

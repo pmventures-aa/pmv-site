@@ -4,6 +4,24 @@ export function Card({ className = '', children }: { className?: string; childre
   return <div className={`rounded-md border border-white/10 bg-navy-900/70 p-4 ${className}`}>{children}</div>
 }
 
+// Content-shaped loading placeholders, mirroring the admin kit's
+// primitives so portal surfaces can skeleton instead of rendering
+// bare "Loading…" text.
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-white/[.07] ${className}`} aria-hidden="true" />
+}
+export function SkeletonRows({ rows = 4, cols = 3 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="space-y-2.5" role="status" aria-label="Loading">
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} className="flex gap-3">
+          {Array.from({ length: cols }).map((_, c) => <Skeleton key={c} className="h-3.5 flex-1" />)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export type Tone = 'gold' | 'green' | 'blue' | 'slate' | 'red'
 const toneMap: Record<Tone, string> = {
   gold: 'bg-gold/10 text-gold border-gold/25',

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../../lib/api'
-import { Panel, Tag, EmptyState, NoAccess, inputCls, btnPrimary, btnOutline } from '../../../components/admin/ui'
+import { Panel, Tag, EmptyState, NoAccess, inputCls, btnPrimary, btnOutline, SkeletonTable } from '../../../components/admin/ui'
 import { toast } from '../../../components/kit/toast'
 
 interface ServiceRow {
@@ -522,7 +522,7 @@ export default function ServiceCatalogSettings() {
         </Panel>
       )}
 
-      {loading ? <p className="text-sm text-slate-400">Loading…</p> : services.length === 0 ? <Panel><EmptyState label="No services yet." /></Panel> : (
+      {loading ? <Panel><SkeletonTable rows={4} cols={3} /></Panel> : services.length === 0 ? <Panel><EmptyState label="No services yet." /></Panel> : (
         <div className="space-y-3">
           {services.map((service) => (
             <Panel key={service.key} className="!p-0">

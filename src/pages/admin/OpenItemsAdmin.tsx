@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { PageIntro, Panel, EmptyState } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, SkeletonTable } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
 import { clientEmailHref } from '../../lib/engagements'
 import { useLiveRefresh } from '../../lib/liveRefresh'
@@ -44,7 +44,7 @@ export default function OpenItemsAdmin() {
     <div>
       <PageIntro kicker="Dashboard drill-down" title={cfg.title} subtitle="Most recent first. Open a row for the client record." />
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <Panel><SkeletonTable rows={6} cols={4} /></Panel>
       ) : items.length === 0 ? (
         <Panel><EmptyState label="Nothing here right now." /></Panel>
       ) : (

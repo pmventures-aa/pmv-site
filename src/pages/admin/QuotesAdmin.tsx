@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Plus, Search } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline, SkeletonTable } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { services } from '../../data/services'
 import { ScopeIntakePicker } from '../../components/admin/ScopeIntakePicker'
@@ -314,7 +314,7 @@ function QuoteDetail({ quoteId, offerings, onBack, onChanged }: { quoteId: strin
   const load = useCallback(() => api.get<QuoteDetailData>(`/admin/quotes/${quoteId}`).then(setData).catch(() => toast.error('Could not load the quote.')), [quoteId])
   useEffect(() => { void load() }, [load])
 
-  if (!data) return <div><button type="button" onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold"><ChevronLeft size={14} />Back to quotes</button><p className="text-sm text-slate-400">Loading…</p></div>
+  if (!data) return <div><button type="button" onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold"><ChevronLeft size={14} />Back to quotes</button><Panel><SkeletonTable rows={6} cols={3} /></Panel></div>
   const { quote, line_items, events, invoice } = data
   const editable = ['draft', 'sent', 'viewed'].includes(quote.status)
   const publicUrl = publicQuoteUrl(quote.public_token)

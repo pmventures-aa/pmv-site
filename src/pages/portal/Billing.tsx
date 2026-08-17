@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../../lib/api'
-import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
+import { Card, PageHeader, StatusBadge, EmptyState, SkeletonRows } from '../../components/ui'
 import { Icon } from '../../components/kit/Icon'
 import { invoiceDueLabel, invoiceMoney, invoiceStatusLabel, isInvoiceOverdue } from '../../../shared/invoiceWorkspace'
 import { quoteMoney, quoteStatusLabel } from '../../../shared/quoteWorkspace'
@@ -107,7 +107,7 @@ export default function Billing() {
         </Card>
       </div>
 
-      {loading ? <Card><p className="text-sm text-slate-400">Loading…</p></Card> : (
+      {loading ? <Card><SkeletonRows rows={5} cols={3} /></Card> : (
         <div className="space-y-5">
           {vault.length > 0 && (
             <section className="space-y-2">
