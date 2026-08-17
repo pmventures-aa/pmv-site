@@ -172,4 +172,19 @@ describe('catalog integrity', () => {
       if (spec.key.endsWith('.reveal') || spec.key === 'billing.process_refund') expect(spec.stepUp).toBe(true)
     }
   })
+
+  it('includes the field.location.* catalog for dispatch/operations', () => {
+    for (const key of ['field.location.view_live', 'field.location.view_history', 'field.location.export', 'field.location.manage'] as const) {
+      const spec = permissionSpec(key)
+      expect(spec, `${key} missing from catalog`).toBeTruthy()
+      expect(spec.category).toBe('field')
+    }
+    // Bulk history operations must require step-up because they expose
+    // durable location trails; the read-only views can be delegated
+    // without an extra challenge.
+    expect(permissionSpec('field.location.export').stepUp).toBe(true)
+    expect(permissionSpec('field.location.manage').stepUp).toBe(true)
+    expect(permissionSpec('field.location.view_live').stepUp).toBeFalsy()
+    expect(permissionSpec('field.location.view_history').stepUp).toBeFalsy()
+  })
 })

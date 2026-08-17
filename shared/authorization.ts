@@ -84,6 +84,9 @@ export type GranularPermission =
   | 'roles.view' | 'roles.manage'
   | 'firm_settings.view' | 'firm_settings.manage'
   | 'security.view' | 'security.manage'
+  // Field-work location tracking (see migration 0080)
+  | 'field.location.view_live' | 'field.location.view_history'
+  | 'field.location.export' | 'field.location.manage'
 
 // Legacy names that already ship in functions/_lib/capabilities.ts.
 export type LegacyPermission =
@@ -98,7 +101,7 @@ export interface PermissionSpec {
   category:
     | 'clients' | 'communications' | 'documents' | 'esign' | 'ron' | 'invitations'
     | 'team' | 'vendors' | 'reporting' | 'audit' | 'banking' | 'billing' | 'finance'
-    | 'users' | 'security' | 'settings'
+    | 'users' | 'security' | 'settings' | 'field'
   // Which legacy permission from the existing capabilities system implies
   // this granular permission. When absent, only Owner/Admin or an explicit
   // grant on this granular key allows it.
@@ -218,6 +221,14 @@ export const PERMISSION_CATALOG: PermissionSpec[] = [
   { key: 'firm_settings.manage', label: 'Manage firm settings', description: 'Change firm-wide operational settings.', category: 'settings', legacy: 'manage_settings', stepUp: true },
   { key: 'security.view', label: 'View security center', description: 'Open the Security Center.', category: 'security', legacy: 'view_audit_log' },
   { key: 'security.manage', label: 'Manage security', description: 'Change security policies, MFA enforcement, and session controls.', category: 'security', ownerOnly: true, stepUp: true },
+  // Field-work location (see migration 0080). View-live and view-history
+  // shim off the existing manage_field_work coarse key so any dispatch
+  // role keeps its live-map view; export and manage require an explicit
+  // grant because they expose historical location data in bulk.
+  { key: 'field.location.view_live',    label: 'View live field locations', description: 'See the current or last-known field location for authorized assignments on the dispatch map.', category: 'field', legacy: 'manage_team' },
+  { key: 'field.location.view_history', label: 'View field location history', description: 'Review the location trail associated with an assignment (arrival, on-site duration, completion location).', category: 'field', legacy: 'manage_team' },
+  { key: 'field.location.export',       label: 'Export field location history', description: 'Export raw location trails as evidence. Requires step-up and is audited.', category: 'field', stepUp: true },
+  { key: 'field.location.manage',       label: 'Manage location tracking policy', description: 'Configure geofence radii, retention windows, and tracking overrides for the firm.', category: 'field', stepUp: true },
 ]
 
 const CATALOG_INDEX: Record<string, PermissionSpec> =

@@ -168,6 +168,21 @@ describe('recordSecurityEvent', () => {
     expect(ctx.eventRows[0].severity).toBe('warning')
   })
 
+  it('maps field-location lifecycle events to sensible default severities', async () => {
+    await recordSecurityEvent(ctx.env, { actor: alice, event: 'FIELD_LOCATION_SESSION_STARTED' })
+    await recordSecurityEvent(ctx.env, { actor: alice, event: 'FIELD_LOCATION_ARRIVAL_CONFIRMED' })
+    await recordSecurityEvent(ctx.env, { actor: alice, event: 'FIELD_LOCATION_HISTORY_VIEWED' })
+    await recordSecurityEvent(ctx.env, { actor: alice, event: 'FIELD_LOCATION_HISTORY_EXPORTED' })
+    const byEvent = Object.fromEntries(ctx.eventRows.map((row) => [row.event_key, row.severity])) as Record<string, string>
+    // Lifecycle transitions are informational; access to durable history
+    // is notice; bulk export is warning-tier because it produces
+    // portable location trails.
+    expect(byEvent.FIELD_LOCATION_SESSION_STARTED).toBe('info')
+    expect(byEvent.FIELD_LOCATION_ARRIVAL_CONFIRMED).toBe('info')
+    expect(byEvent.FIELD_LOCATION_HISTORY_VIEWED).toBe('notice')
+    expect(byEvent.FIELD_LOCATION_HISTORY_EXPORTED).toBe('warning')
+  })
+
   it('captures the impersonator id when the actor is being impersonated', async () => {
     const impersonated: SessionUser = { ...alice, impersonated_by_user_id: 'user_owner' }
     await recordSecurityEvent(ctx.env, {
