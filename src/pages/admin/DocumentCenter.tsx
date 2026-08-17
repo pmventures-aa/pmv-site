@@ -7,7 +7,7 @@ import { useAppPath } from '../../lib/basePath'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { DocumentCanvas } from '../../components/admin/DocumentCanvas'
 import { DocumentExportMenu } from '../../components/admin/DocumentExportMenu'
-import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
+import { Panel, EmptyState, Tag, inputCls, btnPrimary, btnSecondary } from '../../components/admin/ui'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
 import { toast } from '../../components/kit/toast'
 
@@ -45,7 +45,7 @@ export default function DocumentCenter(){
   const p=useAppPath()
   const [workspace,setWorkspace]=useState<WorkspaceDoc[]>([]),[archived,setArchived]=useState<WorkspaceDoc[]>([]),[selected,setSelected]=useState(''),[detail,setDetail]=useState<DocDetail|null>(null)
   const [clientDocs,setClientDocs]=useState<ClientDoc[]>([]),[reports,setReports]=useState<ReportExport[]>([]),[catalog,setCatalog]=useState<CatalogEntry[]>([]),[loading,setLoading]=useState(true)
-  const [tab,setTab]=useState<'workspace'|'client'|'reports'|'archived'>('workspace'),[q,setQ]=useState(''),[composer,setComposer]=useState<'none'|'text'|'upload'>('none'),[picker,setPicker]=useState(false)
+  const [tab,setTab]=useState<'workspace'|'shared'|'client'|'reports'|'archived'>('workspace'),[q,setQ]=useState(''),[composer,setComposer]=useState<'none'|'text'|'upload'>('none'),[picker,setPicker]=useState(false)
   const [newTitle,setNewTitle]=useState(''),[newFolder,setNewFolder]=useState('General'),[newText,setNewText]=useState(''),[uploadFile,setUploadFile]=useState<File|null>(null),[busy,setBusy]=useState(false)
   const [editTitle,setEditTitle]=useState(''),[editFolder,setEditFolder]=useState(''),[editDescription,setEditDescription]=useState(''),[editText,setEditText]=useState('')
   const [shareEmail,setShareEmail]=useState(''),[shareName,setShareName]=useState(''),[shareMessage,setShareMessage]=useState(''),[versionFile,setVersionFile]=useState<File|null>(null)
@@ -74,14 +74,74 @@ export default function DocumentCenter(){
   async function sendForSignature(){if(!detail)return;try{const r=await api.post<{id:string}>(`/admin/documents-workspace/${detail.document.id}/envelope`,{});toast.success('Draft envelope created');window.location.href=p(`envelopes?open=${encodeURIComponent(r.id)}`)}catch(e){toast.error(e instanceof ApiError?e.message:'Could not create envelope')}}
   async function generate(){if(!reportKey)return;setGenerating(true);try{const r=await api.post<{export:{file_name:string}}>(`/admin/reports/${reportKey}/export.pdf?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,{});toast.success(`${r.export.file_name} created.`);setTab('reports');await load()}catch(e){toast.error(e instanceof ApiError?e.message:'Could not generate report PDF.')}finally{setGenerating(false)}}
 
-  const rows=tab==='archived'?archivedRows:activeRows
-  return <div>
-    <PageIntro kicker="Documents" title="Document Hub" subtitle="Open, edit, version, share, and send documents without leaving HQ." action={<><button type="button" className={btnPrimary} onClick={()=>{setTab('workspace');setPicker(true)}}><FilePlus2 size={15}/> New Document</button><Link className={btnSecondary} to={p('envelopes')}>Envelopes</Link></>}/>
-    <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"><div role="group" aria-label="Document Hub sections" className="flex flex-wrap gap-1 rounded-xl border border-white/10 bg-white/[.018] p-1">{([['workspace','My Documents'],['client','Client Files'],['reports','Reports'],['archived','Archived']] as const).map(([key,label])=><button key={key} type="button" aria-pressed={tab===key} onClick={()=>{setTab(key);setSelected('')}} className={`rounded-lg px-3.5 py-2 text-xs font-semibold transition ${tab===key?'bg-white/[.08] text-white shadow-sm':'text-slate-400 hover:text-white'}`}>{label}</button>)}</div><div className="flex flex-1 items-center justify-end gap-2"><label className="relative w-full max-w-sm"><span className="sr-only">Search documents</span><Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/><input className={`${inputCls} pl-9`} type="search" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search documents…"/></label>{tab==='workspace'&&<button type="button" className={btnSecondary} onClick={()=>setComposer(composer==='upload'?'none':'upload')}><Upload size={15}/> Upload</button>}</div></div>
-    {tab==='workspace'&&composer!=='none'&&<Composer mode={composer} title={newTitle} folder={newFolder} text={newText} file={uploadFile} busy={busy} setTitle={setNewTitle} setFolder={setNewFolder} setText={setNewText} setFile={setUploadFile} close={()=>setComposer('none')} submit={composer==='text'?createText:upload}/>} 
-    {(tab==='workspace'||tab==='archived')&&(selected&&detail?<div className="grid min-h-[680px] gap-4 2xl:grid-cols-[260px_minmax(0,1fr)_330px]"><LibraryRail rows={rows} selected={selected} loading={loading} onSelect={setSelected}/><DocumentCanvas document={detail.document} text={editText} onTextChange={setEditText} fullPageHref={p(`document-center/${detail.document.id}`)}/><Inspector detail={detail} archived={tab==='archived'} values={{editTitle,editFolder,editDescription,shareEmail,shareName,shareMessage,versionFile}} setters={{setEditTitle,setEditFolder,setEditDescription,setShareEmail,setShareName,setShareMessage,setVersionFile}} actions={{save,share,replaceVersion,archive:()=>archiveDoc(tab==='archived'),sendForSignature}}/></div>:<DocumentLibrary rows={rows} loading={loading} empty={tab==='workspace'?'No documents match this view.':'No archived documents.'} onSelect={setSelected}/>) }
-    {tab==='client'&&<Panel className="!p-0 overflow-x-auto">{clientRows.length===0?<div className="p-6"><EmptyState label="No client documents match this view."/></div>:<table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-white/10 text-[10px] uppercase tracking-[.12em] text-slate-500"><th className="px-5 py-3">Document</th><th className="px-5 py-3">Client</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Visibility</th><th className="px-5 py-3">Added</th></tr></thead><tbody>{clientRows.map(d=><tr key={d.id} className="border-b border-white/5 hover:bg-white/[.02]"><td className="px-5 py-4"><a className="font-medium text-gold" href={`/api/portal/documents/${d.id}/file`} target="_blank" rel="noreferrer">{d.file_name||'Open document'}</a></td><td className="px-5 py-4"><Link className="text-slate-200 hover:text-gold" to={p(`clients/${d.client_user_id}`)}>{d.client_name}</Link></td><td className="px-5 py-4 text-slate-400">{d.category||'other'}</td><td className="px-5 py-4"><Tag>{d.visibility}</Tag></td><td className="px-5 py-4 text-slate-400">{new Date(d.created_at).toLocaleDateString()}</td></tr>)}</tbody></table>}</Panel>}
-    {tab==='reports'&&<><Panel className="mb-4"><div className="grid gap-3 xl:grid-cols-[1fr_240px_150px_150px_auto] xl:items-end"><div><p className="text-sm font-semibold text-white">Generate report PDF</p><p className="mt-1 text-xs text-slate-500">Create a branded report and keep it in HQ.</p></div><select className={inputCls} value={reportKey} onChange={e=>setReportKey(e.target.value)}>{catalog.map(r=><option key={r.key} value={r.key}>{r.label}</option>)}</select><input className={inputCls} type="date" value={from} onChange={e=>setFrom(e.target.value)}/><input className={inputCls} type="date" value={to} onChange={e=>setTo(e.target.value)}/><button className={btnPrimary} disabled={!reportKey||generating} onClick={generate}>{generating?'Generating…':'Generate PDF'}</button></div></Panel><Panel className="!p-0 overflow-x-auto">{reportRows.length===0?<div className="p-6"><EmptyState label="No report PDFs generated yet."/></div>:<table className="w-full min-w-[720px] text-left text-sm"><tbody>{reportRows.map(r=><tr key={r.id} className="border-b border-white/5 hover:bg-white/[.02]"><td className="px-5 py-4"><a className="font-medium text-gold" href={`/api/admin/report-exports/${r.id}/file`} target="_blank" rel="noreferrer">{r.file_name}</a><p className="mt-1 text-xs text-slate-500">{r.report_label}</p></td><td className="px-5 py-4 text-slate-400">{r.created_by_name||r.created_by_email||'Pinnacle'}</td><td className="px-5 py-4 text-slate-400">{size(r.size_bytes)}</td><td className="px-5 py-4 text-slate-400">{new Date(r.created_at).toLocaleString()}</td></tr>)}</tbody></table>}</Panel></>}
+  const sharedRows=useMemo(()=>workspace.filter(d=>(d.share_count||0)>0).filter(filter),[workspace,q])
+  const rows=tab==='archived'?archivedRows:tab==='shared'?sharedRows:activeRows
+  const sections: Array<{key:typeof tab;label:string;icon:LucideIcon;count?:number|null}>=[
+    {key:'workspace',label:'My Documents',icon:Folder,count:activeRows.length},
+    {key:'shared',label:'Shared',icon:Mail,count:sharedRows.length},
+    {key:'client',label:'Client Files',icon:FileText,count:clientDocs.length},
+    {key:'reports',label:'Reports',icon:History,count:reports.length},
+    {key:'archived',label:'Archived',icon:Archive,count:archivedRows.length},
+  ]
+
+  return <div className="flex h-full min-h-0 flex-col lg:flex-row">
+    <aside className="flex shrink-0 flex-col border-b border-white/10 bg-navy-900/60 backdrop-blur lg:h-full lg:w-60 lg:border-b-0 lg:border-r">
+      <div className="border-b border-white/10 px-4 py-3">
+        <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/80">Documents</p>
+        <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-1">
+          <button type="button" className={`${btnPrimary} w-full justify-center`} onClick={()=>{setTab('workspace');setPicker(true)}}><FilePlus2 size={14}/> New</button>
+          <button type="button" className={`${btnSecondary} w-full justify-center`} onClick={()=>{setTab('workspace');setComposer(composer==='upload'?'none':'upload')}}><Upload size={14}/> Upload</button>
+        </div>
+      </div>
+      <nav aria-label="Document Center sections" className="min-h-0 flex-1 overflow-y-auto p-2">
+        {sections.map(section=>{
+          const active=tab===section.key
+          const Icon=section.icon
+          return <button
+            key={section.key}
+            type="button"
+            aria-current={active?'page':undefined}
+            onClick={()=>{setTab(section.key);setSelected('')}}
+            className={`group mb-0.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition ${active?'bg-white/[.08] text-white ring-1 ring-white/10':'text-slate-400 hover:bg-white/[.04] hover:text-white'}`}
+          >
+            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/[.025] ${active?'text-gold':'text-slate-500 group-hover:text-gold'}`}><Icon size={13} strokeWidth={1.8}/></span>
+            <span className="min-w-0 flex-1 text-left truncate">{section.label}</span>
+            {section.count!=null && section.count>0 && <span className="text-[10px] font-semibold text-slate-500">{section.count}</span>}
+          </button>
+        })}
+        <button
+          type="button"
+          onClick={()=>setPicker(true)}
+          className="group mt-3 flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-slate-400 transition hover:bg-white/[.04] hover:text-white"
+        >
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/[.025] text-slate-500 group-hover:text-gold"><FileText size={13} strokeWidth={1.8}/></span>
+          <span>Templates</span>
+        </button>
+        <Link
+          to={p('envelopes')}
+          className="group mt-0.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-slate-400 transition hover:bg-white/[.04] hover:text-white"
+        >
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/[.025] text-slate-500 group-hover:text-gold"><Send size={13} strokeWidth={1.8}/></span>
+          <span>Envelopes</span>
+          <ChevronRight size={12} className="ml-auto text-slate-600"/>
+        </Link>
+      </nav>
+    </aside>
+    <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-3 py-2.5 sm:px-4">
+        <label className="relative flex-1 max-w-xl">
+          <span className="sr-only">Search documents</span>
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"/>
+          <input className={`${inputCls} pl-9`} type="search" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search documents…"/>
+        </label>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4">
+        {tab==='workspace'&&composer!=='none'&&<Composer mode={composer} title={newTitle} folder={newFolder} text={newText} file={uploadFile} busy={busy} setTitle={setNewTitle} setFolder={setNewFolder} setText={setNewText} setFile={setUploadFile} close={()=>setComposer('none')} submit={composer==='text'?createText:upload}/>}
+        {(tab==='workspace'||tab==='archived'||tab==='shared')&&(selected&&detail?<div className="grid min-h-[680px] gap-4 2xl:grid-cols-[260px_minmax(0,1fr)_330px]"><LibraryRail rows={rows} selected={selected} loading={loading} onSelect={setSelected}/><DocumentCanvas document={detail.document} text={editText} onTextChange={setEditText} fullPageHref={p(`document-center/${detail.document.id}`)}/><Inspector detail={detail} archived={tab==='archived'} values={{editTitle,editFolder,editDescription,shareEmail,shareName,shareMessage,versionFile}} setters={{setEditTitle,setEditFolder,setEditDescription,setShareEmail,setShareName,setShareMessage,setVersionFile}} actions={{save,share,replaceVersion,archive:()=>archiveDoc(tab==='archived'),sendForSignature}}/></div>:<DocumentLibrary rows={rows} loading={loading} empty={tab==='archived'?'No archived documents.':tab==='shared'?'No documents have been shared yet.':'No documents match this view.'} onSelect={setSelected}/>) }
+        {tab==='client'&&<Panel className="!p-0 overflow-x-auto">{clientRows.length===0?<div className="p-6"><EmptyState label="No client documents match this view."/></div>:<table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-white/10 text-[10px] uppercase tracking-[.12em] text-slate-500"><th className="px-5 py-3">Document</th><th className="px-5 py-3">Client</th><th className="px-5 py-3">Category</th><th className="px-5 py-3">Visibility</th><th className="px-5 py-3">Added</th></tr></thead><tbody>{clientRows.map(d=><tr key={d.id} className="border-b border-white/5 hover:bg-white/[.02]"><td className="px-5 py-4"><a className="font-medium text-gold" href={`/api/portal/documents/${d.id}/file`} target="_blank" rel="noreferrer">{d.file_name||'Open document'}</a></td><td className="px-5 py-4"><Link className="text-slate-200 hover:text-gold" to={p(`clients/${d.client_user_id}`)}>{d.client_name}</Link></td><td className="px-5 py-4 text-slate-400">{d.category||'other'}</td><td className="px-5 py-4"><Tag>{d.visibility}</Tag></td><td className="px-5 py-4 text-slate-400">{new Date(d.created_at).toLocaleDateString()}</td></tr>)}</tbody></table>}</Panel>}
+        {tab==='reports'&&<><Panel className="mb-4"><div className="grid gap-3 xl:grid-cols-[1fr_240px_150px_150px_auto] xl:items-end"><div><p className="text-sm font-semibold text-white">Generate report PDF</p><p className="mt-1 text-xs text-slate-500">Create a branded report and keep it in HQ.</p></div><select className={inputCls} value={reportKey} onChange={e=>setReportKey(e.target.value)}>{catalog.map(r=><option key={r.key} value={r.key}>{r.label}</option>)}</select><input className={inputCls} type="date" value={from} onChange={e=>setFrom(e.target.value)}/><input className={inputCls} type="date" value={to} onChange={e=>setTo(e.target.value)}/><button className={btnPrimary} disabled={!reportKey||generating} onClick={generate}>{generating?'Generating…':'Generate PDF'}</button></div></Panel><Panel className="!p-0 overflow-x-auto">{reportRows.length===0?<div className="p-6"><EmptyState label="No report PDFs generated yet."/></div>:<table className="w-full min-w-[720px] text-left text-sm"><tbody>{reportRows.map(r=><tr key={r.id} className="border-b border-white/5 hover:bg-white/[.02]"><td className="px-5 py-4"><a className="font-medium text-gold" href={`/api/admin/report-exports/${r.id}/file`} target="_blank" rel="noreferrer">{r.file_name}</a><p className="mt-1 text-xs text-slate-500">{r.report_label}</p></td><td className="px-5 py-4 text-slate-400">{r.created_by_name||r.created_by_email||'Pinnacle'}</td><td className="px-5 py-4 text-slate-400">{size(r.size_bytes)}</td><td className="px-5 py-4 text-slate-400">{new Date(r.created_at).toLocaleString()}</td></tr>)}</tbody></table>}</Panel></>}
+      </div>
+    </div>
     <Dialog open={picker} onOpenChange={setPicker}><DialogContent title="Create a Document" description="Start writing immediately - add a title, client, or matter whenever you're ready." size="md"><div className="space-y-2">{QUICK_CREATES.map(o=><button key={o.key} type="button" disabled={busy} onClick={()=>void quickCreate(o)} className="flex w-full items-start gap-3 rounded-lg border border-white/10 bg-white/[.02] px-4 py-3 text-left transition hover:border-gold/40 hover:bg-gold/[.05] focus-visible:ring-2 focus-visible:ring-gold/40 disabled:opacity-60"><span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[.03] text-gold"><o.icon size={16}/></span><span className="min-w-0"><span className="block text-sm font-semibold text-white">{o.label}</span><span className="mt-0.5 block text-xs leading-5 text-slate-400">{o.description}</span></span></button>)}</div><details className="group mt-3 rounded-lg border border-white/10 bg-white/[.015]"><summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:text-white [&::-webkit-details-marker]:hidden"><span>More Templates</span><ChevronDown size={15} className="transition group-open:rotate-180"/></summary><div className="space-y-1 border-t border-white/10 p-2">{MORE_TEMPLATES.map(o=><button key={o.key} type="button" disabled={busy} onClick={()=>void quickCreate(o)} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-white/[.04] focus-visible:ring-2 focus-visible:ring-gold/40 disabled:opacity-60"><span className="min-w-0"><span className="block text-sm font-medium text-white">{o.label}</span><span className="mt-0.5 block text-xs leading-5 text-slate-400">{o.description}</span></span></button>)}</div></details></DialogContent></Dialog>
   </div>
 }
