@@ -138,6 +138,8 @@ export default function ProviderNetworkAdmin() {
       lng: person.lng,
       href: person.assignment_id ? `field-work/${person.assignment_id}` : `network/${person.user_id}/profile`,
       stale: freshness !== 'live',
+      lastSeenAt: person.updated_at,
+      sharingActive: person.sharing_active == null ? null : Boolean(person.sharing_active),
     }]
   }), [mapPeople, user?.id, viewerUserId, visibleIds])
   const noLocationCount = useMemo(

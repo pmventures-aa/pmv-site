@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LocateFixed, MapPin, Navigation, Radio } from 'lucide-react'
 import { useAppPath } from '../../lib/basePath'
+import { FieldLocationStaleness } from './FieldLocationIndicator'
 
 export type FieldMapPin = {
   id: string
@@ -13,6 +14,12 @@ export type FieldMapPin = {
   lng: number
   href?: string
   stale?: boolean
+  // ISO timestamp of the last received location for this pin (people
+  // pins only; site pins can leave this null). Powers the Live/Stale/
+  // Last-known label in the selected pin card so we never render a
+  // stale pin as though it were currently live.
+  lastSeenAt?: string | null
+  sharingActive?: boolean | null
 }
 
 const DEFAULT_CENTER = { lat: 26.3683, lng: -80.1289 }
@@ -178,6 +185,9 @@ export function FieldLiveMap({
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{selectedPin.label}</p>
             <p className="mt-0.5 text-[11px] text-slate-500">{selectedPin.sublabel || selectedPin.status || (selectedPin.kind === 'site' ? 'Job site' : 'Team location')}</p>
+            {selectedPin.kind !== 'site' && (
+              <FieldLocationStaleness lastSeenAt={selectedPin.lastSeenAt} sharingActive={selectedPin.sharingActive} className="mt-1" />
+            )}
           </div>
           {selectedPin.href && <Link to={p(selectedPin.href)} className="shrink-0 text-xs font-bold text-gold hover:underline">Open</Link>}
         </div>

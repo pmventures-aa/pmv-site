@@ -21,6 +21,8 @@ import { Avatar } from '../../components/kit/Avatar'
 import { toast } from '../../components/kit/toast'
 import { hqWorkspaceCopy } from '../../lib/workspace'
 import { formatVendorFee } from '../../../shared/vendorFeeAdjustment'
+import { useFieldLocationSession, type FieldLocationEndedReason } from '../../lib/useFieldLocationSession'
+import { FieldLocationIndicator } from '../../components/admin/FieldLocationIndicator'
 
 interface Assignment {
   id: string
@@ -347,28 +349,24 @@ export default function FieldWorkDetail() {
     }
   }
 
-  // Live map ping: while traveling or on site, report GPS so HQ can see the agent.
-  useEffect(() => {
-    if (!assignment) return
-    if (!['traveling', 'on_site', 'documented', 'signed'].includes(assignment.status)) return
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return
-    let lastSent = 0
-    const id = navigator.geolocation.watchPosition(
-      (pos) => {
-        const now = Date.now()
-        if (now - lastSent < 20_000) return
-        lastSent = now
-        void api.post(`/admin/field-assignments/${assignment.id}/ping`, {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy_m: pos.coords.accuracy,
-        }).catch(() => {})
-      },
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 8000 },
-    )
-    return () => navigator.geolocation.clearWatch(id)
-  }, [assignment?.id, assignment?.status])
+  // Field-location session: while the assignment is in an active
+  // field status, useFieldLocationSession opens a proper session on
+  // the server (migration 0080), watches with navigator.geolocation,
+  // throttles points client-side (mirrors the server's throttle), and
+  // ends the session cleanly on unmount / status change. The session's
+  // /point handler also mirrors the newest coordinate into
+  // field_agent_locations, so the dispatch live-map still gets fed
+  // without the old /field-assignments/:id/ping loop.
+  const trackingAssignmentId = assignment && ['traveling', 'on_site', 'documented'].includes(assignment.status) ? assignment.id : null
+  const endReasonOnUnmount: FieldLocationEndedReason =
+    assignment?.status === 'completed' ? 'assignment_completed'
+      : assignment?.status === 'cancelled' ? 'assignment_cancelled'
+      : 'operator_stopped'
+  const locationSession = useFieldLocationSession({
+    assignmentId: trackingAssignmentId,
+    source: 'browser',
+    endReasonOnUnmount,
+  })
 
   // Auto-arrival: while we're in the 'traveling' state and we have a target
   // pin, poll geolocation lightly and flip to on_site when the vendor gets
@@ -508,7 +506,19 @@ export default function FieldWorkDetail() {
         kicker={isRon ? 'Remote Online Notarization' : 'Field assignment'}
         title={assignment.title || assignment.service_key.replace(/_/g, ' ')}
         subtitle={siteLine(assignment)}
-        action={<div className="flex items-center gap-2">{assignment.vendor_user_id !== user?.id && <button type="button" disabled={assigningSelf} onClick={() => void assignToMe()} className={`${btnOutline} disabled:opacity-50`}>{assigningSelf ? <Loader2 size={14} className="animate-spin" /> : null} Assign to me</button>}<Tag tone={tone.tone}>{tone.label}</Tag></div>}
+        action={<div className="flex flex-wrap items-center gap-2">
+          {locationSession.state !== 'idle' && (
+            <FieldLocationIndicator
+              state={locationSession.state}
+              lastSentAt={locationSession.lastSentAt}
+              assignmentLabel={assignment.title || (isRon ? 'Remote Online Notarization' : 'Field visit')}
+              pointsSent={locationSession.pointsSent}
+              onStop={() => void locationSession.stop('operator_stopped')}
+            />
+          )}
+          {assignment.vendor_user_id !== user?.id && <button type="button" disabled={assigningSelf} onClick={() => void assignToMe()} className={`${btnOutline} disabled:opacity-50`}>{assigningSelf ? <Loader2 size={14} className="animate-spin" /> : null} Assign to me</button>}
+          <Tag tone={tone.tone}>{tone.label}</Tag>
+        </div>}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
