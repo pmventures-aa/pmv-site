@@ -4,6 +4,7 @@ import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { activityInsert, logActivity } from '../activity'
 import { actorIp, actorUserAgent, actorGeo, logAudit } from '../auditLog'
+import { recordSecurityEvent } from '../security'
 import { sendEmail } from '../email'
 import { renderPinnacleEmailLayout } from '../emailTemplates/layout'
 import { renderFieldAssignmentAuditEmail } from '../emailTemplates/fieldAssignmentAudit'
@@ -361,6 +362,19 @@ fieldWorkRoutes.post('/field-assignments/:id/arrive', requireStaff, async (c) =>
     entityType: 'field_assignment',
     entityId: row.id,
     after: { lat: num(body.lat), lng: num(body.lng), source },
+  })
+  // Field-location arrival is also a security-lifecycle event per the
+  // field-location spec's audit list. Note this is only fired on the
+  // provider's own arrival confirmation; source='auto_geofence' still
+  // requires an explicit tap on the "Mark Arrived" suggestion (see
+  // FieldWorkVendor - the client no longer auto-flips status).
+  await recordSecurityEvent(c.env, {
+    actor: user,
+    event: 'FIELD_LOCATION_ARRIVAL_CONFIRMED',
+    resourceType: 'field_assignment',
+    resourceId: row.id,
+    metadata: { source, lat: num(body.lat), lng: num(body.lng) },
+    request: c.req.raw,
   })
   return c.json({ ok: true })
 })
