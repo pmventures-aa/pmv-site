@@ -1,3 +1,4 @@
+import { lazy } from 'react'
 import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { AdminLayout } from '../../components/admin/AdminLayout'
@@ -19,7 +20,7 @@ import ClientDetail from './ClientDetail'
 import ClientDetailModern from './ClientDetailModern'
 import UsersAdmin from './UsersAdmin'
 import AssignmentsAdmin from './AssignmentsAdmin'
-import SettingsAdmin from './SettingsAdmin'
+const SettingsAdmin = lazy(() => import('./SettingsAdmin'))
 import CRMRecordsAdmin from './CRMRecordsAdmin'
 import LeadCreate from './LeadCreate'
 import LeadDetail from './LeadDetail'
@@ -30,30 +31,36 @@ import PipelinesAdmin from './PipelinesAdmin'
 import AuditLogAdmin from './AuditLogAdmin'
 import ProviderNetworkAdmin from './ProviderNetworkAdmin'
 import ProviderProfile from './ProviderProfile'
-import ReportingCenter from './ReportingCenter'
-import ManagementCenter from './ManagementCenter'
+const ReportingCenter = lazy(() => import('./ReportingCenter'))
+const ManagementCenter = lazy(() => import('./ManagementCenter'))
 import ClientBannersAdmin from './ClientBannersAdmin'
-import AutomationCenter from './AutomationCenter'
+const AutomationCenter = lazy(() => import('./AutomationCenter'))
 import SecurityCenter from './SecurityCenter'
 import InvoicesAdmin from './InvoicesAdmin'
 import ServiceAssignmentsAdmin from './ServiceAssignmentsAdmin'
 import InvitationsAdmin from './InvitationsAdmin'
 import RolesPermissionsAdmin from './RolesPermissionsAdmin'
-import DocumentOperationsDashboard from './DocumentOperationsDashboard'
-import DocumentFullPage from './DocumentFullPage'
-import CommunityDocuments from './CommunityDocuments'
-import EnvelopeWorkspaceEnterprise from './EnvelopeWorkspaceEnterprise'
-import ESignPlatformAdmin from './ESignPlatformAdmin'
+// Heavy, lower-frequency workspaces are route-level lazy chunks so the
+// initial HQ bundle stays lean. Everything above (dashboard, clients,
+// messaging, revenue) stays static because operators hit those on
+// nearly every session. The Suspense boundary lives in AdminLayout
+// around the Outlet.
+const DocumentOperationsDashboard = lazy(() => import('./DocumentOperationsDashboard'))
+const DocumentFullPage = lazy(() => import('./DocumentFullPage'))
+const CommunityDocuments = lazy(() => import('./CommunityDocuments'))
+const EnvelopeWorkspaceEnterprise = lazy(() => import('./EnvelopeWorkspaceEnterprise'))
+const ESignPlatformAdmin = lazy(() => import('./ESignPlatformAdmin'))
 import FieldWorkAdmin from './FieldWorkAdmin'
 import FieldWorkDetail, { FieldWorkList } from './FieldWorkVendor'
 import CasesAdmin from './CasesAdmin'
 import AdminCalendar from './AdminCalendar'
-import PublicFunnelAdmin from './PublicFunnelAdmin'
+const PublicFunnelAdmin = lazy(() => import('./PublicFunnelAdmin'))
 import QuotesAdmin from './QuotesAdmin'
-import StrOperations, { TurnoverDetail } from './StrOperations'
-import StrPropertyAdmin from './StrPropertyAdmin'
-import StrPackages from './StrPackages'
-import StrProviderTurnovers from './StrProviderTurnovers'
+const StrOperations = lazy(() => import('./StrOperations'))
+const TurnoverDetail = lazy(() => import('./StrOperations').then((m) => ({ default: m.TurnoverDetail })))
+const StrPropertyAdmin = lazy(() => import('./StrPropertyAdmin'))
+const StrPackages = lazy(() => import('./StrPackages'))
+const StrProviderTurnovers = lazy(() => import('./StrProviderTurnovers'))
 
 const STAFF_VISIBLE = ['dashboard','pipelines','clients','inquiries','quotes','messages','cases','calendar','activity','invoices','field-work','service-assignments','security-center','str-operations']
 
