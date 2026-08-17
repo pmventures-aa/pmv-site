@@ -8,6 +8,7 @@ import { toast } from '../../components/kit/toast'
 import { InlineLoading } from '../../components/LoadingScreen'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
 import { campaignAudienceHref, clientEmailHref, clientInboxHref } from '../../lib/engagements'
+import { ClientActionsMenu } from '../../components/admin/ClientActionsMenu'
 import ClientRelationships from './ClientRelationships'
 import { humanizeLabel } from '../../../shared/displayCase'
 
@@ -248,11 +249,10 @@ export default function ClientDetailModern() {
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-400"><a href={`mailto:${account.email}`} className="hover:text-gold">{account.email}</a>{account.phone && <a href={`tel:${account.phone}`} className="hover:text-gold">{account.phone}</a>}{profile?.state && <span>{profile.state}</span>}</div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link to={clientEmailHref(p, { id: account.id, email: account.email, name: account.full_name })} className={btnPrimary}>Email client</Link>
           <Link to={clientInboxHref(p, account.id)} className={btnOutline}>Messages</Link>
-          <Link to={p(`clients/${account.public_ref}/activity`)} className={btnOutline}>Add note</Link>
-          <Link to={p(`clients/${account.public_ref}/manage`)} className={btnOutline}>Manage records</Link>
+          <ClientActionsMenu clientId={account.id} clientRef={account.public_ref} buildBaseHref={p} />
         </div>
       </div>
       <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-500">
