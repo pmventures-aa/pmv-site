@@ -46,6 +46,7 @@ import { vendorApplicationUploadRoutes } from '../_lib/routes/vendorApplicationU
 import { serviceOfferingPublicRoutes, serviceOfferingAdminRoutes } from '../_lib/routes/serviceOfferings'
 import { relationshipAutomationRoutes, relationshipAutomationAdminRoutes } from '../_lib/routes/relationshipAutomation'
 import { fieldWorkRoutes } from '../_lib/routes/fieldWork'
+import { fieldLocationRoutes } from '../_lib/routes/fieldLocation'
 import { casesRoutes } from '../_lib/routes/cases'
 import { communicationBrandingAdminRoutes, communicationBrandingPublicRoutes } from '../_lib/routes/communicationBranding'
 import { presenceRoutes } from '../_lib/routes/presence'
@@ -186,6 +187,7 @@ app.route('/admin', commsRoutes)
 app.route('/admin', crmWriteRoutes)
 app.route('/admin', crmRoutes)
 app.route('/admin', fieldWorkRoutes)
+app.route('/admin', fieldLocationRoutes)
 app.route('/admin', workAssignmentRoutes)
 app.route('/admin', adminCalendarRoutes)
 // External calendar (Google, later Microsoft) OAuth + sync surface. Kept
