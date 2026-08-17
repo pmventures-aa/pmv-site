@@ -231,7 +231,7 @@ export default function QuotesAdmin() {
   return <div>
     <PageIntro
       kicker="Revenue"
-        title="Quotes"
+      title="Quotes"
       subtitle="Write a quote, send a branded link, and let the client accept or decline with notes. Accepted quotes convert to an invoice."
       action={<div className="flex flex-wrap items-center gap-2">
         <button className={btnOutline} onClick={() => setScreen('templates')}>Templates</button>
@@ -263,7 +263,7 @@ export default function QuotesAdmin() {
 
         {quotes === null ? <p className="text-sm text-slate-400">Loading quotes…</p>
           : visible.length === 0 ? <EmptyState label={quotes.length === 0 ? 'No quotes yet. Create one, send the link, and it will show up here.' : 'Nothing matches this view.'} />
-          : <div className="overflow-hidden rounded-xl border border-white/10">
+          : <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="bg-white/[0.025] text-[10px] uppercase tracking-wide text-slate-500">
                   <tr><th className="px-4 py-3 font-medium">Quote</th><th className="px-4 py-3 font-medium">Recipient</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Total</th><th className="px-4 py-3 font-medium">Next</th></tr>
@@ -272,7 +272,7 @@ export default function QuotesAdmin() {
                   {visible.map((quote) => {
                     const action = quoteNextAction(quote.status, quote.invoice_id)
                     return (
-                      <tr key={quote.id} className="cursor-pointer border-t border-white/5 transition hover:bg-white/[0.025]" onClick={() => openDetail(quote.id)}>
+                      <tr key={quote.id} tabIndex={0} role="button" aria-label={`Open quote ${quote.quote_number} for ${quote.recipient_name}`} className="cursor-pointer border-t border-white/5 outline-none transition hover:bg-white/[0.025] focus-visible:bg-white/[0.04] focus-visible:ring-1 focus-visible:ring-gold/40" onClick={() => openDetail(quote.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(quote.id) } }}>
                         <td className="px-4 py-3"><b className="block text-white">{quote.quote_number}</b><span className="text-xs text-slate-500">{quote.title}</span></td>
                         <td className="px-4 py-3"><b className="block text-slate-200">{quote.recipient_name}</b><span className="text-xs text-slate-500">{quote.recipient_company || quote.recipient_email}</span></td>
                         <td className="px-4 py-3"><Tag tone={quoteStatusTone(quote.status)}>{quoteStatusLabel(quote.status)}</Tag><p className="mt-1 text-[11px] text-slate-500">{quote.invoice_number ? `Invoice ${quote.invoice_number}` : quoteIdleLabel(quote)}</p></td>

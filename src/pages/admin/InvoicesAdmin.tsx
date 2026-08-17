@@ -302,7 +302,7 @@ export default function InvoicesAdmin() {
         <div className="grid gap-3 md:hidden">
           {visible.map((invoice) => {
             const action = invoiceNextAction(invoice)
-            return <article key={invoice.id} className="rounded-xl border border-white/10 bg-white/[.02] p-4" onClick={() => openDetail(invoice.id)}>
+            return <article key={invoice.id} tabIndex={0} role="button" aria-label={`Open invoice ${invoice.invoice_number || invoice.id.slice(0, 8)}`} className="cursor-pointer rounded-xl border border-white/10 bg-white/[.02] p-4 outline-none transition focus-visible:border-gold/40 focus-visible:ring-1 focus-visible:ring-gold/40" onClick={() => openDetail(invoice.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(invoice.id) } }}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0"><b className="block truncate text-white">{invoice.invoice_number || invoice.id.slice(0, 8)}</b><p className="mt-1 truncate text-xs text-slate-400">{invoice.business_name || invoice.client_name || invoice.client_email}</p></div>
                 <Tag tone={invoiceStatusTone(invoice)}>{invoiceStatusLabel(invoice)}</Tag>
@@ -328,7 +328,7 @@ export default function InvoicesAdmin() {
               {visible.map((invoice) => {
                 const action = invoiceNextAction(invoice)
                 return (
-                  <tr key={invoice.id} className="cursor-pointer border-t border-white/5 transition hover:bg-white/[0.025]" onClick={() => openDetail(invoice.id)}>
+                  <tr key={invoice.id} tabIndex={0} role="button" aria-label={`Open invoice ${invoice.invoice_number || invoice.id.slice(0, 8)}`} className="cursor-pointer border-t border-white/5 outline-none transition hover:bg-white/[0.025] focus-visible:bg-white/[0.04] focus-visible:ring-1 focus-visible:ring-gold/40" onClick={() => openDetail(invoice.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(invoice.id) } }}>
                     <td className="px-4 py-3"><b className="block text-white">{invoice.invoice_number || invoice.id.slice(0, 8)}</b><span className="text-xs text-slate-500">{invoice.title || 'Invoice'}{invoice.quote_number ? ` · from ${invoice.quote_number}` : ''} · {invoice.line_item_count} line{Number(invoice.line_item_count) === 1 ? '' : 's'}</span></td>
                     <td className="px-4 py-3"><b className="block text-slate-200">{invoice.business_name || invoice.client_name || invoice.client_email}</b><span className="text-xs text-slate-500">{invoice.client_email}</span></td>
                     <td className="px-4 py-3"><Tag tone={invoiceStatusTone(invoice)}>{invoiceStatusLabel(invoice)}</Tag><p className="mt-1 text-[11px] text-slate-500">{invoiceDueLabel(invoice)}</p></td>
