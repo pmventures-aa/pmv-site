@@ -41,8 +41,9 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
   const location = useLocation()
   const canOpenSettings = nav.some((item) => item.key === 'settings')
   const { count: emailUnread } = useEmailUnreadCount()
-  const hideHqNav = /(^|\/)(messages|communications)(\/|$)/.test(location.pathname)
+  const hideHqNav = /(^|\/)(messages|communications|document-center)(\/|$)/.test(location.pathname)
   const mailWorkspace = /(^|\/)messages(\/|$)/.test(location.pathname)
+  const docWorkspace = /(^|\/)document-center(\/|$)/.test(location.pathname)
 
   function toggleSidebar() {
     setSidebarOpen((open) => {
@@ -169,7 +170,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             ) : (
               <button onClick={toggleSidebar} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white" aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>{sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}</button>
             )}
-            {hideHqNav ? <p className="truncate text-sm font-semibold text-white">Communications</p> : <GlobalSearch className="w-full max-w-md" />}
+            {hideHqNav ? <p className="truncate text-sm font-semibold text-white">{docWorkspace ? 'Document Center' : 'Communications'}</p> : <GlobalSearch className="w-full max-w-md" />}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <SlaAlertChip />
@@ -181,7 +182,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
           </div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={mailWorkspace ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-0' : hideHqNav ? 'flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4' : 'flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4'}><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={(mailWorkspace || docWorkspace) ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-0' : hideHqNav ? 'flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4' : 'flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4'}><AdminPageBoundary><Outlet /></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
     </div>
