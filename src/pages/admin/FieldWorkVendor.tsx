@@ -23,6 +23,7 @@ import { hqWorkspaceCopy } from '../../lib/workspace'
 import { formatVendorFee } from '../../../shared/vendorFeeAdjustment'
 import { useFieldLocationSession, type FieldLocationEndedReason } from '../../lib/useFieldLocationSession'
 import { FieldLocationIndicator } from '../../components/admin/FieldLocationIndicator'
+import { FieldLocationHistory } from '../../components/admin/FieldLocationHistory'
 
 interface Assignment {
   id: string
@@ -749,6 +750,13 @@ export default function FieldWorkDetail() {
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Job notes</p>
               <p className="mt-1 whitespace-pre-wrap text-sm text-slate-300">{assignment.notes}</p>
             </Panel>
+          )}
+          {/* Staff-facing location trail. The endpoint itself is gated by
+              field.location.view_history, but only rendering for
+              staff/admin avoids a visible "restricted" empty state on
+              every vendor's own assignment. */}
+          {(user?.role === 'staff' || user?.role === 'admin') && (
+            <FieldLocationHistory assignmentId={assignment.id} />
           )}
         </div>
       </div>
