@@ -95,6 +95,42 @@ describe('field-location server helpers', () => {
   })
 })
 
+describe('field-location assignment history route', () => {
+  const source = readFileSyncSafe(new URL('../functions/_lib/routes/fieldLocation.ts', import.meta.url))
+
+  it('is gated by field.location.view_history granular permission', () => {
+    expect(source).toContain("requirePermission('field.location.view_history')")
+    // Import from the granular authorize layer, not the coarse capabilities file.
+    expect(source).toContain("import { requirePermission } from '../authorize'")
+  })
+
+  it('fires FIELD_LOCATION_HISTORY_VIEWED and records session + point counts as metadata', () => {
+    expect(source).toContain("event: 'FIELD_LOCATION_HISTORY_VIEWED'")
+    expect(source).toMatch(/metadata:\s*\{[\s\S]*?session_count[\s\S]*?point_count/)
+  })
+
+  it('clamps limit to [1, 5000] with a default of 500 so a caller cannot ask for the whole trail', () => {
+    expect(source).toContain('Math.max(1, Math.min(5000, Math.trunc(requestedLimit)))')
+    expect(source).toContain('500')
+  })
+
+  it('reports whether the point list was truncated so the client can page later', () => {
+    expect(source).toContain("truncated: (points.results?.length ?? 0) >= limit")
+  })
+
+  it('orders sessions and points chronologically for arrival/on-site/completion reconstruction', () => {
+    expect(source).toMatch(/field_location_sessions[\s\S]*?ORDER BY started_at ASC/)
+    expect(source).toMatch(/field_location_points[\s\S]*?ORDER BY captured_at ASC/)
+  })
+})
+
+// Local helper - importing fs at the top of file is fine but the
+// existing describe blocks already do inline read, keep parallel.
+function readFileSyncSafe(url: URL): string {
+  const fs = require('node:fs') as typeof import('node:fs')
+  return fs.readFileSync(url, 'utf8')
+}
+
 describe('field-location route wiring', () => {
   it('is registered under /admin so it inherits the requireUser middleware chain', async () => {
     const source = await import('node:fs').then((fs) => fs.readFileSync(new URL('../functions/api/[[route]].ts', import.meta.url), 'utf8'))
