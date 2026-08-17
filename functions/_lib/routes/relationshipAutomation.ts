@@ -4,6 +4,7 @@ import { requireOwner, requireStaff, requireUser } from '../mid'
 import { runDueClientNurture } from '../relationshipAutomation'
 import { runClientNotificationOutbox } from '../clientNotificationOutbox'
 import { runDueScheduledReports } from '../scheduledReports'
+import { runFieldLocationRetention } from '../fieldLocationRetention'
 import { uuid } from '../crypto'
 import { runDueScopeFollowups } from '../scopeFunnel'
 import { runDocumentAutomation } from './documentPlatformV2'
@@ -21,6 +22,7 @@ const AUTOMATIONS = {
   scope_followup: { label: 'Public request follow-up', cadence: 'Daily at 10:40 AM ET', intervalMinutes: 1440, description: 'Sends the three-step, opt-in follow-up sequence for unbooked public scope requests and stops after booking or account creation.' },
   document_envelopes: { label: 'Document envelope lifecycle', cadence: 'Every 10 minutes', intervalMinutes: 10, description: 'Sends e-sign reminders, expires overdue envelopes, and applies retention disposition while respecting legal holds.' },
   str_operations: { label: 'STR turnover operations', cadence: 'Every 10 minutes', intervalMinutes: 10, description: 'Monitors STR turnover dispatch: flags unassigned/at-risk turnovers and low supplies.' },
+  field_location_retention: { label: 'Field-location retention', cadence: 'Daily at 03:15 AM ET', intervalMinutes: 1440, description: 'Prunes raw field_location_points beyond the configured retention window (default 90 days). Session summary rows carrying arrival/completion milestones are preserved.' },
 } as const
 
 type AutomationKey = keyof typeof AUTOMATIONS
@@ -218,7 +220,9 @@ async function executeAutomation(c: any, key: AutomationKey, triggerType: 'sched
           ? await runDueScheduledReports(c.env, 20)
           : key === 'str_operations'
             ? await runStrOperations(c.env)
-            : await runDueScopeFollowups(c.env, 50)
+            : key === 'field_location_retention'
+              ? await runFieldLocationRetention(c.env)
+              : await runDueScopeFollowups(c.env, 50)
     const processed = Number(result.processed || 0)
     const succeeded = Number((result as any).sent || 0)
     const failed = Number((result as any).failed || 0)
@@ -307,6 +311,7 @@ relationshipAutomationAdminRoutes.get('/automation-center', requireOwner, async 
     } else if (key === 'client_nurture') nextRunAt = nextDailyEastern(10,20)
     else if(key==='scheduled_reports') nextRunAt=nextHourly()
     else if(key==='scope_followup') nextRunAt=nextDailyEastern(10,40)
+    else if(key==='field_location_retention') nextRunAt=nextDailyEastern(3,15)
     return {
       key,
       ...meta,
@@ -420,5 +425,9 @@ relationshipAutomationRoutes.post('/automation/reports/run', requireAutomationCr
 })
 relationshipAutomationRoutes.post('/automation/scope-followup/run', requireAutomationCron, async (c) => {
   const result=await executeAutomation(c,'scope_followup','scheduled')
+  return c.json({ok:true,...result})
+})
+relationshipAutomationRoutes.post('/automation/field-location-retention/run', requireAutomationCron, async (c) => {
+  const result=await executeAutomation(c,'field_location_retention','scheduled')
   return c.json({ok:true,...result})
 })
