@@ -4,6 +4,7 @@ import { requireStaff } from '../mid'
 import { uuid } from '../crypto'
 import { recordSecurityEvent } from '../security'
 import { actorIp, actorGeo } from '../auditLog'
+import { requirePermission } from '../authorize'
 
 // Field-location session lifecycle endpoints. Pairs with the schema
 // from migration 0080 (field_location_sessions + field_location_points).
@@ -298,6 +299,75 @@ fieldLocationRoutes.get('/field-location/session/active', requireStaff, async (c
   const stale = Date.now() - lastSeen > SESSION_TIMEOUT_MS
   return c.json({ session, stale, geo: actorGeo(c.req.raw), ip: actorIp(c.req.raw) })
 })
+
+// GET /admin/field-location/assignment/:id/history
+// Query: ?limit=<int> (default 500, max 5000)
+// Returns: {
+//   assignment_id, sessions: [{ id, started_at, ended_at, ended_reason,
+//     start_latitude, start_longitude, last_latitude, last_longitude,
+//     last_accuracy_m, last_seen_at, point_count }],
+//   points: [{ id, session_id, latitude, longitude, accuracy_meters,
+//     heading_degrees, speed_mps, source, captured_at }]
+// }
+//
+// Gated by field.location.view_history (see PR #171 - shims to
+// manage_team so any dispatch role keeps its history view without a
+// role edit, but the granular grant can be revoked independently for
+// roles that need finer control). Fires FIELD_LOCATION_HISTORY_VIEWED
+// - the read itself is an audit event because a location trail is
+// sensitive operational data.
+fieldLocationRoutes.get(
+  '/field-location/assignment/:id/history',
+  requireStaff,
+  requirePermission('field.location.view_history'),
+  async (c) => {
+    const user = c.get('user')
+    const assignmentId = c.req.param('id')
+    if (!assignmentId) return c.json({ error: 'assignment id is required' }, 400)
+    const requestedLimit = Number(c.req.query('limit') || '500')
+    const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(5000, Math.trunc(requestedLimit))) : 500
+
+    const assignment = await loadAssignmentBrief(c.env, assignmentId)
+    if (!assignment) return c.json({ error: 'assignment not found' }, 404)
+
+    const sessions = await c.env.DB.prepare(
+      `SELECT id, assignment_id, provider_id, status, started_at, ended_at, ended_reason,
+              start_latitude, start_longitude, last_latitude, last_longitude,
+              last_accuracy_m, last_seen_at, point_count
+         FROM field_location_sessions
+         WHERE assignment_id = ?
+         ORDER BY started_at ASC`,
+    ).bind(assignmentId).all()
+
+    const points = await c.env.DB.prepare(
+      `SELECT id, session_id, latitude, longitude, accuracy_meters, altitude_meters,
+              heading_degrees, speed_mps, source, captured_at
+         FROM field_location_points
+         WHERE assignment_id = ?
+         ORDER BY captured_at ASC
+         LIMIT ?`,
+    ).bind(assignmentId, limit).all()
+
+    await recordSecurityEvent(c.env, {
+      actor: user,
+      event: 'FIELD_LOCATION_HISTORY_VIEWED',
+      resourceType: 'field_assignment',
+      resourceId: assignmentId,
+      metadata: {
+        session_count: sessions.results?.length ?? 0,
+        point_count: points.results?.length ?? 0,
+      },
+      request: c.req.raw,
+    })
+
+    return c.json({
+      assignment_id: assignmentId,
+      sessions: sessions.results ?? [],
+      points: points.results ?? [],
+      truncated: (points.results?.length ?? 0) >= limit,
+    })
+  },
+)
 
 // Exported for tests.
 export const _internal = {
