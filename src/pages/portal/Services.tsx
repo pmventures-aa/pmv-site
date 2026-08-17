@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
+import { Card, PageHeader, StatusBadge, EmptyState, SkeletonRows } from '../../components/ui'
 import { useAppPath } from '../../lib/basePath'
 import { displayValue, type IntakeValue } from '../../lib/intake'
 
@@ -152,7 +152,7 @@ export default function Services() {
       <Card className="mb-4">
         <h2 className="mb-3 text-sm font-semibold text-white">Active &amp; enrolled services</h2>
         {loading ? (
-          <p className="text-sm text-slate-400">Loading…</p>
+          <SkeletonRows rows={3} cols={2} />
         ) : enrolled.length === 0 ? (
           <EmptyState label="No active services yet: start a journey below." />
         ) : (

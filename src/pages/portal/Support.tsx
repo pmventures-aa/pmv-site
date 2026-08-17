@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import { propertyDisplayName } from '../../../shared/propertyProfile'
-import { Card, PageHeader, StatusBadge, EmptyState } from '../../components/ui'
+import { Card, PageHeader, StatusBadge, EmptyState, SkeletonRows } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
 
 interface Ticket {
@@ -164,7 +164,7 @@ export default function Support() {
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <Card><SkeletonRows rows={4} cols={3} /></Card>
       ) : tickets.length === 0 ? (
         <Card>
           <EmptyState label="No requests yet. Start one whenever you need Pinnacle's help." />

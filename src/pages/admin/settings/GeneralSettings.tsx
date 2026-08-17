@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../../lib/api'
-import { Panel, NoAccess, inputCls, btnPrimary } from '../../../components/admin/ui'
+import { Panel, NoAccess, inputCls, btnPrimary, SkeletonTable } from '../../../components/admin/ui'
 import { toast } from '../../../components/kit/toast'
 import { ResendWebhookPanel } from './ResendWebhookPanel'
 import { ProcessorReviewLoginPanel } from './ProcessorReviewLoginPanel'
@@ -53,7 +53,7 @@ export default function GeneralSettings() {
     }
   }
 
-  if (loading) return <p className="text-sm text-slate-400">Loading…</p>
+  if (loading) return <Panel><SkeletonTable rows={5} cols={2} /></Panel>
   if (forbidden) return <NoAccess label="General settings" />
 
   return (

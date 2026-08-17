@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../../lib/api'
-import { Card, PageHeader, EmptyState } from '../../components/ui'
+import { Card, PageHeader, EmptyState, SkeletonRows } from '../../components/ui'
 import { Avatar } from '../../components/kit/Avatar'
 import { PresenceDot } from '../../components/kit/PresenceDot'
 import { usePresence, humanizePresence, humanizeLastSeen } from '../../lib/presence'
@@ -55,7 +55,7 @@ export default function MyTeam() {
     <div>
       <PageHeader eyebrow="Your Pinnacle team" title="My Team" subtitle="The people assigned to your account." />
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <Card><SkeletonRows rows={3} cols={2} /></Card>
       ) : loadError ? (
         <Card>
           <div className="space-y-2 text-sm text-slate-400">

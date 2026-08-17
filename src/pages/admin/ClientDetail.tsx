@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAppPath } from '../../lib/basePath'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, StatCard } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag, EmptyState, inputCls, btnPrimary, StatCard, SkeletonTable } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 import { Avatar } from '../../components/kit/Avatar'
@@ -615,7 +615,7 @@ function MatterNotesDialog({ clientId, matterId, title }: { clientId: string; ma
         <button className="text-xs font-medium text-gold hover:underline">Notes</button>
       </DialogTrigger>
       <DialogContent title={`Notes: ${title}`} description="Staff-only, never visible to the client.">
-        {loading ? <p className="text-sm text-slate-400">Loading…</p> : <NoteThread notes={notes} onAdd={addNote} busy={busy} onArchive={archiveNote} />}
+        {loading ? <SkeletonTable rows={3} cols={1} /> : <NoteThread notes={notes} onAdd={addNote} busy={busy} onArchive={archiveNote} />}
       </DialogContent>
     </Dialog>
   )

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-import { Logo } from '../../components/ui'
+import { Logo, SkeletonRows } from '../../components/ui'
 import { ThemeToggle } from '../../components/ThemeToggle'
 import { Icon, type IconName } from '../../components/kit/Icon'
 import { inputCls } from '../auth/AuthLayout'
@@ -75,7 +75,7 @@ export default function TrustedPortal() {
             <aside className="space-y-1.5">{allowed.map(([key, mode]) => { const meta = sectionMeta[key] || { label: key, icon: 'file' as IconName }; return <button key={key} onClick={() => setSection(key)} className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left transition ${section === key ? 'border-gold/40 bg-gold/[0.08] text-white' : 'border-white/10 bg-white/[0.02] text-slate-400 hover:border-white/20 hover:text-white'}`}><Icon name={meta.icon} size={15}/><span className="flex-1 text-sm font-medium">{meta.label}</span><span className="text-[10px] uppercase tracking-wide text-gold">{mode}</span></button> })}</aside>
             <section className="min-w-0 rounded-md border border-white/10 bg-white/[0.025] p-4">
               {section && <div className="mb-3 flex items-center justify-between"><div><p className="eyebrow">Shared by client</p><h2 className="mt-0.5 text-base font-semibold text-white">{sectionMeta[section]?.label || section}</h2></div>{data?.mode && <span className="rounded-sm border border-gold/20 px-2 py-0.5 text-xs text-gold">{data.mode} access</span>}</div>}
-              {!data ? <p className="text-sm text-slate-500">Loading…</p> : <SectionView section={section} clientId={clientId} data={data} onRefresh={() => api.get<SectionData>(`/portal/trusted/${clientId}/${section}`).then(setData)} />}
+              {!data ? <SkeletonRows rows={4} cols={4} /> : <SectionView section={section} clientId={clientId} data={data} onRefresh={() => api.get<SectionData>(`/portal/trusted/${clientId}/${section}`).then(setData)} />}
             </section>
           </div>
         )}

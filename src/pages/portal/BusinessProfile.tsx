@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { Card, PageHeader } from '../../components/ui'
+import { Card, PageHeader, SkeletonRows } from '../../components/ui'
 import { inputCls } from '../auth/AuthLayout'
 import { useAuth } from '../../lib/auth'
 import { Avatar } from '../../components/kit/Avatar'
@@ -62,7 +62,7 @@ export default function BusinessProfile() {
       )}
       <Card className="max-w-2xl">
         {loading ? (
-          <p className="text-sm text-slate-400">Loading…</p>
+          <SkeletonRows rows={5} cols={2} />
         ) : loadError ? (
           <div className="space-y-2 text-sm text-slate-400">
             <p>Couldn't load your business profile.</p>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { PageIntro, Panel, Tag, EmptyState, inputCls, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag, EmptyState, inputCls, btnOutline, SkeletonTable } from '../../components/admin/ui'
 import { Avatar } from '../../components/kit/Avatar'
 import { useAppPath } from '../../lib/basePath'
 import { clientEmailHref, clientInboxHref } from '../../lib/engagements'
@@ -79,7 +79,7 @@ export default function ClientsList() {
         </select>
       </div>
       {loading ? (
-        <Panel className="overflow-x-auto !p-0"><div className="p-6 text-sm text-slate-400">Loading…</div></Panel>
+        <Panel className="overflow-x-auto !p-0"><div className="p-6"><SkeletonTable rows={6} cols={5} /></div></Panel>
       ) : filtered.length === 0 ? (
         <Panel className="overflow-x-auto !p-0"><div className="p-6"><EmptyState label={clients.length === 0 ? 'No clients yet.' : 'No clients match your search.'} /></div></Panel>
       ) : (

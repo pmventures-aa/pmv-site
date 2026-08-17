@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Plus, Search } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline, SkeletonTable } from '../../components/admin/ui'
 import { DateSelect, todayIsoDate } from '../../components/kit/DateSelect'
 import { toast } from '../../components/kit/toast'
 import { COUNTRY_OPTIONS, US_STATES } from '../../data/regions'
@@ -621,7 +621,7 @@ function InvoiceDetail({ invoiceId, onBack, onChanged, onOpen }: { invoiceId: st
   const load = useCallback(() => api.get<InvoiceDetailData>(`/admin/invoices/${invoiceId}`).then(setData).catch(() => toast.error('Could not load the invoice.')), [invoiceId])
   useEffect(() => { void load() }, [load])
 
-  if (!data) return <div><button type="button" onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold"><ChevronLeft size={14} />Back to invoices</button><p className="text-sm text-slate-400">Loading…</p></div>
+  if (!data) return <div><button type="button" onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold"><ChevronLeft size={14} />Back to invoices</button><Panel><SkeletonTable rows={6} cols={3} /></Panel></div>
   const { invoice, line_items, reminders } = data
   const editable = invoice.status === 'open'
 

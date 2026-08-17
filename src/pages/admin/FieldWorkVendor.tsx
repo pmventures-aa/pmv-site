@@ -20,6 +20,7 @@ import { useAuth } from '../../lib/auth'
 import { Avatar } from '../../components/kit/Avatar'
 import { toast } from '../../components/kit/toast'
 import { hqWorkspaceCopy } from '../../lib/workspace'
+import { InlineLoading } from '../../components/LoadingScreen'
 import { formatVendorFee } from '../../../shared/vendorFeeAdjustment'
 import { useFieldLocationSession, type FieldLocationEndedReason } from '../../lib/useFieldLocationSession'
 import { FieldLocationIndicator } from '../../components/admin/FieldLocationIndicator'
@@ -509,7 +510,7 @@ export default function FieldWorkDetail() {
     }
   }
 
-  if (loading) return <p className="text-sm text-slate-400">Loading…</p>
+  if (loading) return <InlineLoading label="Loading assignment…" variant="orb" />
   if (!assignment) return <p className="text-sm text-slate-400">Assignment not found.</p>
 
   const tone = statusTone(assignment.status)
