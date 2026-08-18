@@ -57,13 +57,6 @@ const PROPERTY_REPORTS = [
   'Damage assessment',
   'Rent-ready / punch list',
 ]
-const DOCUMENT_PHOTOS = ['ID / credential photos', 'Document scans or copies', 'Signing-room photos', 'Delivery / drop-off photos']
-const DOCUMENT_REPORTS = ['Delivery confirmation', 'Completion certificate', 'Filing receipt', 'Notary journal confirmation']
-const OPS_PHOTOS = ['Screenshots of current tools', 'Process / workflow photos', 'Location or office photos']
-const OPS_REPORTS = ['Process map', 'Operational audit', 'Handoff checklist', 'Weekly status note']
-const SYSTEMS_PHOTOS = ['Screenshots of the current system', 'Error or downtime photos', 'Terminal / hardware photos']
-const SYSTEMS_REPORTS = ['Cutover checklist', 'Data-mapping summary', 'Go-live status note']
-
 function statusQuestion(key: string, label: string, hint?: string): ScopeQuestion {
   return q(key, label, 'yesno', { options: ['Yes', 'No'], hint })
 }
@@ -98,17 +91,22 @@ function propertyCore(extra: ScopeQuestion[] = []): ScopeQuestion[] {
 }
 
 function documentCore(extra: ScopeQuestion[] = []): ScopeQuestion[] {
+  // Document/notary work does not use the photos/report/check-in deliverable
+  // question - the deliverable is the completed or notarized document itself,
+  // so asking "What do you need back?" there just confuses the intake.
   return [
     statusQuestion('has_document', 'Do you already have the document?'),
-    ...deliverableQuestions(DOCUMENT_PHOTOS, DOCUMENT_REPORTS),
     ...extra,
   ]
 }
 
 function opsCore(statusKey: 'is_urgent' | 'system_down' | 'has_deadline', statusLabel: string, extra: ScopeQuestion[] = []): ScopeQuestion[] {
-  const photos = statusKey === 'system_down' ? SYSTEMS_PHOTOS : OPS_PHOTOS
-  const reports = statusKey === 'system_down' ? SYSTEMS_REPORTS : OPS_REPORTS
-  return [statusQuestion(statusKey, statusLabel), ...deliverableQuestions(photos, reports), ...extra]
+  // Operations, systems, funding, and transition work is remote advisory work -
+  // the deliverable is a plan, an audit, or a completed migration, not a photo
+  // or a "check-in" package. Each of these flows already asks what the client
+  // needs (need_type, change_type, record_types, use_of_funds), so the generic
+  // "What do you need back? Photos / Written report" question is just noise here.
+  return [statusQuestion(statusKey, statusLabel), ...extra]
 }
 
 const CLEAN_QUESTIONS: ScopeQuestion[] = propertyCore([
@@ -204,10 +202,14 @@ const OTHER_QUESTIONS: ScopeQuestion[] = opsCore('has_deadline', 'Is there a dea
   q('outcome', 'What outcome are you after?', 'text', { hint: 'Describe the handled state so we can scope backwards from it' }),
 ])
 
+// The shared intake shape every request follows: a location plus a leading
+// yes/no status question. Only property and field flows additionally attach the
+// photos/report/check-in deliverable question, because there the deliverable
+// really is photos and a written report. Document, notary, and operations flows
+// deliberately do not, so that part is not part of the universal contract.
 export function hasStandardIntake(questions: ScopeQuestion[]): boolean {
   const keys = new Set(questions.map((item) => item.key))
-  const hasStatus = STATUS_QUESTION_KEYS.some((key) => keys.has(key))
-  return hasStatus && keys.has('deliverables') && keys.has('photos_required') && keys.has('reports_required')
+  return STATUS_QUESTION_KEYS.some((key) => keys.has(key))
 }
 
 const JOB_QUESTIONS: Record<string, ScopeQuestion[]> = {
