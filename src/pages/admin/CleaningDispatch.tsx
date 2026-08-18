@@ -136,12 +136,12 @@ export default function CleaningDispatch() {
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
-        <StatCard label="Needs Review" value={String(summary.needs_review ?? 0)} />
-        <StatCard label="Awaiting Vendor" value={String(summary.awaiting_vendor ?? 0)} />
-        <StatCard label="Active" value={String(summary.active ?? 0)} />
-        <StatCard label="Completed" value={String(summary.completed ?? 0)} />
-        <StatCard label="Booked Revenue" value={formatUsd(summary.booked_revenue_cents ?? 0)} />
-        <StatCard label="Completed Margin" value={formatUsd((summary.completed_revenue_cents ?? 0) - (summary.completed_payout_cents ?? 0))} />
+        <StatCard label="Needs Review" value={String(summary.needs_review ?? 0)} accent="coral" />
+        <StatCard label="Awaiting Vendor" value={String(summary.awaiting_vendor ?? 0)} accent="gold" />
+        <StatCard label="Active" value={String(summary.active ?? 0)} accent="sea" />
+        <StatCard label="Completed" value={String(summary.completed ?? 0)} accent="green" />
+        <StatCard label="Booked Revenue" value={formatUsd(summary.booked_revenue_cents ?? 0)} accent="gold" />
+        <StatCard label="Completed Margin" value={formatUsd((summary.completed_revenue_cents ?? 0) - (summary.completed_payout_cents ?? 0))} accent="sea" />
       </div>
 
       <div className="flex flex-wrap gap-3">

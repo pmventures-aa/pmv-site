@@ -123,6 +123,10 @@ export function ParallaxMedia({ children, className = '', strength = 40 }: { chi
 // ---------------------------------------------------------------------------
 export interface JourneyStep { n: string; label: string; detail: string }
 
+// Rotate the step marker through the coastal palette so a row of steps carries
+// gold + sea + coral instead of a single stretch of gold.
+const STEP_ACCENTS = ['border-gold/40 text-gold', 'border-sea-400/50 text-sea-300', 'border-coral-400/50 text-coral-300']
+
 export function ProcessJourney({ steps, className = '', cols = 6 }: { steps: JourneyStep[]; className?: string; cols?: 3 | 4 | 5 | 6 }) {
   const reduce = useReducedMotion()
   // Static class map so Tailwind can see the utilities; controls the desktop
@@ -140,7 +144,7 @@ export function ProcessJourney({ steps, className = '', cols = 6 }: { steps: Jou
           viewport={{ once: true, margin: '-48px' }}
           transition={reduce ? { duration: 0 } : { ...pmvMotion.gentle, delay: i * 0.06 }}
         >
-          <span className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full border border-gold/40 bg-navy-950 font-display text-xs font-bold text-gold">{step.n}</span>
+          <span className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border bg-navy-950 font-display text-xs font-bold ${STEP_ACCENTS[i % STEP_ACCENTS.length]}`}>{step.n}</span>
           <h3 className="mt-4 font-display text-sm font-bold uppercase tracking-[0.08em] text-white">{step.label}</h3>
           <p className="mt-2 text-sm leading-6 text-slate-400">{step.detail}</p>
         </motion.li>

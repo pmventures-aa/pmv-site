@@ -22,13 +22,15 @@ export function SkeletonRows({ rows = 4, cols = 3 }: { rows?: number; cols?: num
   )
 }
 
-export type Tone = 'gold' | 'green' | 'blue' | 'slate' | 'red'
+export type Tone = 'gold' | 'green' | 'blue' | 'slate' | 'red' | 'sea' | 'coral'
 const toneMap: Record<Tone, string> = {
   gold: 'bg-gold/10 text-gold border-gold/25',
   green: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/25',
   blue: 'bg-sky-400/10 text-sky-300 border-sky-400/25',
   slate: 'bg-white/5 text-slate-300 border-white/15',
   red: 'bg-rose-400/10 text-rose-300 border-rose-400/25',
+  sea: 'bg-sea-400/10 text-sea-300 border-sea-400/25',
+  coral: 'bg-coral-400/10 text-coral-300 border-coral-400/25',
 }
 
 export function StatusBadge({ children, tone = 'slate' }: { children: React.ReactNode; tone?: Tone }) {
@@ -119,4 +121,13 @@ export function EmptyState({ label }: { label: string }) {
   return <div className="rounded-md border border-dashed border-white/10 py-5 text-center"><p className="text-sm text-slate-500">{label}</p></div>
 }
 
-export function StatCard({ label, value }: { label: string; value: React.ReactNode }) { return <Card className="p-3"><p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-2xl font-semibold text-white">{value}</p></Card> }
+// Accent color for a stat card's marker rail. Optional and default-off, so
+// existing stat grids are unchanged; pass one to tint a card in a row.
+const STAT_ACCENT: Record<'gold' | 'sea' | 'coral' | 'green' | 'red', string> = {
+  gold: 'before:bg-gold', sea: 'before:bg-sea-400', coral: 'before:bg-coral-400',
+  green: 'before:bg-emerald-400', red: 'before:bg-rose-400',
+}
+export function StatCard({ label, value, accent }: { label: string; value: React.ReactNode; accent?: keyof typeof STAT_ACCENT }) {
+  const rail = accent ? `relative overflow-hidden before:absolute before:inset-y-0 before:left-0 before:w-1 ${STAT_ACCENT[accent]}` : ''
+  return <Card className={`p-3 ${rail}`}><p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-2xl font-semibold text-white">{value}</p></Card>
+}

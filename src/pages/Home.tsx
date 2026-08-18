@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion } from 'motion/react'
 import { Header } from '../components/public/Header'
 import { Footer } from '../components/public/Footer'
@@ -12,8 +13,8 @@ import type { OperatingWorld } from '../../shared/workspace'
 import { HeroGuideRail } from '../components/public/HeroGuideRail'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
-import { ProjectScenario, ProofRail, StoryImage, type RailPanel, type StoryPanel } from '../components/public/story'
-import { CLIENT_LOGIN, GET_HELP, founder, howItWorks, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
+import { StoryImage, type RailPanel } from '../components/public/story'
+import { CLIENT_LOGIN, GET_HELP, founder, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 import { getCleaningConfig } from '../lib/cleaningApi'
 import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricing'
 
@@ -28,22 +29,9 @@ const LIFECYCLE: RailPanel[] = [
   { n: '06', title: 'Complete', detail: 'You receive the result, the record, and a clear next step.', slot: 'completion', labels: ['Report delivered'] },
 ]
 
-const FIELD_PANELS: StoryPanel[] = [
-  { n: '01', title: 'Inspection', detail: 'A local field professional documents the property, inside and out.', slot: 'property_exterior', labels: ['On site'] },
-  { n: '02', title: 'Documentation', detail: 'Photos and notes are captured with time and location context.', slot: 'documentation', labels: ['Geo verified', 'Time stamped'] },
-  { n: '03', title: 'Coordination', detail: 'If something needs attention, the right vendor is coordinated for you.', slot: 'vendor_arrival', labels: ['Vendor coordinated'] },
-  { n: '04', title: 'Completion', detail: 'You get a clear report of what was found and what was done.', slot: 'completion', labels: ['Report delivered'] },
-]
-
-const SCENARIOS: { title: string; slot: RailPanel['slot']; steps: string[] }[] = [
-  { title: 'Vacant property', slot: 'property_interior', steps: ['Inspection requested', 'Local professional coordinated', 'Photos documented', 'Issue identified', 'Vendor coordinated', 'Completion verified'] },
-  { title: 'Business document', slot: 'document_signing', steps: ['Document requested', 'Requirements reviewed', 'Document prepared / coordinated', 'Signature completed', 'Delivery confirmed', 'Record preserved'] },
-  { title: 'Field request', slot: 'field_inspection', steps: ['Request submitted', 'Location confirmed', 'Field resource assigned', 'Work completed', 'Evidence uploaded', 'Customer notified'] },
-]
-
-const DELIVERABLES = ['Photo documentation', 'Timestamps', 'Status updates', 'Signatures', 'Service records', 'Audit trails', 'Completion reports', 'Communication history']
-
 const WORLD_BY_PATHWAY: Record<string, OperatingWorld> = { business: 'business', property: 'property', personal: 'documents' }
+// One coastal accent per path so the three lanes read as distinct.
+const PATH_ACCENTS = ['text-gold', 'text-sea-300', 'text-coral-300']
 const WORLD_LABEL: Record<string, string> = { property: 'Property', documents: 'Document', business: 'Business', funding: 'Funding' }
 
 function worldFromQuery(to: string): OperatingWorld | '' {
@@ -111,13 +99,13 @@ export default function Home() {
             {pathways.map((item, i) => (
               <motion.article key={item.key} variants={staggerItem} className="border-b border-white/10 py-10 lg:border-b-0 lg:border-r lg:px-8 lg:first:pl-0 lg:last:border-r-0 lg:last:pr-0">
                 <p className="eyebrow">{item.label}</p>
-                <span className="mt-2 block font-display text-xs text-gold/55">0{i + 1}</span>
+                <span className={`mt-2 block font-display text-xs ${PATH_ACCENTS[i % PATH_ACCENTS.length]}`}>0{i + 1}</span>
                 <h3 className="mt-5 font-display text-2xl font-bold leading-tight text-white sm:text-[1.85rem]">{item.title}</h3>
                 <p className="mt-4 text-sm leading-7 text-slate-400">{item.body}</p>
                 <ul className="mt-5 space-y-1.5 text-sm text-slate-300">
                   {item.items.map((capability) => <li key={capability}>{capability}</li>)}
                 </ul>
-                <ViewTransitionLink to={item.to} onClick={() => visitor.setWorld(WORLD_BY_PATHWAY[item.key])} className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">Explore {item.label} →</ViewTransitionLink>
+                <ViewTransitionLink to={item.to} onClick={() => visitor.setWorld(WORLD_BY_PATHWAY[item.key])} className={`mt-6 inline-flex text-sm font-semibold hover:underline ${PATH_ACCENTS[i % PATH_ACCENTS.length]}`}>Explore {item.label} →</ViewTransitionLink>
               </motion.article>
             ))}
           </StaggerGroup>
@@ -135,57 +123,6 @@ export default function Home() {
           heading="From a first request to a finished result."
           panels={LIFECYCLE}
         />
-
-        <section className="border-y border-gold/15 bg-gradient-to-br from-gold/[.055] via-white/[.012] to-transparent">
-          <div className="container-pmv grid gap-12 py-16 sm:py-20 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
-            <Reveal>
-              <p className="eyebrow">How Pinnacle works</p>
-              <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">You do not have to know the service name first.</h2>
-              <p className="mt-5 max-w-lg text-base leading-8 text-slate-400">
-                Tell us what is going on. We review the matter, name who is handling it, and stay with the work through completion.
-              </p>
-              <ViewTransitionLink to="/how-it-works" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-gold">See the full process <span>→</span></ViewTransitionLink>
-            </Reveal>
-            <div className="divide-y divide-white/10 border-y border-white/10">
-              {howItWorks.map(([title, body], i) => (
-                <Reveal key={title} delay={i * 0.05} className="grid gap-3 py-6 sm:grid-cols-[44px_minmax(160px,.7fr)_1fr] sm:items-start">
-                  <span className="font-display text-xs font-bold text-gold/60">0{i + 1}</span>
-                  <h3 className="font-display text-sm font-bold text-white">{title}</h3>
-                  <p className="text-sm leading-6 text-slate-400">{body}</p>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-navy-900/30 py-16 sm:py-24">
-          <div className="container-pmv">
-            <Reveal className="max-w-2xl">
-              <p className="eyebrow">Field &amp; property support</p>
-              <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-4xl">Field support, step by step.</h2>
-              <p className="mt-4 text-base leading-7 text-slate-400">A local professional handles the visit. You see what happened without having to chase it down.</p>
-            </Reveal>
-            <StaggerGroup className="mt-10 grid gap-5 sm:grid-cols-2">
-              {FIELD_PANELS.map((panel) => (
-                <motion.article key={panel.n} variants={staggerItem} className="overflow-hidden rounded-xl border border-white/10 bg-navy-950/40">
-                  <StoryImage slot={panel.slot} aspect="aspect-[16/9]" rounded="rounded-none" reveal={false} />
-                  <div className="p-6">
-                    <div className="flex items-center gap-2">
-                      <span className="font-display text-xs font-bold text-gold/70">{panel.n}</span>
-                      <h3 className="font-display text-lg font-semibold text-white">{panel.title}</h3>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">{panel.detail}</p>
-                    {panel.labels && (
-                      <div className="mt-4 flex flex-wrap gap-1.5">
-                        {panel.labels.map((l) => <span key={l} className="rounded-full border border-white/10 bg-white/[.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{l}</span>)}
-                      </div>
-                    )}
-                  </div>
-                </motion.article>
-              ))}
-            </StaggerGroup>
-          </div>
-        </section>
 
         <section className="container-pmv py-16 sm:py-24">
           <Reveal className="max-w-3xl">
@@ -260,18 +197,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="container-pmv py-16 sm:py-20">
-          <Reveal className="grid gap-8 lg:grid-cols-2 lg:items-end">
-            <div>
-              <p className="eyebrow">The right support for the matter</p>
-              <h2 className="mt-4 font-display text-3xl font-bold text-white sm:text-4xl">Direct when we can. Coordinated when it should be.</h2>
-            </div>
-            <p className="text-sm leading-7 text-slate-400">
-              Pinnacle may provide the work directly, manage the matter, or work with licensed third-party professionals when specialized or regulated services are required. We name that up front. We are not a law firm, accounting firm, lender, or licensed property manager unless that provider is identified as such.
-            </p>
-          </Reveal>
-        </section>
-
         <section className="border-y border-white/[.07]">
           <div className="container-pmv py-16 sm:py-20">
             <Reveal className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -308,25 +233,6 @@ export default function Home() {
             </Reveal>
             <ScopeWizard source="home" compact />
           </div>
-        </section>
-
-        <section className="border-t border-white/[.07] bg-navy-900/30 py-16 sm:py-24">
-          <div className="container-pmv">
-            <Reveal className="max-w-3xl">
-              <p className="eyebrow">Example workflows</p>
-              <h2 className="mt-4 font-display text-3xl font-bold tracking-[-.035em] text-white sm:text-5xl">What a request looks like, start to finish.</h2>
-              <p className="mt-5 text-base leading-7 text-slate-400">Illustrations of how typical requests move through Pinnacle. These are example workflows, not client case studies.</p>
-            </Reveal>
-            <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {SCENARIOS.map((scenario) => (
-                <ProjectScenario key={scenario.title} title={scenario.title} slot={scenario.slot} steps={scenario.steps} />
-              ))}
-            </div>
-          </div>
-          <div className="container-pmv mt-12">
-            <p className="eyebrow mb-3">What you receive</p>
-          </div>
-          <ProofRail items={DELIVERABLES} />
         </section>
 
         <PublicMetricsBand />
@@ -410,17 +316,79 @@ const RAIL_ACCENTS = [
 ]
 
 function LifecycleRail({ eyebrow, heading, panels }: { eyebrow: string; heading: string; panels: RailPanel[] }) {
+  const scroller = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ left: false, right: true })
+  const drag = useRef<{ startX: number; startLeft: number; active: boolean; moved: boolean }>({ startX: 0, startLeft: 0, active: false, moved: false })
+
+  const syncEdges = () => {
+    const el = scroller.current
+    if (!el) return
+    setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft < el.scrollWidth - el.clientWidth - 4 })
+  }
+  useEffect(() => {
+    syncEdges()
+    const el = scroller.current
+    if (!el) return
+    el.addEventListener('scroll', syncEdges, { passive: true })
+    window.addEventListener('resize', syncEdges)
+    return () => { el.removeEventListener('scroll', syncEdges); window.removeEventListener('resize', syncEdges) }
+  }, [])
+
+  const scrollByCards = (dir: 1 | -1) => {
+    const el = scroller.current
+    if (!el) return
+    const card = el.querySelector('article')
+    const step = card ? (card as HTMLElement).offsetWidth + 16 : el.clientWidth * 0.85
+    el.scrollBy({ left: dir * step, behavior: 'smooth' })
+  }
+
+  // Click-drag to scroll on pointer devices; native swipe still works on touch.
+  const onPointerDown = (e: React.PointerEvent) => {
+    const el = scroller.current
+    if (!el || e.pointerType === 'touch') return
+    drag.current = { startX: e.clientX, startLeft: el.scrollLeft, active: true, moved: false }
+  }
+  const onPointerMove = (e: React.PointerEvent) => {
+    const el = scroller.current
+    if (!el || !drag.current.active) return
+    const dx = e.clientX - drag.current.startX
+    if (Math.abs(dx) > 4) drag.current.moved = true
+    el.scrollLeft = drag.current.startLeft - dx
+  }
+  const endDrag = () => { drag.current.active = false }
+
   return (
     <section className="border-y border-white/[.07] bg-navy-900/30 py-16 sm:py-24">
       <div className="container-pmv">
         <Reveal className="max-w-2xl">
           <p className="eyebrow">{eyebrow}</p>
           <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-4xl">{heading}</h2>
-          <p className="mt-4 text-sm text-slate-400">Swipe through the six steps every Pinnacle matter follows.</p>
+          <p className="mt-4 text-sm text-slate-400">Six steps every Pinnacle matter follows. Drag, swipe, or use the arrows.</p>
         </Reveal>
+        <div className="mt-6 hidden gap-2 sm:flex">
+          {([[-1, ChevronLeft, edges.left, 'Previous'], [1, ChevronRight, edges.right, 'Next']] as const).map(([dir, Icon, enabled, label]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => scrollByCards(dir)}
+              disabled={!enabled}
+              aria-label={label}
+              className="grid h-10 w-10 place-items-center rounded-full border border-white/15 text-slate-200 transition-colors hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-white/15 disabled:hover:text-slate-200"
+            >
+              <Icon className="h-5 w-5" />
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="mt-10">
-        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-[max(1.5rem,calc((100vw-72rem)/2))] pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mt-8">
+        <div
+          ref={scroller}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerLeave={endDrag}
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-[max(1.5rem,calc((100vw-72rem)/2))] pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           {panels.map((panel, i) => (
             <article key={panel.n} className="snap-start shrink-0 basis-[82%] sm:basis-[48%] lg:basis-[31%] xl:basis-[23.5%]">
               <div className="overflow-hidden rounded-xl border border-white/10 bg-navy-950/40">
