@@ -14,10 +14,10 @@ import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
 import { HorizontalStoryRail, StickyStorySection, ProjectScenario, ProofRail, type RailPanel, type StoryPanel } from '../components/public/story'
 import { CLIENT_LOGIN, GET_HELP, founder, howItWorks, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 
-// How a request moves — the reusable Pinnacle lifecycle, shown as a bounded
+// How a request moves - the reusable Pinnacle lifecycle, shown as a bounded
 // horizontal story on desktop and a swipe carousel on mobile.
 const LIFECYCLE: RailPanel[] = [
-  { n: '01', title: 'Request', detail: 'Tell us what needs to happen — where, when, and what matters most. No account required.', slot: 'business_owner', labels: ['Intake logged'] },
+  { n: '01', title: 'Request', detail: 'Tell us what needs to happen - where, when, and what matters most. No account required.', slot: 'business_owner', labels: ['Intake logged'] },
   { n: '02', title: 'Review', detail: 'We review the matter and confirm exactly what it needs before anything starts.', slot: 'review' },
   { n: '03', title: 'Coordinate', detail: 'The right Pinnacle contact or vetted local provider is assigned and briefed.', slot: 'coordination', labels: ['Provider assigned'] },
   { n: '04', title: 'Execute', detail: 'The work happens on the ground, documented as it goes.', slot: 'field_inspection', labels: ['On site'] },
@@ -127,7 +127,7 @@ export default function Home() {
 
         <HorizontalStoryRail
           eyebrow="How the work moves"
-          heading="From a first request to a finished result — you can watch it move."
+          heading="From a first request to a finished result - you can watch it move."
           panels={LIFECYCLE}
         />
 

@@ -28,7 +28,7 @@ function useMediaQuery(query: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// StoryImage — the single way photography enters the public site. Renders a
+// StoryImage - the single way photography enters the public site. Renders a
 // real <img> when the slot has a src, otherwise a brand-toned gradient scene.
 // Reveals with a restrained scale + fade as it enters the viewport.
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ export function MediaLabel({ items, className = '' }: { items: string[]; classNa
 }
 
 // ---------------------------------------------------------------------------
-// ParallaxMedia — restrained depth. Translates its child a few percent against
+// ParallaxMedia - restrained depth. Translates its child a few percent against
 // scroll. Off entirely for reduced-motion and on mobile (where it costs more
 // than it gives).
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ export function ParallaxMedia({ children, className = '', strength = 40 }: { chi
 }
 
 // ---------------------------------------------------------------------------
-// ProcessJourney — the reusable Pinnacle lifecycle language, shown rather than
+// ProcessJourney - the reusable Pinnacle lifecycle language, shown rather than
 // described. Connected numbered chapters; horizontal on desktop, vertical on
 // mobile. Reveals in sequence.
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ export function ProcessJourney({ steps, className = '' }: { steps: JourneyStep[]
 }
 
 // ---------------------------------------------------------------------------
-// ProofRail — a slow, restrained ticker of deliverables/evidence. Pauses on
+// ProofRail - a slow, restrained ticker of deliverables/evidence. Pauses on
 // hover; fully still for reduced-motion (Tailwind motion-reduce variant, no JS
 // timer). Not an aggressive marquee.
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ export function ProofRail({ items, className = '' }: { items: string[]; classNam
 }
 
 // ---------------------------------------------------------------------------
-// ProjectScenario — an example workflow, clearly labeled so it is never mistaken
+// ProjectScenario - an example workflow, clearly labeled so it is never mistaken
 // for a real client case study. Numbered mini-journey with an optional scene.
 // ---------------------------------------------------------------------------
 export function ProjectScenario({
@@ -211,7 +211,7 @@ export function ProjectScenario({
 }
 
 // ---------------------------------------------------------------------------
-// StickyStorySection — a sticky headline on the left while image+text panels
+// StickyStorySection - a sticky headline on the left while image+text panels
 // advance on the right. The active panel is driven by which one is in view, so
 // there is no scroll hijacking. Mobile stacks naturally.
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ function StoryPanelBlock({ panel, onActive }: { panel: StoryPanel; onActive: () 
 }
 
 // ---------------------------------------------------------------------------
-// HorizontalStoryRail — a bounded storytelling section where vertical scroll
+// HorizontalStoryRail - a bounded storytelling section where vertical scroll
 // advances a horizontal sequence (desktop), a native swipe carousel (mobile),
 // or a plain vertical stack (reduced-motion). Never traps the page scroll: the
 // horizontal movement is purely scroll-linked within the section's own height.

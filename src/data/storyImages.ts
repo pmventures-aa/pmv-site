@@ -2,7 +2,7 @@
 //
 // Photography is referenced by a stable *slot* name rather than a hard-coded
 // path, so real production photos can be dropped in later by setting `src` on a
-// slot — every page that uses the slot upgrades at once, with no component
+// slot - every page that uses the slot upgrades at once, with no component
 // changes. Until a photo exists, the slot renders a tasteful brand-toned
 // gradient "scene" (defined here, no binary assets shipped) so layouts are
 // complete and never look broken.
