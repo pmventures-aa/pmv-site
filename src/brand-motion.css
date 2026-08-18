@@ -1,12 +1,16 @@
 /* Pinnacle kinetic brand system. Motion stays compositor-friendly: transform + opacity only. */
 .pmv-brand-object {
   isolation: isolate;
-  contain: layout paint style;
+  /* NOTE: `contain: paint` here caused iOS Safari to double-paint the
+   * drop-shadowed crest (a ghosted/offset duplicate). Keep layout+style
+   * containment only so the shadow composites once. */
+  contain: layout style;
 }
 
 .pmv-brand-face {
   position: relative;
   z-index: 1;
+  transform: translateZ(0);
   filter: drop-shadow(0 18px 28px rgba(0,0,0,.28));
 }
 

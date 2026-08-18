@@ -10,6 +10,7 @@ import { liveLetterheadHtml, type SignatureRosterPerson } from '../../lib/emailS
 import { SignaturePreview } from './SignatureLetterhead'
 import { canDispatchPerson, networkDispatchHref } from '../../lib/networkRoster'
 import { DOC_LABELS, type ApplicationDocKey } from '../../../shared/providerApplication'
+import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 
 interface Data {
   employee: any
@@ -271,16 +272,7 @@ export default function ProviderProfile() {
                   <dd className="mt-1.5 space-y-1">
                     {data.vendor_documents.length === 0 && <p className="text-xs text-slate-500">No files on record yet.</p>}
                     {data.vendor_documents.map((doc) => (
-                      <a
-                        key={doc.id}
-                        href={`/api/admin/employees/${id}/vendor-documents/${doc.id}/download`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[.02] px-2.5 py-1.5 text-xs text-slate-200 transition hover:border-gold/40 hover:text-gold"
-                      >
-                        <span className="truncate">{doc.document_type === 'application_summary' ? '★ ' : ''}{doc.file_name || 'Document'}</span>
-                        <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-500">{String(doc.document_type).replace(/_/g, ' ')}</span>
-                      </a>
+                      <DocRow key={doc.id} employeeId={id} doc={doc} />
                     ))}
                   </dd>
                 </div>
@@ -442,6 +434,45 @@ function ApplicationReviewPanel({ application }: { application: any }) {
   )
 }
 
+// A document row that opens the file in an in-app viewer (modal) with a clear
+// Close, instead of navigating away to the raw file with no way back. PDFs and
+// images preview inline; anything else offers download. Download and
+// open-in-new-tab stay available for staff who want them.
+function DocRow({ employeeId, doc }: { employeeId: string; doc: any }) {
+  const base = `/api/admin/employees/${employeeId}/vendor-documents/${doc.id}/download`
+  const inlineUrl = `${base}?inline=1`
+  const type = String(doc.content_type || '')
+  const name = String(doc.file_name || 'Document')
+  const isPdf = type.includes('pdf') || name.toLowerCase().endsWith('.pdf')
+  const isImage = type.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(name)
+  const label = DOC_LABELS[doc.document_type as ApplicationDocKey] || String(doc.document_type).replace(/_/g, ' ')
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button type="button" className="flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[.02] px-2.5 py-1.5 text-left text-xs text-slate-200 transition hover:border-gold/40 hover:text-gold">
+          <span className="truncate">{doc.document_type === 'application_summary' ? '★ ' : ''}{name}</span>
+          <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-500">{label}</span>
+        </button>
+      </DialogTrigger>
+      <DialogContent title={name} description={label} size="full">
+        <div className="overflow-hidden rounded-md border border-white/10 bg-navy-950">
+          {isPdf ? (
+            <iframe title={name} src={inlineUrl} className="h-[70vh] w-full" />
+          ) : isImage ? (
+            <img src={inlineUrl} alt={name} className="mx-auto max-h-[70vh] w-auto object-contain" />
+          ) : (
+            <div className="p-10 text-center text-sm text-slate-400">This file type cannot preview here. Use Download or Open to view it.</div>
+          )}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a href={base} className={btnPrimary}>Download</a>
+          <a href={inlineUrl} target="_blank" rel="noreferrer" className="inline-flex items-center rounded-md border border-white/12 px-3 py-1.5 text-sm font-semibold text-slate-200 transition hover:border-gold/45 hover:text-gold">Open in new tab</a>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // Editable, current provider credentials - insurance, notary, background
 // check, tax - plus document management. This is the place to revise details
 // over time (e.g. when an insurance carrier or policy changes), separate from
@@ -570,10 +601,7 @@ function CredentialsTab({ id, data, reload }: { id: string; data: Data; reload: 
         <div className="mt-3 space-y-1">
           {data.vendor_documents.length === 0 && <p className="text-xs text-slate-500">No documents on record.</p>}
           {data.vendor_documents.map((doc: any) => (
-            <a key={doc.id} href={`/api/admin/employees/${id}/vendor-documents/${doc.id}/download`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[.02] px-2.5 py-1.5 text-xs text-slate-200 transition hover:border-gold/40 hover:text-gold">
-              <span className="truncate">{doc.document_type === 'application_summary' ? '★ ' : ''}{doc.file_name || 'Document'}</span>
-              <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-500">{DOC_LABELS[doc.document_type as ApplicationDocKey] || String(doc.document_type).replace(/_/g, ' ')}</span>
-            </a>
+            <DocRow key={doc.id} employeeId={id} doc={doc} />
           ))}
         </div>
       </Panel>
