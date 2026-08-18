@@ -81,6 +81,7 @@ import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
 import { portalCalendarRoutes, adminCalendarRoutes } from '../_lib/routes/calendarRoutes'
 import { externalCalendarRoutes, externalCalendarWebhookRoutes } from '../_lib/routes/externalCalendar'
 import { strPublicRoutes, strAdminRoutes, strPortalRoutes } from '../_lib/routes/strRoutes'
+import { cleaningPricingPublicRoutes, cleaningPricingAdminRoutes } from '../_lib/routes/cleaningPricing'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -123,6 +124,7 @@ app.route('/', quotePublicRoutes)
 app.route('/', carePlanPublicRoutes)
 app.route('/', managedTemplatePublicRoutes)
 app.route('/', strPublicRoutes)
+app.route('/', cleaningPricingPublicRoutes)
 
 app.get('/me', requireUser, async (c) => {
   const user = c.get('user')
@@ -198,6 +200,7 @@ app.route('/admin', adminCalendarRoutes)
 app.route('/admin', externalCalendarRoutes)
 app.route('/', externalCalendarWebhookRoutes)
 app.route('/admin', strAdminRoutes)
+app.route('/admin', cleaningPricingAdminRoutes)
 app.route('/admin', casesRoutes)
 app.route('/admin', communicationBrandingAdminRoutes)
 app.route('/admin', presenceRoutes)
