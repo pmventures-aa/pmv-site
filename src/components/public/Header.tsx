@@ -9,6 +9,7 @@ import { ViewTransitionLink } from './ViewTransitionLink'
 import { CLIENT_LOGIN, GET_HELP, pathwayLinks, pathways, whoWeHelp } from '../../data/publicSite'
 
 const navItems = [
+  { to: '/cleaning', label: 'Cleaning' },
   { to: '/how-it-works', label: 'How It Works' },
   { to: '/about', label: 'About' },
   { to: '/resources', label: 'Resources' },

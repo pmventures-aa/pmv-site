@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Header } from '../components/public/Header'
@@ -11,8 +12,10 @@ import type { OperatingWorld } from '../../shared/workspace'
 import { HeroGuideRail } from '../components/public/HeroGuideRail'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
-import { HorizontalStoryRail, StickyStorySection, ProjectScenario, ProofRail, type RailPanel, type StoryPanel } from '../components/public/story'
+import { HorizontalStoryRail, StickyStorySection, ProjectScenario, ProofRail, StoryImage, type RailPanel, type StoryPanel } from '../components/public/story'
 import { CLIENT_LOGIN, GET_HELP, founder, howItWorks, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
+import { getCleaningConfig } from '../lib/cleaningApi'
+import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricing'
 
 // How a request moves - the reusable Pinnacle lifecycle, shown as a bounded
 // horizontal story on desktop and a swipe carousel on mobile.
@@ -124,6 +127,8 @@ export default function Home() {
             </ViewTransitionLink>
           </Reveal>
         </section>
+
+        <HomeCleaningSection />
 
         <HorizontalStoryRail
           eyebrow="How the work moves"
@@ -316,5 +321,59 @@ export default function Home() {
       </main>
       <Footer />
     </div>
+  )
+}
+
+const CLEANING_TILES: { key: CleaningServiceType; title: string; to: string }[] = [
+  { key: 'str_turnover', title: 'Airbnb Turnovers', to: '/cleaning/airbnb-turnovers' },
+  { key: 'residential_standard', title: 'Recurring Home Cleaning', to: '/cleaning/recurring' },
+  { key: 'residential_standard', title: 'One-Time Cleaning', to: '/cleaning/recurring' },
+  { key: 'deep', title: 'Deep Cleaning', to: '/cleaning/recurring' },
+  { key: 'move_in_out', title: 'Move-In / Move-Out', to: '/cleaning/recurring' },
+]
+
+// Cleaning spotlight on the homepage. Starting prices come from the pricing
+// engine config so they never drift from HQ's live pricing.
+function HomeCleaningSection() {
+  const [prices, setPrices] = useState<Record<string, number | null> | null>(null)
+  useEffect(() => {
+    let live = true
+    getCleaningConfig().then((c) => live && setPrices(c.startingPrices)).catch(() => {})
+    return () => { live = false }
+  }, [])
+  const from = (key: CleaningServiceType) => {
+    const cents = prices?.[key]
+    return typeof cents === 'number' ? `From ${formatUsd(cents)}` : 'Custom quote'
+  }
+  return (
+    <section className="border-y border-gold/15 bg-navy-900/30">
+      <div className="container-pmv grid gap-10 py-16 sm:py-20 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:gap-16">
+        <Reveal>
+          <p className="eyebrow">Cleaning & Property Turnovers</p>
+          <h2 className="pmv-h2 mt-4">From your own home to your next guest check-in, we make sure it is ready.</h2>
+          <p className="mt-5 max-w-xl text-lg leading-8 text-slate-300">
+            Easy online pricing, professional local cleaners, and documented completion across Miami-Dade, Broward, and Palm Beach.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <ViewTransitionLink to="/cleaning/airbnb-turnovers" className={btnPrimary}>Get My Price</ViewTransitionLink>
+            <ViewTransitionLink to="/cleaning" className={btnOutline}>Explore Cleaning</ViewTransitionLink>
+          </div>
+          <p className="mt-4 text-sm text-slate-400">
+            Airbnb turnovers {from('str_turnover').toLowerCase()} · Home cleaning {from('residential_standard').toLowerCase()}
+          </p>
+        </Reveal>
+        <Reveal delay={0.05}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <StoryImage slot="property_interior" aspect="aspect-[4/3]" className="rounded-lg sm:col-span-2" />
+            {CLEANING_TILES.map((tile) => (
+              <ViewTransitionLink key={tile.title} to={tile.to} className="group flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-navy-950/50 px-4 py-3 transition-colors hover:border-gold/40">
+                <span className="text-sm font-semibold text-white group-hover:text-gold">{tile.title}</span>
+                <span className="shrink-0 text-xs font-semibold text-gold/85">{from(tile.key)}</span>
+              </ViewTransitionLink>
+            ))}
+          </div>
+        </Reveal>
+      </div>
+    </section>
   )
 }
