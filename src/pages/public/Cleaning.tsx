@@ -73,12 +73,12 @@ export default function CleaningHub() {
 
         <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {SUBSERVICES.map((s, i) => (
-            <ViewTransitionLink key={s.title} to={s.to} className="group rounded-lg border border-white/10 bg-navy-900/55 p-6 transition-colors hover:border-gold/40">
+            <ViewTransitionLink key={s.title} to={s.to} className="group rounded-lg border border-white/10 bg-navy-900/55 p-6 transition-colors hover:border-sea-400/50">
               <div className="flex items-baseline justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gold/80">{String(i + 1).padStart(2, '0')}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-sea-300/90">{String(i + 1).padStart(2, '0')}</p>
                 <span className="text-xs font-semibold text-gold/90">{fromLabel(prices, s.key)}</span>
               </div>
-              <h3 className="mt-3 text-base font-semibold text-white group-hover:text-gold">{s.title}</h3>
+              <h3 className="mt-3 text-base font-semibold text-white group-hover:text-sea-300">{s.title}</h3>
               <p className="mt-2 text-sm leading-6 text-slate-400">{s.blurb}</p>
             </ViewTransitionLink>
           ))}
