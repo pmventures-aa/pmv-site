@@ -935,12 +935,12 @@ function DashboardTab({
   return (
     <div className="space-y-5">
       <button onClick={onGoToRecords} className="grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6 text-left">
-        <StatCard label="Open Matters" value={openMatters} />
-        <StatCard label="Open Tasks" value={openTasks} />
-        <StatCard label="Open Tickets" value={openTickets} />
-        <StatCard label="Upcoming Appts." value={upcoming.length} />
-        <StatCard label="Open Funding" value={openFunding} />
-        <StatCard label="Balance Owed" value={`$${(balanceOwedCents / 100).toLocaleString()}`} />
+        <StatCard label="Open Matters" value={openMatters} accent="sea" />
+        <StatCard label="Open Tasks" value={openTasks} accent="sea" />
+        <StatCard label="Open Tickets" value={openTickets} accent="coral" />
+        <StatCard label="Upcoming Appts." value={upcoming.length} accent="gold" />
+        <StatCard label="Open Funding" value={openFunding} accent="green" />
+        <StatCard label="Balance Owed" value={`$${(balanceOwedCents / 100).toLocaleString()}`} accent="coral" />
       </button>
 
       <div className="grid gap-5 lg:grid-cols-2">

@@ -109,12 +109,12 @@ export default function StrOperations() {
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Today" value={summary?.today ?? '–'} />
-        <StatCard label="At risk" value={summary?.at_risk ?? '–'} />
-        <StatCard label="Unassigned" value={summary?.unassigned ?? '–'} />
-        <StatCard label="Awaiting verification" value={summary?.awaiting_verification ?? '–'} />
-        <StatCard label="Open issues" value={summary?.open_issues ?? '–'} />
-        <StatCard label="Scheduled" value={statusCount('scheduled')} />
+        <StatCard label="Today" value={summary?.today ?? '–'} accent="sea" />
+        <StatCard label="At risk" value={summary?.at_risk ?? '–'} accent="coral" />
+        <StatCard label="Unassigned" value={summary?.unassigned ?? '–'} accent="gold" />
+        <StatCard label="Awaiting verification" value={summary?.awaiting_verification ?? '–'} accent="gold" />
+        <StatCard label="Open issues" value={summary?.open_issues ?? '–'} accent="coral" />
+        <StatCard label="Scheduled" value={statusCount('scheduled')} accent="sea" />
       </div>
 
       <Panel className="mb-4">
@@ -447,10 +447,10 @@ export function TurnoverDetail() {
       </Panel>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Client charge" value={money(t.client_charge_cents)} />
-        <StatCard label="Provider payout" value={money(t.provider_payout_cents)} />
-        <StatCard label="Payout status" value={payoutStatusLabel(t.payout_status)} />
-        <StatCard label="Ready by" value={t.required_complete_at ? new Date(t.required_complete_at.replace(' ', 'T')).toLocaleString() : '–'} />
+        <StatCard label="Client charge" value={money(t.client_charge_cents)} accent="gold" />
+        <StatCard label="Provider payout" value={money(t.provider_payout_cents)} accent="sea" />
+        <StatCard label="Payout status" value={payoutStatusLabel(t.payout_status)} accent="green" />
+        <StatCard label="Ready by" value={t.required_complete_at ? new Date(t.required_complete_at.replace(' ', 'T')).toLocaleString() : '–'} accent="coral" />
       </div>
 
       {data.gate.requiredItems > 0 && (
