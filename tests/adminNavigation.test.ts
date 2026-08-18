@@ -40,21 +40,33 @@ describe('HQ navigation contract', () => {
     expect(keys.has('client-banners')).toBe(false)
   })
 
-  it('keeps Field Work and Remote Notarization as separate operational tabs', () => {
+  it('keeps Field Work and Remote Notarization as separate Delivery tabs', () => {
     const field = adminNav.find((item) => item.key === 'field-work')
     const ron = adminNav.find((item) => item.key === 'ron')
     expect(field?.label).toBe('Field Work')
-    expect(field?.section).toBe('Operations')
+    expect(field?.section).toBe('Delivery')
     expect(ron?.label).toBe('Remote Notarization')
-    expect(ron?.section).toBe('Operations')
+    expect(ron?.section).toBe('Delivery')
     // Neither tab should carry the combined 'Field Work & RON' label.
     expect(adminNav.some((item) => /field.*ron/i.test(item.label))).toBe(false)
   })
 
-  it('moves dispatch surfaces (network) into Operations so revenue vs administration stays clean', () => {
+  it('consolidates the sidebar into the six intended hubs, contiguously', () => {
     const network = adminNav.find((item) => item.key === 'network')
-    expect(network?.section).toBe('Operations')
+    expect(network?.section).toBe('People')
+    const users = adminNav.find((item) => item.key === 'users')
+    expect(users?.section).toBe('People')
+    const messages = adminNav.find((item) => item.key === 'messages')
+    expect(messages?.section).toBe('Service')
     const automation = adminNav.find((item) => item.key === 'automation-center')
     expect(automation?.section).toBe('Intelligence')
+
+    // Only these hubs, and each hub's items must be contiguous so the sidebar
+    // grouping (which merges consecutive same-section items) renders one block
+    // per hub.
+    const sections = adminNav.filter((i) => i.section).map((i) => i.section as string)
+    const uniqueInOrder = sections.filter((s, i) => sections[i - 1] !== s)
+    expect(uniqueInOrder).toEqual(['Revenue', 'Service', 'Delivery', 'People', 'Intelligence', 'Administration'])
+    expect(new Set(uniqueInOrder).size).toBe(uniqueInOrder.length)
   })
 })
