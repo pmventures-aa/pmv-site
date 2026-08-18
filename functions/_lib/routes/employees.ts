@@ -254,9 +254,12 @@ employeeRoutes.get('/employees/:id/vendor-documents/:documentId/download', requi
   const object = await c.env.UPLOADS.get(row.object_key)
   if (!object) return c.json({ error: 'stored document not found' }, 404)
   const safe = row.file_name.replace(/["\r\n]/g, '_')
+  // ?inline=1 serves the file for in-app preview (viewer modal) instead of
+  // forcing a download, so staff can look at a document and close back out.
+  const disposition = c.req.query('inline') === '1' ? 'inline' : 'attachment'
   return new Response(object.body, { headers: {
     'Content-Type': row.content_type || object.httpMetadata?.contentType || 'application/octet-stream',
-    'Content-Disposition': `attachment; filename="${safe}"`,
+    'Content-Disposition': `${disposition}; filename="${safe}"`,
     'Cache-Control': 'private, no-store',
   } })
 })
