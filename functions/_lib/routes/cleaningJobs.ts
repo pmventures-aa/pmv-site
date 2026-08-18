@@ -351,8 +351,22 @@ cleaningJobsAdminRoutes.get('/cleaning/jobs/:id', requireStaff, async (c) => {
     const v = await c.env.DB.prepare('SELECT full_name FROM users WHERE id = ?').bind(row.assigned_vendor_user_id).first<{ full_name: string | null }>()
     vendorName = v?.full_name || null
   }
-  const events = await c.env.DB.prepare('SELECT id, actor_user_id, kind, from_status, to_status, detail, created_at FROM cleaning_job_events WHERE job_id = ? ORDER BY created_at ASC').bind(id).all()
-  return c.json({ job: staffJobView(row, Date.now(), vendorName), addonsJson: row.addons_json, reviewReasons: row.review_reasons_json, notesInternal: row.notes_internal, events: events.results || [] })
+  const [events, checklist, issues, photos] = await Promise.all([
+    c.env.DB.prepare('SELECT id, actor_user_id, kind, from_status, to_status, detail, created_at FROM cleaning_job_events WHERE job_id = ? ORDER BY created_at ASC').bind(id).all(),
+    c.env.DB.prepare('SELECT id, category, item_key, label, required, status, na_reason FROM cleaning_job_checklist_items WHERE job_id = ? ORDER BY sort_order').bind(id).all(),
+    c.env.DB.prepare('SELECT id, category, severity, description, status, created_at FROM cleaning_job_issues WHERE job_id = ? ORDER BY created_at DESC').bind(id).all(),
+    c.env.DB.prepare('SELECT id, label FROM cleaning_job_photos WHERE job_id = ? ORDER BY created_at ASC').bind(id).all<{ id: string; label: string }>(),
+  ])
+  return c.json({
+    job: staffJobView(row, Date.now(), vendorName),
+    addonsJson: row.addons_json,
+    reviewReasons: row.review_reasons_json,
+    notesInternal: row.notes_internal,
+    events: events.results || [],
+    checklist: checklist.results || [],
+    issues: issues.results || [],
+    photos: (photos.results || []).map((p) => ({ id: p.id, label: p.label, url: `/admin/cleaning/photos/${p.id}` })),
+  })
 })
 
 /** Candidate vendors for assignment (active providers). */

@@ -71,6 +71,7 @@ export default function CleaningDispatch() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('open')
   const [countyFilter, setCountyFilter] = useState('')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -178,8 +179,10 @@ export default function CleaningDispatch() {
               {jobs.map((job) => (
                 <tr key={job.id} className="border-b border-white/[.06] align-top">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-white">{job.serviceLabel}</p>
-                    <p className="text-xs text-slate-400">{job.reference} · {job.tierLabel || `${job.bedrooms}BR`}/{job.bathrooms}BA · {COUNTY_LABEL[job.county] || job.county}</p>
+                    <button onClick={() => setSelectedId(job.id)} className="text-left">
+                      <p className="font-medium text-white hover:text-gold">{job.serviceLabel}</p>
+                      <p className="text-xs text-slate-400">{job.reference} · {job.tierLabel || `${job.bedrooms}BR`}/{job.bathrooms}BA · {COUNTY_LABEL[job.county] || job.county}</p>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-300">
                     {job.scheduledDate || <span className="text-amber-300">Unscheduled</span>}
@@ -265,6 +268,115 @@ export default function CleaningDispatch() {
           </Panel>
         </div>
       )}
+
+      {selectedId && <JobDrawer jobId={selectedId} vendors={vendors} onClose={() => setSelectedId(null)} onChanged={load} />}
+    </div>
+  )
+}
+
+interface JobDetail {
+  job: Job & { propertyAddress: string | null; propertyUnit: string | null; contactName: string | null; contactPhone: string | null; payoutStatus: string; paymentStatus: string; marginPercent: number }
+  notesInternal: string | null
+  events: { id: string; kind: string; from_status: string | null; to_status: string | null; detail: string | null; created_at: string }[]
+  checklist: { id: string; category: string; label: string; required: number; status: string }[]
+  issues: { id: string; category: string; severity: string; description: string; status: string }[]
+  photos: { id: string; label: string; url: string }[]
+}
+
+function JobDrawer({ jobId, vendors, onClose, onChanged }: { jobId: string; vendors: Vendor[]; onClose: () => void; onChanged: () => void }) {
+  const [detail, setDetail] = useState<JobDetail | null>(null)
+  const load = useCallback(async () => {
+    try { setDetail(await api.get<JobDetail>(`/admin/cleaning/jobs/${jobId}`)) } catch { /* ignore */ }
+  }, [jobId])
+  useEffect(() => { void load() }, [load])
+
+  async function act(fn: () => Promise<unknown>) {
+    try { await fn(); await load(); onChanged() } catch (err) { toast.error(err instanceof ApiError ? err.message : 'Action failed.') }
+  }
+
+  const j = detail?.job
+  const done = detail ? detail.checklist.filter((i) => i.status === 'complete' || i.status === 'not_applicable').length : 0
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/50" onClick={onClose}>
+      <div className="h-full w-full max-w-md overflow-y-auto border-l border-white/10 bg-navy-950 p-6" onClick={(e) => e.stopPropagation()}>
+        {!j ? (
+          <p className="text-sm text-slate-400">Loading…</p>
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-white">{j.serviceLabel}</h2>
+                <p className="text-xs text-slate-400">{j.reference} · {cleaningStatusLabel(j.status)}</p>
+              </div>
+              <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-md border border-white/10 p-2"><p className="text-[10px] uppercase text-slate-500">Client</p><p className="text-sm font-semibold text-white">{formatUsd(j.clientTotalCents)}</p></div>
+              <div className="rounded-md border border-white/10 p-2"><p className="text-[10px] uppercase text-slate-500">Payout</p><p className="text-sm font-semibold text-slate-200">{formatUsd(j.vendorPayoutCents)}</p></div>
+              <div className="rounded-md border border-white/10 p-2"><p className="text-[10px] uppercase text-slate-500">Margin</p><p className={`text-sm font-semibold ${j.belowMinMargin ? 'text-rose-300' : 'text-emerald-300'}`}>{j.marginPercent}%</p></div>
+            </div>
+
+            {(j.propertyAddress || j.contactName) && (
+              <div className="mt-4 text-sm text-slate-300">
+                {j.propertyAddress && <p>{j.propertyAddress}{j.propertyUnit ? `, ${j.propertyUnit}` : ''}</p>}
+                {j.contactName && <p className="text-slate-400">{j.contactName}{j.contactPhone ? ` · ${j.contactPhone}` : ''}</p>}
+                <p className="text-slate-500">{j.scheduledDate || 'Unscheduled'}{j.arrivalWindow ? ` · ${j.arrivalWindow}` : ''}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {!j.assignedVendorName && (
+                <select className={`${inputCls} max-w-[180px] py-1 text-xs`} defaultValue="" onChange={(e) => e.target.value && act(() => api.post(`/admin/cleaning/jobs/${jobId}/assign`, { vendorUserId: e.target.value }))}>
+                  <option value="" disabled>Assign vendor…</option>
+                  {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                </select>
+              )}
+              {j.status === 'needs_review' && <button onClick={() => act(() => api.post(`/admin/cleaning/jobs/${jobId}/status`, { status: 'scheduled' }))} className="rounded-md bg-gold px-3 py-1.5 text-xs font-semibold text-navy-950">Approve</button>}
+              {j.payoutStatus !== 'paid' && j.status === 'completed' && <button onClick={() => act(() => api.patch(`/admin/cleaning/jobs/${jobId}`, { payoutStatus: 'approved' }))} className="rounded-md border border-white/15 px-3 py-1.5 text-xs font-semibold text-slate-200">Approve payout</button>}
+              {!['completed', 'cancelled'].includes(j.status) && <button onClick={() => act(() => api.post(`/admin/cleaning/jobs/${jobId}/status`, { status: 'cancelled' }))} className="rounded-md px-3 py-1.5 text-xs text-slate-400 hover:text-rose-300">Cancel</button>}
+            </div>
+
+            {detail.issues.length > 0 && (
+              <div className="mt-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issues</p>
+                {detail.issues.map((i) => <p key={i.id} className={`mt-1 text-sm ${i.severity === 'urgent' ? 'text-rose-300' : 'text-amber-300'}`}>{i.category} · {i.severity}: {i.description}</p>)}
+              </div>
+            )}
+
+            {detail.photos.length > 0 && (
+              <div className="mt-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Photos</p>
+                <div className="mt-2 grid grid-cols-4 gap-2">
+                  {detail.photos.map((p) => <img key={p.id} src={`/api${p.url}`} alt={p.label} className="aspect-square w-full rounded object-cover" loading="lazy" />)}
+                </div>
+              </div>
+            )}
+
+            {detail.checklist.length > 0 && (
+              <div className="mt-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Checklist · {done}/{detail.checklist.length}</p>
+                <div className="mt-2 space-y-1">
+                  {detail.checklist.map((i) => (
+                    <p key={i.id} className={`text-sm ${i.status === 'complete' || i.status === 'not_applicable' ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{i.label}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">History</p>
+              <div className="mt-2 space-y-1">
+                {detail.events.map((e) => (
+                  <p key={e.id} className="text-xs text-slate-400">{e.created_at.slice(0, 16).replace('T', ' ')} · {e.to_status ? cleaningStatusLabel(e.to_status) : e.kind}{e.detail ? ` - ${e.detail}` : ''}</p>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
