@@ -36,6 +36,7 @@ import CarePlans, { CarePlansConfirmation } from './pages/public/CarePlans'
 import StrTurnover from './pages/public/StrTurnover'
 import StrQuote from './pages/public/StrQuote'
 import CleaningHub, { CleaningAirbnb, CleaningRecurring } from './pages/public/Cleaning'
+import { CleaningArea, CleaningAreasIndex } from './pages/public/CleaningArea'
 import NotFound from './pages/public/NotFound'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
@@ -110,6 +111,8 @@ function App() {
         <Route path="/cleaning" element={<CleaningHub />} />
         <Route path="/cleaning/airbnb-turnovers" element={<CleaningAirbnb />} />
         <Route path="/cleaning/recurring" element={<CleaningRecurring />} />
+        <Route path="/cleaning/areas" element={<CleaningAreasIndex />} />
+        <Route path="/cleaning/:area" element={<CleaningArea />} />
         <Route path="/about" element={<About />} />
         <Route path="/service-area" element={<ServiceArea />} />
         <Route path="/professionals" element={<Professionals />} />

@@ -9,6 +9,13 @@ import { CleaningCalculator } from '../../components/public/CleaningCalculator'
 import { getCleaningConfig } from '../../lib/cleaningApi'
 import { formatUsd, type CleaningServiceType } from '../../../shared/cleaningPricing'
 import { usePageMeta } from '../../lib/usePageMeta'
+import { CLEANING_SERVICE_AREAS } from '../../../shared/cleaningServiceAreas'
+
+// A curated strip of marquee cities for the hub - the full grid lives on
+// /cleaning/areas. One per major metro keeps the row tidy on the hub.
+const AREA_LINKS = CLEANING_SERVICE_AREAS.filter((a) =>
+  ['miami', 'miami-beach', 'coral-gables', 'fort-lauderdale', 'hollywood', 'west-palm-beach', 'boca-raton', 'delray-beach'].includes(a.slug),
+)
 
 // Live starting prices, always from the pricing engine config - never hardcoded.
 function useStartingPrices() {
@@ -87,6 +94,21 @@ export default function CleaningHub() {
               { n: '03', label: 'Documented completion', detail: 'A checklist is followed and completion is documented, guest-ready when it matters.' },
             ]}
           />
+        </div>
+
+        <div className="mt-16 border-t border-white/10 pt-12">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <p className="eyebrow">Where we clean</p>
+            <ViewTransitionLink to="/cleaning/areas" className="text-sm font-semibold text-gold hover:text-gold/80">All service areas</ViewTransitionLink>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {AREA_LINKS.map((a) => (
+              <ViewTransitionLink key={a.slug} to={`/cleaning/${a.slug}`} className="rounded-full border border-white/12 bg-navy-900/50 px-4 py-1.5 text-sm text-slate-300 transition-colors hover:border-gold/40 hover:text-gold">
+                {a.city}
+              </ViewTransitionLink>
+            ))}
+          </div>
+          <p className="mt-4 text-sm text-slate-500">Serving Miami-Dade, Broward, and Palm Beach County.</p>
         </div>
       </section>
       <Footer />
