@@ -51,4 +51,27 @@ export async function getCleaningQuote(input: CleaningQuoteInput): Promise<Clean
   return res.quote
 }
 
+export interface CleaningBookingContact {
+  name: string
+  email: string
+  phone?: string
+  address?: string
+  unit?: string
+  scheduledDate?: string
+  arrivalWindow?: string
+  guestCheckoutAt?: string
+  guestCheckinAt?: string
+  source?: string
+}
+export interface CleaningBookingResult {
+  reference: string
+  status: string
+  needsReview: boolean
+  totalCents: number
+  message: string
+}
+export function bookCleaning(input: CleaningQuoteInput & CleaningBookingContact): Promise<CleaningBookingResult> {
+  return api.post('/public/cleaning/book', input) as Promise<CleaningBookingResult>
+}
+
 export type { CleaningCounty, CleaningFrequency, CleaningServiceType, CleaningQuoteInput, CleaningCustomerQuote }
