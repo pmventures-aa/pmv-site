@@ -63,7 +63,10 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
   if (!employee) return c.json({ error: 'not found' }, 404)
 
   const [logins, tasks, networkNotes, dispatch, notes, avgResponse, vendorDocuments, agreementAcceptances] = await Promise.all([
-    c.env.DB.prepare("SELECT created_at, actor_ip, actor_user_agent FROM audit_log WHERE actor_user_id = ? AND action = 'login' ORDER BY created_at DESC LIMIT 20").bind(id).all(),
+    // Sign-ins land under 'login' (password) or 'auth0_login' (Auth0/social),
+    // which is how most providers authenticate — include both, and surface the
+    // captured IP, device, and geo so staff can see where a provider signed in.
+    c.env.DB.prepare("SELECT created_at, action, actor_ip, actor_user_agent, actor_city, actor_region, actor_country FROM audit_log WHERE actor_user_id = ? AND action IN ('login','auth0_login') ORDER BY created_at DESC LIMIT 25").bind(id).all(),
     c.env.DB.prepare(
       `SELECT t.id,t.title,t.status,t.due_date,t.created_at,u.full_name client_name,u.email client_email
        FROM client_tasks t JOIN users u ON u.id = t.client_user_id

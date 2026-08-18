@@ -182,6 +182,7 @@ export default function ProviderProfile() {
       {tab === 'profile' && (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,.85fr)]">
           <div className="space-y-5">
+          <ApplicationReviewPanel application={data.vendor_application} />
           <Panel>
             <h2 className="text-sm font-semibold text-white">Relationship</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">Status, coverage, and whether this person is preferred for dispatch.</p>
@@ -270,6 +271,8 @@ export default function ProviderProfile() {
                       <a
                         key={doc.id}
                         href={`/api/admin/employees/${id}/vendor-documents/${doc.id}/download`}
+                        target="_blank"
+                        rel="noreferrer"
                         className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[.02] px-2.5 py-1.5 text-xs text-slate-200 transition hover:border-gold/40 hover:text-gold"
                       >
                         <span className="truncate">{doc.document_type === 'application_summary' ? '★ ' : ''}{doc.file_name || 'Document'}</span>
@@ -348,9 +351,22 @@ export default function ProviderProfile() {
         <div className="grid gap-5 lg:grid-cols-2">
           <Panel>
             <h2 className="text-sm font-semibold text-white">Access history</h2>
-            {data.login_history.length ? data.login_history.map((l: any, i: number) => (
-              <p key={i} className="border-b border-white/[.06] py-3 text-sm text-slate-400">Signed in {new Date(l.created_at).toLocaleString()}</p>
-            )) : <p className="py-6 text-sm text-slate-500">No sign-ins recorded.</p>}
+            <p className="mt-0.5 text-xs text-slate-500">Sign-ins with the network, device, and approximate location captured at login.</p>
+            {data.login_history.length ? data.login_history.map((l: any, i: number) => {
+              const location = [l.actor_city, l.actor_region, l.actor_country].filter(Boolean).join(', ')
+              return (
+                <div key={i} className="border-b border-white/[.06] py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-slate-200">{new Date(l.created_at).toLocaleString()}</p>
+                    <span className="text-[10px] uppercase tracking-wide text-slate-500">{l.action === 'auth0_login' ? 'Auth0 / social' : 'Password'}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {location || 'Location unavailable'}{l.actor_ip ? ` · IP ${l.actor_ip}` : ''}
+                  </p>
+                  {l.actor_user_agent && <p className="mt-0.5 text-xs text-slate-600">{describeDevice(l.actor_user_agent)}</p>}
+                </div>
+              )
+            }) : <p className="py-6 text-sm text-slate-500">No sign-ins recorded yet. Sign-ins appear here after this provider next logs in.</p>}
           </Panel>
           <Panel>
             <h2 className="text-sm font-semibold text-white">Work history</h2>
@@ -365,6 +381,64 @@ export default function ProviderProfile() {
       )}
     </div>
   )
+}
+
+// The applicant's submitted enrollment answers, shown for staff review.
+// Read-only readout built from a fixed field list so nothing unexpected leaks
+// and the notary commission is always visible when captured.
+function ApplicationReviewPanel({ application }: { application: any }) {
+  if (!application) {
+    return (
+      <Panel>
+        <h2 className="text-sm font-semibold text-white">Application review</h2>
+        <p className="mt-2 text-sm text-slate-500">No structured application answers on file. This provider may have been added manually or applied before the enrollment questionnaire was captured. Use “Generate application PDF” once answers exist.</p>
+      </Panel>
+    )
+  }
+  const val = (v: any): string => Array.isArray(v) ? v.filter(Boolean).join(', ') : v === true ? 'Yes' : v === false ? 'No' : (v ?? '') === '' ? '' : String(v)
+  const rows: Array<{ label: string; value: string }> = [
+    { label: 'Entity type', value: val(application.entity_type) },
+    { label: 'Has EIN', value: val(application.has_ein) },
+    { label: 'Business', value: val(application.company_name) },
+    { label: 'Service categories', value: val(application.enrollments) },
+    { label: 'Service area', value: val(application.service_area) },
+    { label: 'Years of experience', value: val(application.years_experience) },
+    { label: 'Travel radius', value: val(application.travel_radius) },
+    { label: 'Professional license', value: val(application.license_status) },
+    { label: 'Insurance', value: val(application.insurance_status) },
+    { label: 'Notary commission number', value: val(application.commission_number) },
+    { label: 'Commission state', value: val(application.commission_state) },
+    { label: 'Commission expiration', value: val(application.commission_expiration) },
+    { label: 'RON platform', value: val(application.ron_provider) },
+    { label: 'Technology platforms', value: val(application.technology_platforms) },
+    { label: 'Accounting credentials', value: val(application.accounting_credentials) },
+    { label: 'Other service', value: val(application.other_service) },
+    { label: 'Applicant notes', value: val(application.notes) },
+  ].filter((r) => r.value !== '')
+  return (
+    <Panel>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-white">Application review</h2>
+        {application.submitted_at && <span className="text-[11px] text-slate-500">Submitted {new Date(application.submitted_at).toLocaleDateString()}</span>}
+      </div>
+      <dl className="mt-3 divide-y divide-white/[.06]">
+        {rows.map((r) => (
+          <div key={r.label} className="grid gap-1 py-2 sm:grid-cols-[180px_1fr]">
+            <dt className="text-[11px] uppercase tracking-wide text-slate-500">{r.label}</dt>
+            <dd className="whitespace-pre-wrap text-sm text-slate-200">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Panel>
+  )
+}
+
+// Compact device summary from a raw user-agent string, for the access log.
+function describeDevice(ua: string): string {
+  const browser = /Edg/.test(ua) ? 'Edge' : /Chrome/.test(ua) ? 'Chrome' : /Firefox/.test(ua) ? 'Firefox' : /Safari/.test(ua) ? 'Safari' : 'Browser'
+  const os = /iPhone|iPad|iOS/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X|Macintosh/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : 'Unknown OS'
+  const kind = /Mobi|Android|iPhone/.test(ua) ? 'Mobile' : 'Desktop'
+  return `${kind} · ${browser} on ${os}`
 }
 
 function Field({ label, children }: { label: string; children: any }) {

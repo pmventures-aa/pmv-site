@@ -202,6 +202,31 @@ export default function ProviderNetworkAdmin() {
         <Metric icon={MapPinned} label="Open dispatch" value={providers.reduce((n, r) => n + openLoad(r), 0)} />
       </div>
 
+      {(() => {
+        const toReview = providers.filter((r) => isProvider(r) && (r.status === 'pending' || r.network_status === 'vetting' || r.network_status === 'prospect'))
+        if (toReview.length === 0) return null
+        return (
+          <div className="mb-4 rounded-xl border border-gold/25 bg-gold/[.05] p-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={16} className="text-gold" />
+              <p className="text-sm font-bold text-white">Providers awaiting review ({toReview.length})</p>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">New and in-vetting applicants. Open a profile to review their application answers, documents, and notary credentials.</p>
+            <div className="mt-3 grid gap-2">
+              {toReview.map((r) => (
+                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{r.full_name || r.email}</p>
+                    <p className="truncate text-[11px] text-slate-500">{r.vendor_category || 'Provider'} · {r.status === 'pending' ? 'Pending approval' : (r.network_status || 'vetting')}{r.application_documents ? ` · ${r.application_documents} file${r.application_documents === 1 ? '' : 's'}` : ' · no files'}</p>
+                  </div>
+                  <Link to={p(`network/${r.id}/profile`)} className="shrink-0 rounded-md border border-gold/40 px-3 py-1.5 text-xs font-semibold text-gold transition hover:bg-gold/10">Review</Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       <DispatchFeeSettingsPanel className="mb-4" />
 
       {((geoPerm.permission === 'prompt' && !geoPerm.ctaHidden) || geoPerm.permission === 'revoked') && sharing !== 'live' && (
