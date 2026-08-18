@@ -90,6 +90,7 @@ export const adminNav: NavItem[] = [
   {key:'automation-center',label:'Automation Center',to:'automation-center',icon:Bot,section:'Intelligence'},
   {key:'management',label:'Management',to:'management',icon:Gauge,section:'Intelligence'},
   {key:'reports',label:'Reports',to:'reports',icon:BarChart3,section:'Intelligence'},
+  {key:'cleaning-reports',label:'Cleaning Reports',to:'cleaning/reports',icon:Sparkles,section:'Intelligence'},
   {key:'activity',label:'Activity',to:'activity',icon:Activity,section:'Intelligence'},
   {key:'security-center',label:'Security Center',to:'security-center',icon:ShieldCheck,section:'Administration'},
   {key:'audit-log',label:'Audit Log',to:'audit-log',icon:ClipboardList,section:'Administration'},
