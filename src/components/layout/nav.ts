@@ -29,6 +29,10 @@ export function clientPortalNav(serviceKeys: string[]): NavItem[] {
   if (keys.has('str_turnover')) {
     extras.push({key:'turnovers',label:'Turnovers',to:'str/turnovers',icon:ClipboardCheck,section:'Your work'})
   }
+  // Cleaning customers keep their property details on file here.
+  if (keys.has('property_management') || keys.has('property_inspections') || keys.has('str_turnover')) {
+    extras.push({key:'cleaning-properties',label:'My Properties',to:'cleaning-properties',icon:Building2,section:'Your work'})
+  }
   if (keys.has('funding')) extras.push({key:'funding',label:'Funding',to:'funding',icon:Gauge,section:'Your work'})
 
   const home = portalNav[0]
@@ -36,8 +40,9 @@ export function clientPortalNav(serviceKeys: string[]): NavItem[] {
   const account = portalNav.filter((item) => item.section === 'Account')
   const properties = extras.filter((item) => item.key === 'properties')
   const turnovers = extras.filter((item) => item.key === 'turnovers')
+  const cleaningProps = extras.filter((item) => item.key === 'cleaning-properties')
   const funding = extras.filter((item) => item.key === 'funding')
-  return [home, work[0], ...properties, ...turnovers, ...funding, ...work.slice(1), ...account]
+  return [home, work[0], ...properties, ...turnovers, ...cleaningProps, ...funding, ...work.slice(1), ...account]
 }
 
 export function clientMobilePrimary(serviceKeys: string[]): string[] {
