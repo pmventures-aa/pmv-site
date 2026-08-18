@@ -2,6 +2,7 @@ import { motion, useReducedMotion, useScroll, useTransform, type MotionValue } f
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { pmvMotion } from '../../lib/motionTheme'
 import { storyImages, type StoryImageKey } from '../../data/storyImages'
+import { SceneArt } from './SceneArt'
 
 // PMV editorial story system. These components extend the existing public
 // motion helpers (Reveal / StaggerGroup / pmvMotion tokens) with the richer,
@@ -74,8 +75,9 @@ export function StoryImage({
           style={{ willChange: 'transform' }}
         />
       ) : (
-        <div className="absolute inset-0" style={{ backgroundImage: image.scene }} aria-label={image.alt} role="img">
-          <span className="absolute bottom-3 left-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">{image.hint}</span>
+        <div className="absolute inset-0" aria-label={image.alt} role="img">
+          <SceneArt slot={slot} />
+          <span className="absolute bottom-3 left-3 rounded-full border border-white/10 bg-navy-950/50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55 backdrop-blur-sm">{image.hint}</span>
         </div>
       )}
       {overlay}
