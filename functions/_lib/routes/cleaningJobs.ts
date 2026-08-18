@@ -27,8 +27,10 @@ import {
   type CleaningJobStatus,
 } from '../../../shared/cleaningJobs'
 import { ensureCleaningPricingConfig } from './cleaningPricing'
-import { createRecurringPlan, generateNextOccurrence } from '../cleaningRecurring'
+import { createRecurringPlan, generateNextOccurrence, materializeChecklist } from '../cleaningRecurring'
 import { isRecurringFrequency } from '../../../shared/cleaningRecurrence'
+import { pushNotification } from '../notificationFeed'
+import { allRequiredResolved, isIssueCategory, isIssueSeverity, issueCategoryLabel } from '../../../shared/cleaningChecklist'
 
 export const cleaningJobsPublicRoutes = new Hono<AppEnv>()
 export const cleaningJobsAdminRoutes = new Hono<AppEnv>()
@@ -151,6 +153,7 @@ function staffJobView(row: JobRow, nowMs: number, vendorName?: string | null) {
     contactPhone: row.contact_phone,
     payoutStatus: row.payout_status,
     paymentStatus: row.payment_status,
+    openIssues: Number(row.open_issues) || 0,
     turnover: turn,
   }
 }
@@ -241,6 +244,7 @@ cleaningJobsPublicRoutes.post('/public/cleaning/book', async (c) => {
   ).run()
 
   await logJobEvent(c.env, id, clientUserId, 'status_change', null, status, 'Booking received')
+  await materializeChecklist(c.env, id, input.service).catch(() => {})
 
   // A recurring booking starts a standing plan; this job is its first visit.
   // Only recurring-eligible services (those the engine gave a recurring context)
@@ -305,7 +309,7 @@ cleaningJobsAdminRoutes.get('/cleaning/jobs', requireStaff, async (c) => {
   if (vendor) { clauses.push('assigned_vendor_user_id = ?'); binds.push(vendor) }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
   const rows = await c.env.DB.prepare(
-    `SELECT ${BOARD_COLUMNS} FROM cleaning_jobs ${where} ORDER BY (scheduled_date IS NULL), scheduled_date ASC, created_at DESC LIMIT 300`,
+    `SELECT ${BOARD_COLUMNS}, (SELECT COUNT(*) FROM cleaning_job_issues i WHERE i.job_id = cleaning_jobs.id AND i.status='open') AS open_issues FROM cleaning_jobs ${where} ORDER BY (scheduled_date IS NULL), scheduled_date ASC, created_at DESC LIMIT 300`,
   ).bind(...binds).all<JobRow>()
 
   // Attach assigned vendor names in one pass.
@@ -485,6 +489,16 @@ cleaningJobsAdminRoutes.post('/cleaning/my-jobs/:id/field', requireUser, async (
   if (job.assigned_vendor_user_id !== me.id) return c.json({ error: 'This is not your job.' }, 403)
   if (job.status !== step.from) return c.json({ error: `Cannot ${action} from ${job.status}.` }, 400)
 
+  // Completion requires every required checklist item resolved, unless the
+  // vendor documents an explicit exception (override with a reason).
+  if (step.action === 'complete' && body.override !== true) {
+    const items = await c.env.DB.prepare('SELECT required, status FROM cleaning_job_checklist_items WHERE job_id=?').bind(id).all<{ required: number; status: string }>()
+    const rows = (items.results || []).map((r) => ({ required: r.required === 1, status: r.status }))
+    if (rows.length && !allRequiredResolved(rows)) {
+      return c.json({ error: 'Finish or mark N/A every required checklist item before completing.' }, 400)
+    }
+  }
+
   const col = statusTimestampColumn(step.to)
   // Optional location context recorded on the event (not continuous tracking).
   const lat = Number(body.lat), lng = Number(body.lng)
@@ -589,4 +603,76 @@ cleaningJobsAdminRoutes.post('/cleaning/plans/:id/action', requireStaff, async (
   }
   await logAudit(c.env, { actorUserId: user.id, actorIp: actorIp(c.req.raw), actorUserAgent: actorUserAgent(c.req.raw), actorGeo: actorGeo(c.req.raw), action: `cleaning_plan_${action}`, entityType: 'recurring_cleaning_plan', entityId: id }).catch(() => {})
   return c.json({ ok: true })
+})
+
+// ---------------------------------------------------------------------------
+// Job checklist + issue reporting (vendor-scoped)
+// ---------------------------------------------------------------------------
+
+async function requireMyJob(c: import('hono').Context<AppEnv>, id: string): Promise<{ ok: true; meId: string } | { ok: false; res: Response }> {
+  const me = c.get('user')!
+  const job = await c.env.DB.prepare('SELECT assigned_vendor_user_id FROM cleaning_jobs WHERE id=?').bind(id).first<{ assigned_vendor_user_id: string | null }>()
+  if (!job) return { ok: false, res: c.json({ error: 'Not found' }, 404) }
+  if (job.assigned_vendor_user_id !== me.id) return { ok: false, res: c.json({ error: 'This is not your job.' }, 403) }
+  return { ok: true, meId: me.id }
+}
+
+cleaningJobsAdminRoutes.get('/cleaning/my-jobs/:id/checklist', requireUser, async (c) => {
+  const id = c.req.param('id')!
+  const guard = await requireMyJob(c, id)
+  if (!guard.ok) return guard.res
+  const items = await c.env.DB.prepare('SELECT id, category, item_key, label, required, status, na_reason FROM cleaning_job_checklist_items WHERE job_id=? ORDER BY sort_order').bind(id).all()
+  const issues = await c.env.DB.prepare('SELECT id, category, severity, description, status, created_at FROM cleaning_job_issues WHERE job_id=? ORDER BY created_at DESC').bind(id).all()
+  return c.json({ items: items.results || [], issues: issues.results || [] })
+})
+
+cleaningJobsAdminRoutes.post('/cleaning/my-jobs/:id/checklist/:itemId', requireUser, async (c) => {
+  const id = c.req.param('id')!
+  const itemId = c.req.param('itemId')!
+  const guard = await requireMyJob(c, id)
+  if (!guard.ok) return guard.res
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+  const status = text(body.status, 20)
+  if (!['pending', 'complete', 'not_applicable'].includes(status)) return c.json({ error: 'Unknown status.' }, 400)
+  const naReason = status === 'not_applicable' ? text(body.naReason, 200) : null
+  await c.env.DB.prepare(
+    "UPDATE cleaning_job_checklist_items SET status=?, na_reason=?, completed_at=CASE WHEN ?='pending' THEN NULL ELSE datetime('now') END, completed_by_user_id=? WHERE id=? AND job_id=?",
+  ).bind(status, naReason, status, guard.meId, itemId, id).run()
+  return c.json({ ok: true })
+})
+
+cleaningJobsAdminRoutes.post('/cleaning/my-jobs/:id/issues', requireUser, async (c) => {
+  const id = c.req.param('id')!
+  const guard = await requireMyJob(c, id)
+  if (!guard.ok) return guard.res
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+  const category = String(body.category)
+  const severity = String(body.severity)
+  const description = text(body.description, 1000)
+  if (!isIssueCategory(category)) return c.json({ error: 'Choose an issue type.' }, 400)
+  if (!isIssueSeverity(severity)) return c.json({ error: 'Choose a severity.' }, 400)
+  if (!description) return c.json({ error: 'Describe the issue.' }, 400)
+  const issueId = uuid()
+  await c.env.DB.prepare(
+    'INSERT INTO cleaning_job_issues (id, job_id, reported_by_user_id, category, severity, description) VALUES (?, ?, ?, ?, ?, ?)',
+  ).bind(issueId, id, guard.meId, category, severity, description).run()
+  await logJobEvent(c.env, id, guard.meId, 'note', null, null, `Issue reported: ${issueCategoryLabel(category)} (${severity})`)
+
+  // Urgent issues alert HQ immediately through the existing notification feed.
+  if (severity === 'urgent') {
+    const job = await c.env.DB.prepare('SELECT reference FROM cleaning_jobs WHERE id=?').bind(id).first<{ reference: string }>()
+    const staff = await c.env.DB.prepare("SELECT id FROM users WHERE role IN ('staff','admin') AND status='active' LIMIT 50").all<{ id: string }>()
+    for (const s of staff.results || []) {
+      await pushNotification(c.env, {
+        userId: s.id,
+        kind: 'cleaning.issue_reported',
+        subjectType: 'cleaning_job',
+        subjectId: id,
+        title: 'Urgent cleaning issue',
+        body: `${issueCategoryLabel(category)} on ${job?.reference || 'a cleaning job'}: ${description.slice(0, 120)}`,
+        deepLinkPath: '/admin/cleaning/dispatch',
+      }).catch(() => {})
+    }
+  }
+  return c.json({ ok: true, id: issueId })
 })

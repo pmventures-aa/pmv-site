@@ -1,9 +1,102 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, inputCls } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { formatUsd } from '../../../shared/cleaningPricing'
 import { VENDOR_FIELD_STEPS, cleaningStatusLabel, formatDuration } from '../../../shared/cleaningJobs'
+import { CLEANING_ISSUE_CATEGORIES, CLEANING_ISSUE_SEVERITIES, issueCategoryLabel, issueSeverityLabel } from '../../../shared/cleaningChecklist'
+
+interface ChecklistItem { id: string; category: string; label: string; required: number; status: string }
+interface JobIssue { id: string; category: string; severity: string; description: string; status: string }
+
+function JobChecklist({ jobId }: { jobId: string }) {
+  const [items, setItems] = useState<ChecklistItem[]>([])
+  const [issues, setIssues] = useState<JobIssue[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [reporting, setReporting] = useState(false)
+  const [issue, setIssue] = useState({ category: 'damage', severity: 'needs_attention', description: '' })
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api.get<{ items: ChecklistItem[]; issues: JobIssue[] }>(`/admin/cleaning/my-jobs/${jobId}/checklist`)
+      setItems(res.items)
+      setIssues(res.issues)
+      setLoaded(true)
+    } catch { /* ignore */ }
+  }, [jobId])
+  useEffect(() => { void load() }, [load])
+
+  async function toggle(item: ChecklistItem) {
+    const next = item.status === 'complete' ? 'pending' : 'complete'
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: next } : i)))
+    try { await api.post(`/admin/cleaning/my-jobs/${jobId}/checklist/${item.id}`, { status: next }) } catch { void load() }
+  }
+
+  async function submitIssue() {
+    if (!issue.description.trim()) return toast.error('Describe the issue.')
+    try {
+      await api.post(`/admin/cleaning/my-jobs/${jobId}/issues`, issue)
+      toast.success('Issue reported.')
+      setReporting(false)
+      setIssue({ category: 'damage', severity: 'needs_attention', description: '' })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not report the issue.')
+    }
+  }
+
+  if (!loaded) return <p className="mt-3 text-xs text-slate-500">Loading checklist…</p>
+
+  const grouped = items.reduce<Record<string, ChecklistItem[]>>((acc, i) => { (acc[i.category] ||= []).push(i); return acc }, {})
+  const done = items.filter((i) => i.status === 'complete' || i.status === 'not_applicable').length
+
+  return (
+    <div className="mt-3 border-t border-white/10 pt-3">
+      <p className="mb-2 text-xs font-semibold text-slate-400">Checklist · {done}/{items.length}</p>
+      <div className="space-y-2.5">
+        {Object.entries(grouped).map(([cat, list]) => (
+          <div key={cat}>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{cat}</p>
+            {list.map((item) => (
+              <button key={item.id} type="button" onClick={() => toggle(item)} className="flex w-full items-center gap-2 py-1.5 text-left text-sm">
+                <span className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${item.status === 'complete' ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300' : 'border-white/20 text-transparent'}`}>✓</span>
+                <span className={item.status === 'complete' ? 'text-slate-400 line-through' : 'text-slate-200'}>{item.label}{item.required ? '' : ' (optional)'}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {issues.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {issues.map((i) => (
+            <p key={i.id} className={`text-xs ${i.severity === 'urgent' ? 'text-rose-300' : 'text-amber-300'}`}>{issueCategoryLabel(i.category)} · {issueSeverityLabel(i.severity)}: {i.description}</p>
+          ))}
+        </div>
+      )}
+
+      {reporting ? (
+        <div className="mt-3 space-y-2 rounded-md border border-white/10 p-3">
+          <div className="grid grid-cols-2 gap-2">
+            <select className={inputCls} value={issue.category} onChange={(e) => setIssue((s) => ({ ...s, category: e.target.value }))}>
+              {CLEANING_ISSUE_CATEGORIES.map((c) => <option key={c} value={c}>{issueCategoryLabel(c)}</option>)}
+            </select>
+            <select className={inputCls} value={issue.severity} onChange={(e) => setIssue((s) => ({ ...s, severity: e.target.value }))}>
+              {CLEANING_ISSUE_SEVERITIES.map((s) => <option key={s} value={s}>{issueSeverityLabel(s)}</option>)}
+            </select>
+          </div>
+          <textarea className={`${inputCls} min-h-[64px]`} placeholder="What did you find?" value={issue.description} onChange={(e) => setIssue((s) => ({ ...s, description: e.target.value }))} />
+          <div className="flex gap-2">
+            <button onClick={submitIssue} className="flex-1 rounded-md bg-gold px-3 py-2 text-sm font-semibold text-navy-950">Send Report</button>
+            <button onClick={() => setReporting(false)} className="px-3 py-2 text-sm text-slate-400">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setReporting(true)} className="mt-3 text-xs font-semibold text-gold">Report an Issue</button>
+      )}
+    </div>
+  )
+}
 
 interface VJob {
   id: string
@@ -148,6 +241,7 @@ export default function CleaningMyJobs() {
                         </p>
                       )}
                       {job.contactPhone && <a href={`tel:${job.contactPhone}`} className="mt-2 inline-block text-xs font-semibold text-gold">Call contact</a>}
+                      {(job.status === 'checked_in' || job.status === 'in_progress') && <JobChecklist jobId={job.id} />}
                       {step && (
                         <button onClick={() => fieldAction(job, step.action)} disabled={busyId === job.id} className="mt-3 w-full rounded-md bg-gold px-3 py-2.5 text-sm font-semibold text-navy-950 disabled:opacity-60">
                           {busyId === job.id ? 'Working…' : step.label}

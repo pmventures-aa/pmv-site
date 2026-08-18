@@ -7,6 +7,7 @@ import type { Env } from './types'
 import { uuid } from './crypto'
 import { priceCleaning, type CleaningPricingConfig, type CleaningQuoteInput } from '../../shared/cleaningPricing'
 import { nextOccurrenceDate, isRecurringFrequency, isDateKey, type RecurringFrequency } from '../../shared/cleaningRecurrence'
+import { checklistTemplateFor } from '../../shared/cleaningChecklist'
 import { ensureCleaningPricingConfig } from './routes/cleaningPricing'
 
 export interface CleaningJobInsert {
@@ -54,6 +55,19 @@ export async function insertCleaningJob(env: Env, id: string, reference: string,
     data.scheduledDate, data.arrivalWindow, data.guestCheckoutAt, data.guestCheckinAt,
     data.status, data.source, data.recurringPlanId, data.createdByUserId,
   ).run()
+  await materializeChecklist(env, id, data.quote.service)
+}
+
+/** Create the per-job checklist from the default template for the service. */
+export async function materializeChecklist(env: Env, jobId: string, service: CleaningQuoteInput['service']): Promise<void> {
+  const template = checklistTemplateFor(service)
+  if (!template.length) return
+  const stmts = template.map((item, index) =>
+    env.DB.prepare(
+      'INSERT INTO cleaning_job_checklist_items (id, job_id, category, item_key, label, required, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).bind(uuid(), jobId, item.category, item.itemKey, item.label, item.required ? 1 : 0, index),
+  )
+  await env.DB.batch(stmts)
 }
 
 function planReference(): string {
