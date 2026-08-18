@@ -46,15 +46,20 @@ export function clientMobilePrimary(serviceKeys: string[]): string[] {
 
 export const portalHiddenRoutes=['planned-calls','funding','property-management','tax-filings'] as const
 
-// HQ navigation, grouped by how staff actually think about the work:
-//   Revenue      -> anything that turns into a signed engagement or a paid
-//                   invoice: pipeline, quotes, invoices, clients, leads.
-//   Operations   -> the day-to-day work delivery surface: comms, cases,
-//                   calendar, field dispatch, RON, STR, service work,
-//                   documents, and the network of providers that ships it.
-//   Intelligence -> automation, reporting, activity, the analytics layer.
-//   Administration -> owner/admin controls: users, roles, security,
-//                   invitations, public website, and settings.
+// HQ navigation, consolidated into six hubs that match how staff think about
+// the work, so the sidebar reads as a handful of clear destinations instead of
+// two dozen flat links. Each `section` renders as a collapsible hub; items in a
+// hub must stay contiguous for the grouping to work.
+//   Revenue        -> anything that becomes a signed engagement or paid
+//                     invoice: pipeline, quotes, invoices, clients, leads.
+//   Service        -> the client-facing surface: messages, support cases, and
+//                     documents.
+//   Delivery       -> getting the work done: scheduling plus field dispatch,
+//                     RON, STR turnovers, and service assignments.
+//   People         -> everyone in the system: the provider network, staff
+//                     users, staff coverage, invitations, and access roles.
+//   Intelligence   -> automation, reporting, activity, analytics.
+//   Administration -> security, audit, public website, and settings.
 export const adminNav: NavItem[] = [
   {key:'dashboard',label:'Overview',to:'',icon:Home},
   {key:'pipelines',label:'Pipeline',to:'pipelines',icon:Workflow,section:'Revenue'},
@@ -62,29 +67,29 @@ export const adminNav: NavItem[] = [
   {key:'invoices',label:'Invoices',to:'invoices',icon:Receipt,section:'Revenue'},
   {key:'clients',label:'Clients',to:'clients',icon:Users,section:'Revenue'},
   {key:'inquiries',label:'Leads',to:'inquiries',icon:UserPlus,section:'Revenue'},
-  {key:'messages',label:'Messages',to:'messages',icon:MessageSquare,section:'Operations'},
-  {key:'cases',label:'Cases & SLA',to:'cases',icon:HelpCircle,section:'Operations'},
-  {key:'calendar',label:'Calendar',to:'calendar',icon:Calendar,section:'Operations'},
-  {key:'field-work',label:'Field Work',to:'field-work',icon:MapPinned,section:'Operations'},
+  {key:'messages',label:'Messages',to:'messages',icon:MessageSquare,section:'Service'},
+  {key:'cases',label:'Cases & SLA',to:'cases',icon:HelpCircle,section:'Service'},
+  {key:'document-center',label:'Documents',to:'document-center',icon:FileText,section:'Service'},
+  {key:'calendar',label:'Calendar',to:'calendar',icon:Calendar,section:'Delivery'},
+  {key:'field-work',label:'Field Work',to:'field-work',icon:MapPinned,section:'Delivery'},
   // Remote Online Notarization is a document-signing session, not a
   // property visit. It shares the same field_assignments backend so it can
   // reuse the audit-trail plumbing, but the operational surface is
   // separate and should not share a nav tab with field visits.
-  {key:'ron',label:'Remote Notarization',to:'ron',icon:Video,section:'Operations'},
-  {key:'str-operations',label:'STR Turnovers',to:'str/operations',icon:DoorOpen,section:'Operations'},
-  {key:'service-assignments',label:'Service Assignments',to:'service-assignments',icon:Wrench,section:'Operations'},
-  {key:'network',label:'Network & Dispatch',to:'network',icon:UsersRound,section:'Operations'},
-  {key:'document-center',label:'Documents',to:'document-center',icon:FileText,section:'Operations'},
+  {key:'ron',label:'Remote Notarization',to:'ron',icon:Video,section:'Delivery'},
+  {key:'str-operations',label:'STR Turnovers',to:'str/operations',icon:DoorOpen,section:'Delivery'},
+  {key:'service-assignments',label:'Service Assignments',to:'service-assignments',icon:Wrench,section:'Delivery'},
+  {key:'network',label:'Network & Dispatch',to:'network',icon:UsersRound,section:'People'},
+  {key:'users',label:'Users',to:'users',icon:UserCog,section:'People'},
+  {key:'assignments',label:'Staff Coverage',to:'assignments',icon:ArrowLeftRight,section:'People'},
+  {key:'invitations',label:'Invitations',to:'invitations',icon:MailPlus,section:'People'},
+  {key:'roles',label:'Roles & Permissions',to:'roles',icon:KeyRound,section:'People'},
   {key:'automation-center',label:'Automation Center',to:'automation-center',icon:Bot,section:'Intelligence'},
   {key:'management',label:'Management',to:'management',icon:Gauge,section:'Intelligence'},
   {key:'reports',label:'Reports',to:'reports',icon:BarChart3,section:'Intelligence'},
   {key:'activity',label:'Activity',to:'activity',icon:Activity,section:'Intelligence'},
   {key:'security-center',label:'Security Center',to:'security-center',icon:ShieldCheck,section:'Administration'},
   {key:'audit-log',label:'Audit Log',to:'audit-log',icon:ClipboardList,section:'Administration'},
-  {key:'users',label:'Users',to:'users',icon:UserCog,section:'Administration'},
-  {key:'assignments',label:'Staff Coverage',to:'assignments',icon:ArrowLeftRight,section:'Administration'},
-  {key:'invitations',label:'Invitations',to:'invitations',icon:MailPlus,section:'Administration'},
-  {key:'roles',label:'Roles & Permissions',to:'roles',icon:KeyRound,section:'Administration'},
   {key:'public-funnel',label:'Public Website',to:'public-funnel',icon:Globe,section:'Administration'},
   {key:'settings',label:'Settings',to:'settings',icon:Settings,section:'Administration'},
 ]
