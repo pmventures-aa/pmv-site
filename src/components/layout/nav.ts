@@ -79,6 +79,8 @@ export const adminNav: NavItem[] = [
   // separate and should not share a nav tab with field visits.
   {key:'ron',label:'Remote Notarization',to:'ron',icon:Video,section:'Delivery'},
   {key:'str-operations',label:'STR Turnovers',to:'str/operations',icon:DoorOpen,section:'Delivery'},
+  {key:'cleaning-dispatch',label:'Cleaning Dispatch',to:'cleaning/dispatch',icon:Sparkles,section:'Delivery'},
+  {key:'cleaning-mine',label:'My Cleaning Jobs',to:'cleaning/mine',icon:ClipboardCheck,section:'Delivery'},
   {key:'service-assignments',label:'Service Assignments',to:'service-assignments',icon:Wrench,section:'Delivery'},
   {key:'network',label:'Network & Dispatch',to:'network',icon:UsersRound,section:'People'},
   {key:'users',label:'Users',to:'users',icon:UserCog,section:'People'},

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { btnPrimary, btnOutline } from './ui'
-import { getCleaningConfig, getCleaningQuote, type PublicCleaningConfig } from '../../lib/cleaningApi'
+import { getCleaningConfig, getCleaningQuote, bookCleaning, type PublicCleaningConfig, type CleaningBookingResult } from '../../lib/cleaningApi'
+import { inputCls } from '../../pages/auth/AuthLayout'
 import { formatUsd, type CleaningCounty, type CleaningFrequency, type CleaningServiceType, type CleaningCustomerQuote } from '../../../shared/cleaningPricing'
 
 const COUNTY_ORDER: CleaningCounty[] = ['miami_dade', 'broward', 'palm_beach']
@@ -35,6 +36,12 @@ export function CleaningCalculator({ service: fixedService, showFrequency = fals
   const [quote, setQuote] = useState<CleaningCustomerQuote | null>(null)
   const [pending, setPending] = useState(false)
   const reqId = useRef(0)
+
+  const [mode, setMode] = useState<'quote' | 'booking' | 'done'>('quote')
+  const [contact, setContact] = useState({ name: '', email: '', phone: '', address: '', scheduledDate: '', arrivalWindow: '' })
+  const [booking, setBooking] = useState<CleaningBookingResult | null>(null)
+  const [bookingBusy, setBookingBusy] = useState(false)
+  const [bookingError, setBookingError] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
@@ -92,6 +99,38 @@ export function CleaningCalculator({ service: fixedService, showFrequency = fals
   function startRequest() {
     const params = new URLSearchParams({ job: 'cleaning_turnover', service: 'property-cleaning', source: `cleaning-calculator-${service}` })
     navigate(`/scope-request?${params.toString()}`)
+  }
+
+  async function submitBooking(e: React.FormEvent) {
+    e.preventDefault()
+    if (!contact.name.trim()) return setBookingError('Enter your name.')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contact.email.trim())) return setBookingError('Enter a valid email address.')
+    setBookingBusy(true)
+    setBookingError(null)
+    try {
+      const res = await bookCleaning({
+        service,
+        county,
+        bedrooms,
+        bathrooms,
+        frequency: recurringAllowed ? frequency : 'one_time',
+        addons,
+        isFirstRecurring: recurringAllowed && frequency !== 'one_time',
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone || undefined,
+        address: contact.address || undefined,
+        scheduledDate: contact.scheduledDate || undefined,
+        arrivalWindow: contact.arrivalWindow || undefined,
+        source: `cleaning-calculator-${service}`,
+      })
+      setBooking(res)
+      setMode('done')
+    } catch {
+      setBookingError('We could not submit your booking. Please try again or start a request.')
+    } finally {
+      setBookingBusy(false)
+    }
   }
 
   if (loadError) {
@@ -204,10 +243,34 @@ export function CleaningCalculator({ service: fixedService, showFrequency = fals
               : 'Instant price for a property in reasonable condition. We confirm before any work begins.'}
           </div>
 
-          <button onClick={startRequest} className={`${btnPrimary} mt-4 w-full`}>
-            {recurringAllowed && frequency !== 'one_time' ? 'Schedule Recurring Service' : 'Book This Cleaning'}
-          </button>
-          <button onClick={startRequest} className={`${btnOutline} mt-2 w-full`}>Ask a Question First</button>
+          {mode === 'done' && booking ? (
+            <div className="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-4 py-4">
+              <p className="text-sm font-semibold text-white">Your request is in.</p>
+              <p className="mt-1 text-xs text-slate-300">{booking.message}</p>
+              <p className="mt-2 text-xs text-slate-400">Reference <span className="font-semibold text-gold">{booking.reference}</span></p>
+            </div>
+          ) : mode === 'booking' ? (
+            <form onSubmit={submitBooking} className="mt-4 space-y-2.5">
+              <input className={inputCls} placeholder="Full name" value={contact.name} onChange={(e) => setContact((s) => ({ ...s, name: e.target.value }))} required />
+              <input className={inputCls} type="email" placeholder="Email" value={contact.email} onChange={(e) => setContact((s) => ({ ...s, email: e.target.value }))} required />
+              <input className={inputCls} type="tel" placeholder="Mobile (optional)" value={contact.phone} onChange={(e) => setContact((s) => ({ ...s, phone: e.target.value }))} />
+              <input className={inputCls} placeholder="Property address (optional)" value={contact.address} onChange={(e) => setContact((s) => ({ ...s, address: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-2">
+                <input className={inputCls} type="date" aria-label="Preferred date" value={contact.scheduledDate} onChange={(e) => setContact((s) => ({ ...s, scheduledDate: e.target.value }))} />
+                <input className={inputCls} placeholder="Arrival window" value={contact.arrivalWindow} onChange={(e) => setContact((s) => ({ ...s, arrivalWindow: e.target.value }))} />
+              </div>
+              {bookingError && <p className="text-xs text-rose-300">{bookingError}</p>}
+              <button type="submit" disabled={bookingBusy} className={`${btnPrimary} w-full disabled:opacity-60`}>{bookingBusy ? 'Submitting…' : 'Confirm Booking'}</button>
+              <button type="button" onClick={() => setMode('quote')} className="w-full py-1 text-xs text-slate-400 hover:text-white">Back to price</button>
+            </form>
+          ) : (
+            <>
+              <button onClick={() => { setBookingError(null); setMode('booking') }} className={`${btnPrimary} mt-4 w-full`}>
+                {recurringAllowed && frequency !== 'one_time' ? 'Schedule Recurring Service' : 'Book This Cleaning'}
+              </button>
+              <button onClick={startRequest} className={`${btnOutline} mt-2 w-full`}>Ask a Question First</button>
+            </>
+          )}
         </div>
       </div>
     </div>
