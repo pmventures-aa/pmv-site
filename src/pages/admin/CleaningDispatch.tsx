@@ -24,6 +24,7 @@ interface Job {
   belowMinMargin: boolean
   needsReview: boolean
   assignedVendorName: string | null
+  openIssues: number
   turnover: { urgency: string; minutesRemaining: number | null }
 }
 interface Summary {
@@ -191,6 +192,7 @@ export default function CleaningDispatch() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-semibold ${toneClass[cleaningStatusTone(job.status)]}`}>{cleaningStatusLabel(job.status)}</span>
+                    {job.openIssues > 0 && <span className="ml-1 inline-block rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">{job.openIssues} issue{job.openIssues > 1 ? 's' : ''}</span>}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-slate-200">{formatUsd(job.clientTotalCents)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-slate-300">{formatUsd(job.vendorPayoutCents)}</td>
