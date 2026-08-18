@@ -245,6 +245,15 @@ cleaningJobsPublicRoutes.post('/public/cleaning/book', async (c) => {
     status, text(body.source, 60) || 'public_calculator', clientUserId,
   ).run()
 
+  // Link a saved property profile when the booker is signed in and owns it.
+  // Gating to owned profiles means a spoofed id from an anonymous request is
+  // ignored, and the job carries the on-site instructions for the cleaner.
+  const propertyProfileId = text(body.propertyProfileId, 40) || null
+  if (propertyProfileId && clientUserId) {
+    const owned = await c.env.DB.prepare('SELECT id FROM cleaning_property_profiles WHERE id=? AND client_user_id=?').bind(propertyProfileId, clientUserId).first()
+    if (owned) await c.env.DB.prepare("UPDATE cleaning_jobs SET property_profile_id=?, updated_at=datetime('now') WHERE id=?").bind(propertyProfileId, id).run()
+  }
+
   await logJobEvent(c.env, id, clientUserId, 'status_change', null, status, 'Booking received')
   await materializeChecklist(c.env, id, input.service).catch(() => {})
 

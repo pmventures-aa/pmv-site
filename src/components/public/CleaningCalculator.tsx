@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { btnPrimary, btnOutline } from './ui'
-import { getCleaningConfig, getCleaningQuote, bookCleaning, type PublicCleaningConfig, type CleaningBookingResult } from '../../lib/cleaningApi'
+import { getCleaningConfig, getCleaningQuote, bookCleaning, getMyCleaningProperties, type PublicCleaningConfig, type CleaningBookingResult } from '../../lib/cleaningApi'
 import { inputCls } from '../../pages/auth/AuthLayout'
+import { useAuth } from '../../lib/auth'
 import { formatUsd, type CleaningCounty, type CleaningFrequency, type CleaningServiceType, type CleaningCustomerQuote } from '../../../shared/cleaningPricing'
+import type { CleaningPropertyProfile } from '../../../shared/cleaningProperty'
 
 const COUNTY_ORDER: CleaningCounty[] = ['miami_dade', 'broward', 'palm_beach']
 
@@ -23,8 +25,13 @@ interface Props {
 
 export function CleaningCalculator({ service: fixedService, showFrequency = false, defaultCounty = 'broward', heading = 'Get my price' }: Props) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [config, setConfig] = useState<PublicCleaningConfig | null>(null)
   const [loadError, setLoadError] = useState(false)
+
+  // Saved properties for a signed-in client, so booking can prefill from one.
+  const [savedProperties, setSavedProperties] = useState<CleaningPropertyProfile[]>([])
+  const [selectedPropertyId, setSelectedPropertyId] = useState('')
 
   const [service, setService] = useState<CleaningServiceType>(fixedService || 'residential_standard')
   const [county, setCounty] = useState<CleaningCounty>(defaultCounty)
@@ -56,6 +63,29 @@ export function CleaningCalculator({ service: fixedService, showFrequency = fals
       live = false
     }
   }, [fixedService])
+
+  // A signed-in client's saved properties become a prefill source.
+  useEffect(() => {
+    if (user?.role !== 'client') { setSavedProperties([]); return }
+    let live = true
+    getMyCleaningProperties().then((list) => live && setSavedProperties(list)).catch(() => {})
+    return () => { live = false }
+  }, [user])
+
+  function applyProperty(id: string) {
+    setSelectedPropertyId(id)
+    const p = savedProperties.find((x) => x.id === id)
+    if (!p) return
+    if (p.county && COUNTY_ORDER.includes(p.county as CleaningCounty)) setCounty(p.county as CleaningCounty)
+    if (p.bedrooms != null) setBedrooms(Math.max(0, Math.min(8, p.bedrooms)))
+    if (p.bathrooms != null) setBathrooms(Math.max(1, Math.min(8, p.bathrooms)))
+    setContact((s) => ({
+      ...s,
+      name: s.name || user?.full_name || '',
+      email: s.email || user?.email || '',
+      address: p.address || s.address,
+    }))
+  }
 
   const activeService = useMemo(() => config?.services.find((s) => s.key === service) || null, [config, service])
   const recurringAllowed = showFrequency && Boolean(activeService?.recurringEligible)
@@ -123,6 +153,7 @@ export function CleaningCalculator({ service: fixedService, showFrequency = fals
         scheduledDate: contact.scheduledDate || undefined,
         arrivalWindow: contact.arrivalWindow || undefined,
         source: `cleaning-calculator-${service}`,
+        propertyProfileId: selectedPropertyId || undefined,
       })
       setBooking(res)
       setMode('done')
@@ -251,6 +282,14 @@ export function CleaningCalculator({ service: fixedService, showFrequency = fals
             </div>
           ) : mode === 'booking' ? (
             <form onSubmit={submitBooking} className="mt-4 space-y-2.5">
+              {savedProperties.length > 0 && (
+                <select className={inputCls} value={selectedPropertyId} onChange={(e) => applyProperty(e.target.value)} aria-label="Use a saved property">
+                  <option value="">Use a saved property…</option>
+                  {savedProperties.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nickname || p.address || 'Saved property'}</option>
+                  ))}
+                </select>
+              )}
               <input className={inputCls} placeholder="Full name" value={contact.name} onChange={(e) => setContact((s) => ({ ...s, name: e.target.value }))} required />
               <input className={inputCls} type="email" placeholder="Email" value={contact.email} onChange={(e) => setContact((s) => ({ ...s, email: e.target.value }))} required />
               <input className={inputCls} type="tel" placeholder="Mobile (optional)" value={contact.phone} onChange={(e) => setContact((s) => ({ ...s, phone: e.target.value }))} />

@@ -7,6 +7,7 @@ import type {
   CleaningQuoteInput,
   CleaningServiceType,
 } from '../../shared/cleaningPricing'
+import type { CleaningPropertyProfile } from '../../shared/cleaningProperty'
 
 // The customer-safe shape returned by GET /public/cleaning/config. This mirrors
 // publicConfigView() on the server: no payout, margin, or minimum-margin data.
@@ -62,6 +63,8 @@ export interface CleaningBookingContact {
   guestCheckoutAt?: string
   guestCheckinAt?: string
   source?: string
+  /** Link the booking to one of the signed-in client's saved properties. */
+  propertyProfileId?: string
 }
 export interface CleaningBookingResult {
   reference: string
@@ -72,6 +75,17 @@ export interface CleaningBookingResult {
 }
 export function bookCleaning(input: CleaningQuoteInput & CleaningBookingContact): Promise<CleaningBookingResult> {
   return api.post('/public/cleaning/book', input) as Promise<CleaningBookingResult>
+}
+
+// Saved properties for a signed-in client, so the booking form can prefill from
+// one instead of re-entering the details. Returns [] for signed-out visitors.
+export async function getMyCleaningProperties(): Promise<CleaningPropertyProfile[]> {
+  try {
+    const res = (await api.get('/portal/cleaning/properties')) as { properties: CleaningPropertyProfile[] }
+    return res.properties || []
+  } catch {
+    return []
+  }
 }
 
 export type { CleaningCounty, CleaningFrequency, CleaningServiceType, CleaningQuoteInput, CleaningCustomerQuote }
