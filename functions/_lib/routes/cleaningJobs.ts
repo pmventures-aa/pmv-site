@@ -32,6 +32,7 @@ import { isRecurringFrequency } from '../../../shared/cleaningRecurrence'
 import { pushNotification } from '../notificationFeed'
 import { allRequiredResolved, isIssueCategory, isIssueSeverity, issueCategoryLabel } from '../../../shared/cleaningChecklist'
 import { validateUploadSignature } from '../fileValidation'
+import { summarizeCleaningJobs } from '../../../shared/cleaningReports'
 
 export const cleaningJobsPublicRoutes = new Hono<AppEnv>()
 export const cleaningJobsAdminRoutes = new Hono<AppEnv>()
@@ -749,4 +750,24 @@ cleaningJobsAdminRoutes.get('/cleaning/photos/:id', requireUser, async (c) => {
   return new Response(obj.body, {
     headers: { 'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff' },
   })
+})
+
+// ---------------------------------------------------------------------------
+// Cleaning reporting (staff)
+// ---------------------------------------------------------------------------
+
+cleaningJobsAdminRoutes.get('/cleaning/reports', requireStaff, async (c) => {
+  const from = text(c.req.query('from'), 20)
+  const to = text(c.req.query('to'), 20)
+  const clauses: string[] = []
+  const binds: unknown[] = []
+  if (/^\d{4}-\d{2}-\d{2}$/.test(from)) { clauses.push('date(created_at) >= ?'); binds.push(from) }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(to)) { clauses.push('date(created_at) <= ?'); binds.push(to) }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+  const rows = await c.env.DB.prepare(
+    `SELECT service_type, county, status, client_total_cents, vendor_payout_cents FROM cleaning_jobs ${where} LIMIT 5000`,
+  ).bind(...binds).all<import('../../../shared/cleaningReports').CleaningReportRow>()
+  const activePlans = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM recurring_cleaning_plans WHERE status='active'").first<{ n: number }>()
+  const report = summarizeCleaningJobs(rows.results || [])
+  return c.json({ report, activePlans: activePlans?.n ?? 0 })
 })
