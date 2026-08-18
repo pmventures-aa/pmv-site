@@ -31,6 +31,16 @@ describe('provider application branching', () => {
     expect(docs.find((d) => d.key === 'auto_insurance')?.required).toBe(true)
   })
 
+  it('only the government ID blocks submission; everything else is onboarding-stage', () => {
+    const docs = documentsForTracks(['mobile_notary', 'property_field'], { businessEntity: true })
+    const signupBlocking = docs.filter((d) => d.stage === 'signup')
+    expect(signupBlocking.map((d) => d.key).sort()).toEqual(['government_id_back', 'government_id_front'])
+    // Required track docs (e.g. notary commission, liability insurance) exist
+    // but are onboarding-stage, so they never trap the applicant mid-flow.
+    expect(docs.find((d) => d.key === 'notary_commission')?.stage).toBe('onboarding')
+    expect(docs.find((d) => d.key === 'ein_letter')?.stage).toBe('onboarding')
+  })
+
   it('always offers a W-9 slot and never requires it at application time', () => {
     const docs = documentsForTracks(['business_operations'], { businessEntity: false })
     const w9 = docs.find((d) => d.key === 'w9')

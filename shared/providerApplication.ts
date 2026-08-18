@@ -44,7 +44,13 @@ export interface TrackDocRequirement {
   key: ApplicationDocKey
   label: string
   help: string
+  // `required` means required for the provider to be *activated*, not to submit
+  // the application. `stage` controls what actually blocks account creation:
+  // only 'signup' documents gate submission; 'onboarding' documents are
+  // strongly encouraged but can be added later from the profile, so an
+  // applicant is never trapped behind a wall of uploads.
   required: boolean
+  stage: 'signup' | 'onboarding'
 }
 
 // Human labels for every document slot, used by the branded PDF and the admin
@@ -101,7 +107,9 @@ export const TRACK_QUESTIONS: Record<ProviderTrackKey, TrackQuestion[]> = {
 }
 
 // Track-specific documents. Base documents (ID, EIN, W-9) are added separately.
-export const TRACK_DOCUMENTS: Record<ProviderTrackKey, TrackDocRequirement[]> = {
+// Track documents are all 'onboarding' stage (added now or later); the `stage`
+// is applied centrally in documentsForTracks so these literals stay terse.
+export const TRACK_DOCUMENTS: Record<ProviderTrackKey, Array<Omit<TrackDocRequirement, 'stage'>>> = {
   property_field: [
     { key: 'insurance', label: 'Proof of liability insurance', help: 'Current certificate or declarations page for general/professional liability.', required: true },
     { key: 'professional_license', label: 'Professional / trade license (if applicable)', help: 'Upload any trade or professional license your work requires.', required: false },
@@ -152,12 +160,14 @@ export function documentsForTracks(
   tracks: ProviderTrackKey[],
   opts: { businessEntity: boolean },
 ): TrackDocRequirement[] {
+  // Only the government ID gates submission; everything else can be added
+  // after approval so the application is never blocked behind uploads.
   const base: TrackDocRequirement[] = [
-    { key: 'government_id_front', label: 'Government ID — front', help: 'Upload a clear image of the front of your government-issued photo ID.', required: true },
-    { key: 'government_id_back', label: 'Government ID — back', help: 'Upload a clear image of the back of the same ID.', required: true },
+    { key: 'government_id_front', label: 'Government ID — front', help: 'Upload a clear image of the front of your government-issued photo ID.', required: true, stage: 'signup' },
+    { key: 'government_id_back', label: 'Government ID — back', help: 'Upload a clear image of the back of the same ID.', required: true, stage: 'signup' },
   ]
   if (opts.businessEntity) {
-    base.push({ key: 'ein_letter', label: 'IRS EIN letter', help: 'Upload your CP 575, 147C, SS-4 confirmation, or other IRS-issued EIN confirmation.', required: true })
+    base.push({ key: 'ein_letter', label: 'IRS EIN letter', help: 'Upload your CP 575, 147C, SS-4 confirmation, or other IRS-issued EIN confirmation.', required: true, stage: 'onboarding' })
   }
 
   const byKey = new Map<ApplicationDocKey, TrackDocRequirement>()
@@ -166,11 +176,11 @@ export function documentsForTracks(
     for (const doc of TRACK_DOCUMENTS[track] ?? []) {
       const existing = byKey.get(doc.key)
       if (existing) existing.required = existing.required || doc.required
-      else byKey.set(doc.key, { ...doc })
+      else byKey.set(doc.key, { ...doc, stage: 'onboarding' })
     }
   }
 
   // W-9 is always offered (optional at application time; collected before pay).
-  byKey.set('w9', { key: 'w9', label: 'W-9 (optional now)', help: 'Provide a current W-9 now or Pinnacle can request it before a paid assignment.', required: false })
+  byKey.set('w9', { key: 'w9', label: 'W-9', help: 'Provide a current W-9 now or Pinnacle can request it before a paid assignment.', required: false, stage: 'onboarding' })
   return [...byKey.values()]
 }

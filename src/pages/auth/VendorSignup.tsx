@@ -97,6 +97,31 @@ export default function VendorSignup() {
       .finally(() => setInviteLoading(false))
   }, [inviteToken])
 
+  // Auto-save the in-progress application so nobody loses their work if they
+  // close the tab, get interrupted, or come back later. Passwords are never
+  // written to storage. Cleared once the application is submitted.
+  const DRAFT_KEY = 'pmv_vendor_application_draft'
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const saved = JSON.parse(raw) as { form?: Partial<typeof form>; step?: Step; uploadToken?: string }
+        if (saved.form) setForm((current) => ({ ...current, ...saved.form, password: '', confirm: '' }))
+        if (saved.step && saved.step !== 'account') setStep(saved.step)
+        if (saved.uploadToken) setUploadToken(saved.uploadToken)
+      }
+    } catch { /* ignore malformed draft */ }
+    setRestored(true)
+  }, [])
+  useEffect(() => {
+    if (!restored) return
+    try {
+      const { password: _pw, confirm: _cf, ...safe } = form
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: safe, step, uploadToken }))
+    } catch { /* storage full or unavailable */ }
+  }, [form, step, uploadToken, restored])
+
   function set<K extends keyof typeof form>(key: K, value: typeof form[K]) { setForm((current) => ({ ...current, [key]: value })) }
   const steps: Step[] = ['contact', 'services', 'questions', 'documents', 'account']
   const stepIndex = steps.indexOf(step)
@@ -145,8 +170,11 @@ export default function VendorSignup() {
       if (form.enrollments.includes('other') && !form.other_service.trim()) return 'Describe the other professional service you provide.'
     }
     if (step === 'documents' && next === 'account') {
+      // Only signup-stage documents (the government ID) block submission. Every
+      // other document can be added later from the provider's profile, so an
+      // applicant is never trapped mid-application.
       for (const doc of trackDocs) {
-        if (doc.required && fileFor(doc.key).length === 0) return `Upload: ${doc.label}.`
+        if (doc.stage === 'signup' && doc.required && fileFor(doc.key).length === 0) return `Upload: ${doc.label}.`
       }
     }
     if (step === 'account') {
@@ -240,6 +268,7 @@ export default function VendorSignup() {
         catch { setDocumentWarning(true) }
       }
       if (inviteToken) await api.post(`/invite/${encodeURIComponent(inviteToken)}/complete-existing`, {}).catch(() => {})
+      try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
       setDone(true)
     } catch (err) { setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.') }
     finally { setBusy(false) }
@@ -266,7 +295,7 @@ export default function VendorSignup() {
 
   return (
     <AuthLayout surface="staff" eyebrow={inviteToken ? 'Private Pinnacle provider invitation' : trackCopy.eyebrow} title={stepTitle} subtitle={stepSubtitle} sideLabel={trackCopy.badge} sideTitle={trackCopy.sideTitle} sideBody={trackCopy.sideBody} footer={<>Already approved? <Link to="../login" className="font-medium text-gold hover:underline">Sign in</Link></>}>
-      <div className="mb-6"><div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {stepIndex + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all" style={{ width:`${progress}%` }}/></div></div>
+      <div className="mb-6"><div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {stepIndex + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all" style={{ width:`${progress}%` }}/></div><p className="mt-2 text-[11px] text-slate-500">Your progress saves automatically — you can close this and pick up where you left off.</p></div>
       {inviteLoading && <p className="mb-4 text-sm text-slate-400">Loading your invitation…</p>}
       {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-lg border border-gold/20 bg-gold/[.05] p-3 text-xs leading-5 text-slate-400"><span className="font-semibold text-gold">Private invitation verified</span> · expires {new Date(invite.expires_at).toLocaleString()}. You can apply as an individual or register your business, and you may change or add services before submitting.</div>}
       <ErrorBanner message={error}/>
@@ -314,10 +343,18 @@ export default function VendorSignup() {
       </div>}
 
       {step === 'documents' && <div className="space-y-4">
-        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-4"><div className="flex gap-3"><ShieldCheck size={19} className="mt-0.5 shrink-0 text-emerald-300"/><div><p className="text-sm font-semibold text-white">Private verification workspace</p><p className="mt-1 text-xs leading-5 text-slate-500">Identity and tax documents are stored separately from your public/provider profile and are only available to authorized reviewers.</p></div></div></div>
-        <p className="text-xs leading-5 text-slate-500">The documents below are tailored to the services you selected. Required items are marked; others are optional but speed up approval.</p>
-        {trackDocs.map((doc) => (
-          <DocumentUpload key={doc.key} label={doc.label} help={doc.help} required={doc.required} files={toUploaded(doc.key)} uploading={uploading===doc.key} onFiles={(picked)=>upload(doc.key,picked)} onRemove={remove}/>
+        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-4"><div className="flex gap-3"><ShieldCheck size={19} className="mt-0.5 shrink-0 text-emerald-300"/><div><p className="text-sm font-semibold text-white">Only your ID is needed to apply</p><p className="mt-1 text-xs leading-5 text-slate-500">Upload a photo ID to submit. Everything else you can add now or later from your profile — it won't hold up your application. Files are stored privately and seen only by authorized reviewers.</p></div></div></div>
+        {trackDocs.filter((doc) => doc.stage === 'signup').map((doc) => (
+          <DocumentUpload key={doc.key} label={doc.label} help={doc.help} required files={toUploaded(doc.key)} uploading={uploading===doc.key} onFiles={(picked)=>upload(doc.key,picked)} onRemove={remove}/>
+        ))}
+        {trackDocs.some((doc) => doc.stage === 'onboarding') && (
+          <div className="pt-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[.14em] text-slate-500">Add now or later — optional to apply</p>
+            <p className="mb-1 mt-1 text-xs leading-5 text-slate-500">Providing these speeds up approval, but you can upload them anytime from your provider profile after you apply.</p>
+          </div>
+        )}
+        {trackDocs.filter((doc) => doc.stage === 'onboarding').map((doc) => (
+          <DocumentUpload key={doc.key} label={doc.required ? `${doc.label} · needed before your first assignment` : doc.label} help={doc.help} files={toUploaded(doc.key)} uploading={uploading===doc.key} onFiles={(picked)=>upload(doc.key,picked)} onRemove={remove}/>
         ))}
         <DocumentUpload label="Other supporting documents" help="Optional certifications, references, work samples, or supporting credentials." multiple files={toUploaded('supporting')} uploading={uploading==='supporting'} onFiles={(picked)=>upload('supporting',picked)} onRemove={remove}/>
         <div className="flex gap-2"><button onClick={()=>setStep('questions')} className="btn-outline flex-1">Back</button><button onClick={()=>void go('account')} className="btn-gold flex-[1.5]">Continue</button></div>
