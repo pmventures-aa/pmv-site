@@ -121,10 +121,13 @@ export function ParallaxMedia({ children, className = '', strength = 40 }: { chi
 // ---------------------------------------------------------------------------
 export interface JourneyStep { n: string; label: string; detail: string }
 
-export function ProcessJourney({ steps, className = '' }: { steps: JourneyStep[]; className?: string }) {
+export function ProcessJourney({ steps, className = '', cols = 6 }: { steps: JourneyStep[]; className?: string; cols?: 3 | 4 | 5 | 6 }) {
   const reduce = useReducedMotion()
+  // Static class map so Tailwind can see the utilities; controls the desktop
+  // column count to match the number of steps.
+  const lgCols = cols === 3 ? 'lg:grid-cols-3' : cols === 4 ? 'lg:grid-cols-4' : cols === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-6'
   return (
-    <ol className={`relative grid gap-6 md:grid-cols-3 lg:grid-cols-6 ${className}`}>
+    <ol className={`relative grid gap-6 md:grid-cols-3 ${lgCols} ${className}`}>
       <span className="pointer-events-none absolute left-0 right-0 top-4 hidden h-px bg-gradient-to-r from-transparent via-gold/30 to-transparent lg:block" aria-hidden="true" />
       {steps.map((step, i) => (
         <motion.li
