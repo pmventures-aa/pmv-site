@@ -31,6 +31,7 @@ import { createRecurringPlan, generateNextOccurrence, materializeChecklist } fro
 import { isRecurringFrequency } from '../../../shared/cleaningRecurrence'
 import { pushNotification } from '../notificationFeed'
 import { allRequiredResolved, isIssueCategory, isIssueSeverity, issueCategoryLabel } from '../../../shared/cleaningChecklist'
+import { validateUploadSignature } from '../fileValidation'
 
 export const cleaningJobsPublicRoutes = new Hono<AppEnv>()
 export const cleaningJobsAdminRoutes = new Hono<AppEnv>()
@@ -675,4 +676,77 @@ cleaningJobsAdminRoutes.post('/cleaning/my-jobs/:id/issues', requireUser, async 
     }
   }
   return c.json({ ok: true, id: issueId })
+})
+
+// ---------------------------------------------------------------------------
+// Completion photos (R2 via env.UPLOADS)
+// ---------------------------------------------------------------------------
+
+const PHOTO_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/webp': 'webp' }
+const PHOTO_LABELS = new Set(['arrival', 'before', 'after', 'damage', 'missing_item', 'restock', 'completed', 'final_guest_ready'])
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024
+
+async function storeCleaningPhoto(env: Env, jobId: string, req: Request):
+  Promise<{ error: string; status: number } | { objectKey: string; size: number; contentType: string; ext: string }> {
+  if (!env.UPLOADS) return { error: 'Photo storage is not configured yet.', status: 503 }
+  const contentType = req.headers.get('Content-Type') || ''
+  const ext = PHOTO_TYPES[contentType]
+  if (!ext) return { error: 'Unsupported image type - use PNG, JPEG, or WebP.', status: 400 }
+  const body = await req.arrayBuffer()
+  if (body.byteLength === 0) return { error: 'Empty upload.', status: 400 }
+  if (body.byteLength > MAX_PHOTO_BYTES) return { error: 'Image too large - 8MB max.', status: 413 }
+  const signature = validateUploadSignature(body, contentType, ['png', 'jpeg', 'webp'])
+  if (!signature.ok) return { error: signature.error, status: 400 }
+  const objectKey = `cleaning-jobs/${jobId}/${uuid()}.${ext}`
+  await env.UPLOADS.put(objectKey, body, { httpMetadata: { contentType }, customMetadata: { validated: 'signature-v1', kind: 'cleaning-photo' } })
+  return { objectKey, size: body.byteLength, contentType, ext }
+}
+
+cleaningJobsAdminRoutes.post('/cleaning/my-jobs/:id/photos', requireUser, async (c) => {
+  const id = c.req.param('id')!
+  const guard = await requireMyJob(c, id)
+  if (!guard.ok) return guard.res
+  const labelRaw = text(c.req.query('label'), 40)
+  const label = PHOTO_LABELS.has(labelRaw) ? labelRaw : 'after'
+  const itemId = text(c.req.query('itemId'), 60) || null
+  const result = await storeCleaningPhoto(c.env, id, c.req.raw)
+  if ('error' in result) return c.json({ error: result.error }, result.status as 400)
+  const photoId = uuid()
+  await c.env.DB.prepare(
+    'INSERT INTO cleaning_job_photos (id, job_id, checklist_item_id, object_key, file_name, content_type, size_bytes, label, captured_at, uploaded_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  ).bind(photoId, id, itemId, result.objectKey, `photo.${result.ext}`, result.contentType, result.size, label, isoNow(), guard.meId).run()
+  return c.json({ ok: true, id: photoId, url: `/admin/cleaning/photos/${photoId}` }, 201)
+})
+
+interface PhotoRow { id: string; label: string; file_name: string; content_type: string | null; captured_at: string | null; checklist_item_id: string | null }
+
+cleaningJobsAdminRoutes.get('/cleaning/my-jobs/:id/photos', requireUser, async (c) => {
+  const id = c.req.param('id')!
+  const guard = await requireMyJob(c, id)
+  if (!guard.ok) return guard.res
+  const rows = await c.env.DB.prepare('SELECT id, label, file_name, content_type, captured_at, checklist_item_id FROM cleaning_job_photos WHERE job_id=? ORDER BY created_at ASC').bind(id).all<PhotoRow>()
+  return c.json({ photos: (rows.results || []).map((p) => ({ id: p.id, label: p.label, checklistItemId: p.checklist_item_id, url: `/admin/cleaning/photos/${p.id}` })) })
+})
+
+cleaningJobsAdminRoutes.get('/cleaning/jobs/:id/photos', requireStaff, async (c) => {
+  const id = c.req.param('id')!
+  const rows = await c.env.DB.prepare('SELECT id, label, file_name, content_type, captured_at, checklist_item_id FROM cleaning_job_photos WHERE job_id=? ORDER BY created_at ASC').bind(id).all<PhotoRow>()
+  return c.json({ photos: (rows.results || []).map((p) => ({ id: p.id, label: p.label, url: `/admin/cleaning/photos/${p.id}` })) })
+})
+
+// Serve a photo to the assigned vendor, any staff member, or the client owner.
+cleaningJobsAdminRoutes.get('/cleaning/photos/:id', requireUser, async (c) => {
+  const me = c.get('user')!
+  const photo = await c.env.DB.prepare('SELECT object_key, job_id FROM cleaning_job_photos WHERE id=?').bind(c.req.param('id')!).first<{ object_key: string; job_id: string }>()
+  if (!photo) return c.json({ error: 'not found' }, 404)
+  const job = await c.env.DB.prepare('SELECT assigned_vendor_user_id, client_user_id FROM cleaning_jobs WHERE id=?').bind(photo.job_id).first<{ assigned_vendor_user_id: string | null; client_user_id: string | null }>()
+  const isStaff = me.role === 'staff' || me.role === 'admin'
+  const allowed = isStaff || job?.assigned_vendor_user_id === me.id || job?.client_user_id === me.id
+  if (!allowed) return c.json({ error: 'not found' }, 404)
+  if (!c.env.UPLOADS) return c.json({ error: 'not found' }, 404)
+  const obj = await c.env.UPLOADS.get(photo.object_key)
+  if (!obj) return c.json({ error: 'not found' }, 404)
+  return new Response(obj.body, {
+    headers: { 'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff' },
+  })
 })

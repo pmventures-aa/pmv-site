@@ -8,23 +8,42 @@ import { CLEANING_ISSUE_CATEGORIES, CLEANING_ISSUE_SEVERITIES, issueCategoryLabe
 
 interface ChecklistItem { id: string; category: string; label: string; required: number; status: string }
 interface JobIssue { id: string; category: string; severity: string; description: string; status: string }
+interface JobPhoto { id: string; label: string; url: string }
 
 function JobChecklist({ jobId }: { jobId: string }) {
   const [items, setItems] = useState<ChecklistItem[]>([])
   const [issues, setIssues] = useState<JobIssue[]>([])
+  const [photos, setPhotos] = useState<JobPhoto[]>([])
   const [loaded, setLoaded] = useState(false)
   const [reporting, setReporting] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [issue, setIssue] = useState({ category: 'damage', severity: 'needs_attention', description: '' })
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get<{ items: ChecklistItem[]; issues: JobIssue[] }>(`/admin/cleaning/my-jobs/${jobId}/checklist`)
+      const [res, photoRes] = await Promise.all([
+        api.get<{ items: ChecklistItem[]; issues: JobIssue[] }>(`/admin/cleaning/my-jobs/${jobId}/checklist`),
+        api.get<{ photos: JobPhoto[] }>(`/admin/cleaning/my-jobs/${jobId}/photos`),
+      ])
       setItems(res.items)
       setIssues(res.issues)
+      setPhotos(photoRes.photos)
       setLoaded(true)
     } catch { /* ignore */ }
   }, [jobId])
   useEffect(() => { void load() }, [load])
+
+  async function addPhoto(file: File, label: string) {
+    setUploading(true)
+    try {
+      await api.upload(`/admin/cleaning/my-jobs/${jobId}/photos?label=${label}`, file)
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not upload the photo.')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function toggle(item: ChecklistItem) {
     const next = item.status === 'complete' ? 'pending' : 'complete'
@@ -65,6 +84,23 @@ function JobChecklist({ jobId }: { jobId: string }) {
             ))}
           </div>
         ))}
+      </div>
+
+      <div className="mt-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-slate-400">Photos · {photos.length}</p>
+          <label className={`cursor-pointer text-xs font-semibold text-gold ${uploading ? 'opacity-50' : ''}`}>
+            {uploading ? 'Uploading…' : 'Add photo'}
+            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading} onChange={(e) => { const f = e.target.files?.[0]; if (f) void addPhoto(f, 'completed'); e.target.value = '' }} />
+          </label>
+        </div>
+        {photos.length > 0 && (
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {photos.map((p) => (
+              <img key={p.id} src={`/api${p.url}`} alt={p.label} className="aspect-square w-full rounded-md object-cover" loading="lazy" />
+            ))}
+          </div>
+        )}
       </div>
 
       {issues.length > 0 && (
