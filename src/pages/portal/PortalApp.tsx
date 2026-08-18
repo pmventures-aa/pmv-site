@@ -34,6 +34,7 @@ import PropertyProfile from './PropertyProfile'
 import Matters from './Matters'
 import MatterDetail from './MatterDetail'
 import Turnovers from './Turnovers'
+import CleaningProperties from './CleaningProperties'
 import TurnoverReport from './TurnoverReport'
 
 function ClientShell() {
@@ -91,6 +92,7 @@ export default function PortalApp({ basePath }: { basePath: string }) {
             <Route path="property-management" element={<Properties />} />
             <Route path="property-management/:id" element={<PropertyProfile />} />
             <Route path="str/turnovers" element={<Turnovers />} />
+            <Route path="cleaning-properties" element={<CleaningProperties />} />
             <Route path="str/turnovers/:id" element={<TurnoverReport />} />
             <Route path="tax-filings" element={<ModulePage config={taxConfig} />} />
             <Route path="support" element={<Support />} />
