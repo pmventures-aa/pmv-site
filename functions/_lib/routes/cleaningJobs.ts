@@ -785,3 +785,126 @@ cleaningJobsAdminRoutes.get('/cleaning/reports', requireStaff, async (c) => {
   const report = summarizeCleaningJobs(rows.results || [])
   return c.json({ report, activePlans: activePlans?.n ?? 0 })
 })
+
+// ---------------------------------------------------------------------------
+// Client portal (scoped to the signed-in client)
+// ---------------------------------------------------------------------------
+
+export const cleaningJobsPortalRoutes = new Hono<AppEnv>()
+
+interface ClientJobRow {
+  id: string; reference: string; service_type: string; service_label: string; county: string
+  bedrooms: number; bathrooms: number; status: string; scheduled_date: string | null
+  arrival_window: string | null; client_total_cents: number; frequency: string; recurring_plan_id: string | null
+}
+
+function clientJobView(r: ClientJobRow) {
+  return {
+    id: r.id, reference: r.reference, serviceType: r.service_type, serviceLabel: r.service_label,
+    status: r.status, scheduledDate: r.scheduled_date, arrivalWindow: r.arrival_window,
+    totalCents: r.client_total_cents, frequency: r.frequency, recurring: Boolean(r.recurring_plan_id),
+  }
+}
+
+cleaningJobsPortalRoutes.get('/cleaning/jobs', requireUser, async (c) => {
+  const me = c.get('user')!
+  const rows = await c.env.DB.prepare(
+    'SELECT id, reference, service_type, service_label, county, bedrooms, bathrooms, status, scheduled_date, arrival_window, client_total_cents, frequency, recurring_plan_id FROM cleaning_jobs WHERE client_user_id = ? ORDER BY (scheduled_date IS NULL), scheduled_date DESC, created_at DESC LIMIT 200',
+  ).bind(me.id).all<ClientJobRow>()
+  const jobs = (rows.results || []).map(clientJobView)
+  const now = new Date().toISOString().slice(0, 10)
+  return c.json({
+    upcoming: jobs.filter((j) => !['completed', 'cancelled'].includes(j.status) && (!j.scheduledDate || j.scheduledDate >= now)),
+    past: jobs.filter((j) => j.status === 'completed' || (j.scheduledDate && j.scheduledDate < now && j.status !== 'cancelled')),
+  })
+})
+
+// Client completion report: status + curated (client_visible) photos + checklist progress. No economics beyond the client's own price.
+cleaningJobsPortalRoutes.get('/cleaning/jobs/:id', requireUser, async (c) => {
+  const me = c.get('user')!
+  const id = c.req.param('id')!
+  const job = await c.env.DB.prepare('SELECT id, reference, service_label, status, scheduled_date, client_total_cents, client_user_id, frequency, recurring_plan_id, service_type FROM cleaning_jobs WHERE id = ?').bind(id).first<ClientJobRow & { client_user_id: string | null }>()
+  if (!job || job.client_user_id !== me.id) return c.json({ error: 'Not found' }, 404)
+  const [checklist, photos] = await Promise.all([
+    c.env.DB.prepare('SELECT required, status FROM cleaning_job_checklist_items WHERE job_id = ?').bind(id).all<{ required: number; status: string }>(),
+    c.env.DB.prepare('SELECT id, label FROM cleaning_job_photos WHERE job_id = ? AND client_visible = 1 ORDER BY created_at ASC').bind(id).all<{ id: string; label: string }>(),
+  ])
+  const items = checklist.results || []
+  const done = items.filter((i) => i.status === 'complete' || i.status === 'not_applicable').length
+  return c.json({
+    job: clientJobView(job),
+    checklist: { done, total: items.length },
+    photos: (photos.results || []).map((p) => ({ id: p.id, label: p.label, url: `/portal/cleaning/photos/${p.id}` })),
+  })
+})
+
+cleaningJobsPortalRoutes.get('/cleaning/photos/:id', requireUser, async (c) => {
+  const me = c.get('user')!
+  const photo = await c.env.DB.prepare('SELECT object_key, job_id, client_visible FROM cleaning_job_photos WHERE id = ?').bind(c.req.param('id')!).first<{ object_key: string; job_id: string; client_visible: number }>()
+  if (!photo || photo.client_visible !== 1) return c.json({ error: 'not found' }, 404)
+  const job = await c.env.DB.prepare('SELECT client_user_id FROM cleaning_jobs WHERE id = ?').bind(photo.job_id).first<{ client_user_id: string | null }>()
+  if (!job || job.client_user_id !== me.id) return c.json({ error: 'not found' }, 404)
+  if (!c.env.UPLOADS) return c.json({ error: 'not found' }, 404)
+  const obj = await c.env.UPLOADS.get(photo.object_key)
+  if (!obj) return c.json({ error: 'not found' }, 404)
+  return new Response(obj.body, { headers: { 'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff' } })
+})
+
+cleaningJobsPortalRoutes.get('/cleaning/plans', requireUser, async (c) => {
+  const me = c.get('user')!
+  const rows = await c.env.DB.prepare(
+    'SELECT id, reference, status, frequency, service_label, next_date, skip_next, visits_completed FROM recurring_cleaning_plans WHERE client_user_id = ? ORDER BY (status=\'active\') DESC, next_date ASC',
+  ).bind(me.id).all<{ id: string; reference: string; status: string; frequency: string; service_label: string; next_date: string | null; skip_next: number; visits_completed: number }>()
+  return c.json({
+    plans: (rows.results || []).map((p) => ({ id: p.id, reference: p.reference, status: p.status, frequency: p.frequency, serviceLabel: p.service_label, nextDate: p.next_date, skipNext: p.skip_next === 1, visitsCompleted: p.visits_completed })),
+  })
+})
+
+cleaningJobsPortalRoutes.post('/cleaning/plans/:id/action', requireUser, async (c) => {
+  const me = c.get('user')!
+  const id = c.req.param('id')!
+  const plan = await c.env.DB.prepare('SELECT id FROM recurring_cleaning_plans WHERE id = ? AND client_user_id = ?').bind(id, me.id).first()
+  if (!plan) return c.json({ error: 'Not found' }, 404)
+  const action = text((await c.req.json().catch(() => ({})) as Record<string, unknown>).action, 20)
+  const map: Record<string, string> = { skip: "skip_next=1", unskip: "skip_next=0", pause: "status='paused'", cancel: "status='cancelled'", resume: "status='active'" }
+  if (!map[action]) return c.json({ error: 'Unknown action.' }, 400)
+  await c.env.DB.prepare(`UPDATE recurring_cleaning_plans SET ${map[action]}, updated_at=datetime('now') WHERE id=?`).bind(id).run()
+  if (action === 'resume') {
+    const pending = await c.env.DB.prepare("SELECT id FROM cleaning_jobs WHERE recurring_plan_id=? AND status NOT IN ('completed','cancelled') LIMIT 1").bind(id).first()
+    if (!pending) await generateNextOccurrence(c.env, id).catch(() => null)
+  }
+  return c.json({ ok: true })
+})
+
+// Convert a completed one-time residential clean into a recurring plan (retention).
+cleaningJobsPortalRoutes.post('/cleaning/jobs/:id/convert-recurring', requireUser, async (c) => {
+  const me = c.get('user')!
+  const id = c.req.param('id')!
+  const freq = text((await c.req.json().catch(() => ({})) as Record<string, unknown>).frequency, 20)
+  if (!isRecurringFrequency(freq)) return c.json({ error: 'Choose weekly, biweekly, or monthly.' }, 400)
+  const job = await c.env.DB.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').bind(id).first<Record<string, unknown>>()
+  if (!job || job.client_user_id !== me.id) return c.json({ error: 'Not found' }, 404)
+  const service = String(job.service_type)
+  const svcCfg = (await ensureCleaningPricingConfig(c.env)).config.services.find((s) => s.key === service)
+  if (!svcCfg?.recurringEligible) return c.json({ error: 'This service is not eligible for a recurring plan.' }, 400)
+  if (job.recurring_plan_id) return c.json({ error: 'This cleaning is already part of a plan.' }, 400)
+  let addons: Record<string, boolean | number> = {}
+  try { addons = JSON.parse(String(job.addons_json || '{}')) } catch { addons = {} }
+  const planId = await createRecurringPlan(c.env, {
+    fromJobId: id,
+    frequency: freq,
+    quote: { service: service as CleaningQuoteResult['service'], county: String(job.county) as CleaningQuoteResult['county'], bedrooms: Number(job.bedrooms) || 0, bathrooms: Number(job.bathrooms) || 1, squareFeet: job.square_feet ? Number(job.square_feet) : undefined, frequency: freq, condition: String(job.condition || 'standard') as 'light' | 'standard' | 'heavy' | 'excessive', supplies: String(job.supplies || 'pinnacle') as 'client' | 'pinnacle', addons, isFirstRecurring: false },
+    serviceLabel: String(job.service_label),
+    clientUserId: me.id,
+    contactName: job.contact_name ? String(job.contact_name) : null,
+    contactEmail: job.contact_email ? String(job.contact_email) : null,
+    contactPhone: job.contact_phone ? String(job.contact_phone) : null,
+    propertyAddress: job.property_address ? String(job.property_address) : null,
+    propertyUnit: job.property_unit ? String(job.property_unit) : null,
+    firstVisitDate: new Date().toISOString().slice(0, 10),
+    arrivalWindow: job.arrival_window ? String(job.arrival_window) : null,
+    createdByUserId: me.id,
+  })
+  await generateNextOccurrence(c.env, planId).catch(() => null)
+  return c.json({ ok: true, planId })
+})
