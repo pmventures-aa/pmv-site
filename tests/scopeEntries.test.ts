@@ -70,12 +70,12 @@ describe('entry-aware scope requests', () => {
     expect(resolveScopeEntry({ offering: 'field-exterior-light' })?.job).toBe('property_inspection')
   })
 
-  it('uses the same intake pattern on every job, guide, and service entry', () => {
+  it('leads every job, guide, and service entry with a status question', () => {
     const jobs = ['cleaning_turnover', 'property_inspection', 'documents_notary', 'eviction_reo', 'business_operations', 'pos_payments', 'other']
     for (const job of jobs) {
       const entry = resolveScopeEntry({ job })
       expect(entry, `missing job entry for ${job}`).toBeTruthy()
-      expect(hasStandardIntake(entry!.questions), `${job} is missing address-style intake (status, photos, reports, check-in)`).toBe(true)
+      expect(hasStandardIntake(entry!.questions), `${job} is missing the leading status question`).toBe(true)
     }
     for (const [slug, entry] of Object.entries(GUIDE_ENTRIES)) {
       expect(hasStandardIntake(entry.questions), `guide ${slug} is missing the shared intake`).toBe(true)
@@ -108,6 +108,9 @@ describe('entry-aware scope requests', () => {
     const base = visibleQuestions(entry!.questions, {}, 'onsite').map((q) => q.key)
     expect(base).toContain('document_kind')
     expect(base).not.toContain('pickup')
+    // Notary/document intakes must not ask the generic "What do you need back?"
+    // deliverable question - their deliverable is the completed document.
+    expect(base).not.toContain('deliverables')
     const courier = visibleQuestions(entry!.questions, { document_kind: ['Courier / delivery'] }, 'onsite').map((q) => q.key)
     expect(courier).toContain('pickup')
     expect(courier).toContain('dropoff')

@@ -57,8 +57,6 @@ const PROPERTY_REPORTS = [
   'Damage assessment',
   'Rent-ready / punch list',
 ]
-const DOCUMENT_PHOTOS = ['ID / credential photos', 'Document scans or copies', 'Signing-room photos', 'Delivery / drop-off photos']
-const DOCUMENT_REPORTS = ['Delivery confirmation', 'Completion certificate', 'Filing receipt', 'Notary journal confirmation']
 const OPS_PHOTOS = ['Screenshots of current tools', 'Process / workflow photos', 'Location or office photos']
 const OPS_REPORTS = ['Process map', 'Operational audit', 'Handoff checklist', 'Weekly status note']
 const SYSTEMS_PHOTOS = ['Screenshots of the current system', 'Error or downtime photos', 'Terminal / hardware photos']
@@ -98,9 +96,11 @@ function propertyCore(extra: ScopeQuestion[] = []): ScopeQuestion[] {
 }
 
 function documentCore(extra: ScopeQuestion[] = []): ScopeQuestion[] {
+  // Document/notary work does not use the photos/report/check-in deliverable
+  // question - the deliverable is the completed or notarized document itself,
+  // so asking "What do you need back?" there just confuses the intake.
   return [
     statusQuestion('has_document', 'Do you already have the document?'),
-    ...deliverableQuestions(DOCUMENT_PHOTOS, DOCUMENT_REPORTS),
     ...extra,
   ]
 }
@@ -204,10 +204,14 @@ const OTHER_QUESTIONS: ScopeQuestion[] = opsCore('has_deadline', 'Is there a dea
   q('outcome', 'What outcome are you after?', 'text', { hint: 'Describe the handled state so we can scope backwards from it' }),
 ])
 
+// The shared intake shape every request follows: a location plus a leading
+// yes/no status question. Property and operations flows additionally attach the
+// photos/report/check-in deliverable question, but document and notary flows
+// deliberately do not (their deliverable is the completed document), so that
+// part is no longer part of the universal contract.
 export function hasStandardIntake(questions: ScopeQuestion[]): boolean {
   const keys = new Set(questions.map((item) => item.key))
-  const hasStatus = STATUS_QUESTION_KEYS.some((key) => keys.has(key))
-  return hasStatus && keys.has('deliverables') && keys.has('photos_required') && keys.has('reports_required')
+  return STATUS_QUESTION_KEYS.some((key) => keys.has(key))
 }
 
 const JOB_QUESTIONS: Record<string, ScopeQuestion[]> = {
