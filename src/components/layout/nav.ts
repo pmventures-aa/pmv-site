@@ -1,7 +1,7 @@
 import {
   Home, Layers, FileText, MessageSquare, Calendar, Receipt, HelpCircle, Building2, Users,
   Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned,
-  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, Video, type LucideIcon,
+  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, Video, Sparkles, type LucideIcon,
 } from 'lucide-react'
 import { clientWorkspace, type OperatingWorld } from '../../lib/workspace'
 
@@ -64,6 +64,7 @@ export const adminNav: NavItem[] = [
   {key:'dashboard',label:'Overview',to:'',icon:Home},
   {key:'pipelines',label:'Pipeline',to:'pipelines',icon:Workflow,section:'Revenue'},
   {key:'quotes',label:'Quotes',to:'quotes',icon:FileText,section:'Revenue'},
+  {key:'cleaning-pricing',label:'Cleaning Pricing',to:'cleaning-pricing',icon:Sparkles,section:'Revenue'},
   {key:'invoices',label:'Invoices',to:'invoices',icon:Receipt,section:'Revenue'},
   {key:'clients',label:'Clients',to:'clients',icon:Users,section:'Revenue'},
   {key:'inquiries',label:'Leads',to:'inquiries',icon:UserPlus,section:'Revenue'},
