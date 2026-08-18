@@ -295,7 +295,7 @@ export default function VendorSignup() {
 
   return (
     <AuthLayout surface="staff" eyebrow={inviteToken ? 'Private Pinnacle provider invitation' : trackCopy.eyebrow} title={stepTitle} subtitle={stepSubtitle} sideLabel={trackCopy.badge} sideTitle={trackCopy.sideTitle} sideBody={trackCopy.sideBody} footer={<>Already approved? <Link to="../login" className="font-medium text-gold hover:underline">Sign in</Link></>}>
-      <div className="mb-6"><div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {stepIndex + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all" style={{ width:`${progress}%` }}/></div><p className="mt-2 text-[11px] text-slate-500">Your progress saves automatically — you can close this and pick up where you left off.</p></div>
+      <div className="mb-6"><div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {stepIndex + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all" style={{ width:`${progress}%` }}/></div><p className="mt-2 text-[11px] text-slate-500">Your progress saves automatically - you can close this and pick up where you left off.</p></div>
       {inviteLoading && <p className="mb-4 text-sm text-slate-400">Loading your invitation…</p>}
       {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-lg border border-gold/20 bg-gold/[.05] p-3 text-xs leading-5 text-slate-400"><span className="font-semibold text-gold">Private invitation verified</span> · expires {new Date(invite.expires_at).toLocaleString()}. You can apply as an individual or register your business, and you may change or add services before submitting.</div>}
       <ErrorBanner message={error}/>
@@ -343,13 +343,13 @@ export default function VendorSignup() {
       </div>}
 
       {step === 'documents' && <div className="space-y-4">
-        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-4"><div className="flex gap-3"><ShieldCheck size={19} className="mt-0.5 shrink-0 text-emerald-300"/><div><p className="text-sm font-semibold text-white">Only your ID is needed to apply</p><p className="mt-1 text-xs leading-5 text-slate-500">Upload a photo ID to submit. Everything else you can add now or later from your profile — it won't hold up your application. Files are stored privately and seen only by authorized reviewers.</p></div></div></div>
+        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-4"><div className="flex gap-3"><ShieldCheck size={19} className="mt-0.5 shrink-0 text-emerald-300"/><div><p className="text-sm font-semibold text-white">Only your ID is needed to apply</p><p className="mt-1 text-xs leading-5 text-slate-500">Upload a photo ID to submit. Everything else you can add now or later from your profile - it won't hold up your application. Files are stored privately and seen only by authorized reviewers.</p></div></div></div>
         {trackDocs.filter((doc) => doc.stage === 'signup').map((doc) => (
           <DocumentUpload key={doc.key} label={doc.label} help={doc.help} required files={toUploaded(doc.key)} uploading={uploading===doc.key} onFiles={(picked)=>upload(doc.key,picked)} onRemove={remove}/>
         ))}
         {trackDocs.some((doc) => doc.stage === 'onboarding') && (
           <div className="pt-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[.14em] text-slate-500">Add now or later — optional to apply</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[.14em] text-slate-500">Add now or later - optional to apply</p>
             <p className="mb-1 mt-1 text-xs leading-5 text-slate-500">Providing these speeds up approval, but you can upload them anytime from your provider profile after you apply.</p>
           </div>
         )}

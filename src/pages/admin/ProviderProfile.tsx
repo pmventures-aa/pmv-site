@@ -442,8 +442,8 @@ function ApplicationReviewPanel({ application }: { application: any }) {
   )
 }
 
-// Editable, current provider credentials — insurance, notary, background
-// check, tax — plus document management. This is the place to revise details
+// Editable, current provider credentials - insurance, notary, background
+// check, tax - plus document management. This is the place to revise details
 // over time (e.g. when an insurance carrier or policy changes), separate from
 // the immutable submitted application.
 const CREDENTIAL_GROUPS: Array<{ title: string; fields: Array<{ key: string; label: string; type?: 'text' | 'date' }> }> = [
@@ -517,7 +517,7 @@ function CredentialsTab({ id, data, reload }: { id: string; data: Data; reload: 
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-white">Credentials</h2>
-            <p className="mt-0.5 text-xs text-slate-500">The current record. Update these whenever something changes — a renewed policy, a new carrier, a completed background check.</p>
+            <p className="mt-0.5 text-xs text-slate-500">The current record. Update these whenever something changes - a renewed policy, a new carrier, a completed background check.</p>
           </div>
           {!data.provider_credentials?.is_saved && <Tag tone="gold">Suggested from application</Tag>}
         </div>
