@@ -11,7 +11,34 @@ import type { OperatingWorld } from '../../shared/workspace'
 import { HeroGuideRail } from '../components/public/HeroGuideRail'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
+import { HorizontalStoryRail, StickyStorySection, ProjectScenario, ProofRail, type RailPanel, type StoryPanel } from '../components/public/story'
 import { CLIENT_LOGIN, GET_HELP, founder, howItWorks, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
+
+// How a request moves — the reusable Pinnacle lifecycle, shown as a bounded
+// horizontal story on desktop and a swipe carousel on mobile.
+const LIFECYCLE: RailPanel[] = [
+  { n: '01', title: 'Request', detail: 'Tell us what needs to happen — where, when, and what matters most. No account required.', slot: 'business_owner', labels: ['Intake logged'] },
+  { n: '02', title: 'Review', detail: 'We review the matter and confirm exactly what it needs before anything starts.', slot: 'review' },
+  { n: '03', title: 'Coordinate', detail: 'The right Pinnacle contact or vetted local provider is assigned and briefed.', slot: 'coordination', labels: ['Provider assigned'] },
+  { n: '04', title: 'Execute', detail: 'The work happens on the ground, documented as it goes.', slot: 'field_inspection', labels: ['On site'] },
+  { n: '05', title: 'Verify', detail: 'Evidence, timestamps, and status are captured and checked.', slot: 'documentation', labels: ['Geo · time stamped'] },
+  { n: '06', title: 'Complete', detail: 'You receive the result, the record, and a clear next step.', slot: 'completion', labels: ['Report delivered'] },
+]
+
+const FIELD_PANELS: StoryPanel[] = [
+  { n: '01', title: 'Inspection', detail: 'A local field professional documents the property, inside and out.', slot: 'property_exterior', labels: ['On site'] },
+  { n: '02', title: 'Documentation', detail: 'Photos and notes are captured with time and location context.', slot: 'documentation', labels: ['Geo verified', 'Time stamped'] },
+  { n: '03', title: 'Coordination', detail: 'If something needs attention, the right vendor is coordinated for you.', slot: 'vendor_arrival', labels: ['Vendor coordinated'] },
+  { n: '04', title: 'Completion', detail: 'You get a clear report of what was found and what was done.', slot: 'completion', labels: ['Report delivered'] },
+]
+
+const SCENARIOS: { title: string; slot: RailPanel['slot']; steps: string[] }[] = [
+  { title: 'Vacant property', slot: 'property_interior', steps: ['Inspection requested', 'Local professional coordinated', 'Photos documented', 'Issue identified', 'Vendor coordinated', 'Completion verified'] },
+  { title: 'Business document', slot: 'document_signing', steps: ['Document requested', 'Requirements reviewed', 'Document prepared / coordinated', 'Signature completed', 'Delivery confirmed', 'Record preserved'] },
+  { title: 'Field request', slot: 'field_inspection', steps: ['Request submitted', 'Location confirmed', 'Field resource assigned', 'Work completed', 'Evidence uploaded', 'Customer notified'] },
+]
+
+const DELIVERABLES = ['Photo documentation', 'Timestamps', 'Status updates', 'Signatures', 'Service records', 'Audit trails', 'Completion reports', 'Communication history']
 
 const WORLD_BY_PATHWAY: Record<string, OperatingWorld> = { business: 'business', property: 'property', personal: 'documents' }
 const WORLD_LABEL: Record<string, string> = { property: 'Property', documents: 'Document', business: 'Business', funding: 'Funding' }
@@ -98,6 +125,12 @@ export default function Home() {
           </Reveal>
         </section>
 
+        <HorizontalStoryRail
+          eyebrow="How the work moves"
+          heading="From a first request to a finished result — you can watch it move."
+          panels={LIFECYCLE}
+        />
+
         <section className="border-y border-gold/15 bg-gradient-to-br from-gold/[.055] via-white/[.012] to-transparent">
           <div className="container-pmv grid gap-12 py-16 sm:py-20 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
             <Reveal>
@@ -118,6 +151,15 @@ export default function Home() {
               ))}
             </div>
           </div>
+        </section>
+
+        <section className="bg-navy-900/30 py-16 sm:py-24">
+          <StickyStorySection
+            eyebrow="Field & property support"
+            heading="Field support, step by step."
+            intro="A local professional handles the visit. You see what happened without having to chase it down."
+            panels={FIELD_PANELS}
+          />
         </section>
 
         <section className="container-pmv py-16 sm:py-24">
@@ -241,6 +283,25 @@ export default function Home() {
             </Reveal>
             <ScopeWizard source="home" compact />
           </div>
+        </section>
+
+        <section className="border-t border-white/[.07] bg-navy-900/30 py-16 sm:py-24">
+          <div className="container-pmv">
+            <Reveal className="max-w-3xl">
+              <p className="eyebrow">Example workflows</p>
+              <h2 className="mt-4 font-display text-3xl font-bold tracking-[-.035em] text-white sm:text-5xl">What a request looks like, start to finish.</h2>
+              <p className="mt-5 text-base leading-7 text-slate-400">Illustrations of how typical requests move through Pinnacle. These are example workflows, not client case studies.</p>
+            </Reveal>
+            <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {SCENARIOS.map((scenario) => (
+                <ProjectScenario key={scenario.title} title={scenario.title} slot={scenario.slot} steps={scenario.steps} />
+              ))}
+            </div>
+          </div>
+          <div className="container-pmv mt-12">
+            <p className="eyebrow mb-3">What you receive</p>
+          </div>
+          <ProofRail items={DELIVERABLES} />
         </section>
 
         <PublicMetricsBand />
