@@ -27,6 +27,8 @@ import {
   type CleaningJobStatus,
 } from '../../../shared/cleaningJobs'
 import { ensureCleaningPricingConfig } from './cleaningPricing'
+import { createRecurringPlan, generateNextOccurrence } from '../cleaningRecurring'
+import { isRecurringFrequency } from '../../../shared/cleaningRecurrence'
 
 export const cleaningJobsPublicRoutes = new Hono<AppEnv>()
 export const cleaningJobsAdminRoutes = new Hono<AppEnv>()
@@ -179,6 +181,15 @@ function vendorJobView(row: JobRow, meId: string, nowMs: number) {
   }
 }
 
+// On completion of a job that belongs to a recurring plan, count the visit and
+// roll the plan forward to schedule the next occurrence.
+async function onJobCompleted(env: Env, jobId: string): Promise<void> {
+  const job = await env.DB.prepare('SELECT recurring_plan_id FROM cleaning_jobs WHERE id=?').bind(jobId).first<{ recurring_plan_id: string | null }>()
+  if (!job?.recurring_plan_id) return
+  await env.DB.prepare("UPDATE recurring_cleaning_plans SET visits_completed = visits_completed + 1, updated_at=datetime('now') WHERE id=?").bind(job.recurring_plan_id).run()
+  await generateNextOccurrence(env, job.recurring_plan_id).catch(() => null)
+}
+
 async function logJobEvent(env: Env, jobId: string, actorUserId: string | null, kind: string, fromStatus: string | null, toStatus: string | null, detail?: string) {
   await env.DB.prepare(
     'INSERT INTO cleaning_job_events (id, job_id, actor_user_id, kind, from_status, to_status, detail) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -230,6 +241,29 @@ cleaningJobsPublicRoutes.post('/public/cleaning/book', async (c) => {
   ).run()
 
   await logJobEvent(c.env, id, clientUserId, 'status_change', null, status, 'Booking received')
+
+  // A recurring booking starts a standing plan; this job is its first visit.
+  // Only recurring-eligible services (those the engine gave a recurring context)
+  // create a plan, so a one-off deep or STR turnover never becomes recurring.
+  const service = pricingConfig.config.services.find((s) => s.key === input.service)
+  let planId: string | null = null
+  if (isRecurringFrequency(input.frequency ?? 'one_time') && service?.recurringEligible) {
+    planId = await createRecurringPlan(c.env, {
+      fromJobId: id,
+      frequency: input.frequency as 'weekly' | 'biweekly' | 'monthly',
+      quote: input,
+      serviceLabel: quote.serviceLabel,
+      clientUserId,
+      contactName,
+      contactEmail,
+      contactPhone: text(body.phone, 40) || null,
+      propertyAddress: text(body.address, 300) || null,
+      propertyUnit: text(body.unit, 60) || null,
+      firstVisitDate: text(body.scheduledDate, 20) || null,
+      arrivalWindow: text(body.arrivalWindow, 60) || null,
+      createdByUserId: clientUserId,
+    }).catch(() => null)
+  }
 
   if (clientUserId) {
     await notifyClientEvent(c.env, {
@@ -362,6 +396,7 @@ cleaningJobsAdminRoutes.post('/cleaning/jobs/:id/status', requireStaff, async (c
   binds.push(id)
   await c.env.DB.prepare(sql).bind(...binds).run()
   await logJobEvent(c.env, id, user.id, 'status_change', job.status, to, reason || undefined)
+  if (to === 'completed') await onJobCompleted(c.env, id)
   return c.json({ ok: true })
 })
 
@@ -461,6 +496,7 @@ cleaningJobsAdminRoutes.post('/cleaning/my-jobs/:id/field', requireUser, async (
 
   // Notify the client on completion.
   if (step.to === 'completed') {
+    await onJobCompleted(c.env, id)
     const full = await c.env.DB.prepare('SELECT client_user_id, service_label, reference FROM cleaning_jobs WHERE id = ?').bind(id).first<{ client_user_id: string | null; service_label: string; reference: string }>()
     if (full?.client_user_id) {
       await notifyClientEvent(c.env, {
@@ -474,4 +510,83 @@ cleaningJobsAdminRoutes.post('/cleaning/my-jobs/:id/field', requireUser, async (
     }
   }
   return c.json({ ok: true, status: step.to })
+})
+
+// ---------------------------------------------------------------------------
+// Recurring plans (staff)
+// ---------------------------------------------------------------------------
+
+interface PlanListRow {
+  id: string
+  reference: string
+  status: string
+  frequency: string
+  service_label: string
+  county: string
+  bedrooms: number
+  bathrooms: number
+  contact_name: string | null
+  property_address: string | null
+  next_date: string | null
+  skip_next: number
+  visits_completed: number
+}
+
+cleaningJobsAdminRoutes.get('/cleaning/plans', requireStaff, async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT id, reference, status, frequency, service_label, county, bedrooms, bathrooms, contact_name, property_address, next_date, skip_next, visits_completed
+     FROM recurring_cleaning_plans ORDER BY (status='active') DESC, next_date ASC LIMIT 300`,
+  ).all<PlanListRow>()
+  return c.json({
+    plans: (rows.results || []).map((p) => ({
+      id: p.id,
+      reference: p.reference,
+      status: p.status,
+      frequency: p.frequency,
+      serviceLabel: p.service_label,
+      county: p.county,
+      bedrooms: p.bedrooms,
+      bathrooms: p.bathrooms,
+      contactName: p.contact_name,
+      propertyAddress: p.property_address,
+      nextDate: p.next_date,
+      skipNext: p.skip_next === 1,
+      visitsCompleted: p.visits_completed,
+    })),
+  })
+})
+
+cleaningJobsAdminRoutes.post('/cleaning/plans/:id/action', requireStaff, async (c) => {
+  const id = c.req.param('id')!
+  const user = c.get('user')!
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+  const action = text(body.action, 20)
+  const plan = await c.env.DB.prepare('SELECT id, status FROM recurring_cleaning_plans WHERE id=?').bind(id).first<{ id: string; status: string }>()
+  if (!plan) return c.json({ error: 'Not found' }, 404)
+
+  switch (action) {
+    case 'skip':
+      await c.env.DB.prepare("UPDATE recurring_cleaning_plans SET skip_next=1, updated_at=datetime('now') WHERE id=?").bind(id).run()
+      break
+    case 'unskip':
+      await c.env.DB.prepare("UPDATE recurring_cleaning_plans SET skip_next=0, updated_at=datetime('now') WHERE id=?").bind(id).run()
+      break
+    case 'pause':
+      await c.env.DB.prepare("UPDATE recurring_cleaning_plans SET status='paused', updated_at=datetime('now') WHERE id=?").bind(id).run()
+      break
+    case 'cancel':
+      await c.env.DB.prepare("UPDATE recurring_cleaning_plans SET status='cancelled', updated_at=datetime('now') WHERE id=?").bind(id).run()
+      break
+    case 'resume': {
+      await c.env.DB.prepare("UPDATE recurring_cleaning_plans SET status='active', updated_at=datetime('now') WHERE id=?").bind(id).run()
+      // If nothing is pending for this plan, schedule the next occurrence now.
+      const pending = await c.env.DB.prepare("SELECT id FROM cleaning_jobs WHERE recurring_plan_id=? AND status NOT IN ('completed','cancelled') LIMIT 1").bind(id).first()
+      if (!pending) await generateNextOccurrence(c.env, id).catch(() => null)
+      break
+    }
+    default:
+      return c.json({ error: 'Unknown action.' }, 400)
+  }
+  await logAudit(c.env, { actorUserId: user.id, actorIp: actorIp(c.req.raw), actorUserAgent: actorUserAgent(c.req.raw), actorGeo: actorGeo(c.req.raw), action: `cleaning_plan_${action}`, entityType: 'recurring_cleaning_plan', entityId: id }).catch(() => {})
+  return c.json({ ok: true })
 })

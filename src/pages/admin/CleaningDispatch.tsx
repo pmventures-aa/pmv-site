@@ -36,6 +36,20 @@ interface Summary {
   completed_payout_cents?: number
 }
 interface Vendor { id: string; name: string }
+interface Plan {
+  id: string
+  reference: string
+  status: string
+  frequency: string
+  serviceLabel: string
+  county: string
+  bedrooms: number
+  contactName: string | null
+  propertyAddress: string | null
+  nextDate: string | null
+  skipNext: boolean
+  visitsCompleted: number
+}
 
 const COUNTY_LABEL: Record<string, string> = { miami_dade: 'Miami-Dade', broward: 'Broward', palm_beach: 'Palm Beach' }
 
@@ -52,6 +66,7 @@ export default function CleaningDispatch() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [summary, setSummary] = useState<Summary>({})
   const [vendors, setVendors] = useState<Vendor[]>([])
+  const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('open')
   const [countyFilter, setCountyFilter] = useState('')
@@ -62,14 +77,16 @@ export default function CleaningDispatch() {
       const params = new URLSearchParams()
       if (statusFilter) params.set('status', statusFilter)
       if (countyFilter) params.set('county', countyFilter)
-      const [jobsRes, sumRes, vendRes] = await Promise.all([
+      const [jobsRes, sumRes, vendRes, planRes] = await Promise.all([
         api.get<{ jobs: Job[] }>(`/admin/cleaning/jobs?${params.toString()}`),
         api.get<{ summary: Summary }>('/admin/cleaning/jobs/summary'),
         api.get<{ vendors: Vendor[] }>('/admin/cleaning/assignable-vendors'),
+        api.get<{ plans: Plan[] }>('/admin/cleaning/plans'),
       ])
       setJobs(jobsRes.jobs)
       setSummary(sumRes.summary || {})
       setVendors(vendRes.vendors)
+      setPlans(planRes.plans)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not load cleaning jobs.')
     } finally {
@@ -96,6 +113,15 @@ export default function CleaningDispatch() {
       await load()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not update status.')
+    }
+  }
+
+  async function planAction(plan: Plan, action: string) {
+    try {
+      await api.post(`/admin/cleaning/plans/${plan.id}/action`, { action })
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update the plan.')
     }
   }
 
@@ -195,6 +221,48 @@ export default function CleaningDispatch() {
           </table>
         )}
       </Panel>
+
+      {plans.length > 0 && (
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-white">Recurring plans</h2>
+          <Panel className="overflow-x-auto p-0">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Plan</th>
+                  <th className="px-4 py-3">Cadence</th>
+                  <th className="px-4 py-3">Next visit</th>
+                  <th className="px-4 py-3">Visits</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {plans.map((plan) => (
+                  <tr key={plan.id} className="border-b border-white/[.06]">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-white">{plan.serviceLabel}</p>
+                      <p className="text-xs text-slate-400">{plan.reference} · {plan.contactName || plan.propertyAddress || COUNTY_LABEL[plan.county]}</p>
+                    </td>
+                    <td className="px-4 py-3 text-xs capitalize text-slate-300">{plan.frequency}</td>
+                    <td className="px-4 py-3 text-xs text-slate-300">{plan.status === 'active' ? (plan.nextDate || '-') : '-'}{plan.skipNext && plan.status === 'active' ? <span className="ml-1 text-amber-300">(skipping)</span> : null}</td>
+                    <td className="px-4 py-3 text-xs text-slate-400">{plan.visitsCompleted}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block rounded px-2 py-0.5 text-[11px] font-semibold ${plan.status === 'active' ? 'bg-emerald-500/15 text-emerald-300' : plan.status === 'paused' ? 'bg-amber-500/15 text-amber-300' : 'bg-white/8 text-slate-400'}`}>{plan.status}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs">
+                      {plan.status === 'active' && <button onClick={() => planAction(plan, plan.skipNext ? 'unskip' : 'skip')} className="text-gold hover:underline">{plan.skipNext ? 'Unskip' : 'Skip next'}</button>}
+                      {plan.status === 'active' && <button onClick={() => planAction(plan, 'pause')} className="ml-3 text-slate-400 hover:text-white">Pause</button>}
+                      {plan.status === 'paused' && <button onClick={() => planAction(plan, 'resume')} className="text-gold hover:underline">Resume</button>}
+                      {plan.status !== 'cancelled' && <button onClick={() => planAction(plan, 'cancel')} className="ml-3 text-slate-500 hover:text-rose-300">Cancel</button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Panel>
+        </div>
+      )}
     </div>
   )
 }
