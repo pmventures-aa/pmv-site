@@ -345,6 +345,53 @@ function RailCard({ panel }: { panel: RailPanel }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// NetworkStory - the "one network" idea made visual: scattered local nodes
+// connected to a central coordination point. Restrained and abstract (not a
+// package tracker); the gentle node pulse is disabled for reduced-motion.
+// ---------------------------------------------------------------------------
+const NETWORK_NODES = [
+  { x: 120, y: 90 }, { x: 250, y: 160 }, { x: 180, y: 250 }, { x: 360, y: 70 },
+  { x: 560, y: 110 }, { x: 660, y: 220 }, { x: 480, y: 260 }, { x: 720, y: 130 },
+]
+const HUB = { x: 400, y: 180 }
+
+export function NetworkStory({ eyebrow = 'One network', heading, body, points }: { eyebrow?: string; heading: string; body: string; points: string[] }) {
+  const reduce = useReducedMotion()
+  return (
+    <div className="container-pmv grid gap-10 lg:grid-cols-[.82fr_1.18fr] lg:items-center lg:gap-14">
+      <div>
+        <p className="eyebrow">{eyebrow}</p>
+        <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-4xl">{heading}</h2>
+        <p className="mt-5 max-w-md text-base leading-8 text-slate-400">{body}</p>
+        <ul className="mt-6 space-y-2 text-sm text-slate-300">
+          {points.map((point) => <li key={point} className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden="true" />{point}</li>)}
+        </ul>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-navy-900/40 p-4">
+        <svg viewBox="0 0 800 360" className="h-auto w-full" role="img" aria-label="Local professionals across the country connected to one central coordination point">
+          {NETWORK_NODES.map((node, i) => (
+            <line key={`l-${i}`} x1={HUB.x} y1={HUB.y} x2={node.x} y2={node.y} stroke="rgba(201,162,39,0.28)" strokeWidth={1} />
+          ))}
+          {NETWORK_NODES.map((node, i) => (
+            <motion.circle
+              key={`n-${i}`} cx={node.x} cy={node.y} r={5} fill="rgba(226,232,240,0.85)"
+              initial={reduce ? false : { opacity: 0.45 }}
+              animate={reduce ? undefined : { opacity: [0.45, 1, 0.45] }}
+              transition={reduce ? undefined : { duration: 3.2, repeat: Infinity, delay: i * 0.35, ease: 'easeInOut' }}
+            />
+          ))}
+          <circle cx={HUB.x} cy={HUB.y} r={16} fill="none" stroke="rgba(201,162,39,0.5)" strokeWidth={1.5} />
+          <circle cx={HUB.x} cy={HUB.y} r={8} fill="#c9a227" />
+        </svg>
+        <div className="mt-3 flex flex-wrap justify-between gap-2 px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <span>Local execution</span><span className="text-gold/80">Central coordination</span><span>Nationwide reach</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ScrollHint() {
   return (
     <div className="container-pmv mt-6 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500" aria-hidden="true">

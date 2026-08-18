@@ -12,6 +12,8 @@ import { usePublicVisitor } from '../../lib/publicContext'
 import { worldFromPublicParams } from '../../lib/workspace'
 import { PriceAnchor } from '../../components/public/PriceAnchor'
 import { CaseStudyStrip } from '../../components/public/Proof'
+import { StoryImage, ProcessJourney, ProjectScenario, ProofRail } from '../../components/public/story'
+import { getServiceStory, DEFAULT_JOURNEY, DEFAULT_DELIVERABLES } from '../../data/serviceStories'
 
 const PLAN_PITCH: Record<'property'|'ops'|'legal', { eyebrow: string; title: string; body: string; from: string; to: string }> = {
   property: { eyebrow: 'Property Care Plans', title: 'Licensed managers in network, or on-call care if you keep the keys.', body: 'Use licensed property managers and CAM agents in the Pinnacle network at a lower cost than the typical percentage shop, or start a Property Care plan from $89/mo with inspections, credits, and priority scheduling.', from: 'From $89/mo', to: '/care-plans?family=property' },
@@ -44,6 +46,7 @@ export default function ServiceDetail() {
 
   if (!service) return <Navigate to="/services" replace />
 
+  const story = getServiceStory(service.slug)
   const others = services.filter((item) => item.slug !== service.slug && item.key !== service.key).slice(0, 3)
   const requestUrl = `/scope-request?entry=${encodeURIComponent(service.slug)}&service=${encodeURIComponent(service.key)}${service.intakeJob ? `&job=${encodeURIComponent(service.intakeJob)}` : ''}&source=service-${encodeURIComponent(service.slug)}`
 
@@ -83,9 +86,42 @@ export default function ServiceDetail() {
           </div>
         </div>
 
+        {story && (
+          <div className="mt-14 grid gap-8 lg:grid-cols-2 lg:items-center lg:gap-12">
+            <StoryImage slot={story.slot} aspect="aspect-[4/3]" />
+            <div>
+              <p className="eyebrow">How Pinnacle handles it</p>
+              <p className="mt-4 text-lg leading-8 text-slate-200">{story.lead}</p>
+              <ul className="mt-6 space-y-2.5 text-sm text-slate-300">
+                {service.highlights.slice(0, 4).map((item) => <li key={item} className="flex gap-3"><span className="text-gold">✓</span>{item}</li>)}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {story && (
+          <div className="mt-16">
+            <p className="eyebrow mb-8">How it moves</p>
+            <ProcessJourney steps={story.journey ?? DEFAULT_JOURNEY} />
+          </div>
+        )}
+
         <OfferingLibrary serviceKey={service.key} offeringPrefixes={service.offeringPrefixes} />
 
         {service.planFamily && <PlanCrossSell family={service.planFamily} />}
+
+        {story && (
+          <div className="mt-16 grid gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-start lg:gap-12">
+            <ProjectScenario label={story.scenario.title} title={service.title} slot={story.slot} steps={story.scenario.steps} />
+            <div>
+              <p className="eyebrow">What you receive</p>
+              <p className="mt-3 text-sm leading-7 text-slate-400">Clear evidence and a record of what happened, so you are never left guessing.</p>
+              <div className="mt-5">
+                <ProofRail items={story.deliverables ?? DEFAULT_DELIVERABLES} />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-16">
           <p className="eyebrow mb-4">You may also want to explore</p>
