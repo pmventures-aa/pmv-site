@@ -41,19 +41,19 @@ export default function CleaningReports() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Booked Revenue" value={formatUsd(report.bookedRevenueCents)} />
-        <StatCard label="Completed Revenue" value={formatUsd(report.completedRevenueCents)} />
-        <StatCard label="Vendor Cost" value={formatUsd(report.vendorCostCents)} />
-        <StatCard label="Gross Margin" value={`${formatUsd(report.grossMarginCents)} · ${report.grossMarginPercent}%`} />
-        <StatCard label="Average Ticket" value={formatUsd(report.averageTicketCents)} />
-        <StatCard label="Completion Rate" value={`${report.completionRate}%`} />
+        <StatCard label="Booked Revenue" value={formatUsd(report.bookedRevenueCents)} accent="gold" />
+        <StatCard label="Completed Revenue" value={formatUsd(report.completedRevenueCents)} accent="green" />
+        <StatCard label="Vendor Cost" value={formatUsd(report.vendorCostCents)} accent="coral" />
+        <StatCard label="Gross Margin" value={`${formatUsd(report.grossMarginCents)} · ${report.grossMarginPercent}%`} accent="sea" />
+        <StatCard label="Average Ticket" value={formatUsd(report.averageTicketCents)} accent="gold" />
+        <StatCard label="Completion Rate" value={`${report.completionRate}%`} accent="green" />
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Jobs" value={String(report.jobCount)} />
-        <StatCard label="Completed" value={String(report.completedCount)} />
-        <StatCard label="STR / Residential" value={`${report.strCount} / ${report.residentialCount}`} />
-        <StatCard label="Active Recurring Plans" value={String(activePlans)} />
+        <StatCard label="Jobs" value={String(report.jobCount)} accent="sea" />
+        <StatCard label="Completed" value={String(report.completedCount)} accent="green" />
+        <StatCard label="STR / Residential" value={`${report.strCount} / ${report.residentialCount}`} accent="coral" />
+        <StatCard label="Active Recurring Plans" value={String(activePlans)} accent="gold" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

@@ -13,8 +13,8 @@ import type { OperatingWorld } from '../../shared/workspace'
 import { HeroGuideRail } from '../components/public/HeroGuideRail'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
-import { ProjectScenario, ProofRail, StoryImage, type RailPanel, type StoryPanel } from '../components/public/story'
-import { CLIENT_LOGIN, GET_HELP, founder, howItWorks, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
+import { StoryImage, type RailPanel } from '../components/public/story'
+import { CLIENT_LOGIN, GET_HELP, founder, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 import { getCleaningConfig } from '../lib/cleaningApi'
 import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricing'
 
@@ -28,21 +28,6 @@ const LIFECYCLE: RailPanel[] = [
   { n: '05', title: 'Verify', detail: 'Evidence, timestamps, and status are captured and checked.', slot: 'documentation', labels: ['Geo · time stamped'] },
   { n: '06', title: 'Complete', detail: 'You receive the result, the record, and a clear next step.', slot: 'completion', labels: ['Report delivered'] },
 ]
-
-const FIELD_PANELS: StoryPanel[] = [
-  { n: '01', title: 'Inspection', detail: 'A local field professional documents the property, inside and out.', slot: 'property_exterior', labels: ['On site'] },
-  { n: '02', title: 'Documentation', detail: 'Photos and notes are captured with time and location context.', slot: 'documentation', labels: ['Geo verified', 'Time stamped'] },
-  { n: '03', title: 'Coordination', detail: 'If something needs attention, the right vendor is coordinated for you.', slot: 'vendor_arrival', labels: ['Vendor coordinated'] },
-  { n: '04', title: 'Completion', detail: 'You get a clear report of what was found and what was done.', slot: 'completion', labels: ['Report delivered'] },
-]
-
-const SCENARIOS: { title: string; slot: RailPanel['slot']; steps: string[] }[] = [
-  { title: 'Vacant property', slot: 'property_interior', steps: ['Inspection requested', 'Local professional coordinated', 'Photos documented', 'Issue identified', 'Vendor coordinated', 'Completion verified'] },
-  { title: 'Business document', slot: 'document_signing', steps: ['Document requested', 'Requirements reviewed', 'Document prepared / coordinated', 'Signature completed', 'Delivery confirmed', 'Record preserved'] },
-  { title: 'Field request', slot: 'field_inspection', steps: ['Request submitted', 'Location confirmed', 'Field resource assigned', 'Work completed', 'Evidence uploaded', 'Customer notified'] },
-]
-
-const DELIVERABLES = ['Photo documentation', 'Timestamps', 'Status updates', 'Signatures', 'Service records', 'Audit trails', 'Completion reports', 'Communication history']
 
 const WORLD_BY_PATHWAY: Record<string, OperatingWorld> = { business: 'business', property: 'property', personal: 'documents' }
 // One coastal accent per path so the three lanes read as distinct.
@@ -139,57 +124,6 @@ export default function Home() {
           panels={LIFECYCLE}
         />
 
-        <section className="border-y border-gold/15 bg-gradient-to-br from-gold/[.055] via-white/[.012] to-transparent">
-          <div className="container-pmv grid gap-12 py-16 sm:py-20 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
-            <Reveal>
-              <p className="eyebrow">How Pinnacle works</p>
-              <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">You do not have to know the service name first.</h2>
-              <p className="mt-5 max-w-lg text-base leading-8 text-slate-400">
-                Tell us what is going on. We review the matter, name who is handling it, and stay with the work through completion.
-              </p>
-              <ViewTransitionLink to="/how-it-works" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-gold">See the full process <span>→</span></ViewTransitionLink>
-            </Reveal>
-            <div className="divide-y divide-white/10 border-y border-white/10">
-              {howItWorks.map(([title, body], i) => (
-                <Reveal key={title} delay={i * 0.05} className="grid gap-3 py-6 sm:grid-cols-[44px_minmax(160px,.7fr)_1fr] sm:items-start">
-                  <span className="font-display text-xs font-bold text-gold/60">0{i + 1}</span>
-                  <h3 className="font-display text-sm font-bold text-white">{title}</h3>
-                  <p className="text-sm leading-6 text-slate-400">{body}</p>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-navy-900/30 py-16 sm:py-24">
-          <div className="container-pmv">
-            <Reveal className="max-w-2xl">
-              <p className="eyebrow">Field &amp; property support</p>
-              <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-4xl">Field support, step by step.</h2>
-              <p className="mt-4 text-base leading-7 text-slate-400">A local professional handles the visit. You see what happened without having to chase it down.</p>
-            </Reveal>
-            <StaggerGroup className="mt-10 grid gap-5 sm:grid-cols-2">
-              {FIELD_PANELS.map((panel) => (
-                <motion.article key={panel.n} variants={staggerItem} className="overflow-hidden rounded-xl border border-white/10 bg-navy-950/40">
-                  <StoryImage slot={panel.slot} aspect="aspect-[16/9]" rounded="rounded-none" reveal={false} />
-                  <div className="p-6">
-                    <div className="flex items-center gap-2">
-                      <span className="font-display text-xs font-bold text-gold/70">{panel.n}</span>
-                      <h3 className="font-display text-lg font-semibold text-white">{panel.title}</h3>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">{panel.detail}</p>
-                    {panel.labels && (
-                      <div className="mt-4 flex flex-wrap gap-1.5">
-                        {panel.labels.map((l) => <span key={l} className="rounded-full border border-white/10 bg-white/[.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{l}</span>)}
-                      </div>
-                    )}
-                  </div>
-                </motion.article>
-              ))}
-            </StaggerGroup>
-          </div>
-        </section>
-
         <section className="container-pmv py-16 sm:py-24">
           <Reveal className="max-w-3xl">
             <p className="eyebrow">Why Pinnacle</p>
@@ -263,18 +197,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="container-pmv py-16 sm:py-20">
-          <Reveal className="grid gap-8 lg:grid-cols-2 lg:items-end">
-            <div>
-              <p className="eyebrow">The right support for the matter</p>
-              <h2 className="mt-4 font-display text-3xl font-bold text-white sm:text-4xl">Direct when we can. Coordinated when it should be.</h2>
-            </div>
-            <p className="text-sm leading-7 text-slate-400">
-              Pinnacle may provide the work directly, manage the matter, or work with licensed third-party professionals when specialized or regulated services are required. We name that up front. We are not a law firm, accounting firm, lender, or licensed property manager unless that provider is identified as such.
-            </p>
-          </Reveal>
-        </section>
-
         <section className="border-y border-white/[.07]">
           <div className="container-pmv py-16 sm:py-20">
             <Reveal className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -311,25 +233,6 @@ export default function Home() {
             </Reveal>
             <ScopeWizard source="home" compact />
           </div>
-        </section>
-
-        <section className="border-t border-white/[.07] bg-navy-900/30 py-16 sm:py-24">
-          <div className="container-pmv">
-            <Reveal className="max-w-3xl">
-              <p className="eyebrow">Example workflows</p>
-              <h2 className="mt-4 font-display text-3xl font-bold tracking-[-.035em] text-white sm:text-5xl">What a request looks like, start to finish.</h2>
-              <p className="mt-5 text-base leading-7 text-slate-400">Illustrations of how typical requests move through Pinnacle. These are example workflows, not client case studies.</p>
-            </Reveal>
-            <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {SCENARIOS.map((scenario) => (
-                <ProjectScenario key={scenario.title} title={scenario.title} slot={scenario.slot} steps={scenario.steps} />
-              ))}
-            </div>
-          </div>
-          <div className="container-pmv mt-12">
-            <p className="eyebrow mb-3">What you receive</p>
-          </div>
-          <ProofRail items={DELIVERABLES} />
         </section>
 
         <PublicMetricsBand />
