@@ -35,6 +35,7 @@ describe('Provider Application PDF', () => {
         commission_state: 'FL',
         commission_expiration: '2028-04-01',
         ron_provider: 'Proof',
+        track_answers: { loan_signing_certified: 'Yes — NNA certified', notary_languages: 'English, Spanish', ron_states: 'FL, TX' },
         notes: 'Available weekends.',
       },
     })

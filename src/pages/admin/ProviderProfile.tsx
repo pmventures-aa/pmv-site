@@ -413,6 +413,8 @@ function ApplicationReviewPanel({ application }: { application: any }) {
     { label: 'Technology platforms', value: val(application.technology_platforms) },
     { label: 'Accounting credentials', value: val(application.accounting_credentials) },
     { label: 'Other service', value: val(application.other_service) },
+    ...Object.entries((application.track_answers && typeof application.track_answers === 'object') ? application.track_answers : {})
+      .map(([k, v]) => ({ label: k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), value: val(v) })),
     { label: 'Applicant notes', value: val(application.notes) },
   ].filter((r) => r.value !== '')
   return (

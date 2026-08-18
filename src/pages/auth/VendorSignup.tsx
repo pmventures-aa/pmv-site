@@ -6,13 +6,14 @@ import { AuthLayout, ErrorBanner, Field, inputCls } from './AuthLayout'
 import { DocumentUpload, type UploadedDocument } from '../../components/forms/DocumentUpload'
 import { PROVIDER_AGREEMENT_URL, PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
 import { vendorApplicationCopy } from '../../lib/workspace'
+import { questionsForTracks, documentsForTracks, type ProviderTrackKey, type ApplicationDocKey } from '../../../shared/providerApplication'
 
 const MIN_PASSWORD = 10
 
 type Step = 'contact' | 'services' | 'questions' | 'documents' | 'account'
-type DocType = 'government_id_front' | 'government_id_back' | 'ein_letter' | 'professional_license' | 'insurance' | 'w9' | 'supporting'
+type DocType = ApplicationDocKey
 
-type EnrollmentKey = 'property_field' | 'mobile_notary' | 'ron' | 'document_courier' | 'merchant_technology' | 'business_operations' | 'bookkeeping_financial' | 'other'
+type EnrollmentKey = ProviderTrackKey
 
 interface InviteData {
   invite: {
@@ -55,6 +56,7 @@ export default function VendorSignup() {
     license_status:'' as ''|'yes'|'no'|'unsure', insurance_status:'' as ''|'yes'|'no',
     technology_platforms:'', accounting_credentials:'', other_service:'', notes:'', password:'', confirm:'',
     provider_agreement_accepted:false, signature_name:'',
+    trackAnswers:{} as Record<string, string>,
   })
   const [uploadToken, setUploadToken] = useState('')
   const [files, setFiles] = useState<UploadedFile[]>([])
@@ -108,8 +110,9 @@ export default function VendorSignup() {
   const techSelected = form.enrollments.includes('merchant_technology')
   const financeSelected = form.enrollments.includes('bookkeeping_financial')
   const businessEntity = form.entity_type !== 'Individual / Sole Proprietor' || form.has_ein === 'yes'
-  const licenseRequired = notarySelected || form.license_status === 'yes'
-  const insuranceRequired = propertySelected || notarySelected || form.insurance_status === 'yes'
+  const trackQuestions = useMemo(() => questionsForTracks(form.enrollments), [form.enrollments])
+  const trackDocs = useMemo(() => documentsForTracks(form.enrollments, { businessEntity }), [form.enrollments, businessEntity])
+  const setTrackAnswer = (key: string, value: string) => setForm((current) => ({ ...current, trackAnswers: { ...current.trackAnswers, [key]: value } }))
   const fileFor = (type: DocType) => files.filter((file) => file.document_type === type)
   const toUploaded = (type: DocType): UploadedDocument[] => fileFor(type).map((file) => ({ id:file.id, name:file.file_name, detail:file.size_bytes ? `${Math.max(1, Math.round(file.size_bytes / 1024))} KB` : undefined }))
 
@@ -142,11 +145,9 @@ export default function VendorSignup() {
       if (form.enrollments.includes('other') && !form.other_service.trim()) return 'Describe the other professional service you provide.'
     }
     if (step === 'documents' && next === 'account') {
-      if (fileFor('government_id_front').length === 0) return 'Upload the front of your government-issued ID.'
-      if (fileFor('government_id_back').length === 0) return 'Upload the back of your government-issued ID.'
-      if (businessEntity && fileFor('ein_letter').length === 0) return 'Upload your IRS EIN confirmation letter.'
-      if (licenseRequired && fileFor('professional_license').length === 0) return 'Upload your applicable professional license or credential.'
-      if (insuranceRequired && fileFor('insurance').length === 0) return 'Upload current proof of insurance.'
+      for (const doc of trackDocs) {
+        if (doc.required && fileFor(doc.key).length === 0) return `Upload: ${doc.label}.`
+      }
     }
     if (step === 'account') {
       if (form.password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters.`
@@ -210,6 +211,7 @@ export default function VendorSignup() {
     technology_platforms:techSelected ? form.technology_platforms : null,
     accounting_credentials:financeSelected ? form.accounting_credentials : null,
     other_service:form.enrollments.includes('other') ? form.other_service : null,
+    track_answers:form.trackAnswers,
     notes:form.notes || null,
   }
 
@@ -293,18 +295,30 @@ export default function VendorSignup() {
         {techSelected && <Field label="POS, payment, gateway, CRM, or business systems you know"><textarea className={`${inputCls} min-h-24`} value={form.technology_platforms} onChange={(e)=>set('technology_platforms',e.target.value)}/></Field>}
         {financeSelected && <Field label="Bookkeeping/accounting experience or credentials"><textarea className={`${inputCls} min-h-24`} value={form.accounting_credentials} onChange={(e)=>set('accounting_credentials',e.target.value)}/></Field>}
         {form.enrollments.includes('other') && <Field label="Describe your other professional service"><textarea className={`${inputCls} min-h-20`} value={form.other_service} onChange={(e)=>set('other_service',e.target.value)}/></Field>}
+        {trackQuestions.length > 0 && (
+          <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-4">
+            <p className="mb-3 text-sm font-semibold text-white">A few specifics for the services you selected</p>
+            <div className="space-y-3">
+              {trackQuestions.map((q) => (
+                <Field key={q.key} label={q.label}>
+                  {q.type === 'textarea'
+                    ? <textarea className={`${inputCls} min-h-20`} placeholder={q.placeholder} value={form.trackAnswers[q.key] || ''} onChange={(e)=>setTrackAnswer(q.key, e.target.value)}/>
+                    : <input className={inputCls} placeholder={q.placeholder} value={form.trackAnswers[q.key] || ''} onChange={(e)=>setTrackAnswer(q.key, e.target.value)}/>}
+                </Field>
+              ))}
+            </div>
+          </div>
+        )}
         <Field label="Additional notes (optional)"><textarea className={`${inputCls} min-h-20`} value={form.notes} onChange={(e)=>set('notes',e.target.value)}/></Field>
         <div className="flex gap-2"><button onClick={()=>setStep('services')} className="btn-outline flex-1">Back</button><button onClick={()=>void go('documents')} className="btn-gold flex-[1.5]">Continue</button></div>
       </div>}
 
       {step === 'documents' && <div className="space-y-4">
         <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-4"><div className="flex gap-3"><ShieldCheck size={19} className="mt-0.5 shrink-0 text-emerald-300"/><div><p className="text-sm font-semibold text-white">Private verification workspace</p><p className="mt-1 text-xs leading-5 text-slate-500">Identity and tax documents are stored separately from your public/provider profile and are only available to authorized reviewers.</p></div></div></div>
-        <DocumentUpload label="Government ID: Front" help="Required. Upload a clear image of the front of your driver license, state ID, or other government-issued photo ID." required files={toUploaded('government_id_front')} uploading={uploading==='government_id_front'} onFiles={(picked)=>upload('government_id_front',picked)} onRemove={remove}/>
-        <DocumentUpload label="Government ID: Back" help="Required. Upload a clear image of the back of the same ID." required files={toUploaded('government_id_back')} uploading={uploading==='government_id_back'} onFiles={(picked)=>upload('government_id_back',picked)} onRemove={remove}/>
-        {businessEntity && <DocumentUpload label="IRS EIN Letter" help="Required for business entities/EIN users. Upload your CP 575, 147C, SS-4 confirmation, or other IRS-issued EIN confirmation." required files={toUploaded('ein_letter')} uploading={uploading==='ein_letter'} onFiles={(picked)=>upload('ein_letter',picked)} onRemove={remove}/>}
-        {licenseRequired && <DocumentUpload label={notarySelected?'Professional license / Notary commission':'Professional license or credential'} help="Required based on the services and licensing answers in your application." required files={toUploaded('professional_license')} uploading={uploading==='professional_license'} onFiles={(picked)=>upload('professional_license',picked)} onRemove={remove}/>} 
-        {insuranceRequired && <DocumentUpload label="Proof of insurance" help="Required based on the services you selected. Upload a current certificate, declarations page, E&O policy, or other applicable coverage proof." required files={toUploaded('insurance')} uploading={uploading==='insurance'} onFiles={(picked)=>upload('insurance',picked)} onRemove={remove}/>} 
-        <DocumentUpload label="W-9 (optional now)" help="You can provide a current W-9 during onboarding now or Pinnacle can request it before a paid assignment." files={toUploaded('w9')} uploading={uploading==='w9'} onFiles={(picked)=>upload('w9',picked)} onRemove={remove}/>
+        <p className="text-xs leading-5 text-slate-500">The documents below are tailored to the services you selected. Required items are marked; others are optional but speed up approval.</p>
+        {trackDocs.map((doc) => (
+          <DocumentUpload key={doc.key} label={doc.label} help={doc.help} required={doc.required} files={toUploaded(doc.key)} uploading={uploading===doc.key} onFiles={(picked)=>upload(doc.key,picked)} onRemove={remove}/>
+        ))}
         <DocumentUpload label="Other supporting documents" help="Optional certifications, references, work samples, or supporting credentials." multiple files={toUploaded('supporting')} uploading={uploading==='supporting'} onFiles={(picked)=>upload('supporting',picked)} onRemove={remove}/>
         <div className="flex gap-2"><button onClick={()=>setStep('questions')} className="btn-outline flex-1">Back</button><button onClick={()=>void go('account')} className="btn-gold flex-[1.5]">Continue</button></div>
       </div>}

@@ -3,12 +3,14 @@ import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { safeUploadName, validateUploadSignature } from '../fileValidation'
 import { generateVendorApplicationPdf } from '../vendorApplicationRecord'
+import { ALL_APPLICATION_DOC_KEYS } from '../../../shared/providerApplication'
 
 const SESSION_TTL = 2 * 60 * 60
 const MAX_BYTES = 20 * 1024 * 1024
 const MAX_FILES = 12
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
-const ALLOWED_DOCUMENT_TYPES = new Set(['government_id_front','government_id_back','ein_letter','professional_license','insurance','w9','supporting'])
+// Base slots plus every per-track slot declared in the shared branching config.
+const ALLOWED_DOCUMENT_TYPES = new Set<string>(ALL_APPLICATION_DOC_KEYS)
 type PendingFile={id:string;document_type:string;object_key:string;file_name:string;content_type:string;size_bytes:number}
 type UploadSession={created_at:string;files:PendingFile[]}
 function key(token:string){return`vendor-upload:${token}`}
