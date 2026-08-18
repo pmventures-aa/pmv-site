@@ -7,7 +7,14 @@ import { GET_HELP } from '../../data/publicSite'
 import { services } from '../../data/services'
 import { api, ApiError } from '../../lib/api'
 import { inputCls } from '../auth/AuthLayout'
+import { StoryImage, ProcessJourney } from '../../components/public/story'
 import { usePageMeta } from '../../lib/usePageMeta'
+
+const CONTACT_NEXT = [
+  { n: '01', label: 'You reach out', detail: 'Send the form, call, or email. No account needed, and no obligation.' },
+  { n: '02', label: 'We review it', detail: 'A real person reads your note and figures out the right next step.' },
+  { n: '03', label: 'You hear back', detail: 'A real person replies within two business hours with a clear path forward.' },
+]
 
 export default function Contact() {
   usePageMeta('Contact', 'Tell us what you need help with and we will follow up about the right service and next step.')
@@ -115,7 +122,13 @@ export default function Contact() {
             <div className="mt-6 border-t border-white/10 pt-4">
               <a href="/portal/login" className="text-sm font-medium text-gold hover:underline">Already a client? Sign in</a>
             </div>
+            <StoryImage slot="coordination" className="mt-6" aspect="aspect-[4/3]" />
           </div>
+        </div>
+
+        <div className="mt-16 border-t border-white/10 pt-12">
+          <p className="eyebrow mb-8">What happens after you reach out</p>
+          <ProcessJourney steps={CONTACT_NEXT} cols={3} />
         </div>
       </section>
       <Footer />

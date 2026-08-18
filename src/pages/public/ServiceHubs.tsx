@@ -11,6 +11,11 @@ import { usePageMeta } from '../../lib/usePageMeta'
 import { usePublicVisitor } from '../../lib/publicContext'
 import type { OperatingWorld } from '../../../shared/workspace'
 import { CaseStudyStrip } from '../../components/public/Proof'
+import { StoryImage, ProcessJourney } from '../../components/public/story'
+import { DEFAULT_JOURNEY } from '../../data/serviceStories'
+import type { StoryImageKey } from '../../data/storyImages'
+
+const HUB_SLOT: Record<'business'|'property'|'mobile', StoryImageKey> = { business: 'coordination', property: 'property_exterior', mobile: 'document_signing' }
 
 const HUB_WORLD: Record<'business'|'property'|'mobile', OperatingWorld> = { business: 'business', property: 'property', mobile: 'documents' }
 const HUB_LABEL: Record<'business'|'property'|'mobile', string> = { business: 'Business Support', property: 'Property Support', mobile: 'Document & Signing Support' }
@@ -111,7 +116,9 @@ function HubPage({ hub }: { hub: keyof typeof HUBS }) {
       </div>
     </section>
 
-    <section className="container-pmv py-14 sm:py-18"><Reveal className="grid gap-10 lg:grid-cols-[.7fr_1.3fr]"><div><p className="eyebrow">Where we help</p><h2 className="mt-3 font-display text-3xl font-medium text-white">Common reasons clients bring this work to Pinnacle.</h2></div><div className="grid gap-x-10 sm:grid-cols-2">{cfg.themes.map(([title,body])=><div key={title} className="border-t border-gold/25 py-5"><h3 className="font-semibold text-white">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{body}</p></div>)}</div></Reveal></section>
+    <section className="container-pmv py-14 sm:py-18"><Reveal className="grid gap-10 lg:grid-cols-[.7fr_1.3fr]"><div><p className="eyebrow">Where we help</p><h2 className="mt-3 font-display text-3xl font-medium text-white">Common reasons clients bring this work to Pinnacle.</h2><StoryImage slot={HUB_SLOT[hub]} className="mt-6 hidden lg:block" aspect="aspect-[4/3]" /></div><div className="grid gap-x-10 sm:grid-cols-2">{cfg.themes.map(([title,body])=><div key={title} className="border-t border-gold/25 py-5"><h3 className="font-semibold text-white">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{body}</p></div>)}</div></Reveal></section>
+
+    <section className="border-y border-white/[.08] py-14 sm:py-18"><div className="container-pmv"><Reveal className="mb-8 max-w-2xl"><p className="eyebrow">How the work moves</p><h2 className="mt-3 font-display text-3xl font-medium text-white sm:text-4xl">A clear path from request to completion.</h2></Reveal><ProcessJourney steps={DEFAULT_JOURNEY} /></div></section>
 
     <section className="border-y border-white/[.08] bg-navy-900/30"><div className="container-pmv py-14 sm:py-18"><Reveal className="mb-7 max-w-3xl"><p className="eyebrow">Services</p><h2 className="mt-3 font-display text-3xl font-medium text-white sm:text-4xl">Choose a service, or start with the situation.</h2><p className="mt-4 text-sm leading-7 text-slate-400">These pages explain the typical scope in more detail. If your need crosses categories, start a request and we can help organize it.</p></Reveal><div className="border-b border-white/10">{hubServices.map((service)=><ServiceRow key={service.slug} service={service} world={HUB_WORLD[hub]}/>)}</div></div></section>
 
