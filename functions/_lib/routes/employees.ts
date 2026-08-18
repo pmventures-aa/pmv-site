@@ -4,8 +4,36 @@ import { requireStaff } from '../mid'
 import { requireNamedPermission, hasNamedPermission } from '../capabilities'
 import { uuid } from '../crypto'
 import { generateVendorApplicationPdf } from '../vendorApplicationRecord'
+import { safeUploadName, validateUploadSignature } from '../fileValidation'
+import { ALL_APPLICATION_DOC_KEYS } from '../../../shared/providerApplication'
 
 export const employeeRoutes = new Hono<AppEnv>()
+
+// Editable text columns on provider_credentials (w9_on_file is handled
+// separately as a boolean).
+const CREDENTIAL_TEXT_FIELDS = [
+  'insurance_carrier', 'insurance_policy_number', 'insurance_expires_at',
+  'auto_insurance_carrier', 'auto_insurance_policy_number', 'auto_insurance_expires_at',
+  'notary_commission_number', 'notary_state', 'notary_expires_at',
+  'eo_bond_provider', 'eo_bond_expires_at',
+  'background_check_status', 'background_check_completed_at',
+  'ein', 'notes',
+] as const
+
+async function ensureProviderCredentialsTable(env: AppEnv['Bindings']) {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS provider_credentials (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      insurance_carrier TEXT, insurance_policy_number TEXT, insurance_expires_at TEXT,
+      auto_insurance_carrier TEXT, auto_insurance_policy_number TEXT, auto_insurance_expires_at TEXT,
+      notary_commission_number TEXT, notary_state TEXT, notary_expires_at TEXT,
+      eo_bond_provider TEXT, eo_bond_expires_at TEXT,
+      background_check_status TEXT, background_check_completed_at TEXT,
+      w9_on_file INTEGER NOT NULL DEFAULT 0, ein TEXT, details_json TEXT, notes TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')), updated_by_user_id TEXT
+    )`,
+  ).run()
+}
 
 employeeRoutes.get('/staff-directory', requireStaff, async (c) => {
   const res = await c.env.DB.prepare(
@@ -100,12 +128,36 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
     ).bind(id).all(),
   ])
 
-  let vendorApplication: unknown = null
+  let vendorApplication: Record<string, unknown> | null = null
   try {
     const row = await c.env.DB.prepare('SELECT application_json, submitted_at, updated_at FROM vendor_application_profiles WHERE user_id = ?').bind(id).first<{ application_json:string; submitted_at:string; updated_at:string }>()
     if (row) vendorApplication = { ...JSON.parse(row.application_json), submitted_at: row.submitted_at, updated_at: row.updated_at }
   } catch (err) {
     console.error('[employees] vendor application profile unavailable', err)
+  }
+
+  // Provider credentials: the editable, current record. When none is saved yet,
+  // seed suggested values from the submitted application so staff start with
+  // what we already know instead of a blank form.
+  let providerCredentials: Record<string, unknown> = { is_saved: false }
+  try {
+    await ensureProviderCredentialsTable(c.env)
+    const row = await c.env.DB.prepare('SELECT * FROM provider_credentials WHERE user_id = ?').bind(id).first<Record<string, unknown>>()
+    if (row) {
+      providerCredentials = { ...row, w9_on_file: Number(row.w9_on_file) === 1, is_saved: true }
+    } else if (vendorApplication) {
+      const a = vendorApplication
+      providerCredentials = {
+        is_saved: false,
+        notary_commission_number: a.commission_number ?? null,
+        notary_state: a.commission_state ?? null,
+        notary_expires_at: a.commission_expiration ?? null,
+        eo_bond_provider: a.ron_provider ?? null,
+        w9_on_file: false,
+      }
+    }
+  } catch (err) {
+    console.error('[employees] provider credentials unavailable', err)
   }
 
   return c.json({
@@ -115,6 +167,7 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
     notes: notes.results ?? [],
     vendor_documents: vendorDocuments.results ?? [],
     vendor_application: vendorApplication,
+    provider_credentials: providerCredentials,
     provider_agreements: agreementAcceptances.results ?? [],
     network_notes: networkNotes.results ?? [],
     dispatch_history: dispatch.results ?? [],
@@ -206,4 +259,61 @@ employeeRoutes.get('/employees/:id/vendor-documents/:documentId/download', requi
     'Content-Disposition': `attachment; filename="${safe}"`,
     'Cache-Control': 'private, no-store',
   } })
+})
+
+// Editable, current provider credentials (insurance, notary, background check,
+// tax). Staff maintain this over time so it stays accurate when things change.
+employeeRoutes.patch('/employees/:id/credentials', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  const id = c.req.param('id') || ''
+  const me = c.get('user')
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>
+  await ensureProviderCredentialsTable(c.env)
+
+  const cols: string[] = []
+  const vals: unknown[] = []
+  for (const field of CREDENTIAL_TEXT_FIELDS) {
+    if (field in body) {
+      cols.push(field)
+      const v = body[field]
+      vals.push(v === '' || v == null ? null : String(v))
+    }
+  }
+  if ('w9_on_file' in body) { cols.push('w9_on_file'); vals.push(body.w9_on_file ? 1 : 0) }
+  if ('details_json' in body) { cols.push('details_json'); vals.push(body.details_json == null ? null : JSON.stringify(body.details_json)) }
+  if (cols.length === 0) return c.json({ error: 'no credential fields provided' }, 400)
+
+  // Upsert: insert the row if absent, otherwise update the provided columns.
+  const insertCols = ['user_id', ...cols, 'updated_at', 'updated_by_user_id']
+  const placeholders = insertCols.map(() => '?').join(', ')
+  const updateSet = [...cols.map((col) => `${col} = excluded.${col}`), "updated_at = datetime('now')", 'updated_by_user_id = excluded.updated_by_user_id'].join(', ')
+  await c.env.DB.prepare(
+    `INSERT INTO provider_credentials (${insertCols.join(', ')}) VALUES (${placeholders})
+     ON CONFLICT(user_id) DO UPDATE SET ${updateSet}`,
+  ).bind(id, ...vals, new Date().toISOString(), me.id).run()
+  return c.json({ ok: true })
+})
+
+// Staff upload of a provider document (e.g. a refreshed insurance certificate
+// when a carrier changes). Stored alongside the provider's application docs.
+employeeRoutes.post('/employees/:id/vendor-documents', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  if (!c.env.UPLOADS) return c.json({ error: 'secure file storage is not configured' }, 503)
+  const id = c.req.param('id') || ''
+  const documentType = (c.req.query('document_type') || 'supporting').toString()
+  if (!ALL_APPLICATION_DOC_KEYS.includes(documentType as never)) return c.json({ error: 'unsupported document type' }, 400)
+  const contentType = (c.req.header('Content-Type') || '').split(';')[0].toLowerCase()
+  const allowed = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+  if (!allowed.has(contentType)) return c.json({ error: 'upload a PDF, JPG, PNG, or WebP file' }, 415)
+  const body = await c.req.arrayBuffer()
+  if (!body.byteLength) return c.json({ error: 'empty file' }, 400)
+  if (body.byteLength > 20 * 1024 * 1024) return c.json({ error: 'files must be 20 MB or smaller' }, 413)
+  const signature = validateUploadSignature(body, contentType, ['pdf', 'jpeg', 'png', 'webp'])
+  if (!signature.ok) return c.json({ error: signature.error }, 415)
+  const fileName = safeUploadName(c.req.header('X-File-Name') || 'document', 'document')
+  const docId = uuid()
+  const objectKey = `vendor-applications/${id}/${docId}-${fileName}`
+  await c.env.UPLOADS.put(objectKey, body, { httpMetadata: { contentType }, customMetadata: { validated: 'signature-v1', documentType, uploadedByStaff: '1' } })
+  await c.env.DB.prepare(
+    `INSERT INTO vendor_application_documents(id,user_id,document_type,object_key,file_name,content_type,size_bytes) VALUES (?,?,?,?,?,?,?)`,
+  ).bind(docId, id, documentType, objectKey, fileName, contentType, body.byteLength).run()
+  return c.json({ ok: true, id: docId }, 201)
 })

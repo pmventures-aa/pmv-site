@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
+import { DOC_LABELS, type ApplicationDocKey } from '../../shared/providerApplication'
 
 // Branded PDF summary of a provider (vendor) application. Reads the flat
 // answer object we persist in vendor_application_profiles.application_json
@@ -59,6 +60,11 @@ function str(value: unknown): string {
   if (Array.isArray(value)) return value.map((v) => str(v)).filter(Boolean).join(', ')
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   return String(value).trim()
+}
+
+function humanizeKey(key: string): string {
+  const s = key.replace(/_/g, ' ').trim()
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 const YES_NO: Record<string, string> = { yes: 'Yes', no: 'No', unsure: 'Unsure' }
@@ -163,6 +169,14 @@ export async function renderVendorApplicationPdf(input: VendorApplicationPdfInpu
   if (str(app.technology_platforms)) labelValue('Technology platforms', str(app.technology_platforms))
   if (str(app.accounting_credentials)) labelValue('Accounting credentials', str(app.accounting_credentials))
 
+  // Track-specific answers captured for the enrolled services.
+  const trackAnswers = (app.track_answers && typeof app.track_answers === 'object') ? app.track_answers as Record<string, unknown> : {}
+  const trackEntries = Object.entries(trackAnswers).filter(([, v]) => str(v) !== '')
+  if (trackEntries.length > 0) {
+    section('Service-specific answers')
+    for (const [key, value] of trackEntries) labelValue(humanizeKey(key), str(value))
+  }
+
   if (str(app.notes)) {
     section('Applicant notes')
     line(str(app.notes), { size: 10, gap: 5 })
@@ -170,7 +184,7 @@ export async function renderVendorApplicationPdf(input: VendorApplicationPdfInpu
 
   section('Uploaded verification documents')
   if (input.documents.length === 0) line('No documents were uploaded with this application.', { color: SLATE })
-  else input.documents.forEach((doc, index) => line(`${index + 1}. ${doc.file_name || 'Uploaded file'} (${doc.document_type.replace(/_/g, ' ')})`, { indent: 6 }))
+  else input.documents.forEach((doc, index) => line(`${index + 1}. ${doc.file_name || 'Uploaded file'} (${DOC_LABELS[doc.document_type as ApplicationDocKey] || doc.document_type.replace(/_/g, ' ')})`, { indent: 6 }))
 
   section('Internal review block')
   labelValue('Review status', '________________________________________________')
