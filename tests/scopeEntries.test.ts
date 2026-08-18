@@ -24,15 +24,14 @@ describe('entry-aware scope requests', () => {
     expect(entry?.remoteDefault).toBe(true)
     expect(entry?.questions.map((q) => q.key)).toEqual([
       'system_down',
-      'deliverables',
-      'photos_required',
-      'reports_required',
       'source_system',
       'destination_system',
       'record_types',
       'exports_ready',
       'must_not_break',
     ])
+    // Operations/systems flows do not carry the field-work deliverable question.
+    expect(entry?.questions.some((q) => q.key === 'deliverables')).toBe(false)
     expect(entry?.pickerLabel.toLowerCase()).toContain('data')
   })
 
