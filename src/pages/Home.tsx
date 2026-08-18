@@ -401,6 +401,14 @@ function HomeCleaningSection() {
 // A smooth, aligned scroll-snap carousel of the Pinnacle lifecycle. Replaces the
 // pinned scroll-jacking rail: it flows with a normal swipe/scroll, snaps cleanly,
 // and shows the scene art per step.
+// Rotate the step-badge accent so the rail carries the full coastal palette
+// (gold + sea + coral) instead of reading as one long stretch of gold.
+const RAIL_ACCENTS = [
+  'border-gold/40 text-gold',
+  'border-sea-400/50 text-sea-300',
+  'border-coral-400/50 text-coral-300',
+]
+
 function LifecycleRail({ eyebrow, heading, panels }: { eyebrow: string; heading: string; panels: RailPanel[] }) {
   return (
     <section className="border-y border-white/[.07] bg-navy-900/30 py-16 sm:py-24">
@@ -413,13 +421,13 @@ function LifecycleRail({ eyebrow, heading, panels }: { eyebrow: string; heading:
       </div>
       <div className="mt-10">
         <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-[max(1.5rem,calc((100vw-72rem)/2))] pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {panels.map((panel) => (
+          {panels.map((panel, i) => (
             <article key={panel.n} className="snap-start shrink-0 basis-[82%] sm:basis-[48%] lg:basis-[31%] xl:basis-[23.5%]">
               <div className="overflow-hidden rounded-xl border border-white/10 bg-navy-950/40">
                 <StoryImage slot={panel.slot} aspect="aspect-[16/10]" rounded="rounded-none" reveal={false} />
                 <div className="p-5">
                   <div className="flex items-center gap-2">
-                    <span className="grid h-7 w-7 place-items-center rounded-full border border-gold/40 font-display text-xs font-bold text-gold">{panel.n}</span>
+                    <span className={`grid h-7 w-7 place-items-center rounded-full border font-display text-xs font-bold ${RAIL_ACCENTS[i % RAIL_ACCENTS.length]}`}>{panel.n}</span>
                     <h3 className="font-display text-lg font-semibold text-white">{panel.title}</h3>
                   </div>
                   <p className="mt-3 text-sm leading-6 text-slate-400">{panel.detail}</p>
