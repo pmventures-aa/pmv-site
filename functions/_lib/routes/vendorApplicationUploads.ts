@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { uuid } from '../crypto'
 import { safeUploadName, validateUploadSignature } from '../fileValidation'
+import { generateVendorApplicationPdf } from '../vendorApplicationRecord'
 
 const SESSION_TTL = 2 * 60 * 60
 const MAX_BYTES = 20 * 1024 * 1024
@@ -46,5 +47,9 @@ vendorApplicationUploadRoutes.post('/vendor-application/session/:token/finalize'
   const session=JSON.parse(raw) as UploadSession
   for(const file of session.files){const finalKey=`vendor-applications/${user.id}/${file.id}-${safeUploadName(file.file_name,'document')}`;const object=await c.env.UPLOADS.get(file.object_key);if(!object)continue;await c.env.UPLOADS.put(finalKey,object.body,{httpMetadata:{contentType:file.content_type},customMetadata:{validated:'signature-v1',documentType:file.document_type}});await c.env.UPLOADS.delete(file.object_key);await c.env.DB.prepare(`INSERT INTO vendor_application_documents(id,user_id,document_type,object_key,file_name,content_type,size_bytes) VALUES (?,?,?,?,?,?,?)`).bind(file.id,user.id,file.document_type,finalKey,file.file_name,file.content_type,file.size_bytes).run()}
   if(parsedBody.application_data&&typeof parsedBody.application_data==='object'){const applicationJson=JSON.stringify(parsedBody.application_data).slice(0,30000);try{await ensureApplicationProfileTable(c.env);await c.env.DB.prepare(`INSERT INTO vendor_application_profiles(user_id,application_json,submitted_at,updated_at) VALUES (?,?,datetime('now'),datetime('now')) ON CONFLICT(user_id) DO UPDATE SET application_json=excluded.application_json,updated_at=datetime('now')`).bind(user.id,applicationJson).run()}catch(err){console.error('[vendor-application] could not persist structured answers',err)}}
-  await c.env.SESSIONS.delete(key(token));return c.json({ok:true,uploaded:session.files.length})
+  await c.env.SESSIONS.delete(key(token))
+  // Build the branded application-summary PDF and attach it to the profile.
+  // Best-effort — a failure here never blocks the application.
+  await generateVendorApplicationPdf(c.env, user.id, c.req.url).catch(()=>null)
+  return c.json({ok:true,uploaded:session.files.length})
 })

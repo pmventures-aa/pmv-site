@@ -3,6 +3,7 @@ import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
 import { requireNamedPermission, hasNamedPermission } from '../capabilities'
 import { uuid } from '../crypto'
+import { generateVendorApplicationPdf } from '../vendorApplicationRecord'
 
 export const employeeRoutes = new Hono<AppEnv>()
 
@@ -173,6 +174,19 @@ employeeRoutes.post('/employees/:id/network-notes', requireStaff, requireNamedPe
   await c.env.DB.prepare(`INSERT INTO provider_network_notes(id,provider_user_id,author_user_id,body,note_type) VALUES(?,?,?,?,?)`)
     .bind(noteId, id, c.get('user').id, text.slice(0,5000), String(body.note_type || 'general').slice(0,40)).run()
   return c.json({ id: noteId }, 201)
+})
+
+// Regenerate the branded provider-application PDF from stored answers and
+// (re)attach it to the profile. Lets staff produce a summary for providers
+// who applied before the PDF existed, or refresh one after edits.
+employeeRoutes.post('/employees/:id/vendor-application/generate-pdf', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  if (!c.env.UPLOADS) return c.json({ error: 'secure file storage is not configured' }, 503)
+  const userId = c.req.param('id') || ''
+  const profile = await c.env.DB.prepare('SELECT 1 FROM vendor_application_profiles WHERE user_id = ?').bind(userId).first()
+  if (!profile) return c.json({ error: 'no stored application answers for this provider' }, 404)
+  const documentId = await generateVendorApplicationPdf(c.env, userId, c.req.url)
+  if (!documentId) return c.json({ error: 'could not generate the application PDF' }, 500)
+  return c.json({ ok: true, document_id: documentId }, 201)
 })
 
 employeeRoutes.get('/employees/:id/vendor-documents/:documentId/download', requireStaff, requireNamedPermission('manage_team'), async (c) => {

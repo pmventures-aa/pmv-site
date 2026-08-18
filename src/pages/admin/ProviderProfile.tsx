@@ -44,6 +44,7 @@ export default function ProviderProfile() {
   const [sigEmail, setSigEmail] = useState('')
   const [sigPhone, setSigPhone] = useState('')
   const [sigReady, setSigReady] = useState(false)
+  const [genBusy, setGenBusy] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +69,19 @@ export default function ProviderProfile() {
   }, [id])
 
   useEffect(() => { void load() }, [load])
+
+  async function generateApplicationPdf() {
+    setGenBusy(true)
+    try {
+      await api.post(`/admin/employees/${id}/vendor-application/generate-pdf`, {})
+      toast.success('Application PDF generated and attached.')
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not generate the application PDF.')
+    } finally {
+      setGenBusy(false)
+    }
+  }
 
   async function saveNetwork() {
     if (!data) return
@@ -243,7 +257,27 @@ export default function ProviderProfile() {
               <dl className="mt-3 space-y-2 text-sm text-slate-300">
                 <div><dt className="text-[11px] uppercase tracking-wide text-slate-500">Email</dt><dd>{e.email}</dd></div>
                 {e.phone && <div><dt className="text-[11px] uppercase tracking-wide text-slate-500">Phone</dt><dd>{e.phone}</dd></div>}
-                <div><dt className="text-[11px] uppercase tracking-wide text-slate-500">Verification files</dt><dd>{data.vendor_documents.length}</dd></div>
+                <div>
+                  <dt className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500">
+                    <span>Application &amp; verification files ({data.vendor_documents.length})</span>
+                    <button type="button" onClick={() => void generateApplicationPdf()} disabled={genBusy} className="text-[11px] font-semibold normal-case text-gold hover:underline disabled:opacity-50">
+                      {genBusy ? 'Generating…' : data.vendor_documents.some((d) => d.document_type === 'application_summary') ? 'Regenerate PDF' : 'Generate application PDF'}
+                    </button>
+                  </dt>
+                  <dd className="mt-1.5 space-y-1">
+                    {data.vendor_documents.length === 0 && <p className="text-xs text-slate-500">No files on record yet.</p>}
+                    {data.vendor_documents.map((doc) => (
+                      <a
+                        key={doc.id}
+                        href={`/api/admin/employees/${id}/vendor-documents/${doc.id}/download`}
+                        className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[.02] px-2.5 py-1.5 text-xs text-slate-200 transition hover:border-gold/40 hover:text-gold"
+                      >
+                        <span className="truncate">{doc.document_type === 'application_summary' ? '★ ' : ''}{doc.file_name || 'Document'}</span>
+                        <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-500">{String(doc.document_type).replace(/_/g, ' ')}</span>
+                      </a>
+                    ))}
+                  </dd>
+                </div>
                 <div>
                   <dt className="text-[11px] uppercase tracking-wide text-slate-500">Provider agreement</dt>
                   <dd className="text-xs leading-5 text-slate-400">
