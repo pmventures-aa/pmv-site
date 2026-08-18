@@ -6,13 +6,14 @@ import { AuthLayout, ErrorBanner, Field, inputCls } from './AuthLayout'
 import { DocumentUpload, type UploadedDocument } from '../../components/forms/DocumentUpload'
 import { PROVIDER_AGREEMENT_URL, PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
 import { vendorApplicationCopy } from '../../lib/workspace'
+import { questionsForTracks, documentsForTracks, type ProviderTrackKey, type ApplicationDocKey } from '../../../shared/providerApplication'
 
 const MIN_PASSWORD = 10
 
 type Step = 'contact' | 'services' | 'questions' | 'documents' | 'account'
-type DocType = 'government_id_front' | 'government_id_back' | 'ein_letter' | 'professional_license' | 'insurance' | 'w9' | 'supporting'
+type DocType = ApplicationDocKey
 
-type EnrollmentKey = 'property_field' | 'mobile_notary' | 'ron' | 'document_courier' | 'merchant_technology' | 'business_operations' | 'bookkeeping_financial' | 'other'
+type EnrollmentKey = ProviderTrackKey
 
 interface InviteData {
   invite: {
@@ -55,6 +56,7 @@ export default function VendorSignup() {
     license_status:'' as ''|'yes'|'no'|'unsure', insurance_status:'' as ''|'yes'|'no',
     technology_platforms:'', accounting_credentials:'', other_service:'', notes:'', password:'', confirm:'',
     provider_agreement_accepted:false, signature_name:'',
+    trackAnswers:{} as Record<string, string>,
   })
   const [uploadToken, setUploadToken] = useState('')
   const [files, setFiles] = useState<UploadedFile[]>([])
@@ -95,6 +97,31 @@ export default function VendorSignup() {
       .finally(() => setInviteLoading(false))
   }, [inviteToken])
 
+  // Auto-save the in-progress application so nobody loses their work if they
+  // close the tab, get interrupted, or come back later. Passwords are never
+  // written to storage. Cleared once the application is submitted.
+  const DRAFT_KEY = 'pmv_vendor_application_draft'
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const saved = JSON.parse(raw) as { form?: Partial<typeof form>; step?: Step; uploadToken?: string }
+        if (saved.form) setForm((current) => ({ ...current, ...saved.form, password: '', confirm: '' }))
+        if (saved.step && saved.step !== 'account') setStep(saved.step)
+        if (saved.uploadToken) setUploadToken(saved.uploadToken)
+      }
+    } catch { /* ignore malformed draft */ }
+    setRestored(true)
+  }, [])
+  useEffect(() => {
+    if (!restored) return
+    try {
+      const { password: _pw, confirm: _cf, ...safe } = form
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: safe, step, uploadToken }))
+    } catch { /* storage full or unavailable */ }
+  }, [form, step, uploadToken, restored])
+
   function set<K extends keyof typeof form>(key: K, value: typeof form[K]) { setForm((current) => ({ ...current, [key]: value })) }
   const steps: Step[] = ['contact', 'services', 'questions', 'documents', 'account']
   const stepIndex = steps.indexOf(step)
@@ -108,8 +135,9 @@ export default function VendorSignup() {
   const techSelected = form.enrollments.includes('merchant_technology')
   const financeSelected = form.enrollments.includes('bookkeeping_financial')
   const businessEntity = form.entity_type !== 'Individual / Sole Proprietor' || form.has_ein === 'yes'
-  const licenseRequired = notarySelected || form.license_status === 'yes'
-  const insuranceRequired = propertySelected || notarySelected || form.insurance_status === 'yes'
+  const trackQuestions = useMemo(() => questionsForTracks(form.enrollments), [form.enrollments])
+  const trackDocs = useMemo(() => documentsForTracks(form.enrollments, { businessEntity }), [form.enrollments, businessEntity])
+  const setTrackAnswer = (key: string, value: string) => setForm((current) => ({ ...current, trackAnswers: { ...current.trackAnswers, [key]: value } }))
   const fileFor = (type: DocType) => files.filter((file) => file.document_type === type)
   const toUploaded = (type: DocType): UploadedDocument[] => fileFor(type).map((file) => ({ id:file.id, name:file.file_name, detail:file.size_bytes ? `${Math.max(1, Math.round(file.size_bytes / 1024))} KB` : undefined }))
 
@@ -142,11 +170,12 @@ export default function VendorSignup() {
       if (form.enrollments.includes('other') && !form.other_service.trim()) return 'Describe the other professional service you provide.'
     }
     if (step === 'documents' && next === 'account') {
-      if (fileFor('government_id_front').length === 0) return 'Upload the front of your government-issued ID.'
-      if (fileFor('government_id_back').length === 0) return 'Upload the back of your government-issued ID.'
-      if (businessEntity && fileFor('ein_letter').length === 0) return 'Upload your IRS EIN confirmation letter.'
-      if (licenseRequired && fileFor('professional_license').length === 0) return 'Upload your applicable professional license or credential.'
-      if (insuranceRequired && fileFor('insurance').length === 0) return 'Upload current proof of insurance.'
+      // Only signup-stage documents (the government ID) block submission. Every
+      // other document can be added later from the provider's profile, so an
+      // applicant is never trapped mid-application.
+      for (const doc of trackDocs) {
+        if (doc.stage === 'signup' && doc.required && fileFor(doc.key).length === 0) return `Upload: ${doc.label}.`
+      }
     }
     if (step === 'account') {
       if (form.password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters.`
@@ -210,6 +239,7 @@ export default function VendorSignup() {
     technology_platforms:techSelected ? form.technology_platforms : null,
     accounting_credentials:financeSelected ? form.accounting_credentials : null,
     other_service:form.enrollments.includes('other') ? form.other_service : null,
+    track_answers:form.trackAnswers,
     notes:form.notes || null,
   }
 
@@ -238,6 +268,7 @@ export default function VendorSignup() {
         catch { setDocumentWarning(true) }
       }
       if (inviteToken) await api.post(`/invite/${encodeURIComponent(inviteToken)}/complete-existing`, {}).catch(() => {})
+      try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
       setDone(true)
     } catch (err) { setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.') }
     finally { setBusy(false) }
@@ -264,7 +295,7 @@ export default function VendorSignup() {
 
   return (
     <AuthLayout surface="staff" eyebrow={inviteToken ? 'Private Pinnacle provider invitation' : trackCopy.eyebrow} title={stepTitle} subtitle={stepSubtitle} sideLabel={trackCopy.badge} sideTitle={trackCopy.sideTitle} sideBody={trackCopy.sideBody} footer={<>Already approved? <Link to="../login" className="font-medium text-gold hover:underline">Sign in</Link></>}>
-      <div className="mb-6"><div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {stepIndex + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all" style={{ width:`${progress}%` }}/></div></div>
+      <div className="mb-6"><div className="flex items-center justify-between text-xs"><span className="font-medium text-white">Step {stepIndex + 1} of {steps.length}</span><span className="text-gold">{progress}% complete</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gold transition-all" style={{ width:`${progress}%` }}/></div><p className="mt-2 text-[11px] text-slate-500">Your progress saves automatically - you can close this and pick up where you left off.</p></div>
       {inviteLoading && <p className="mb-4 text-sm text-slate-400">Loading your invitation…</p>}
       {inviteToken && invite?.status === 'pending' && <div className="mb-5 rounded-lg border border-gold/20 bg-gold/[.05] p-3 text-xs leading-5 text-slate-400"><span className="font-semibold text-gold">Private invitation verified</span> · expires {new Date(invite.expires_at).toLocaleString()}. You can apply as an individual or register your business, and you may change or add services before submitting.</div>}
       <ErrorBanner message={error}/>
@@ -293,18 +324,38 @@ export default function VendorSignup() {
         {techSelected && <Field label="POS, payment, gateway, CRM, or business systems you know"><textarea className={`${inputCls} min-h-24`} value={form.technology_platforms} onChange={(e)=>set('technology_platforms',e.target.value)}/></Field>}
         {financeSelected && <Field label="Bookkeeping/accounting experience or credentials"><textarea className={`${inputCls} min-h-24`} value={form.accounting_credentials} onChange={(e)=>set('accounting_credentials',e.target.value)}/></Field>}
         {form.enrollments.includes('other') && <Field label="Describe your other professional service"><textarea className={`${inputCls} min-h-20`} value={form.other_service} onChange={(e)=>set('other_service',e.target.value)}/></Field>}
+        {trackQuestions.length > 0 && (
+          <div className="rounded-xl border border-white/[.08] bg-white/[.02] p-4">
+            <p className="mb-3 text-sm font-semibold text-white">A few specifics for the services you selected</p>
+            <div className="space-y-3">
+              {trackQuestions.map((q) => (
+                <Field key={q.key} label={q.label}>
+                  {q.type === 'textarea'
+                    ? <textarea className={`${inputCls} min-h-20`} placeholder={q.placeholder} value={form.trackAnswers[q.key] || ''} onChange={(e)=>setTrackAnswer(q.key, e.target.value)}/>
+                    : <input className={inputCls} placeholder={q.placeholder} value={form.trackAnswers[q.key] || ''} onChange={(e)=>setTrackAnswer(q.key, e.target.value)}/>}
+                </Field>
+              ))}
+            </div>
+          </div>
+        )}
         <Field label="Additional notes (optional)"><textarea className={`${inputCls} min-h-20`} value={form.notes} onChange={(e)=>set('notes',e.target.value)}/></Field>
         <div className="flex gap-2"><button onClick={()=>setStep('services')} className="btn-outline flex-1">Back</button><button onClick={()=>void go('documents')} className="btn-gold flex-[1.5]">Continue</button></div>
       </div>}
 
       {step === 'documents' && <div className="space-y-4">
-        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-4"><div className="flex gap-3"><ShieldCheck size={19} className="mt-0.5 shrink-0 text-emerald-300"/><div><p className="text-sm font-semibold text-white">Private verification workspace</p><p className="mt-1 text-xs leading-5 text-slate-500">Identity and tax documents are stored separately from your public/provider profile and are only available to authorized reviewers.</p></div></div></div>
-        <DocumentUpload label="Government ID: Front" help="Required. Upload a clear image of the front of your driver license, state ID, or other government-issued photo ID." required files={toUploaded('government_id_front')} uploading={uploading==='government_id_front'} onFiles={(picked)=>upload('government_id_front',picked)} onRemove={remove}/>
-        <DocumentUpload label="Government ID: Back" help="Required. Upload a clear image of the back of the same ID." required files={toUploaded('government_id_back')} uploading={uploading==='government_id_back'} onFiles={(picked)=>upload('government_id_back',picked)} onRemove={remove}/>
-        {businessEntity && <DocumentUpload label="IRS EIN Letter" help="Required for business entities/EIN users. Upload your CP 575, 147C, SS-4 confirmation, or other IRS-issued EIN confirmation." required files={toUploaded('ein_letter')} uploading={uploading==='ein_letter'} onFiles={(picked)=>upload('ein_letter',picked)} onRemove={remove}/>}
-        {licenseRequired && <DocumentUpload label={notarySelected?'Professional license / Notary commission':'Professional license or credential'} help="Required based on the services and licensing answers in your application." required files={toUploaded('professional_license')} uploading={uploading==='professional_license'} onFiles={(picked)=>upload('professional_license',picked)} onRemove={remove}/>} 
-        {insuranceRequired && <DocumentUpload label="Proof of insurance" help="Required based on the services you selected. Upload a current certificate, declarations page, E&O policy, or other applicable coverage proof." required files={toUploaded('insurance')} uploading={uploading==='insurance'} onFiles={(picked)=>upload('insurance',picked)} onRemove={remove}/>} 
-        <DocumentUpload label="W-9 (optional now)" help="You can provide a current W-9 during onboarding now or Pinnacle can request it before a paid assignment." files={toUploaded('w9')} uploading={uploading==='w9'} onFiles={(picked)=>upload('w9',picked)} onRemove={remove}/>
+        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.04] p-4"><div className="flex gap-3"><ShieldCheck size={19} className="mt-0.5 shrink-0 text-emerald-300"/><div><p className="text-sm font-semibold text-white">Only your ID is needed to apply</p><p className="mt-1 text-xs leading-5 text-slate-500">Upload a photo ID to submit. Everything else you can add now or later from your profile - it won't hold up your application. Files are stored privately and seen only by authorized reviewers.</p></div></div></div>
+        {trackDocs.filter((doc) => doc.stage === 'signup').map((doc) => (
+          <DocumentUpload key={doc.key} label={doc.label} help={doc.help} required files={toUploaded(doc.key)} uploading={uploading===doc.key} onFiles={(picked)=>upload(doc.key,picked)} onRemove={remove}/>
+        ))}
+        {trackDocs.some((doc) => doc.stage === 'onboarding') && (
+          <div className="pt-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[.14em] text-slate-500">Add now or later - optional to apply</p>
+            <p className="mb-1 mt-1 text-xs leading-5 text-slate-500">Providing these speeds up approval, but you can upload them anytime from your provider profile after you apply.</p>
+          </div>
+        )}
+        {trackDocs.filter((doc) => doc.stage === 'onboarding').map((doc) => (
+          <DocumentUpload key={doc.key} label={doc.required ? `${doc.label} · needed before your first assignment` : doc.label} help={doc.help} files={toUploaded(doc.key)} uploading={uploading===doc.key} onFiles={(picked)=>upload(doc.key,picked)} onRemove={remove}/>
+        ))}
         <DocumentUpload label="Other supporting documents" help="Optional certifications, references, work samples, or supporting credentials." multiple files={toUploaded('supporting')} uploading={uploading==='supporting'} onFiles={(picked)=>upload('supporting',picked)} onRemove={remove}/>
         <div className="flex gap-2"><button onClick={()=>setStep('questions')} className="btn-outline flex-1">Back</button><button onClick={()=>void go('account')} className="btn-gold flex-[1.5]">Continue</button></div>
       </div>}

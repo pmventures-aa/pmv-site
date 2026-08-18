@@ -9,11 +9,13 @@ import { toast } from '../../components/kit/toast'
 import { liveLetterheadHtml, type SignatureRosterPerson } from '../../lib/emailSignatures'
 import { SignaturePreview } from './SignatureLetterhead'
 import { canDispatchPerson, networkDispatchHref } from '../../lib/networkRoster'
+import { DOC_LABELS, type ApplicationDocKey } from '../../../shared/providerApplication'
 
 interface Data {
   employee: any
   vendor_application: any
   vendor_documents: any[]
+  provider_credentials: any
   provider_agreements: any[]
   tasks: any[]
   notes: any[]
@@ -25,6 +27,7 @@ interface Data {
 
 const tabs = [
   { key: 'profile', label: 'Overview' },
+  { key: 'credentials', label: 'Credentials' },
   { key: 'dispatch', label: 'Dispatch' },
   { key: 'notes', label: 'Notes' },
   { key: 'history', label: 'History' },
@@ -296,6 +299,10 @@ export default function ProviderProfile() {
         </div>
       )}
 
+      {tab === 'credentials' && (
+        <CredentialsTab id={id} data={data} reload={load} />
+      )}
+
       {tab === 'dispatch' && (
         <Panel>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -413,6 +420,8 @@ function ApplicationReviewPanel({ application }: { application: any }) {
     { label: 'Technology platforms', value: val(application.technology_platforms) },
     { label: 'Accounting credentials', value: val(application.accounting_credentials) },
     { label: 'Other service', value: val(application.other_service) },
+    ...Object.entries((application.track_answers && typeof application.track_answers === 'object') ? application.track_answers : {})
+      .map(([k, v]) => ({ label: k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), value: val(v) })),
     { label: 'Applicant notes', value: val(application.notes) },
   ].filter((r) => r.value !== '')
   return (
@@ -430,6 +439,145 @@ function ApplicationReviewPanel({ application }: { application: any }) {
         ))}
       </dl>
     </Panel>
+  )
+}
+
+// Editable, current provider credentials - insurance, notary, background
+// check, tax - plus document management. This is the place to revise details
+// over time (e.g. when an insurance carrier or policy changes), separate from
+// the immutable submitted application.
+const CREDENTIAL_GROUPS: Array<{ title: string; fields: Array<{ key: string; label: string; type?: 'text' | 'date' }> }> = [
+  { title: 'General liability insurance', fields: [
+    { key: 'insurance_carrier', label: 'Carrier' },
+    { key: 'insurance_policy_number', label: 'Policy number' },
+    { key: 'insurance_expires_at', label: 'Expires', type: 'date' },
+  ] },
+  { title: 'Auto insurance', fields: [
+    { key: 'auto_insurance_carrier', label: 'Carrier' },
+    { key: 'auto_insurance_policy_number', label: 'Policy number' },
+    { key: 'auto_insurance_expires_at', label: 'Expires', type: 'date' },
+  ] },
+  { title: 'Notary commission', fields: [
+    { key: 'notary_commission_number', label: 'Commission number' },
+    { key: 'notary_state', label: 'State' },
+    { key: 'notary_expires_at', label: 'Expires', type: 'date' },
+  ] },
+  { title: 'E&O / bond', fields: [
+    { key: 'eo_bond_provider', label: 'Provider' },
+    { key: 'eo_bond_expires_at', label: 'Expires', type: 'date' },
+  ] },
+  { title: 'Tax', fields: [
+    { key: 'ein', label: 'EIN' },
+  ] },
+]
+
+function CredentialsTab({ id, data, reload }: { id: string; data: Data; reload: () => Promise<void> }) {
+  const seed = data.provider_credentials || {}
+  const [form, setForm] = useState<Record<string, any>>(() => ({ ...seed }))
+  const [saving, setSaving] = useState(false)
+  const [uploadType, setUploadType] = useState<ApplicationDocKey>('insurance')
+  const [uploadBusy, setUploadBusy] = useState(false)
+  const setField = (key: string, value: any) => setForm((cur) => ({ ...cur, [key]: value }))
+
+  async function save() {
+    setSaving(true)
+    try {
+      const payload: Record<string, any> = { w9_on_file: !!form.w9_on_file }
+      for (const group of CREDENTIAL_GROUPS) for (const f of group.fields) payload[f.key] = form[f.key] ?? ''
+      payload.background_check_status = form.background_check_status ?? ''
+      payload.background_check_completed_at = form.background_check_completed_at ?? ''
+      payload.notes = form.notes ?? ''
+      await api.patch(`/admin/employees/${id}/credentials`, payload)
+      toast.success('Credentials saved.')
+      await reload()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not save credentials.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function uploadDoc(file: File | undefined) {
+    if (!file) return
+    setUploadBusy(true)
+    try {
+      await api.upload(`/admin/employees/${id}/vendor-documents?document_type=${encodeURIComponent(uploadType)}`, file)
+      toast.success('Document uploaded.')
+      await reload()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not upload that document.')
+    } finally {
+      setUploadBusy(false)
+    }
+  }
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,.8fr)]">
+      <Panel>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Credentials</h2>
+            <p className="mt-0.5 text-xs text-slate-500">The current record. Update these whenever something changes - a renewed policy, a new carrier, a completed background check.</p>
+          </div>
+          {!data.provider_credentials?.is_saved && <Tag tone="gold">Suggested from application</Tag>}
+        </div>
+        <div className="mt-4 space-y-5">
+          {CREDENTIAL_GROUPS.map((group) => (
+            <div key={group.title}>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.16em] text-gold">{group.title}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {group.fields.map((f) => (
+                  <Field key={f.key} label={f.label}>
+                    <input className={inputCls} type={f.type === 'date' ? 'date' : 'text'} value={form[f.key] ?? ''} onChange={(e) => setField(f.key, e.target.value)} />
+                  </Field>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.16em] text-gold">Background check</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Status">
+                <select className={inputCls} value={form.background_check_status ?? ''} onChange={(e) => setField('background_check_status', e.target.value)}>
+                  <option value="">Not set</option>
+                  <option value="not_started">Not started</option>
+                  <option value="pending">Pending</option>
+                  <option value="cleared">Cleared</option>
+                  <option value="flagged">Flagged</option>
+                </select>
+              </Field>
+              <Field label="Completed"><input className={inputCls} type="date" value={form.background_check_completed_at ?? ''} onChange={(e) => setField('background_check_completed_at', e.target.value)} /></Field>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={!!form.w9_on_file} onChange={(e) => setField('w9_on_file', e.target.checked)} />W-9 on file</label>
+          <Field label="Internal notes"><textarea className={`${inputCls} min-h-24`} value={form.notes ?? ''} onChange={(e) => setField('notes', e.target.value)} placeholder="Anything HQ should know about this provider's credentials." /></Field>
+          <button className={btnPrimary} disabled={saving} onClick={() => void save()}><Save size={14} />{saving ? 'Saving…' : 'Save credentials'}</button>
+        </div>
+      </Panel>
+
+      <Panel>
+        <h2 className="text-sm font-semibold text-white">Documents</h2>
+        <p className="mt-0.5 text-xs text-slate-500">Upload a refreshed file when something changes (e.g. a new insurance certificate). Existing files stay on record.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select className={`${inputCls} h-9 flex-1`} value={uploadType} onChange={(e) => setUploadType(e.target.value as ApplicationDocKey)}>
+            {(Object.keys(DOC_LABELS) as ApplicationDocKey[]).map((k) => <option key={k} value={k}>{DOC_LABELS[k]}</option>)}
+          </select>
+          <label className={`${btnPrimary} cursor-pointer ${uploadBusy ? 'opacity-60' : ''}`}>
+            {uploadBusy ? 'Uploading…' : 'Upload'}
+            <input type="file" className="hidden" accept="application/pdf,image/*" disabled={uploadBusy} onChange={(e) => { void uploadDoc(e.target.files?.[0]); e.currentTarget.value = '' }} />
+          </label>
+        </div>
+        <div className="mt-3 space-y-1">
+          {data.vendor_documents.length === 0 && <p className="text-xs text-slate-500">No documents on record.</p>}
+          {data.vendor_documents.map((doc: any) => (
+            <a key={doc.id} href={`/api/admin/employees/${id}/vendor-documents/${doc.id}/download`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[.02] px-2.5 py-1.5 text-xs text-slate-200 transition hover:border-gold/40 hover:text-gold">
+              <span className="truncate">{doc.document_type === 'application_summary' ? '★ ' : ''}{doc.file_name || 'Document'}</span>
+              <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-500">{DOC_LABELS[doc.document_type as ApplicationDocKey] || String(doc.document_type).replace(/_/g, ' ')}</span>
+            </a>
+          ))}
+        </div>
+      </Panel>
+    </div>
   )
 }
 
