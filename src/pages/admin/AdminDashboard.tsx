@@ -29,7 +29,7 @@ interface NeedsAttention { overdue_tasks:OverdueTask[]; overdue_invoices:Overdue
 interface DashboardResponse { stats:Stats; upcoming_appointments:Appointment[]; recent_activity:ActivityEvent[]; needs_attention:NeedsAttention }
 
 function money(cents:number):string { return `$${(cents/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}` }
-function StatLink({label,value,to}:{label:string;value:number|string;to?:string}) { const content=<StatCard label={label} value={value}/>; return to?<Link to={to} className="block">{content}</Link>:content }
+function StatLink({label,value,to,accent}:{label:string;value:number|string;to?:string;accent?:'gold'|'sea'|'coral'|'green'|'red'}) { const content=<StatCard label={label} value={value} accent={accent}/>; return to?<Link to={to} className="block">{content}</Link>:content }
 
 export default function AdminDashboard(){
   const {user,workspace}=useAuth(); const p=useAppPath(); const[data,setData]=useState<DashboardResponse|null>(null); const[createOpen,setCreateOpen]=useState(false); const[loadError,setLoadError]=useState<string|null>(null)
@@ -60,12 +60,12 @@ export default function AdminDashboard(){
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         {!data ? Array.from({length:6}).map((_,i)=><SkeletonStatCard key={i}/>) : <>
-          <StatLink label="Clients" value={stats?.clients??0} to={p('clients')}/>
-          <StatLink label="Open Tickets" value={stats?.open_tickets??0} to={p('open-items/tickets')}/>
-          <StatLink label="Open Matters" value={stats?.open_matters??0} to={p('open-items/matters')}/>
-          <StatLink label="Pending Tasks" value={stats?.pending_tasks??0} to={p('open-items/tasks')}/>
-          <StatLink label="Calls Pending" value={stats?.pending_calls??0} to={p('open-items/calls')}/>
-          <StatLink label="Open Invoices" value={stats?.open_invoices??0} to={p('invoices')}/>
+          <StatLink label="Clients" value={stats?.clients??0} to={p('clients')} accent="sea"/>
+          <StatLink label="Open Tickets" value={stats?.open_tickets??0} to={p('open-items/tickets')} accent="coral"/>
+          <StatLink label="Open Matters" value={stats?.open_matters??0} to={p('open-items/matters')} accent="sea"/>
+          <StatLink label="Pending Tasks" value={stats?.pending_tasks??0} to={p('open-items/tasks')} accent="gold"/>
+          <StatLink label="Calls Pending" value={stats?.pending_calls??0} to={p('open-items/calls')} accent="coral"/>
+          <StatLink label="Open Invoices" value={stats?.open_invoices??0} to={p('invoices')} accent="gold"/>
         </>}
       </div>
     </section>

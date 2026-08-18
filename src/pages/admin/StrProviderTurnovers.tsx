@@ -74,10 +74,10 @@ export default function StrProviderTurnovers() {
         subtitle="Accept offers, manage today's work, and prepare for upcoming turnovers."
       />
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Earned (completed)" value={money(data?.earnings_completed_cents)} />
-        <StatCard label="Today" value={today.length} />
-        <StatCard label="Upcoming" value={upcoming.length} />
-        <StatCard label="Offers" value={offers.length} />
+        <StatCard label="Earned (completed)" value={money(data?.earnings_completed_cents)} accent="green" />
+        <StatCard label="Today" value={today.length} accent="sea" />
+        <StatCard label="Upcoming" value={upcoming.length} accent="gold" />
+        <StatCard label="Offers" value={offers.length} accent="coral" />
       </div>
 
       {offers.length > 0 && (
