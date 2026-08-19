@@ -44,9 +44,12 @@ function worldFromQuery(to: string): OperatingWorld | '' {
 
 export default function Home() {
   const visitor = usePublicVisitor()
+  // Home page leads with the brand so Google can identify and display the site
+  // name; interior pages keep the "Page | Pinnacle Management Ventures" pattern.
   usePageMeta(
-    'Professional Support. One Call Away.',
+    'Pinnacle Management Ventures | Professional Support, One Call Away',
     'Pinnacle Management Ventures helps businesses, property owners, and individuals get business, property, and administrative matters handled through one trusted point of contact.',
+    { exactTitle: true },
   )
   const heroCtaLabel = visitor.state.returning && visitor.state.world && visitor.state.world !== 'general'
     ? `Continue Your ${WORLD_LABEL[visitor.state.world] ?? 'Help'} Request`

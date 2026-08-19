@@ -17,5 +17,21 @@ export function CtaBand({ title, body, primary, secondary }: { title:string; bod
 }
 
 export function SplitFeatures({ items }: { items:[string,string][] }) { return <StaggerGroup className="divide-y divide-white/10 border-y border-white/10">{items.map(([title,body],i)=><motion.div key={title} variants={staggerItem} className="grid gap-3 py-6 sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-7"><span className="font-display text-sm text-gold/75">{String(i+1).padStart(2,'0')}</span><div className="grid gap-2 md:grid-cols-[minmax(180px,.6fr)_minmax(0,1fr)] md:gap-8"><h3 className="text-base font-semibold text-white">{title}</h3><p className="text-sm leading-6 text-slate-400">{body}</p></div></motion.div>)}</StaggerGroup> }
-export function Faq({ items }: { items:[string,string][] }) { return <div className="border-y border-white/10">{items.map(([question,answer])=><details key={question} className="group border-b border-white/[.07] py-5 last:border-b-0"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-white transition-colors hover:text-gold marker:content-none">{question}<span className="shrink-0 text-gold transition duration-200 group-open:rotate-45">+</span></summary><p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{answer}</p></details>)}</div> }
+export function Faq({ items }: { items:[string,string][] }) {
+  // Emit FAQPage structured data so these questions can earn rich results.
+  // `<` is escaped to keep the JSON-LD from breaking out of the script tag.
+  const faqLd = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: items.map(([question, answer]) => ({
+      '@type': 'Question',
+      name: question,
+      acceptedAnswer: { '@type': 'Answer', text: answer },
+    })),
+  }).replace(/</g, '\\u003c')
+  return <div className="border-y border-white/10">
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: faqLd }} />
+    {items.map(([question,answer])=><details key={question} className="group border-b border-white/[.07] py-5 last:border-b-0"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-white transition-colors hover:text-gold marker:content-none">{question}<span className="shrink-0 text-gold transition duration-200 group-open:rotate-45">+</span></summary><p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{answer}</p></details>)}
+  </div>
+}
 export function ServiceList({ items, compact=false }: { items:ServiceInfo[]; compact?:boolean }) { return <StaggerGroup className="border-y border-white/10">{items.map((s,i)=><motion.div key={s.slug} variants={staggerItem} className="border-b border-white/[.075] last:border-b-0"><ViewTransitionLink to={`/services/${s.slug}`} className="group grid gap-4 py-6 sm:grid-cols-[54px_minmax(180px,.7fr)_minmax(0,1fr)_auto] sm:items-start sm:gap-6"><span className="pt-0.5 font-display text-xs text-gold/65">{String(i+1).padStart(2,'0')}</span><div><h3 className="text-base font-semibold text-white transition-colors group-hover:text-gold">{s.title}</h3>{s.popular&&<span className="mt-2 inline-block text-[10px] font-semibold uppercase tracking-[.12em] text-gold/75">Featured</span>}</div>{!compact?<p className="max-w-2xl text-sm leading-6 text-slate-400">{s.shortDescription}</p>:<span/>}<span className="text-sm font-medium text-slate-500 transition group-hover:translate-x-1 group-hover:text-gold">View ›</span></ViewTransitionLink></motion.div>)}</StaggerGroup> }
