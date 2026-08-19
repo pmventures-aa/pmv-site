@@ -9,6 +9,7 @@ import { buildPdf } from '../documentExport'
 import { protectPdf } from '../pdfSecurity'
 import { htmlToPlainText } from '../../../shared/emailSignatureHtml'
 import { CREST_ABSOLUTE_URL } from '../../../shared/letterhead'
+import { isDocMargin, isDocPageSize } from '../../../shared/docLayout'
 
 const EXPORT_MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
@@ -68,8 +69,10 @@ internalDocumentAdminRoutes.post('/documents-workspace/text', async (c) => {
   const title = String(b?.title || '').trim().slice(0, 200)
   if (!title) return c.json({ error: 'title is required' }, 400)
   const id = uuid(); const versionId = uuid(); const user = c.get('user'); const content = String(b?.text_content || ''); const isBranded = b?.is_branded === 0 ? 0 : 1
+  const pageSize = isDocPageSize(b?.page_size) ? b.page_size : 'letter'
+  const pageMargins = isDocMargin(b?.page_margins) ? b.page_margins : 'normal'
   await c.env.DB.batch([
-    c.env.DB.prepare(`INSERT INTO internal_documents (id,title,description,folder,document_type,status,text_content,mime_type,is_branded,tags_json,created_by_user_id,updated_by_user_id,created_at,updated_at) VALUES (?,?,?,?, 'text','active',?,'text/plain',?,?,?,?,?,?)`).bind(id,title,b?.description||null,String(b?.folder||'General').slice(0,100),content,isBranded,JSON.stringify(Array.isArray(b?.tags)?b.tags:[]),user.id,user.id,now(),now()),
+    c.env.DB.prepare(`INSERT INTO internal_documents (id,title,description,folder,document_type,status,text_content,mime_type,is_branded,page_size,page_margins,tags_json,created_by_user_id,updated_by_user_id,created_at,updated_at) VALUES (?,?,?,?, 'text','active',?,'text/plain',?,?,?,?,?,?,?,?)`).bind(id,title,b?.description||null,String(b?.folder||'General').slice(0,100),content,isBranded,pageSize,pageMargins,JSON.stringify(Array.isArray(b?.tags)?b.tags:[]),user.id,user.id,now(),now()),
     c.env.DB.prepare(`INSERT INTO internal_document_versions (id,document_id,version_number,text_content,change_note,created_by_user_id,created_at) VALUES (?,?,1,?,?,?,?)`).bind(versionId,id,content,'Initial version',user.id,now()),
   ])
   return c.json({ id }, 201)
@@ -113,7 +116,9 @@ internalDocumentAdminRoutes.patch('/documents-workspace/:id', async (c) => {
   let text = doc.text_content
   let makeVersion = false
   if (doc.document_type === 'text' && b.text_content !== undefined && String(b.text_content) !== String(doc.text_content || '')) { text = String(b.text_content); makeVersion = true }
-  await c.env.DB.prepare(`UPDATE internal_documents SET title=?,description=?,folder=?,tags_json=?,text_content=?,updated_by_user_id=?,updated_at=? WHERE id=?`).bind(title,description||null,folder,tags,text,user.id,now(),id).run()
+  const pageSize = b.page_size !== undefined ? (isDocPageSize(b.page_size) ? b.page_size : doc.page_size || 'letter') : (doc.page_size || 'letter')
+  const pageMargins = b.page_margins !== undefined ? (isDocMargin(b.page_margins) ? b.page_margins : doc.page_margins || 'normal') : (doc.page_margins || 'normal')
+  await c.env.DB.prepare(`UPDATE internal_documents SET title=?,description=?,folder=?,tags_json=?,text_content=?,page_size=?,page_margins=?,updated_by_user_id=?,updated_at=? WHERE id=?`).bind(title,description||null,folder,tags,text,pageSize,pageMargins,user.id,now(),id).run()
   if (makeVersion) {
     const latest = await c.env.DB.prepare('SELECT COALESCE(MAX(version_number),0) n FROM internal_document_versions WHERE document_id=?').bind(id).first<any>()
     await c.env.DB.prepare(`INSERT INTO internal_document_versions (id,document_id,version_number,text_content,change_note,created_by_user_id,created_at) VALUES (?,?,?,?,?,?,?)`).bind(uuid(),id,Number(latest?.n||0)+1,text,String(b.change_note||'Edited in Document Hub').slice(0,300),user.id,now()).run()
@@ -168,7 +173,7 @@ internalDocumentAdminRoutes.post('/documents-workspace/:id/export', async (c) =>
         const bytes = await buildDocx({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo })
         return new Response(bytes as unknown as ArrayBuffer, { headers: { 'Content-Type': EXPORT_MIME_DOCX, 'Content-Disposition': disposition(`${base}.docx`) } })
       }
-      const bytes = await buildPdf({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo })
+      const bytes = await buildPdf({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo, pageSize: doc.page_size, margins: doc.page_margins })
       if (format === 'protected_pdf') {
         const pw = passwordOk()
         if (!pw) return c.json({ error: 'Password must be at least 8 characters.' }, 400)

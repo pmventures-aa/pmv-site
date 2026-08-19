@@ -18,6 +18,13 @@
 .doc-paper{--doc-mx:72px;--doc-mt:64px;--doc-mb:48px;position:relative;width:816px;min-height:1056px;background:#fff;color:#1b2430;box-shadow:0 24px 60px rgba(0,0,0,.32);border:1px solid rgba(10,23,40,.10)}
 .doc-margins-narrow{--doc-mx:48px;--doc-mt:52px;--doc-mb:40px}
 .doc-margins-wide{--doc-mx:108px;--doc-mt:78px;--doc-mb:60px}
+/* Page sizes at 96dpi. Letter is the .doc-paper default (816×1056); Legal keeps
+   the 8.5in width but is taller, A4 is narrower and taller. Body min-height
+   tracks the page so a short document still fills a full page. */
+.doc-size-legal{min-height:1344px}
+.doc-size-legal .doc-body{min-height:1048px}
+.doc-size-a4{width:794px;min-height:1123px}
+.doc-size-a4 .doc-body{min-height:827px}
 /* Faint guide showing the printable margin box. Screen only. */
 .doc-paper::after{content:"";position:absolute;pointer-events:none;top:calc(var(--doc-mt) - 18px);left:calc(var(--doc-mx) - 16px);right:calc(var(--doc-mx) - 16px);bottom:calc(var(--doc-mb) - 14px);border:1px dashed rgba(10,23,40,.09);border-radius:2px}
 .doc-letterhead{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1.15rem;padding:var(--doc-mt) var(--doc-mx) 22px}
