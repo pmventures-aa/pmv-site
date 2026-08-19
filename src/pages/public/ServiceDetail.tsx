@@ -112,8 +112,11 @@ export default function ServiceDetail() {
 
         {story && (
           <div className="mt-16 grid gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-start lg:gap-12">
-            <ProjectScenario label={story.scenario.title} title={service.title} slot={story.slot} steps={story.scenario.steps} />
-            <div>
+            <ProjectScenario className="min-w-0" label={story.scenario.title} title={service.title} slot={story.slot} steps={story.scenario.steps} />
+            {/* min-w-0 lets the ProofRail's overflow-hidden clip the ticker instead
+                of its w-max/nowrap content forcing this track wide and starving
+                the sibling column to a sliver. */}
+            <div className="min-w-0">
               <p className="eyebrow">What you receive</p>
               <p className="mt-3 text-sm leading-7 text-slate-400">Clear evidence and a record of what happened, so you are never left guessing.</p>
               <div className="mt-5">
