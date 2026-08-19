@@ -23,6 +23,7 @@ import { PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../..
 import { getCurrentProviderAgreementVersion } from '../managedTemplates'
 import { toDisplayCase } from '../../../shared/displayCase'
 import { isValidEmail, isValidPhone } from '../../../shared/contactValidation'
+import { ensureProviderCode } from '../providerCode'
 import { advanceInquiryLifecycle } from '../lifecycle'
 import { getInviteByToken } from '../invites'
 import { canCompleteStagedVendorSignup, type ExistingAccount } from '../vendorStaging'
@@ -265,6 +266,10 @@ authRoutes.post('/vendor-signup', async (c) => {
       ).bind(uuid(), id, title, vendorCategory, displayName || fullName).run()
     }
   }
+
+  // Assign the provider's human-friendly Provider ID (PMV-1000xx) now, so it
+  // exists from the moment they apply. Best-effort — never blocks signup.
+  await ensureProviderCode(c.env, id).catch(() => undefined)
 
   const inviteToken = typeof body.invite_token === 'string' ? body.invite_token.trim() : ''
   if (inviteToken) {

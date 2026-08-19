@@ -141,7 +141,7 @@ export default function ProviderProfile() {
   const e = data.employee
   const provider = e.party_type === 'vendor'
   const agreement = data.provider_agreements[0]
-  const subtitle = [e.vendor_category || e.role_name || e.title, e.email, e.phone].filter(Boolean).join(' · ')
+  const subtitle = [e.display_name && e.display_name !== e.full_name ? `Goes by ${e.display_name}` : null, e.vendor_category || e.role_name || e.title, e.email, e.phone].filter(Boolean).join(' · ')
 
   return (
     <div>
@@ -166,6 +166,7 @@ export default function ProviderProfile() {
             {canDispatchPerson(e) && (
               <Link to={networkDispatchHref(p, e.id)} className="btn-gold">Dispatch</Link>
             )}
+            {provider && e.provider_code ? <Tag>{e.provider_code}</Tag> : null}
             {e.is_preferred_provider ? <Tag tone="gold"><Star size={12} className="fill-gold" />Preferred</Tag> : null}
           </div>
         }
@@ -455,21 +456,65 @@ function DocRow({ employeeId, doc }: { employeeId: string; doc: any }) {
         </button>
       </DialogTrigger>
       <DialogContent title={name} description={label} size="full">
-        <div className="overflow-hidden rounded-md border border-white/10 bg-navy-950">
-          {isPdf ? (
-            <iframe title={name} src={inlineUrl} className="h-[70vh] w-full" />
-          ) : isImage ? (
-            <img src={inlineUrl} alt={name} className="mx-auto max-h-[70vh] w-auto object-contain" />
-          ) : (
-            <div className="p-10 text-center text-sm text-slate-400">This file type cannot preview here. Use Download or Open to view it.</div>
-          )}
-        </div>
+        <DocPreview inlineUrl={inlineUrl} base={base} name={name} isPdf={isPdf} isImage={isImage} />
         <div className="mt-4 flex flex-wrap gap-2">
           <a href={base} className={btnPrimary}>Download</a>
           <a href={inlineUrl} target="_blank" rel="noreferrer" className="inline-flex items-center rounded-md border border-white/12 px-3 py-1.5 text-sm font-semibold text-slate-200 transition hover:border-gold/45 hover:text-gold">Open in new tab</a>
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Fetches the file as a same-origin blob and previews the blob URL, rather
+// than pointing an <iframe>/<img> straight at the /api download route. Two
+// reasons: the strict CSP only frames 'self'/blob:, and streaming the bytes
+// ourselves lets us show a clean in-app message on failure instead of a bare
+// browser/Cloudflare error page. Only mounts (and so only fetches) when the
+// dialog is open.
+function DocPreview({ inlineUrl, base, name, isPdf, isImage }: { inlineUrl: string; base: string; name: string; isPdf: boolean; isImage: boolean }) {
+  const [url, setUrl] = useState('')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(isPdf || isImage ? 'loading' : 'ready')
+
+  useEffect(() => {
+    if (!isPdf && !isImage) return
+    let objectUrl = ''
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(inlineUrl, { credentials: 'same-origin' })
+        if (!res.ok) throw new Error(String(res.status))
+        const blob = await res.blob()
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+        setStatus('ready')
+      } catch {
+        if (!cancelled) setStatus('error')
+      }
+    })()
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [inlineUrl, isPdf, isImage])
+
+  return (
+    <div className="overflow-hidden rounded-md border border-white/10 bg-navy-950">
+      {status === 'loading' ? (
+        <div className="grid h-[70vh] place-items-center text-sm text-slate-400">Loading preview…</div>
+      ) : status === 'error' ? (
+        <div className="grid h-[40vh] place-items-center px-6 text-center text-sm text-slate-400">
+          <div>
+            <p className="font-medium text-slate-300">This document could not be previewed here.</p>
+            <p className="mt-1">Use <a href={base} className="font-semibold text-gold hover:underline">Download</a> to open it directly.</p>
+          </div>
+        </div>
+      ) : isPdf ? (
+        <iframe title={name} src={url} className="h-[70vh] w-full" />
+      ) : isImage ? (
+        <img src={url} alt={name} className="mx-auto max-h-[70vh] w-auto object-contain" />
+      ) : (
+        <div className="p-10 text-center text-sm text-slate-400">This file type cannot preview here. Use Download or Open to view it.</div>
+      )}
+    </div>
   )
 }
 
