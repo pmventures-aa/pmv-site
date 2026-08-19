@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv, SessionUser } from '../types'
 import { requireAdmin, requireOwner, requireStaff } from '../mid'
 import { NAMED_PERMISSIONS, namedPermissionColumn, requireNamedPermission, resolveNamedPermission } from '../capabilities'
-import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult, getInviteTtlHours, type InviteType } from '../invites'
+import { createInvite, rotateInviteToken, sendInviteEmail, recordInviteEmailResult, getInviteTtlHours, inviteCopy, type InviteType } from '../invites'
 import { INVITE_TTL_SETTING_KEY, parseInviteTtlHours } from '../../../shared/inviteTtl'
 import { stageVendorProfile, VendorInviteConflict } from '../vendorStaging'
 import { logAudit, actorIp, actorUserAgent } from '../auditLog'
@@ -71,6 +71,24 @@ invitationAdminRoutes.get('/invitation-role-options', requireStaff, requireNamed
     `SELECT id,name,party_type FROM role_definitions WHERE party_type IN ('employee','either') AND COALESCE(is_archived,0) = 0 ORDER BY name`,
   ).all()
   return c.json({ roles: rows.results || [] })
+})
+
+// Live preview of exactly what the invite email will say, using the same
+// inviteCopy() the send path uses (no drift). Lets staff see how a personal
+// note reads in context before sending.
+invitationAdminRoutes.post('/invitations/preview', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+  const inviteType = (['vendor', 'client', 'staff'].includes(String(b.invite_type)) ? b.invite_type : 'vendor') as InviteType
+  const knownServices = Array.isArray(b.known_services) ? b.known_services.map((v) => clean(v as string, 80)).filter(Boolean) : []
+  const metadata = {
+    vendor_category: clean(b.vendor_category as string, 120) || undefined,
+    company_name: toDisplayCase(clean(b.company_name as string, 200)) || undefined,
+    known_services: inviteType === 'vendor' ? knownServices : undefined,
+    personal_note: inviteType === 'vendor' ? clean(b.personal_note as string, 800) || undefined : undefined,
+  }
+  const firstName = (clean(b.full_name as string, 160) || '').trim().split(/\s+/)[0] || 'there'
+  const copy = inviteCopy(inviteType, clean(b.client_name as string, 160) || null, metadata)
+  return c.json({ firstName, ...copy })
 })
 
 invitationAdminRoutes.post('/invitations', requireStaff, requireNamedPermission('manage_invitations'), async (c) => {

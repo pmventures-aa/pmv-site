@@ -168,7 +168,7 @@ export function providerInviteCopy(metadata: Record<string, unknown> = {}): { su
   }
 }
 
-function inviteCopy(type: InviteType, clientName?: string | null, metadata: Record<string, unknown> = {}): { subject:string; eyebrow:string; title:string; body:string; cta:string } {
+export function inviteCopy(type: InviteType, clientName?: string | null, metadata: Record<string, unknown> = {}): { subject:string; eyebrow:string; title:string; body:string; cta:string } {
   if (type === 'vendor') return providerInviteCopy(metadata)
   if (type === 'trusted_contact') return {
     subject: `${clientName || 'A Pinnacle client'} invited you as a Trusted Contact`,
