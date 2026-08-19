@@ -13,11 +13,12 @@ export const MARGIN = 48
 export const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2
 
 export const NAVY = rgb(0.035, 0.075, 0.14)
-export const GOLD = rgb(0.78, 0.61, 0.23)
-export const SLATE = rgb(0.34, 0.38, 0.44)
-export const LIGHT = rgb(0.93, 0.94, 0.96)
-export const BORDER = rgb(0.78, 0.8, 0.83)
-export const RED = rgb(0.65, 0.16, 0.16)
+export const GOLD = rgb(0.72, 0.55, 0.19)
+export const SLATE = rgb(0.42, 0.46, 0.52)
+export const LIGHT = rgb(0.955, 0.965, 0.975)
+export const BORDER = rgb(0.85, 0.87, 0.9)
+export const FIELD_BG = rgb(0.995, 0.997, 1)
+export const RED = rgb(0.6, 0.16, 0.16)
 
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
   const words = String(text ?? '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean)
@@ -103,22 +104,29 @@ export class PdfForm {
     const hx = this.logo ? MARGIN + 54 : MARGIN
     this.page.drawText('PINNACLE', { x: hx, y: this.y - 4, size: 18, font: this.bold, color: NAVY })
     this.page.drawText('MANAGEMENT VENTURES', { x: hx, y: this.y - 18, size: 7, font: this.bold, color: GOLD })
-    this.page.drawText(bigTitle, { x: MARGIN, y: this.y - 60, size: 21, font: this.bold, color: NAVY })
-    this.y -= 78
+    this.page.drawText(bigTitle, { x: MARGIN, y: this.y - 58, size: 22, font: this.bold, color: NAVY })
+    this.y -= 74
     if (kicker) {
-      this.page.drawText(kicker.toUpperCase(), { x: MARGIN, y: this.y, size: 11, font: this.bold, color: GOLD })
-      this.y -= 18
+      this.page.drawText(kicker.toUpperCase(), { x: MARGIN, y: this.y, size: 10, font: this.bold, color: GOLD })
+      this.y -= 14
     }
+    // Hairline under the letterhead to seat the title cleanly.
+    this.page.drawLine({ start: { x: MARGIN, y: this.y }, end: { x: MARGIN + CONTENT_WIDTH, y: this.y }, thickness: 1, color: GOLD })
+    this.y -= 8
   }
 
-  // Numbered gray section band, like a real form's "1. GENERAL INFORMATION".
+  // Section header: a numbered navy label seated on a hairline rule, with a
+  // short gold tick. Lighter and more premium than a full ink band, and it
+  // keeps the header attached to at least the first field row.
   section(title: string): void {
-    this.ensure(34)
+    this.ensure(60)
     this.sectionNo += 1
+    this.y -= 16
+    this.page.drawRectangle({ x: MARGIN, y: this.y - 1, width: 16, height: 10, color: GOLD })
+    this.page.drawText(`${this.sectionNo}.  ${title.toUpperCase()}`, { x: MARGIN + 24, y: this.y, size: 10, font: this.bold, color: NAVY })
     this.y -= 8
-    this.page.drawRectangle({ x: MARGIN, y: this.y - 4, width: CONTENT_WIDTH, height: 20, color: NAVY })
-    this.page.drawText(`${this.sectionNo}.  ${title.toUpperCase()}`, { x: MARGIN + 9, y: this.y + 2, size: 9, font: this.bold, color: rgb(1, 1, 1) })
-    this.y -= 28
+    this.page.drawLine({ start: { x: MARGIN, y: this.y }, end: { x: MARGIN + CONTENT_WIDTH, y: this.y }, thickness: 0.75, color: BORDER })
+    this.y -= 16
   }
 
   // A grid of boxed label/value fields. Two columns; a field marked `full`
@@ -132,31 +140,29 @@ export class PdfForm {
       const a = items[i]
       const full = a.full
       const b = full ? undefined : items[i + 1]
-      const aLines = wrap((a.value || '').toUpperCase(), this.regular, 10, (full ? CONTENT_WIDTH : colW) - 12)
-      const bLines = b ? wrap((b.value || '').toUpperCase(), this.regular, 10, colW - 12) : ['']
+      const aLines = wrap((a.value || '').toUpperCase(), this.regular, 10, (full ? CONTENT_WIDTH : colW) - 20)
+      const bLines = b ? wrap((b.value || '').toUpperCase(), this.regular, 10, colW - 20) : ['']
       const rows = Math.max(aLines.length, bLines.length, 1)
-      const boxH = 15 + rows * 12 + 6
-      this.ensure(boxH + 6)
+      const boxH = 18 + rows * 13 + 8
+      this.ensure(boxH + 8)
       const top = this.y
       this.drawField(MARGIN, top, full ? CONTENT_WIDTH : colW, boxH, a.label, aLines)
       if (b) this.drawField(MARGIN + colW + gutter, top, colW, boxH, b.label, bLines)
-      this.y -= boxH + 6
+      this.y -= boxH + 8
       i += full ? 1 : 2
     }
   }
 
   private drawField(x: number, top: number, w: number, h: number, label: string, valueLines: string[]): void {
-    this.page.drawRectangle({ x, y: top - h, width: w, height: h, borderColor: BORDER, borderWidth: 0.75, color: rgb(0.995, 0.996, 0.998) })
-    this.page.drawText(label.toUpperCase(), { x: x + 6, y: top - 11, size: 6.5, font: this.bold, color: SLATE })
-    let vy = top - 24
-    const hasValue = valueLines.some((l) => l.trim() !== '')
-    if (!hasValue) {
-      this.page.drawLine({ start: { x: x + 6, y: vy + 2 }, end: { x: x + w - 6, y: vy + 2 }, thickness: 0.5, color: BORDER })
-      return
-    }
+    this.page.drawRectangle({ x, y: top - h, width: w, height: h, borderColor: BORDER, borderWidth: 0.75, color: FIELD_BG })
+    // Gold accent tick on the left edge of each field for a finished, branded feel.
+    this.page.drawRectangle({ x, y: top - h, width: 2, height: h, color: GOLD })
+    this.page.drawText(label.toUpperCase(), { x: x + 10, y: top - 13, size: 6.5, font: this.bold, color: SLATE })
+    let vy = top - 27
     for (const l of valueLines) {
-      this.page.drawText(l, { x: x + 6, y: vy, size: 10, font: this.regular, color: NAVY })
-      vy -= 12
+      if (l.trim() === '') continue
+      this.page.drawText(l, { x: x + 10, y: vy, size: 10.5, font: this.regular, color: NAVY })
+      vy -= 13
     }
   }
 
