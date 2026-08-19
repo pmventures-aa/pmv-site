@@ -11,6 +11,7 @@ import { jobsForWorld, publicIntakeCopy, worldFromPublicParams } from '../../lib
 import type { OperatingWorld } from '../../../shared/workspace'
 import { resolveScopeEntry, visibleQuestions, type ScopeQuestion } from '../../../shared/scopeEntries'
 import type { GeoHit } from '../../../shared/geocode'
+import { DEFAULT_SCOPE_REPLY_WINDOW, type PublicSiteConfig } from '../../../shared/siteConfig'
 
 function UseMyLocationButton({ onResolved }: { onResolved: (a: GeoHit) => void }) {
   const [state, setState] = useState<'idle' | 'locating' | 'ok' | 'error'>('idle')
@@ -209,6 +210,14 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     writeScopeDraft(draftKey,form,step)
   },[form,step,draftKey])
 
+  // HQ-configurable reply-time promise (falls back to the default phrase).
+  const [replyWindow,setReplyWindow]=useState(DEFAULT_SCOPE_REPLY_WINDOW)
+  useEffect(()=>{
+    let live=true
+    api.get<PublicSiteConfig>('/public/site-config').then(r=>{if(live&&r?.scopeReplyWindow)setReplyWindow(r.scopeReplyWindow)}).catch(()=>{})
+    return ()=>{live=false}
+  },[])
+
   const catalogQuestions: ScopeQuestion[] = useMemo(() => {
     if(entry && form.job_type===entry.job) return entry.questions
     return resolveScopeEntry({job:form.job_type})?.questions || []
@@ -286,13 +295,36 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
         : 'What should be true when the work is finished? Add any deadline, access issue, document, property condition, or other detail that matters.'
   const detailsTitle = entry && form.job_type===entry.job ? entry.title : 'A few details specific to this work'
 
+  // Named steps + a warm, encouraging helper line that acknowledges progress
+  // and previews what is next, so the form reads like a short conversation.
+  const stepNames = locked ? ['The details','Where to reply'] : ['The work','The details','Where to reply']
+  const activeStepIndex = locked ? step-1 : step
+  const helperLine = step===0
+    ? 'Pick the closest fit. The next screen only asks what that kind of work needs.'
+    : step===1
+      ? `Great${selectedLabel?`, ${selectedLabel.toLowerCase()}`:''}. A few quick details and you are almost done.`
+      : 'Thanks! Last thing: where should a real person reply?'
+
   return <div className={`overflow-hidden rounded-2xl border border-white/10 bg-navy-900/75 shadow-[0_24px_80px_rgba(0,0,0,.24)] ${compact?'':'max-w-5xl'}`}>
     <div className="border-b border-white/10 px-5 py-4 sm:px-7">
       <div className="flex items-center justify-between gap-5">
-        <div><p className="eyebrow">{selectedLabel||copy.eyebrow}</p><p className="mt-1 text-xs text-slate-500">About two minutes · a workspace is reserved when you send this · reply within 2 business hours</p></div>
-        <span className="text-xs font-bold text-gold">{displayStep} / {displayTotal}</span>
+        <div><p className="eyebrow">{selectedLabel||copy.eyebrow}</p><p className="mt-1 text-xs text-slate-500">About two minutes · no account needed · a real person replies within {replyWindow}</p></div>
+        <span className="shrink-0 text-xs font-bold text-gold">Step {displayStep} of {displayTotal}</span>
       </div>
-      <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10"><motion.div className="h-full bg-gold" animate={{width:`${progressPct}%`}}/></div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+        {stepNames.map((name,i)=>(
+          <span key={name} className="flex items-center gap-2">
+            <span className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${i===activeStepIndex?'text-gold':i<activeStepIndex?'text-slate-300':'text-slate-600'}`}>{name}</span>
+            {i<stepNames.length-1 && <span className={`h-px w-5 ${i<activeStepIndex?'bg-gold/50':'bg-white/10'}`}/>}
+          </span>
+        ))}
+      </div>
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10"><motion.div className="h-full bg-gold" animate={{width:`${progressPct}%`}} transition={{type:'spring',stiffness:120,damping:22}}/></div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.p key={helperLine} initial={{opacity:0,y:4}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:.2}} className="mt-3 flex items-start gap-2 text-sm leading-6 text-slate-300">
+          <span aria-hidden className="mt-0.5 text-gold">✦</span><span>{helperLine}</span>
+        </motion.p>
+      </AnimatePresence>
     </div>
 
     <div className="p-5 sm:p-7"><AnimatePresence mode="wait" initial={false}>
@@ -391,7 +423,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
             <input type="checkbox" className="mt-0.5 accent-gold" checked={form.follow_up_opt_in} onChange={e=>update('follow_up_opt_in',e.target.checked)}/>
             <span>Send up to three helpful follow-up emails about this request if I do not book. I can unsubscribe at any time. Service-related replies are sent either way.</span>
           </label>
-          <p className="mt-4 rounded-lg border border-gold/15 bg-gold/[.04] px-4 py-3 text-xs leading-5 text-slate-300"><strong className="text-white">Response promise:</strong> a person will review your request and reply within two business hours.</p>
+          <p className="mt-4 rounded-lg border border-gold/15 bg-gold/[.04] px-4 py-3 text-xs leading-5 text-slate-300"><strong className="text-white">Response promise:</strong> a real person will review your request and reply within {replyWindow}.</p>
         </div>}
 
       </motion.div>

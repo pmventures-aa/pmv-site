@@ -1,4 +1,4 @@
-import { motion, useReducedMotion, useScroll, useTransform, type MotionValue } from 'motion/react'
+import { motion, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from 'motion/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { pmvMotion } from '../../lib/motionTheme'
 import { storyImages, type StoryImageKey } from '../../data/storyImages'
@@ -38,6 +38,7 @@ export function StoryImage({
   className = '',
   aspect = 'aspect-[4/3]',
   reveal = true,
+  drift = true,
   rounded = 'rounded-xl',
   overlay,
   children,
@@ -46,6 +47,7 @@ export function StoryImage({
   className?: string
   aspect?: string
   reveal?: boolean
+  drift?: boolean
   rounded?: string
   overlay?: ReactNode
   children?: ReactNode
@@ -53,8 +55,17 @@ export function StoryImage({
   const reduce = useReducedMotion()
   const image = storyImages[slot]
   const animate = reveal && !reduce
+  // Slow scroll-linked drift: the photo eases a few pixels against the scroll
+  // as its section passes, so imagery has life instead of just fading in. The
+  // image is held at a slight scale so the drift never exposes an edge. Spring
+  // smoothed; off for reduced motion.
+  const figureRef = useRef<HTMLElement>(null)
+  const { scrollYProgress } = useScroll({ target: figureRef, offset: ['start end', 'end start'] })
+  const driftY = useSpring(useTransform(scrollYProgress, [0, 1], [12, -12]), { stiffness: 60, damping: 22, mass: 0.5 })
+  const useDrift = drift && !reduce && !!image.src
   return (
     <motion.figure
+      ref={figureRef}
       className={`relative overflow-hidden border border-white/10 bg-navy-900/50 ${rounded} ${aspect} ${className}`}
       initial={animate ? { opacity: 0 } : false}
       whileInView={{ opacity: 1 }}
@@ -68,11 +79,11 @@ export function StoryImage({
           loading="lazy"
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
-          initial={animate ? { scale: 1.05 } : false}
-          whileInView={{ scale: 1 }}
+          initial={animate ? { opacity: 0 } : false}
+          whileInView={{ opacity: 1 }}
           viewport={{ once: true, margin: '-64px' }}
           transition={reduce ? { duration: 0 } : { ...pmvMotion.premium, duration: 0.9 }}
-          style={{ willChange: 'transform' }}
+          style={useDrift ? { y: driftY, scale: 1.08, willChange: 'transform' } : undefined}
         />
       ) : (
         <div className="absolute inset-0" aria-label={image.alt} role="img">

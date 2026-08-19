@@ -2,8 +2,17 @@ import type { Env } from './types'
 import { uuid } from './crypto'
 import { sendEmail, sendEmailStrict } from './email'
 import { renderRelationshipEvent } from './emailTemplates/relationship'
+import { SCOPE_REPLY_WINDOW_KEY, DEFAULT_SCOPE_REPLY_WINDOW } from '../../shared/siteConfig'
 
 import { portalUrl } from './appUrls'
+
+// The HQ-configurable phrase for how quickly a person replies to a request.
+export async function getScopeReplyWindow(env: Env): Promise<string> {
+  try {
+    const row = await env.DB.prepare('SELECT value FROM app_settings WHERE key = ?').bind(SCOPE_REPLY_WINDOW_KEY).first<{ value: string | null }>()
+    return (row?.value || '').trim() || DEFAULT_SCOPE_REPLY_WINDOW
+  } catch { return DEFAULT_SCOPE_REPLY_WINDOW }
+}
 
 export const PUBLIC_SITE_BASE = 'https://pinnaclemanagementventures.com'
 export const CLIENT_PORTAL_BASE = portalUrl()
@@ -81,14 +90,15 @@ export function calculateCleaningEstimate(rule: QuoteRule, squareFeet: number, c
 
 export async function sendScopeConfirmation(env: Env, input: { name: string; email: string; jobLabel: string; token: string }) {
   const url = `${PUBLIC_SITE_BASE}/scope-request/confirmation?request=${encodeURIComponent(input.token)}`
+  const replyWindow = await getScopeReplyWindow(env)
   const email = renderRelationshipEvent({
     eventKey: 'scope_request_received',
     firstName: input.name,
     subject: 'We received your Pinnacle request',
-    preheader: 'Your request is in. A person will review it within two business hours.',
+    preheader: `Your request is in. A person will review it within ${replyWindow}.`,
     eyebrow: 'Request received',
     title: 'We have the request. Now we will make the next step clear.',
-    body: `We received your request for ${input.jobLabel}. A person from Pinnacle will review the scope and reply within two business hours.\n\nYou can use the request page below to review what you sent, request a preferred service time when available, or create a client workspace without entering the same information again.`,
+    body: `We received your request for ${input.jobLabel}. A person from Pinnacle will review the scope and reply within ${replyWindow}.\n\nYou can use the request page below to review what you sent, request a preferred service time when available, or create a client workspace without entering the same information again.`,
     ctaLabel: 'Review My Request',
     ctaUrl: url,
   })

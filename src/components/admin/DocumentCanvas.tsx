@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  AlignCenter, AlignLeft, AlignRight, Bold, Download, FileText, Indent, Italic,
-  Link2, List, ListOrdered, Maximize2, Minus, Outdent, Plus, Redo2, RemoveFormatting, RotateCw,
-  Strikethrough, Underline, Undo2,
+  AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, CalendarDays, Download, FileText, Image as ImageIcon,
+  Indent, Italic, Link2, List, ListOrdered, Maximize2, Minus, Outdent, PenLine, Plus, Redo2, RemoveFormatting,
+  RotateCw, SeparatorHorizontal, Strikethrough, Subscript, Superscript, Table as TableIcon, Underline, Undo2,
 } from 'lucide-react'
 import { LetterheadCrest } from './LetterheadCrest'
 import { DocumentExportMenu } from './DocumentExportMenu'
-import { DOC_FONTS, DOC_HIGHLIGHT, DOC_INK, DOC_SIZES, toEditorHtml } from '../../../shared/docHtml'
+import { DOC_FONTS, DOC_FONT_GROUPS, DOC_HIGHLIGHT, DOC_INK, DOC_SIZES, toEditorHtml } from '../../../shared/docHtml'
 import { FIRM_NAME, FIRM_PHONE, FIRM_REGION, FIRM_SITE_HOST, FIRM_TAGLINE, SUPPORT_EMAIL } from '../../../shared/letterhead'
 import './documentCanvas.css'
 
@@ -81,6 +81,7 @@ async function parseDocx(bytes:ArrayBuffer):Promise<DocxBlock[]>{
 
 export function DocumentCanvas({document,text,onTextChange,readOnly=false,fullPage=false,fullPageHref}:{document:CanvasDocument;text:string;onTextChange:(v:string)=>void;readOnly?:boolean;fullPage?:boolean;fullPageHref?:string}){
   const [zoom,setZoom]=useState(100),[docx,setDocx]=useState<DocxBlock[]|null>(null),[docxError,setDocxError]=useState(''),[loading,setLoading]=useState(false),[reloadKey,setReloadKey]=useState(0)
+  const [margins,setMargins]=useState<'normal'|'narrow'|'wide'>('normal')
   const ext=extension(document.original_name), mime=document.mime_type||''
   const url=`/api/admin/documents-workspace/${document.id}/file?v=${reloadKey}`
   const isPdf=mime==='application/pdf'||ext==='pdf', isImage=mime.startsWith('image/'), isDocx=ext==='docx'||mime.includes('wordprocessingml')
@@ -98,6 +99,11 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false,fullPa
     <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-navy-950/90 px-3 py-2 sm:px-4">
       <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{document.title}</p><p className="text-[11px] text-slate-500">{typeLabel} · {readOnly?'read-only reference':'formatting lives in the bar below, not on the page'}</p></div>
       <div className="flex items-center gap-1.5">
+        {document.document_type==='text'&&<select className="doc-ribbon-select mr-1" value={margins} onChange={(e)=>setMargins(e.target.value as typeof margins)} title="Page margins" style={{height:'2rem'}}>
+          <option value="normal">Normal margins</option>
+          <option value="narrow">Narrow margins</option>
+          <option value="wide">Wide margins</option>
+        </select>}
         <button className="doc-tool" onClick={()=>setZoom(v=>Math.max(60,v-10))} title="Zoom out"><Minus size={15}/></button><span className="w-12 text-center text-[11px] tabular-nums text-slate-400">{zoom}%</span><button className="doc-tool" onClick={()=>setZoom(v=>Math.min(180,v+10))} title="Zoom in"><Plus size={15}/></button>
         <button className="doc-tool" onClick={()=>{setZoom(100);setReloadKey(v=>v+1)}} title="Refresh document"><RotateCw size={14}/></button>
         {fullPageHref
@@ -111,7 +117,7 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false,fullPa
     {editableText && <FormatRibbon onChange={onTextChange}/>}
     <div className={`relative overflow-auto bg-[#2a3037] p-4 sm:p-7 ${fullPage?'h-[calc(100vh-138px)] min-h-[540px]':'h-[calc(100vh-255px)] min-h-[600px]'}`}>
       {isPdf&&<div className="mx-auto h-full min-h-[560px] w-full overflow-hidden bg-white shadow-2xl" style={{maxWidth:`${Math.round(900*zoom/100)}px`}}><iframe key={reloadKey} title={document.title} src={`${url}#toolbar=0&navpanes=1&view=FitH`} className="h-full w-full bg-white"/></div>}
-      {document.document_type==='text'&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center',marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}><article className="doc-paper">{branded&&<PaperBrand/>}<div className="doc-body"><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</article></div>}
+      {document.document_type==='text'&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center',marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}><article className={`doc-paper doc-margins-${margins}`}>{branded&&<PaperBrand/>}<div className="doc-body"><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</article></div>}
       {isImage&&<div className="mx-auto flex min-h-[500px] items-start justify-center"><img src={url} alt={document.title} style={{width:`${zoom}%`,maxWidth:'none'}} className="bg-white shadow-2xl"/></div>}
       {isDocx&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center'}}><article className="doc-paper">{branded&&<PaperBrand/>}<div className="doc-body">{loading?<PreviewMessage text="Rendering DOCX…"/>:docxError?<PreviewMessage text={docxError}/>:docx?.map((b,i)=>b.type==='table'?<table key={i} className="my-5 w-full border-collapse text-sm"><tbody>{b.rows.map((row,r)=><tr key={r}>{row.map((cell,c)=><td key={c} className="border border-slate-300 p-2 align-top">{cell}</td>)}</tr>)}</tbody></table>:b.style?.toLowerCase().includes('heading')?<h2 key={i} className="mb-3 mt-6 font-serif text-xl font-semibold">{b.text}</h2>:<p key={i} className="mb-3 whitespace-pre-wrap font-serif text-[15px] leading-7">{b.text||' '}</p>)}</div>{branded&&<PaperFooter/>}</article></div>}
       {!isPdf&&!isImage&&!isDocx&&document.document_type!=='text'&&<div className="mx-auto grid min-h-[520px] max-w-2xl place-items-center bg-white p-10 text-center shadow-2xl"><div><FileText size={52} className="mx-auto text-slate-300"/><h3 className="mt-5 text-lg font-semibold text-slate-800">Preview unavailable for this file type</h3><p className="mt-2 text-sm leading-6 text-slate-500">The file remains stored securely in Document Hub. Open or download it to work with the original format.</p><a href={url} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Open document</a></div></div>}
@@ -141,6 +147,9 @@ function applyFontSize(root: HTMLElement | null, px: string){
 function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
   const [link, setLink] = useState('')
   const [linkOpen, setLinkOpen] = useState(false)
+  const [insertOpen, setInsertOpen] = useState(false)
+  const [imgOpen, setImgOpen] = useState(false)
+  const [imgUrl, setImgUrl] = useState('')
   const saved = useRef<Range | null>(null)
 
   function saveSelection() {
@@ -174,6 +183,30 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
     setLink('')
     setLinkOpen(false)
   }
+  // Insert HTML at the caret, then persist. Used by the Insert menu.
+  function insertHtml(html: string) {
+    restoreSelection()
+    runCommand('insertHTML', html)
+    capture()
+  }
+  const TABLE_HTML = '<table class="doc-table"><thead><tr><th>Column</th><th>Column</th><th>Column</th></tr></thead><tbody><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody></table><p><br></p>'
+  const SIG_HTML = '<div class="doc-sigline"><span class="doc-sigline-rule"></span><span class="doc-sigline-label">Signature</span></div><p><br></p>'
+  function insertItem(kind: 'table' | 'hr' | 'pagebreak' | 'date' | 'signature') {
+    setInsertOpen(false)
+    if (kind === 'table') return insertHtml(TABLE_HTML)
+    if (kind === 'hr') { restoreSelection(); runCommand('insertHorizontalRule'); return capture() }
+    if (kind === 'pagebreak') return insertHtml('<div class="doc-pagebreak"></div><p><br></p>')
+    if (kind === 'signature') return insertHtml(SIG_HTML)
+    if (kind === 'date') return insertHtml(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))
+  }
+  function applyImage() {
+    const src = imgUrl.trim()
+    if (!src) return
+    insertHtml(`<img src="${src.replace(/"/g, '&quot;')}" alt="">`)
+    setImgUrl('')
+    setImgOpen(false)
+    setInsertOpen(false)
+  }
   return (
     <div className="doc-ribbon" onMouseDown={(e) => {
       const target = e.target as HTMLElement
@@ -189,14 +222,23 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
         <select className="doc-ribbon-select" defaultValue="P" onChange={(e) => run('formatBlock', e.target.value)} title="Paragraph style">
           <option value="P">Body</option>
           <option value="H1">Title</option>
-          <option value="H2">Heading</option>
-          <option value="H3">Subheading</option>
+          <option value="H2">Subtitle</option>
+          <option value="H3">Heading 1</option>
+          <option value="H4">Heading 2</option>
+          <option value="H5">Heading 3</option>
           <option value="BLOCKQUOTE">Quote</option>
+          <option value="PRE">Monospace block</option>
         </select>
-        <select className="doc-ribbon-select" defaultValue={DOC_FONTS[0].value} onChange={(e) => run('fontName', e.target.value)} title="Font">
-          {DOC_FONTS.map((font) => <option key={font.label} value={font.value}>{font.label}</option>)}
+        <select className="doc-ribbon-select" defaultValue={DOC_FONTS[0].value} onChange={(e) => run('fontName', e.target.value)} title="Font" style={{ maxWidth: '9rem' }}>
+          {DOC_FONT_GROUPS.map((group) => (
+            <optgroup key={group} label={group}>
+              {DOC_FONTS.filter((font) => font.group === group).map((font) => (
+                <option key={font.label} value={font.value} style={{ fontFamily: font.value }}>{font.label}</option>
+              ))}
+            </optgroup>
+          ))}
         </select>
-        <select className="doc-ribbon-select" defaultValue="15px" onChange={(e) => size(e.target.value)} title="Font size" style={{ maxWidth: '4.4rem' }}>
+        <select className="doc-ribbon-select" defaultValue="16px" onChange={(e) => size(e.target.value)} title="Font size" style={{ maxWidth: '4.4rem' }}>
           {DOC_SIZES.map((value) => <option key={value} value={value}>{value.replace('px', '')}</option>)}
         </select>
       </div>
@@ -205,6 +247,8 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
         <button type="button" className="doc-ribbon-btn" title="Italic" onClick={() => run('italic')}><Italic size={14}/></button>
         <button type="button" className="doc-ribbon-btn" title="Underline" onClick={() => run('underline')}><Underline size={14}/></button>
         <button type="button" className="doc-ribbon-btn" title="Strikethrough" onClick={() => run('strikeThrough')}><Strikethrough size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Superscript" onClick={() => run('superscript')}><Superscript size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Subscript" onClick={() => run('subscript')}><Subscript size={14}/></button>
       </div>
       <div className="doc-ribbon-group">
         <select className="doc-ribbon-select" defaultValue={DOC_INK[0].value} onChange={(e) => run('foreColor', e.target.value)} title="Text color" style={{ maxWidth: '5.6rem' }}>
@@ -218,6 +262,7 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
         <button type="button" className="doc-ribbon-btn" title="Align left" onClick={() => run('justifyLeft')}><AlignLeft size={14}/></button>
         <button type="button" className="doc-ribbon-btn" title="Align center" onClick={() => run('justifyCenter')}><AlignCenter size={14}/></button>
         <button type="button" className="doc-ribbon-btn" title="Align right" onClick={() => run('justifyRight')}><AlignRight size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Justify" onClick={() => run('justifyFull')}><AlignJustify size={14}/></button>
       </div>
       <div className="doc-ribbon-group">
         <button type="button" className="doc-ribbon-btn" title="Bulleted list" onClick={() => run('insertUnorderedList')}><List size={14}/></button>
@@ -235,7 +280,26 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
         )}
         <button type="button" className="doc-ribbon-btn" title="Clear formatting" onClick={() => run('removeFormat')}><RemoveFormatting size={14}/></button>
       </div>
-      <p className="doc-ribbon-hint">Select text first, then use this bar. Zoom and export stay in the title row so they never sit on the letterhead.</p>
+      <div className="doc-ribbon-group" style={{ position: 'relative' }}>
+        <button type="button" className={`doc-ribbon-btn ${insertOpen ? 'is-open' : ''}`} title="Insert" onClick={() => { setInsertOpen((open) => !open); setImgOpen(false) }}><Plus size={14}/><span className="ml-1 text-[11px]">Insert</span></button>
+        {insertOpen && (
+          <div className="doc-insert-menu">
+            <button type="button" className="doc-insert-item" onClick={() => { setImgOpen(true); setInsertOpen(false) }}><ImageIcon size={14}/>Image from URL</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('table')}><TableIcon size={14}/>Table</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('hr')}><SeparatorHorizontal size={14}/>Horizontal rule</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('pagebreak')}><Minus size={14}/>Page break</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('signature')}><PenLine size={14}/>Signature line</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('date')}><CalendarDays size={14}/>Today's date</button>
+          </div>
+        )}
+        {imgOpen && (
+          <div className="doc-link-row">
+            <input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="https://image-url" onKeyDown={(e) => { if (e.key === 'Enter') applyImage() }}/>
+            <button type="button" className="doc-ribbon-btn" onClick={applyImage}>Add</button>
+          </div>
+        )}
+      </div>
+      <p className="doc-ribbon-hint">Select text first, then use this bar. Zoom, margins, and export stay in the title row so they never sit on the letterhead.</p>
     </div>
   )
 }

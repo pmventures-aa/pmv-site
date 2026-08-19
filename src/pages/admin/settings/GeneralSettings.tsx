@@ -5,6 +5,7 @@ import { toast } from '../../../components/kit/toast'
 import { ResendWebhookPanel } from './ResendWebhookPanel'
 import { ProcessorReviewLoginPanel } from './ProcessorReviewLoginPanel'
 import { INVITE_TTL_PRESETS, INVITE_TTL_SETTING_KEY, parseInviteTtlHours } from '../../../../shared/inviteTtl'
+import { SCOPE_REPLY_WINDOW_KEY, DEFAULT_SCOPE_REPLY_WINDOW } from '../../../../shared/siteConfig'
 
 const FIRM_FIELDS: { key: string; label: string; type?: string; help?: string }[] = [
   { key: 'firm_notify_email', label: 'Notification email', type: 'email', help: 'Fallback recipient when a client has no assigned representative.' },
@@ -82,6 +83,18 @@ export default function GeneralSettings() {
           <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Public site URL for unsubscribe links</span>
           <input className={inputCls} type="url" placeholder="https://www.pinnaclemanagementventures.com" value={settings.marketing_public_base_url ?? ''} onChange={(e) => setSettings((s) => ({ ...s, marketing_public_base_url: e.target.value }))} />
           <span className="mt-1 block text-xs leading-relaxed text-slate-500">Optional. If blank, Pinnacle uses https://www.pinnaclemanagementventures.com.</span>
+        </label>
+      </Panel>
+
+      <Panel>
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-white">Request intake</h3>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500">The reply-time promise shown on the public "Start a request" form and in the confirmation email. Write it as a phrase that reads after "within".</p>
+        </div>
+        <label className="block max-w-sm">
+          <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Reply window</span>
+          <input className={inputCls} placeholder={DEFAULT_SCOPE_REPLY_WINDOW} value={settings[SCOPE_REPLY_WINDOW_KEY] ?? ''} onChange={(e) => setSettings((s) => ({ ...s, [SCOPE_REPLY_WINDOW_KEY]: e.target.value }))} />
+          <span className="mt-1 block text-xs leading-relaxed text-slate-500">Shows as "a real person replies within {settings[SCOPE_REPLY_WINDOW_KEY]?.trim() || DEFAULT_SCOPE_REPLY_WINDOW}." Leave blank for the default.</span>
         </label>
       </Panel>
 

@@ -4,7 +4,8 @@ import { uuid } from '../crypto'
 import { activityInsert } from '../activity'
 import { escapeHtml, notifyStaff } from '../email'
 import { requireOwner, requireStaff, requireUser } from '../mid'
-import { calculateCleaningEstimate, CLIENT_PORTAL_BASE, sendScopeConfirmation, twoBusinessHoursFrom, type QuoteRule } from '../scopeFunnel'
+import { calculateCleaningEstimate, CLIENT_PORTAL_BASE, getScopeReplyWindow, sendScopeConfirmation, twoBusinessHoursFrom, type QuoteRule } from '../scopeFunnel'
+import type { PublicSiteConfig } from '../../../shared/siteConfig'
 import { ensureServiceOfferingsSeeded } from './serviceOfferings'
 import { createActivationToken } from '../session'
 import { sendAccountWelcome, CLIENT_PORTAL_URL } from '../accountEmails'
@@ -12,6 +13,12 @@ import { advanceInquiryLifecycle } from '../lifecycle'
 
 export const scopeFunnelPublicRoutes = new Hono<AppEnv>()
 export const scopeFunnelAdminRoutes = new Hono<AppEnv>()
+
+// Small, customer-safe config for the public request wizard.
+scopeFunnelPublicRoutes.get('/public/site-config', async (c) => {
+  const config: PublicSiteConfig = { scopeReplyWindow: await getScopeReplyWindow(c.env) }
+  return c.json(config)
+})
 
 const MAX_PER_HOUR = 12
 const JOBS: Record<string,{label:string;serviceKey:string|null;guideSlug?:string;remote?:boolean}> = {
