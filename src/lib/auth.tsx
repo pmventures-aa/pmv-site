@@ -4,6 +4,8 @@ import { emptyWorkspace, rememberOperatingWorld, type WorkspaceContext } from '.
 
 export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
 
+export type AccessScope = 'full' | 'provider_review'
+
 export interface SessionUser {
   id: string
   email: string
@@ -11,6 +13,13 @@ export interface SessionUser {
   full_name: string | null
   first_name?: string | null
   last_name?: string | null
+  // Provider/vendor context, mirrored from the server so the client can route
+  // an under-review provider into the review shell. Absent access_scope means
+  // full access.
+  party_type?: 'vendor' | 'employee' | null
+  network_status?: string | null
+  review_stage?: string | null
+  access_scope?: AccessScope
 }
 
 interface AuthState {
@@ -79,8 +88,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     newWelcomeSession()
     setUser(data.user)
     try {
+      // Re-read /me so the in-memory user carries the server-derived fields the
+      // login response omits (notably access_scope, which routes an under-review
+      // provider into the review shell).
       const me = await api.get<{ user: SessionUser; workspace?: WorkspaceContext }>('/me')
+      setUser(me.user)
       setWorkspace(applyWorkspace(me.workspace))
+      return me.user
     } catch {
       setWorkspace(emptyWorkspace())
     }

@@ -14,6 +14,7 @@ import ResetPassword from '../auth/ResetPassword'
 import SetPassword from '../auth/SetPassword'
 import VendorSignup from '../auth/VendorSignup'
 import StaffInvite from '../auth/StaffInvite'
+import UnderReviewShell from './UnderReviewShell'
 import AdminDashboard from './AdminDashboard'
 import ClientsList from './ClientsList'
 import ClientDetail from './ClientDetail'
@@ -70,6 +71,11 @@ const STAFF_VISIBLE = ['dashboard','pipelines','clients','inquiries','quotes','m
 
 function AdminShell(){
   const{user,workspace}=useAuth();const caps=useCapabilities();const visible=new Set(STAFF_VISIBLE)
+  // An under-review provider (access_scope 'provider_review') never reaches HQ:
+  // the review shell takes over the whole authenticated area: no HQ nav, no HQ
+  // data fetches, only the provider's own review status + self-service.
+  if(user?.access_scope==='provider_review') return <UnderReviewShell/>
+
   if(caps.can_manage_users){visible.add('users');visible.add('assignments')}
   if(caps.can_manage_settings)visible.add('settings')
   if(caps.can_view_audit_log)visible.add('audit-log')

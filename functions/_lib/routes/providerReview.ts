@@ -12,6 +12,7 @@ import { Hono } from 'hono'
 import type { AppEnv, Env } from '../types'
 import { requireStaff, requireProvider } from '../mid'
 import { uuid } from '../crypto'
+import { isValidPhone } from '../../../shared/contactValidation'
 import { isReviewStage, type FollowUpRequest } from '../../../shared/providerJourney'
 
 export const providerReviewAdminRoutes = new Hono<AppEnv>()
@@ -56,6 +57,14 @@ providerReviewAdminRoutes.post('/providers/:userId/review/stage', requireStaff, 
   // Approval/decline also moves the coarse network_status so downstream gating stays in sync.
   const netSql = stage === 'approved' ? ", network_status='active'" : stage === 'declined' ? ", network_status='declined'" : ''
   await c.env.DB.prepare(`UPDATE team_members SET review_stage=?${netSql} WHERE user_id=?`).bind(stage, userId).run()
+  // Approval graduates the account from 'provisional' to 'active' so it leaves
+  // the review shell: getUser re-derives access_scope from users.status on the
+  // next request, so the provider's own session picks up full scope with no
+  // re-login. Only lift a provisional vendor — never touch an already-active
+  // account's status here.
+  if (stage === 'approved') {
+    await c.env.DB.prepare("UPDATE users SET status='active' WHERE id=? AND status='provisional'").bind(userId).run()
+  }
   return c.json({ ok: true, stage })
 })
 
@@ -87,9 +96,48 @@ providerReviewAdminRoutes.post('/follow-ups/:id/resolve', requireStaff, async (c
 
 providerReviewSelfRoutes.get('/self/review', requireProvider, async (c) => {
   const me = c.get('user')!
-  const tm = await c.env.DB.prepare('SELECT review_stage, network_status, vendor_category FROM team_members WHERE user_id=?').bind(me.id).first<{ review_stage: string; network_status: string; vendor_category: string | null }>()
-  if (!tm) return c.json({ error: 'Not a provider account' }, 404)
-  return c.json({ stage: tm.review_stage, networkStatus: tm.network_status, vendorCategory: tm.vendor_category, followUps: await listFollowUps(c.env, me.id) })
+  const row = await c.env.DB.prepare(
+    `SELECT tm.review_stage, tm.network_status, tm.vendor_category, tm.display_name,
+            u.full_name, u.email, u.phone
+     FROM team_members tm JOIN users u ON u.id = tm.user_id
+     WHERE tm.user_id = ?`,
+  ).bind(me.id).first<{ review_stage: string; network_status: string; vendor_category: string | null; display_name: string | null; full_name: string | null; email: string; phone: string | null }>()
+  if (!row) return c.json({ error: 'Not a provider account' }, 404)
+  // A profile is "complete" once the provider has confirmed how they want to be
+  // shown (display name), their legal name, and a reachable phone. SSO sign-ups
+  // arrive with a name but no phone/display name, so the shell prompts them to
+  // self-fill — the reason self-fill exists even for SSO accounts.
+  const profileComplete = !!(row.display_name && row.full_name && row.phone)
+  return c.json({
+    stage: row.review_stage,
+    networkStatus: row.network_status,
+    vendorCategory: row.vendor_category,
+    profileComplete,
+    profile: {
+      displayName: row.display_name,
+      fullName: row.full_name,
+      email: row.email,
+      phone: row.phone,
+    },
+    followUps: await listFollowUps(c.env, me.id),
+  })
+})
+
+// Provider self-fills the details HQ needs to finish review. Scoped strictly to
+// the caller's own rows (users + their team_members). No status/stage change —
+// filling your profile never advances your own review; that stays with staff.
+providerReviewSelfRoutes.post('/self/profile', requireProvider, async (c) => {
+  const me = c.get('user')!
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+  const fullName = text(body.fullName, 120)
+  const displayName = text(body.displayName, 120)
+  const phone = text(body.phone, 40)
+  if (!fullName) return c.json({ error: 'Enter your full legal name.' }, 400)
+  if (!displayName) return c.json({ error: 'Enter a display name.' }, 400)
+  if (!isValidPhone(phone)) return c.json({ error: 'Enter a valid phone number.' }, 400)
+  await c.env.DB.prepare('UPDATE users SET full_name=?, phone=? WHERE id=?').bind(fullName, phone, me.id).run()
+  await c.env.DB.prepare('UPDATE team_members SET display_name=? WHERE user_id=?').bind(displayName, me.id).run()
+  return c.json({ ok: true })
 })
 
 providerReviewSelfRoutes.post('/self/follow-ups/:id/respond', requireProvider, async (c) => {
