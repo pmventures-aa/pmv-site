@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
-import { Reveal } from '../../components/public/motion'
+import { Reveal, RevealHeading } from '../../components/public/motion'
 import { btnOutline, btnPrimary } from '../../components/public/ui'
 import { Breadcrumbs, BreadcrumbSlot } from '../../components/public/Breadcrumbs'
 import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
@@ -111,7 +111,7 @@ function HubPage({ hub }: { hub: keyof typeof HUBS }) {
     <section className="pmv-hero-story relative overflow-hidden border-b border-white/[.08]">
       <div className="pmv-hero-gold" aria-hidden="true" />
       <div className="container-pmv grid gap-10 py-12 sm:py-16 lg:grid-cols-[1.12fr_.88fr] lg:items-center lg:py-20">
-        <Reveal><p className="eyebrow">{cfg.eyebrow}</p><h1 className="pmv-h1 mt-4 max-w-4xl">{cfg.title}</h1><p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{cfg.intro}</p><p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">{cfg.statement}</p><div className="mt-8 flex flex-wrap gap-3"><ViewTransitionLink to={HUB_INTAKE[hub].to} className={btnPrimary}>{HUB_INTAKE[hub].cta}</ViewTransitionLink>{hub==='property'&&<ViewTransitionLink to="/instant-quote" className={btnOutline}>Instant Cleaning / Inspection Estimate</ViewTransitionLink>}<ViewTransitionLink to="/services" className={btnOutline}>All Services</ViewTransitionLink></div></Reveal>
+        <Reveal><p className="eyebrow">{cfg.eyebrow}</p><RevealHeading className="mt-4"><h1 className="pmv-h1 max-w-4xl">{cfg.title}</h1></RevealHeading><p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{cfg.intro}</p><p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">{cfg.statement}</p><div className="mt-8 flex flex-wrap gap-3"><ViewTransitionLink to={HUB_INTAKE[hub].to} className={btnPrimary}>{HUB_INTAKE[hub].cta}</ViewTransitionLink>{hub==='property'&&<ViewTransitionLink to="/instant-quote" className={btnOutline}>Instant Cleaning / Inspection Estimate</ViewTransitionLink>}<ViewTransitionLink to="/services" className={btnOutline}>All Services</ViewTransitionLink></div></Reveal>
         <Reveal className="relative flex min-h-[300px] items-center justify-center"><BrandMark3D size={200} decorative variant="quiet" className="relative z-10"/></Reveal>
       </div>
     </section>

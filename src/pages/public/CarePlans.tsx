@@ -4,7 +4,7 @@ import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
-import { MagneticCta, Reveal } from '../../components/public/motion'
+import { MagneticCta, Reveal, RevealHeading } from '../../components/public/motion'
 import { CARE_PLANS, CARE_PLAN_FAMILIES, formatPrice, groupServices, type PlanFamilyKey, type PlanService, type PlanTier } from '../../../shared/carePlans'
 import { pmvMotion } from '../../lib/motionTheme'
 import { usePageMeta } from '../../lib/usePageMeta'
@@ -44,7 +44,7 @@ export default function CarePlans(){
       <AnimatePresence mode="wait">
         <motion.div key={family} initial={reduceMotion?false:{opacity:0,y:12}} animate={{opacity:1,y:0}} exit={reduceMotion?undefined:{opacity:0,y:-8}} transition={panelTransition} className="max-w-4xl">
           <p className="eyebrow">{familyDef.eyebrow}</p>
-          <h1 className="pmv-h1 mt-4">{familyDef.headline}</h1>
+          <RevealHeading className="mt-4"><h1 className="pmv-h1">{familyDef.headline}</h1></RevealHeading>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">{familyDef.intro}</p>
           <p className="mt-4 max-w-3xl text-sm font-semibold leading-6 text-gold/90">{familyDef.promise}</p>
           <div className="mt-8 flex flex-wrap gap-3">
