@@ -13,7 +13,28 @@ import { worldFromPublicParams } from '../../lib/workspace'
 import { PriceAnchor } from '../../components/public/PriceAnchor'
 import { CaseStudyStrip } from '../../components/public/Proof'
 import { StoryImage, ProcessJourney, ProjectScenario, ProofRail } from '../../components/public/story'
+import { BrandPanel } from '../../components/public/BrandPanel'
 import { getServiceStory, DEFAULT_JOURNEY, DEFAULT_DELIVERABLES } from '../../data/serviceStories'
+
+// One topical brand-pack panel per major service, matched by slug. Only the
+// clean web-ready landscape visuals go inline here (the tall campaign posters
+// would read as a flyer wall); a couple carry a baked-in top strip + divider
+// rule, so they get an `aspect` that crops into the panel from the bottom.
+// Services not listed render unchanged.
+const SERVICE_PANEL: Record<string, { src: string; alt: string; aspect?: string; focus?: 'top' | 'center' | 'bottom' }> = {
+  'consulting': { src: '/brand/business-administrative-support.webp', alt: 'Illustrative Pinnacle business and administrative support.', aspect: '3 / 1.82' },
+  'administrative-support': { src: '/brand/business-administrative-support.webp', alt: 'Illustrative Pinnacle administrative support.', aspect: '3 / 1.82' },
+  'merchant-services': { src: '/brand/merchant-pos-consulting.webp', alt: 'Illustrative merchant services and point-of-sale consulting.', aspect: '16 / 8', focus: 'top' },
+  'property-management': { src: '/brand/property-field-services.webp', alt: 'Illustrative property and field services with a mobile inspection report.' },
+  'property-inspections': { src: '/brand/property-field-services.webp', alt: 'Illustrative property inspection with a mobile condition report.' },
+  'field-photos-bpo': { src: '/brand/property-field-services.webp', alt: 'Illustrative field photos and property condition documentation.' },
+  'property-cleaning': { src: '/brand/cleaning-property-turnover.webp', alt: 'Illustrative property cleaning and turnover.', aspect: '16 / 9', focus: 'top' },
+  'short-term-rental-support': { src: '/brand/cleaning-property-turnover.webp', alt: 'Illustrative short-term rental cleaning and turnover.', aspect: '16 / 9', focus: 'top' },
+  'mobile-notary': { src: '/brand/mobile-notary-ron.webp', alt: 'Illustrative mobile notary and remote online notarization.', aspect: '3 / 1.82' },
+  'remote-online-notary': { src: '/brand/mobile-notary-ron.webp', alt: 'Illustrative remote online notarization session.', aspect: '3 / 1.82' },
+  'document-preparation': { src: '/brand/document-support.webp', alt: 'Illustrative document preparation and support.' },
+  'document-courier': { src: '/brand/document-support.webp', alt: 'Illustrative document courier and support.' },
+}
 
 const PLAN_PITCH: Record<'property'|'ops'|'legal', { eyebrow: string; title: string; body: string; from: string; to: string }> = {
   property: { eyebrow: 'Property Care Plans', title: 'Licensed managers in network, or on-call care if you keep the keys.', body: 'Use licensed property managers and CAM agents in the Pinnacle network at a lower cost than the typical percentage shop, or start a Property Care plan from $89/mo with inspections, credits, and priority scheduling.', from: 'From $89/mo', to: '/care-plans?family=property' },
@@ -85,6 +106,12 @@ export default function ServiceDetail() {
             </ul>
           </div>
         </div>
+
+        {SERVICE_PANEL[service.slug] && (
+          <div className="mt-14">
+            <BrandPanel {...SERVICE_PANEL[service.slug]} className="mx-auto max-w-3xl" />
+          </div>
+        )}
 
         {story && (
           <div className="mt-14 grid gap-8 lg:grid-cols-2 lg:items-center lg:gap-12">
