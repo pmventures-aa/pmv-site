@@ -104,9 +104,20 @@ export async function getUser(env: Env, request: Request): Promise<SessionUser |
   }
 
   const live = await env.DB.prepare(
-    `SELECT id,email,role,full_name,first_name,last_name,status FROM users WHERE id=?`,
+    `SELECT u.id, u.email, u.role, u.full_name, u.first_name, u.last_name, u.status,
+            tm.party_type, tm.network_status, tm.review_stage
+     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
+     WHERE u.id = ?`,
   ).bind(cached.id).first<any>()
-  if (!live || live.status !== 'active' || live.role !== cached.role || live.email !== cached.email) {
+  // Which live account states are allowed to hold a session:
+  //  - 'active'      → every ordinary account (full scope).
+  //  - 'provisional' → an under-review vendor/provider, admitted ONLY to
+  //    their own review shell (provider_review scope). No account carries
+  //    this status until the provider-login slice sets it, so admitting it
+  //    here changes nothing for anyone today.
+  const isProvisionalProvider = live?.status === 'provisional' && live?.party_type === 'vendor'
+  const admitted = live?.status === 'active' || isProvisionalProvider
+  if (!live || !admitted || live.role !== cached.role || live.email !== cached.email) {
     const sessionId = await env.SESSIONS.get(`sessmeta:${token}`)
     await Promise.all([
       env.SESSIONS.delete(`sess:${token}`),
@@ -125,6 +136,10 @@ export async function getUser(env: Env, request: Request): Promise<SessionUser |
     full_name: live.full_name ?? null,
     first_name: live.first_name ?? null,
     last_name: live.last_name ?? null,
+    party_type: live.party_type === 'vendor' ? 'vendor' : live.party_type ? 'employee' : null,
+    network_status: live.network_status ?? null,
+    review_stage: live.review_stage ?? null,
+    access_scope: isProvisionalProvider ? 'provider_review' : 'full',
   }
 
   // Impersonation swap: if this cookie has an active impersonation record

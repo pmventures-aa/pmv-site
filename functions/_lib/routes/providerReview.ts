@@ -3,14 +3,14 @@
 //   providerReviewAdminRoutes -> '/admin'  (staff drive the journey)
 //   providerReviewSelfRoutes  -> '/'       (the provider sees status + responds)
 //
-// No authorization-gate change here: admin endpoints require staff; self
-// endpoints act only on the caller's own team_members row and their own
-// follow-up requests. Admitting under-review providers to login is a separate,
-// deliberate step (vendor accounts are currently staff-role).
+// Admin endpoints require staff. Self endpoints are gated by requireProvider
+// — the one gate that admits an under-review provider (access_scope
+// 'provider_review'); every other gate rejects that scope. Handlers here act
+// only on the caller's own team_members row and follow-up requests.
 
 import { Hono } from 'hono'
 import type { AppEnv, Env } from '../types'
-import { requireStaff, requireUser } from '../mid'
+import { requireStaff, requireProvider } from '../mid'
 import { uuid } from '../crypto'
 import { isReviewStage, type FollowUpRequest } from '../../../shared/providerJourney'
 
@@ -85,14 +85,14 @@ providerReviewAdminRoutes.post('/follow-ups/:id/resolve', requireStaff, async (c
 // Provider self-service (the logged-in provider)
 // ---------------------------------------------------------------------------
 
-providerReviewSelfRoutes.get('/self/review', requireUser, async (c) => {
+providerReviewSelfRoutes.get('/self/review', requireProvider, async (c) => {
   const me = c.get('user')!
   const tm = await c.env.DB.prepare('SELECT review_stage, network_status, vendor_category FROM team_members WHERE user_id=?').bind(me.id).first<{ review_stage: string; network_status: string; vendor_category: string | null }>()
   if (!tm) return c.json({ error: 'Not a provider account' }, 404)
   return c.json({ stage: tm.review_stage, networkStatus: tm.network_status, vendorCategory: tm.vendor_category, followUps: await listFollowUps(c.env, me.id) })
 })
 
-providerReviewSelfRoutes.post('/self/follow-ups/:id/respond', requireUser, async (c) => {
+providerReviewSelfRoutes.post('/self/follow-ups/:id/respond', requireProvider, async (c) => {
   const me = c.get('user')!
   const id = c.req.param('id')!
   const response = text((await c.req.json().catch(() => ({})) as Record<string, unknown>).response, 4000)

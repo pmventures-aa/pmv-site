@@ -32,6 +32,13 @@ export interface Env {
 
 export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
 
+// Where a session is allowed to go. 'full' is every ordinary account
+// (staff, admin, client, and already-approved vendors). 'provider_review'
+// is an under-review vendor/provider admitted ONLY to their own review
+// shell — closed by default everywhere else. See getUser() + the gates
+// in mid.ts.
+export type AccessScope = 'full' | 'provider_review'
+
 export interface SessionUser {
   id: string
   email: string
@@ -39,6 +46,16 @@ export interface SessionUser {
   full_name: string | null
   first_name?: string | null
   last_name?: string | null
+  // Provider/vendor context, derived from team_members on every request so
+  // authorization never trusts a stale cookie. party_type is 'vendor' for
+  // provider accounts, 'employee' for internal staff, null for clients.
+  party_type?: 'vendor' | 'employee' | null
+  network_status?: string | null
+  review_stage?: string | null
+  // Coarse capability boundary. Absent means 'full'. 'provider_review'
+  // marks an under-review provider who may reach ONLY requireProvider
+  // endpoints; requireUser/requireStaff/requireAdmin/etc. all reject it.
+  access_scope?: AccessScope
   // Impersonation context: when set, the caller is actually the owner
   // acting AS this user via an active impersonation session. All auth
   // checks below still treat user.id as the effective user, but audit
