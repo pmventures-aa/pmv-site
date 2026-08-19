@@ -7,6 +7,7 @@ import { DocumentUpload, type UploadedDocument } from '../../components/forms/Do
 import { PROVIDER_AGREEMENT_URL, PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
 import { vendorApplicationCopy } from '../../lib/workspace'
 import { questionsForTracks, documentsForTracks, type ProviderTrackKey, type ApplicationDocKey } from '../../../shared/providerApplication'
+import { isValidEmail, isValidPhone } from '../../../shared/contactValidation'
 
 const MIN_PASSWORD = 10
 
@@ -50,7 +51,7 @@ export default function VendorSignup() {
   const [inviteLoading, setInviteLoading] = useState(!!inviteToken)
   const [step, setStep] = useState<Step>('contact')
   const [form, setForm] = useState({
-    first_name:'', last_name:'', email:'', phone:'', company_name:'', entity_type:'', has_ein:'' as ''|'yes'|'no',
+    first_name:'', last_name:'', display_name:'', email:'', phone:'', company_name:'', entity_type:'', has_ein:'' as ''|'yes'|'no',
     enrollments: initialTrack as EnrollmentKey[], service_area:[] as string[], years_experience:'', travel_radius:'',
     commission_state:'Florida', commission_number:'', commission_expiration:'', ron_provider:'',
     license_status:'' as ''|'yes'|'no'|'unsure', insurance_status:'' as ''|'yes'|'no',
@@ -148,8 +149,8 @@ export default function VendorSignup() {
   function validate(next?: Step) {
     if (step === 'contact') {
       if (!form.first_name.trim() || !form.last_name.trim()) return 'Enter your first and last name to continue.'
-      if (!form.email.includes('@')) return 'Enter a valid email address.'
-      if (!form.phone.trim()) return 'Enter a mobile phone number.'
+      if (!isValidEmail(form.email)) return 'Enter a valid email address.'
+      if (!isValidPhone(form.phone)) return 'Enter a valid phone number (at least 10 digits).'
       if (!form.entity_type) return 'Choose how you operate your business.'
       if (!form.has_ein) return 'Tell us whether you use an EIN.'
       if (businessEntity && !form.company_name.trim()) return 'Enter your business or practice name.'
@@ -252,6 +253,7 @@ export default function VendorSignup() {
     try {
       await api.post('/auth/vendor-signup', {
         full_name:fullName,
+        display_name:form.display_name.trim() || form.first_name.trim() || undefined,
         email:form.email,
         phone:form.phone,
         company_name:form.company_name || undefined,
@@ -302,6 +304,7 @@ export default function VendorSignup() {
 
       {step === 'contact' && <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3"><Field label="First name"><input className={inputCls} value={form.first_name} onChange={(e)=>set('first_name',e.target.value)}/></Field><Field label="Last name"><input className={inputCls} value={form.last_name} onChange={(e)=>set('last_name',e.target.value)}/></Field></div>
+        <Field label="Display name (what we call you)"><input className={inputCls} placeholder={form.first_name.trim() || 'How your name should appear'} value={form.display_name} onChange={(e)=>set('display_name',e.target.value)}/><p className="mt-1 text-[11px] leading-4 text-slate-500">Optional. Defaults to your first name. Your full legal name is still used for agreements.</p></Field>
         <Field label="Email"><input className={inputCls} type="email" readOnly={!!inviteToken} value={form.email} onChange={(e)=>set('email',e.target.value)}/></Field>
         <Field label="Mobile phone"><input className={inputCls} type="tel" value={form.phone} onChange={(e)=>set('phone',e.target.value)}/></Field>
         <Field label="How do you operate?"><select className={inputCls} value={form.entity_type} onChange={(e)=>set('entity_type',e.target.value)}><option value="">Select entity type</option><option>Individual / Sole Proprietor</option><option>LLC</option><option>Corporation</option><option>Partnership</option><option>Nonprofit</option><option>Other</option></select></Field>
