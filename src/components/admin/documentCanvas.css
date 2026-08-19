@@ -48,3 +48,20 @@
 .doc-page a{color:#0a1728;text-decoration:underline;text-underline-offset:3px}
 .doc-link-row{display:flex;align-items:center;gap:.4rem}
 .doc-link-row input{height:1.85rem;min-width:12rem;border:1px solid rgba(255,255,255,.12);border-radius:.35rem;background:rgba(255,255,255,.05);color:#e2e8f0;font-size:11px;padding:0 .5rem}
+
+/* Inserted content: tables, rules, page breaks, signature lines, images. */
+.doc-page table.doc-table{width:100%;border-collapse:collapse;margin:.8rem 0}
+.doc-page table.doc-table th,.doc-page table.doc-table td{border:1px solid #cfd6df;padding:6px 9px;text-align:left;vertical-align:top;font-size:.95em}
+.doc-page table.doc-table th{background:#f3f5f8;font-weight:650}
+.doc-page hr{border:0;border-top:1px solid #cbd2db;margin:1.1rem 0}
+.doc-page .doc-pagebreak{height:0;border-top:1px dashed #b9c2cf;margin:1.5rem 0;position:relative}
+.doc-page .doc-pagebreak::after{content:"Page break";position:absolute;top:-.62em;left:50%;transform:translateX(-50%);background:#fff;padding:0 .5rem;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#94a3b8}
+.doc-page .doc-sigline{margin:1.7rem 0 .4rem;max-width:300px}
+.doc-page .doc-sigline-rule{display:block;border-bottom:1px solid #1b2430;height:1.5rem}
+.doc-page .doc-sigline-label{display:block;margin-top:.28rem;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#64748b}
+.doc-page img{max-width:100%;height:auto;border-radius:2px}
+/* The insert dropdown panel. */
+.doc-insert-menu{position:absolute;z-index:30;top:calc(100% + .35rem);left:0;min-width:12rem;padding:.35rem;border:1px solid rgba(255,255,255,.12);border-radius:.55rem;background:#0d1826;box-shadow:0 18px 44px rgba(0,0,0,.5)}
+.doc-insert-item{display:flex;width:100%;align-items:center;gap:.6rem;border:0;background:transparent;color:#cbd5e1;font-size:12.5px;text-align:left;padding:.42rem .55rem;border-radius:.4rem;cursor:pointer}
+.doc-insert-item:hover{background:rgba(255,255,255,.06);color:#fff}
+@media print{.doc-page .doc-pagebreak{break-after:page;page-break-after:always;border:0}.doc-page .doc-pagebreak::after{display:none}}

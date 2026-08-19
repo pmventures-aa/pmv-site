@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Download, FileText, Indent, Italic,
-  Link2, List, ListOrdered, Maximize2, Minus, Outdent, Plus, Redo2, RemoveFormatting, RotateCw,
-  Strikethrough, Subscript, Superscript, Underline, Undo2,
+  AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, CalendarDays, Download, FileText, Image as ImageIcon,
+  Indent, Italic, Link2, List, ListOrdered, Maximize2, Minus, Outdent, PenLine, Plus, Redo2, RemoveFormatting,
+  RotateCw, SeparatorHorizontal, Strikethrough, Subscript, Superscript, Table as TableIcon, Underline, Undo2,
 } from 'lucide-react'
 import { LetterheadCrest } from './LetterheadCrest'
 import { DocumentExportMenu } from './DocumentExportMenu'
@@ -147,6 +147,9 @@ function applyFontSize(root: HTMLElement | null, px: string){
 function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
   const [link, setLink] = useState('')
   const [linkOpen, setLinkOpen] = useState(false)
+  const [insertOpen, setInsertOpen] = useState(false)
+  const [imgOpen, setImgOpen] = useState(false)
+  const [imgUrl, setImgUrl] = useState('')
   const saved = useRef<Range | null>(null)
 
   function saveSelection() {
@@ -179,6 +182,30 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
     run('createLink', href.startsWith('http') ? href : `https://${href}`)
     setLink('')
     setLinkOpen(false)
+  }
+  // Insert HTML at the caret, then persist. Used by the Insert menu.
+  function insertHtml(html: string) {
+    restoreSelection()
+    runCommand('insertHTML', html)
+    capture()
+  }
+  const TABLE_HTML = '<table class="doc-table"><thead><tr><th>Column</th><th>Column</th><th>Column</th></tr></thead><tbody><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody></table><p><br></p>'
+  const SIG_HTML = '<div class="doc-sigline"><span class="doc-sigline-rule"></span><span class="doc-sigline-label">Signature</span></div><p><br></p>'
+  function insertItem(kind: 'table' | 'hr' | 'pagebreak' | 'date' | 'signature') {
+    setInsertOpen(false)
+    if (kind === 'table') return insertHtml(TABLE_HTML)
+    if (kind === 'hr') { restoreSelection(); runCommand('insertHorizontalRule'); return capture() }
+    if (kind === 'pagebreak') return insertHtml('<div class="doc-pagebreak"></div><p><br></p>')
+    if (kind === 'signature') return insertHtml(SIG_HTML)
+    if (kind === 'date') return insertHtml(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))
+  }
+  function applyImage() {
+    const src = imgUrl.trim()
+    if (!src) return
+    insertHtml(`<img src="${src.replace(/"/g, '&quot;')}" alt="">`)
+    setImgUrl('')
+    setImgOpen(false)
+    setInsertOpen(false)
   }
   return (
     <div className="doc-ribbon" onMouseDown={(e) => {
@@ -253,7 +280,26 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
         )}
         <button type="button" className="doc-ribbon-btn" title="Clear formatting" onClick={() => run('removeFormat')}><RemoveFormatting size={14}/></button>
       </div>
-      <p className="doc-ribbon-hint">Select text first, then use this bar. Zoom and export stay in the title row so they never sit on the letterhead.</p>
+      <div className="doc-ribbon-group" style={{ position: 'relative' }}>
+        <button type="button" className={`doc-ribbon-btn ${insertOpen ? 'is-open' : ''}`} title="Insert" onClick={() => { setInsertOpen((open) => !open); setImgOpen(false) }}><Plus size={14}/><span className="ml-1 text-[11px]">Insert</span></button>
+        {insertOpen && (
+          <div className="doc-insert-menu">
+            <button type="button" className="doc-insert-item" onClick={() => { setImgOpen(true); setInsertOpen(false) }}><ImageIcon size={14}/>Image from URL</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('table')}><TableIcon size={14}/>Table</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('hr')}><SeparatorHorizontal size={14}/>Horizontal rule</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('pagebreak')}><Minus size={14}/>Page break</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('signature')}><PenLine size={14}/>Signature line</button>
+            <button type="button" className="doc-insert-item" onClick={() => insertItem('date')}><CalendarDays size={14}/>Today's date</button>
+          </div>
+        )}
+        {imgOpen && (
+          <div className="doc-link-row">
+            <input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="https://image-url" onKeyDown={(e) => { if (e.key === 'Enter') applyImage() }}/>
+            <button type="button" className="doc-ribbon-btn" onClick={applyImage}>Add</button>
+          </div>
+        )}
+      </div>
+      <p className="doc-ribbon-hint">Select text first, then use this bar. Zoom, margins, and export stay in the title row so they never sit on the letterhead.</p>
     </div>
   )
 }
