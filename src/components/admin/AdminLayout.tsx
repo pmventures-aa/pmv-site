@@ -14,6 +14,7 @@ import { SlaAlertChip } from './SlaAlertChip'
 import { AdminPageBoundary } from './AdminPageBoundary'
 import { WhoMenu } from './WhoMenu'
 import { LocationAutoStart } from './LocationAutoStart'
+import { TopbarLocation } from './TopbarLocation'
 import { pmvMotion, pmvPanel } from '../../lib/motionTheme'
 import { InlineLoading } from '../LoadingScreen'
 import { useEmailUnreadCount } from '../../lib/useEmailUnread'
@@ -137,6 +138,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             </NavLink>
           ) : <Logo compact />}
           <div className="flex shrink-0 items-center gap-1.5">
+            <TopbarLocation compact />
             <span className="hidden sm:inline-flex"><SlaAlertChip /></span>
             <button onClick={() => setMobileSearchOpen((v) => !v)} className="hidden h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 sm:grid" aria-label="Search"><Search size={17} /></button>
             <button onClick={refreshPage} className="hidden h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 hover:text-gold sm:grid" aria-label="Refresh page"><RotateCw size={15} /></button>
@@ -175,6 +177,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
             {hideHqNav ? <p className="truncate text-sm font-semibold text-white">Communications</p> : <GlobalSearch className="w-full max-w-md" />}
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <TopbarLocation />
             <SlaAlertChip />
             <button onClick={refreshPage} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-gold" title="Refresh this page" aria-label="Refresh this HQ page"><RotateCw size={14} /></button>
             {!hideHqNav && <MailBell />}

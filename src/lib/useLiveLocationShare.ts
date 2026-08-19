@@ -1,77 +1,85 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from './api'
 
 // Live location sharing for staff/vendor dispatch surfaces. Encapsulates the
 // watchPosition loop that posts a ping to /admin/location (throttled) plus the
-// /admin/location/stop teardown, so the Network & Dispatch page and the HQ
-// mobile auto-start surface share one implementation. The caller is
+// /admin/location/stop teardown, so the Network & Dispatch page, the HQ mobile
+// auto-start, and the top-bar indicator share ONE implementation. The caller is
 // responsible for deciding WHEN to share (permission gate, mobile-only rules,
 // "not on an active assignment"); this hook only owns HOW.
 //
-// Start is safe to call repeatedly: it no-ops while a watch is already running.
+// State is a module-level singleton: one watch and one shared `sharing` value
+// across every surface, so a persistent top-bar control and a page-level control
+// never spin up competing watches or disagree about whether this device is live.
+// The watch deliberately survives component unmount (SPA navigation) - it is
+// stopped only by an explicit stop() so sharing keeps flowing as the operator
+// moves between HQ pages.
 export type SharingState = 'idle' | 'starting' | 'live' | 'error'
+
+let sharing: SharingState = 'idle'
+let watchId: number | null = null
+let lastLocationSend = 0
+const listeners = new Set<() => void>()
+
+function notify() { listeners.forEach((l) => l()) }
+function setSharing(next: SharingState) {
+  if (sharing === next) return
+  sharing = next
+  notify()
+}
+
+// Start is safe to call repeatedly: it no-ops while a watch is already running.
+export function startLiveLocation(): void {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) { setSharing('error'); return }
+  if (watchId != null) return
+  setSharing('starting')
+  watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const now = Date.now()
+      if (now - lastLocationSend < 20_000) return
+      lastLocationSend = now
+      void api.post('/admin/location', {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy_m: position.coords.accuracy,
+      }).then(() => setSharing('live')).catch(() => setSharing('error'))
+    },
+    (error) => {
+      setSharing('error')
+      console.error('[location] watchPosition failed', error?.message || error)
+    },
+    { enableHighAccuracy: true, maximumAge: 15_000, timeout: 20_000 },
+  )
+}
+
+export async function stopLiveLocation(): Promise<void> {
+  if (watchId != null) navigator.geolocation.clearWatch(watchId)
+  watchId = null
+  lastLocationSend = 0
+  try {
+    await api.post('/admin/location/stop')
+    setSharing('idle')
+  } catch (err) {
+    setSharing('idle')
+    console.error('[location] stop failed', err instanceof ApiError ? err.message : err)
+  }
+}
 
 export function useLiveLocationShare({ onChanged }: { onChanged?: () => void } = {}): {
   sharing: SharingState
   start: () => void
   stop: () => Promise<void>
 } {
-  const [sharing, setSharing] = useState<SharingState>('idle')
-  const watchId = useRef<number | null>(null)
-  const lastLocationSend = useRef(0)
+  const [state, setState] = useState<SharingState>(sharing)
   const onChangedRef = useRef(onChanged)
   onChangedRef.current = onChanged
 
-  const start = useCallback(() => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setSharing('error')
-      return
-    }
-    if (watchId.current != null) return
-    setSharing('starting')
-    watchId.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const now = Date.now()
-        if (now - lastLocationSend.current < 20_000) return
-        lastLocationSend.current = now
-        void api.post('/admin/location', {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy_m: position.coords.accuracy,
-        }).then(() => {
-          setSharing('live')
-          onChangedRef.current?.()
-        }).catch(() => {
-          setSharing('error')
-          // Page owners get a toast via onChanged; keep the hook silent.
-          onChangedRef.current?.()
-        })
-      },
-      (error) => {
-        setSharing('error')
-        console.error('[location] watchPosition failed', error?.message || error)
-      },
-      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 20_000 },
-    )
+  useEffect(() => {
+    const listener = () => { setState(sharing); onChangedRef.current?.() }
+    listeners.add(listener)
+    setState(sharing) // sync any change that landed before this subscribe
+    return () => { listeners.delete(listener) }
   }, [])
 
-  const stop = useCallback(async () => {
-    if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
-    watchId.current = null
-    lastLocationSend.current = 0
-    try {
-      await api.post('/admin/location/stop')
-      setSharing('idle')
-      onChangedRef.current?.()
-    } catch (err) {
-      setSharing('idle')
-      console.error('[location] stop failed', err instanceof ApiError ? err.message : err)
-    }
-  }, [])
-
-  useEffect(() => () => {
-    if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
-  }, [])
-
-  return { sharing, start, stop }
+  return { sharing: state, start: startLiveLocation, stop: stopLiveLocation }
 }

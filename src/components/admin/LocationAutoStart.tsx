@@ -42,11 +42,16 @@ export function LocationAutoStart() {
   // not on a surface that manages its own watch.
   useEffect(() => {
     if (!isMobile) return
+    // Only auto-start once the BROWSER has confirmed the grant. Starting on the
+    // optimistic localStorage 'granted' would fire watchPosition - and the
+    // permission dialog - on every page open for a device whose real state is
+    // still 'prompt'.
+    if (!geoPerm.confirmed) return
     if (geoPerm.permission !== 'granted') return
     if (sharing !== 'idle') return
     if (onNetworkPage || onActiveAssignment) return
     start()
-  }, [isMobile, geoPerm.permission, sharing, onNetworkPage, onActiveAssignment, start])
+  }, [isMobile, geoPerm.confirmed, geoPerm.permission, sharing, onNetworkPage, onActiveAssignment, start])
 
   const showPrompt =
     isMobile && !onNetworkPage && !onActiveAssignment && sharing === 'idle'

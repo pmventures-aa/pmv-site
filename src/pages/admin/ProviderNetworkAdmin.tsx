@@ -152,12 +152,16 @@ export default function ProviderNetworkAdmin() {
   // caller already has one running. Runs once per mount.
   useEffect(() => {
     if (autoStartedRef.current) return
+    // Wait for the browser to confirm the grant - never auto-watch on the
+    // optimistic localStorage hint, which would re-trigger the permission
+    // dialog on every visit.
+    if (!geoPerm.confirmed) return
     if (geoPerm.permission !== 'granted') return
     if (sharing !== 'idle') return
     autoStartedRef.current = true
     startLocationSharing()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geoPerm.permission])
+  }, [geoPerm.confirmed, geoPerm.permission])
 
   async function patchRow(row: NetworkPerson, patch: Partial<Pick<NetworkPerson, 'availability_status' | 'is_preferred_provider'>>) {
     setBusyId(row.id)
