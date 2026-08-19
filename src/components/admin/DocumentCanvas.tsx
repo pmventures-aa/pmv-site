@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  AlignCenter, AlignLeft, AlignRight, Bold, Download, FileText, Indent, Italic,
+  AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Download, FileText, Indent, Italic,
   Link2, List, ListOrdered, Maximize2, Minus, Outdent, Plus, Redo2, RemoveFormatting, RotateCw,
-  Strikethrough, Underline, Undo2,
+  Strikethrough, Subscript, Superscript, Underline, Undo2,
 } from 'lucide-react'
 import { LetterheadCrest } from './LetterheadCrest'
 import { DocumentExportMenu } from './DocumentExportMenu'
-import { DOC_FONTS, DOC_HIGHLIGHT, DOC_INK, DOC_SIZES, toEditorHtml } from '../../../shared/docHtml'
+import { DOC_FONTS, DOC_FONT_GROUPS, DOC_HIGHLIGHT, DOC_INK, DOC_SIZES, toEditorHtml } from '../../../shared/docHtml'
 import { FIRM_NAME, FIRM_PHONE, FIRM_REGION, FIRM_SITE_HOST, FIRM_TAGLINE, SUPPORT_EMAIL } from '../../../shared/letterhead'
 import './documentCanvas.css'
 
@@ -189,14 +189,23 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
         <select className="doc-ribbon-select" defaultValue="P" onChange={(e) => run('formatBlock', e.target.value)} title="Paragraph style">
           <option value="P">Body</option>
           <option value="H1">Title</option>
-          <option value="H2">Heading</option>
-          <option value="H3">Subheading</option>
+          <option value="H2">Subtitle</option>
+          <option value="H3">Heading 1</option>
+          <option value="H4">Heading 2</option>
+          <option value="H5">Heading 3</option>
           <option value="BLOCKQUOTE">Quote</option>
+          <option value="PRE">Monospace block</option>
         </select>
-        <select className="doc-ribbon-select" defaultValue={DOC_FONTS[0].value} onChange={(e) => run('fontName', e.target.value)} title="Font">
-          {DOC_FONTS.map((font) => <option key={font.label} value={font.value}>{font.label}</option>)}
+        <select className="doc-ribbon-select" defaultValue={DOC_FONTS[0].value} onChange={(e) => run('fontName', e.target.value)} title="Font" style={{ maxWidth: '9rem' }}>
+          {DOC_FONT_GROUPS.map((group) => (
+            <optgroup key={group} label={group}>
+              {DOC_FONTS.filter((font) => font.group === group).map((font) => (
+                <option key={font.label} value={font.value} style={{ fontFamily: font.value }}>{font.label}</option>
+              ))}
+            </optgroup>
+          ))}
         </select>
-        <select className="doc-ribbon-select" defaultValue="15px" onChange={(e) => size(e.target.value)} title="Font size" style={{ maxWidth: '4.4rem' }}>
+        <select className="doc-ribbon-select" defaultValue="16px" onChange={(e) => size(e.target.value)} title="Font size" style={{ maxWidth: '4.4rem' }}>
           {DOC_SIZES.map((value) => <option key={value} value={value}>{value.replace('px', '')}</option>)}
         </select>
       </div>
@@ -205,6 +214,8 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
         <button type="button" className="doc-ribbon-btn" title="Italic" onClick={() => run('italic')}><Italic size={14}/></button>
         <button type="button" className="doc-ribbon-btn" title="Underline" onClick={() => run('underline')}><Underline size={14}/></button>
         <button type="button" className="doc-ribbon-btn" title="Strikethrough" onClick={() => run('strikeThrough')}><Strikethrough size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Superscript" onClick={() => run('superscript')}><Superscript size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Subscript" onClick={() => run('subscript')}><Subscript size={14}/></button>
       </div>
       <div className="doc-ribbon-group">
         <select className="doc-ribbon-select" defaultValue={DOC_INK[0].value} onChange={(e) => run('foreColor', e.target.value)} title="Text color" style={{ maxWidth: '5.6rem' }}>
@@ -218,6 +229,7 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
         <button type="button" className="doc-ribbon-btn" title="Align left" onClick={() => run('justifyLeft')}><AlignLeft size={14}/></button>
         <button type="button" className="doc-ribbon-btn" title="Align center" onClick={() => run('justifyCenter')}><AlignCenter size={14}/></button>
         <button type="button" className="doc-ribbon-btn" title="Align right" onClick={() => run('justifyRight')}><AlignRight size={14}/></button>
+        <button type="button" className="doc-ribbon-btn" title="Justify" onClick={() => run('justifyFull')}><AlignJustify size={14}/></button>
       </div>
       <div className="doc-ribbon-group">
         <button type="button" className="doc-ribbon-btn" title="Bulleted list" onClick={() => run('insertUnorderedList')}><List size={14}/></button>
