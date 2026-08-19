@@ -6,6 +6,7 @@ import { CtaBand, btnOutline, btnPrimary } from '../../components/public/ui'
 import { Icon, type IconName } from '../../components/kit/Icon'
 import { BrandMark3D } from '../../components/ui'
 import { StoryImage, NetworkStory } from '../../components/public/story'
+import { BrandPanel } from '../../components/public/BrandPanel'
 import { usePageMeta } from '../../lib/usePageMeta'
 import { GET_HELP, founder, principles } from '../../data/publicSite'
 
@@ -32,6 +33,8 @@ export default function About(){
     <section className="pmv-gold-band border-y border-gold/15"><div className="container-pmv py-14 sm:py-16"><Reveal className="max-w-3xl"><p className="eyebrow">What we support</p><h2 className="mt-3 font-display text-3xl font-medium text-white sm:text-4xl">Professional support across business, property, and operational work.</h2></Reveal><div className="mt-8 divide-y divide-white/10 border-y border-white/10">{areas.map(([title,body])=><Reveal key={title} className="grid gap-2 py-5 md:grid-cols-[240px_1fr]"><h3 className="font-semibold text-white">{title}</h3><p className="text-sm leading-6 text-slate-400">{body}</p></Reveal>)}</div></div></section>
 
     <section className="container-pmv py-14 sm:py-16"><Reveal className="grid gap-10 lg:grid-cols-[.75fr_1.25fr]"><div><p className="eyebrow">The Pinnacle approach</p><h2 className="mt-3 font-display text-3xl font-medium text-white sm:text-4xl">Understand the matter. Own the next step.</h2><p className="mt-4 text-sm leading-6 text-slate-400">Good professional support is less about theatrics and more about context, communication, judgment, and follow-through.</p></div><div className="pmv-process-line">{principles.map(([t,b],i)=><div key={t} className="pmv-process-step"><span>0{i+1}</span><div><h3>{t}</h3><p>{b}</p></div></div>)}</div></Reveal></section>
+
+    <section className="border-y border-white/10"><div className="container-pmv py-14 sm:py-16"><Reveal className="mx-auto max-w-3xl"><BrandPanel src="/brand/pmv-brand-panel.webp" alt="Pinnacle Management Ventures brand mark: professional support, nationwide solutions, trusted, reliable, results driven." illustrative={false}/></Reveal></div></section>
 
     <section className="border-y border-white/10 bg-navy-900/30"><div className="container-pmv grid gap-10 py-14 sm:py-16 lg:grid-cols-[.8fr_1.2fr] lg:items-center"><Reveal><p className="eyebrow">Leadership</p><h2 className="mt-3 font-display text-3xl font-medium text-white">{founder.name}</h2><p className="mt-2 text-sm font-semibold uppercase tracking-[.12em] text-gold">{founder.title}</p><StoryImage slot="business_owner" className="mt-6 max-w-sm" aspect="aspect-[4/3]" /></Reveal><Reveal><p className="text-base leading-8 text-slate-300">{founder.lead}</p><p className="mt-4 text-base leading-8 text-slate-400">{founder.close}</p></Reveal></div></section>
 

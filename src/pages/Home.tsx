@@ -14,6 +14,7 @@ import { OrbitalFlow } from '../components/public/OrbitalFlow'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
 import { StoryImage, type RailPanel } from '../components/public/story'
+import { BrandPanel } from '../components/public/BrandPanel'
 import { CLIENT_LOGIN, GET_HELP, founder, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 import { getCleaningConfig } from '../lib/cleaningApi'
 import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricing'
@@ -144,6 +145,24 @@ export default function Home() {
         </section>
 
         <section className="border-y border-white/[.07] bg-navy-900/30">
+          <div className="container-pmv grid gap-10 py-16 sm:py-20 lg:grid-cols-[.95fr_1.05fr] lg:items-center lg:gap-14">
+            <Reveal>
+              <p className="eyebrow">One network · Nationwide coverage</p>
+              <h2 className="mt-4 font-display text-3xl font-bold tracking-[-.035em] text-white sm:text-4xl">Professional support, wherever the work takes you.</h2>
+              <p className="mt-5 max-w-lg text-base leading-7 text-slate-400">
+                Pinnacle coordinates remote professional support nationwide, with hands-on field coverage throughout South Florida. One point of contact keeps the people, documents, and next steps moving together.
+              </p>
+              <ViewTransitionLink to="/how-it-works" className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-gold hover:underline">
+                Explore how Pinnacle works <span aria-hidden="true">→</span>
+              </ViewTransitionLink>
+            </Reveal>
+            <Reveal delay={0.05}>
+              <BrandPanel src="/brand/one-network-nationwide-coverage.webp" alt="Illustrative United States network graphic showing Pinnacle Management Ventures coordinating support nationwide with South Florida highlighted." />
+            </Reveal>
+          </div>
+        </section>
+
+        <section className="border-b border-white/[.07]">
           <div className="container-pmv py-16 sm:py-20">
             <Reveal>
               <p className="eyebrow">Real-world situations</p>
