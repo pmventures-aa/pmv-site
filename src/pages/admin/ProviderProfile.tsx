@@ -12,6 +12,7 @@ import { canDispatchPerson, networkDispatchHref } from '../../lib/networkRoster'
 import { DOC_LABELS, type ApplicationDocKey } from '../../../shared/providerApplication'
 import { Dialog, DialogTrigger, DialogContent } from '../../components/kit/Dialog'
 
+interface SsoIdentity { connection: string; label: string; email: string | null; last_login_at: string | null }
 interface Data {
   employee: any
   vendor_application: any
@@ -24,6 +25,8 @@ interface Data {
   network_notes: any[]
   dispatch_history: any[]
   avg_response_hours: number | null
+  sso_identities?: SsoIdentity[]
+  has_password?: boolean
 }
 
 const tabs = [
@@ -43,6 +46,8 @@ export default function ProviderProfile() {
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [profile, setProfile] = useState({ full_name: '', display_name: '', phone: '', vendor_category: '' })
+  const [savingProfile, setSavingProfile] = useState(false)
   const [sigName, setSigName] = useState('')
   const [sigTitle, setSigTitle] = useState('')
   const [sigEmail, setSigEmail] = useState('')
@@ -55,6 +60,13 @@ export default function ProviderProfile() {
       const next = await api.get<Data>(`/admin/employees/${id}`)
       setData(next)
       setError('')
+      const emp0 = next.employee || {}
+      setProfile({
+        full_name: emp0.full_name || '',
+        display_name: emp0.display_name || '',
+        phone: emp0.phone || '',
+        vendor_category: emp0.vendor_category || '',
+      })
       try {
         const sigs = await api.get<{ roster?: SignatureRosterPerson[] }>('/admin/email-signatures')
         const person = (sigs.roster || []).find((row) => row.user_id === id)
@@ -84,6 +96,19 @@ export default function ProviderProfile() {
       toast.error(err instanceof ApiError ? err.message : 'Could not generate the application PDF.')
     } finally {
       setGenBusy(false)
+    }
+  }
+
+  async function saveProfile() {
+    setSavingProfile(true)
+    try {
+      await api.patch(`/admin/employees/${id}/profile`, profile)
+      toast.success('Provider details saved.')
+      await load()
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'Could not save provider details.')
+    } finally {
+      setSavingProfile(false)
     }
   }
 
@@ -141,6 +166,11 @@ export default function ProviderProfile() {
   const e = data.employee
   const provider = e.party_type === 'vendor'
   const agreement = data.provider_agreements[0]
+  const sso = data.sso_identities || []
+  const ssoNames = sso.map((s) => s.label).join(' · ')
+  const signInMethod = sso.length
+    ? `${ssoNames} SSO${data.has_password ? ' · password' : ''}`
+    : data.has_password ? 'Password' : 'No sign-in set yet'
   const subtitle = [e.display_name && e.display_name !== e.full_name ? `Goes by ${e.display_name}` : null, e.vendor_category || e.role_name || e.title, e.email, e.phone].filter(Boolean).join(' · ')
 
   return (
@@ -167,6 +197,7 @@ export default function ProviderProfile() {
               <Link to={networkDispatchHref(p, e.id)} className="btn-gold">Dispatch</Link>
             )}
             {provider && e.provider_code ? <Tag>{e.provider_code}</Tag> : null}
+            {sso.length > 0 ? <Tag tone="gold">{sso.length === 1 ? `${sso[0].label} SSO` : 'SSO'}</Tag> : null}
             {e.is_preferred_provider ? <Tag tone="gold"><Star size={12} className="fill-gold" />Preferred</Tag> : null}
           </div>
         }
@@ -187,6 +218,19 @@ export default function ProviderProfile() {
       {tab === 'profile' && (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,.85fr)]">
           <div className="space-y-5">
+          {provider && (
+            <Panel>
+              <h2 className="text-sm font-semibold text-white">Provider details</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Correct the provider&apos;s name, how they appear, phone, and what they provide. These are the same fields a provider can self-fill on their review shell.</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Field label="Full legal name"><input className={inputCls} value={profile.full_name} onChange={(x) => setProfile({ ...profile, full_name: x.target.value })} /></Field>
+                <Field label="Display name"><input className={inputCls} value={profile.display_name} onChange={(x) => setProfile({ ...profile, display_name: x.target.value })} placeholder="How they appear" /></Field>
+                <Field label="Phone"><input className={inputCls} value={profile.phone} onChange={(x) => setProfile({ ...profile, phone: x.target.value })} placeholder="(555) 123-4567" /></Field>
+                <Field label="What they provide"><input className={inputCls} value={profile.vendor_category} onChange={(x) => setProfile({ ...profile, vendor_category: x.target.value })} placeholder="Mobile notary, cleaning…" /></Field>
+              </div>
+              <button className={`${btnPrimary} mt-4`} disabled={savingProfile} onClick={() => void saveProfile()}><Save size={14} />{savingProfile ? 'Saving…' : 'Save provider details'}</button>
+            </Panel>
+          )}
           <ApplicationReviewPanel application={data.vendor_application} />
           <Panel>
             <h2 className="text-sm font-semibold text-white">Relationship</h2>
@@ -263,6 +307,10 @@ export default function ProviderProfile() {
               <dl className="mt-3 space-y-2 text-sm text-slate-300">
                 <div><dt className="text-[11px] uppercase tracking-wide text-slate-500">Email</dt><dd>{e.email}</dd></div>
                 {e.phone && <div><dt className="text-[11px] uppercase tracking-wide text-slate-500">Phone</dt><dd>{e.phone}</dd></div>}
+                <div>
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">Sign-in method</dt>
+                  <dd>{signInMethod}{sso.length > 0 && sso[0].last_login_at ? <span className="text-xs text-slate-500"> · last used {new Date(sso[0].last_login_at).toLocaleDateString()}</span> : null}</dd>
+                </div>
                 <div>
                   <dt className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500">
                     <span>Application &amp; verification files ({data.vendor_documents.length})</span>
