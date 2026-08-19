@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { Header } from '../components/public/Header'
 import { Footer } from '../components/public/Footer'
 import { btnOutline, btnPrimary, CtaBand, MotionStage } from '../components/public/ui'
@@ -316,9 +316,13 @@ const RAIL_ACCENTS = [
 ]
 
 function LifecycleRail({ eyebrow, heading, panels }: { eyebrow: string; heading: string; panels: RailPanel[] }) {
+  const reduce = useReducedMotion()
   const scroller = useRef<HTMLDivElement>(null)
   const [edges, setEdges] = useState({ left: false, right: true })
   const drag = useRef<{ startX: number; startLeft: number; active: boolean; moved: boolean }>({ startX: 0, startLeft: 0, active: false, moved: false })
+  // Auto-advance pauses while the pointer is over the rail or the user is
+  // dragging, so it never fights a manual interaction.
+  const paused = useRef(false)
 
   const syncEdges = () => {
     const el = scroller.current
@@ -334,13 +338,32 @@ function LifecycleRail({ eyebrow, heading, panels }: { eyebrow: string; heading:
     return () => { el.removeEventListener('scroll', syncEdges); window.removeEventListener('resize', syncEdges) }
   }, [])
 
+  const step = () => {
+    const el = scroller.current
+    if (!el) return 0
+    const card = el.querySelector('article') as HTMLElement | null
+    return card ? card.offsetWidth + 16 : el.clientWidth * 0.85
+  }
   const scrollByCards = (dir: 1 | -1) => {
     const el = scroller.current
     if (!el) return
-    const card = el.querySelector('article')
-    const step = card ? (card as HTMLElement).offsetWidth + 16 : el.clientWidth * 0.85
-    el.scrollBy({ left: dir * step, behavior: 'smooth' })
+    el.scrollBy({ left: dir * step(), behavior: 'smooth' })
   }
+
+  // Gentle automatic advance; loops back to the start at the end. Off entirely
+  // for reduced-motion, and it never moves the page (only this overflow rail).
+  useEffect(() => {
+    if (reduce) return
+    const el = scroller.current
+    if (!el) return
+    const id = window.setInterval(() => {
+      if (paused.current || drag.current.active) return
+      const atEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 4
+      if (atEnd) el.scrollTo({ left: 0, behavior: 'smooth' })
+      else el.scrollBy({ left: step(), behavior: 'smooth' })
+    }, 3800)
+    return () => window.clearInterval(id)
+  }, [reduce])
 
   // Click-drag to scroll on pointer devices; native swipe still works on touch.
   const onPointerDown = (e: React.PointerEvent) => {
@@ -363,7 +386,7 @@ function LifecycleRail({ eyebrow, heading, panels }: { eyebrow: string; heading:
         <Reveal className="max-w-2xl">
           <p className="eyebrow">{eyebrow}</p>
           <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-4xl">{heading}</h2>
-          <p className="mt-4 text-sm text-slate-400">Six steps every Pinnacle matter follows. Drag, swipe, or use the arrows.</p>
+          <p className="mt-4 text-sm text-slate-400">Six steps every Pinnacle matter follows. It advances on its own, or drag, swipe, and use the arrows.</p>
         </Reveal>
         <div className="mt-6 hidden gap-2 sm:flex">
           {([[-1, ChevronLeft, edges.left, 'Previous'], [1, ChevronRight, edges.right, 'Next']] as const).map(([dir, Icon, enabled, label]) => (
@@ -387,6 +410,8 @@ function LifecycleRail({ eyebrow, heading, panels }: { eyebrow: string; heading:
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerLeave={endDrag}
+          onMouseEnter={() => { paused.current = true }}
+          onMouseLeave={() => { paused.current = false }}
           className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-[max(1.5rem,calc((100vw-72rem)/2))] pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {panels.map((panel, i) => (

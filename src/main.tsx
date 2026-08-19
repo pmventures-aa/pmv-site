@@ -10,34 +10,43 @@ import './public-motion.css'
 import './brand-motion.css'
 import './mail-workspace.css'
 import Home from './pages/Home'
-import ServicesOverview from './pages/public/ServicesOverview'
-import ServiceDetail from './pages/public/ServiceDetail'
-import { BusinessOperationsHub, PropertyFieldHub, MobileDocumentHub } from './pages/public/ServiceHubs'
-import ProjectGuidePage from './pages/public/ProjectGuides'
-import About from './pages/public/About'
-import HowItWorks from './pages/public/HowItWorks'
-import Resources from './pages/public/Resources'
-import ServiceArea from './pages/public/ServiceArea'
-import Contact from './pages/public/Contact'
-import Professionals from './pages/public/Professionals'
-import Terms from './pages/public/Terms'
-import Privacy from './pages/public/Privacy'
-import ElectronicCommunications from './pages/public/ElectronicCommunications'
-import Accessibility from './pages/public/Accessibility'
-import ProviderAgreement from './pages/public/ProviderAgreement'
-import VerifyDocument from './pages/public/VerifyDocument'
-import SignerExperience from './pages/public/SignerExperience'
-import SharedDocument from './pages/public/SharedDocument'
-import ScopeRequest from './pages/public/ScopeRequest'
-import ScopeConfirmation from './pages/public/ScopeConfirmation'
-import InstantQuote from './pages/public/InstantQuote'
-import QuoteView from './pages/public/QuoteView'
-import CarePlans, { CarePlansConfirmation } from './pages/public/CarePlans'
-import StrTurnover from './pages/public/StrTurnover'
-import StrQuote from './pages/public/StrQuote'
-import CleaningHub, { CleaningAirbnb, CleaningRecurring } from './pages/public/Cleaning'
-import { CleaningArea, CleaningAreasIndex } from './pages/public/CleaningArea'
-import NotFound from './pages/public/NotFound'
+// Non-home public routes are code-split so the landing page ships a smaller
+// initial bundle; each route's chunk loads on navigation behind a Suspense
+// fallback. Home stays eager because it is the LCP-critical entry point.
+const ServicesOverview = lazy(() => import('./pages/public/ServicesOverview'))
+const ServiceDetail = lazy(() => import('./pages/public/ServiceDetail'))
+const BusinessOperationsHub = lazy(() => import('./pages/public/ServiceHubs').then((m) => ({ default: m.BusinessOperationsHub })))
+const PropertyFieldHub = lazy(() => import('./pages/public/ServiceHubs').then((m) => ({ default: m.PropertyFieldHub })))
+const MobileDocumentHub = lazy(() => import('./pages/public/ServiceHubs').then((m) => ({ default: m.MobileDocumentHub })))
+const ProjectGuidePage = lazy(() => import('./pages/public/ProjectGuides'))
+const About = lazy(() => import('./pages/public/About'))
+const HowItWorks = lazy(() => import('./pages/public/HowItWorks'))
+const Resources = lazy(() => import('./pages/public/Resources'))
+const ServiceArea = lazy(() => import('./pages/public/ServiceArea'))
+const Contact = lazy(() => import('./pages/public/Contact'))
+const Professionals = lazy(() => import('./pages/public/Professionals'))
+const Terms = lazy(() => import('./pages/public/Terms'))
+const Privacy = lazy(() => import('./pages/public/Privacy'))
+const ElectronicCommunications = lazy(() => import('./pages/public/ElectronicCommunications'))
+const Accessibility = lazy(() => import('./pages/public/Accessibility'))
+const ProviderAgreement = lazy(() => import('./pages/public/ProviderAgreement'))
+const VerifyDocument = lazy(() => import('./pages/public/VerifyDocument'))
+const SignerExperience = lazy(() => import('./pages/public/SignerExperience'))
+const SharedDocument = lazy(() => import('./pages/public/SharedDocument'))
+const ScopeRequest = lazy(() => import('./pages/public/ScopeRequest'))
+const ScopeConfirmation = lazy(() => import('./pages/public/ScopeConfirmation'))
+const InstantQuote = lazy(() => import('./pages/public/InstantQuote'))
+const QuoteView = lazy(() => import('./pages/public/QuoteView'))
+const CarePlans = lazy(() => import('./pages/public/CarePlans'))
+const CarePlansConfirmation = lazy(() => import('./pages/public/CarePlans').then((m) => ({ default: m.CarePlansConfirmation })))
+const StrTurnover = lazy(() => import('./pages/public/StrTurnover'))
+const StrQuote = lazy(() => import('./pages/public/StrQuote'))
+const CleaningHub = lazy(() => import('./pages/public/Cleaning'))
+const CleaningAirbnb = lazy(() => import('./pages/public/Cleaning').then((m) => ({ default: m.CleaningAirbnb })))
+const CleaningRecurring = lazy(() => import('./pages/public/Cleaning').then((m) => ({ default: m.CleaningRecurring })))
+const CleaningArea = lazy(() => import('./pages/public/CleaningArea').then((m) => ({ default: m.CleaningArea })))
+const CleaningAreasIndex = lazy(() => import('./pages/public/CleaningArea').then((m) => ({ default: m.CleaningAreasIndex })))
+const NotFound = lazy(() => import('./pages/public/NotFound'))
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
 import { PublicVisitorProvider } from './lib/publicContext'
@@ -87,6 +96,7 @@ function App() {
   }
   return (
     <PublicVisitorProvider>
+      <Suspense fallback={<SurfaceFallback />}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<ServicesOverview />} />
@@ -130,6 +140,7 @@ function App() {
         <Route path="/admin/*" element={<Suspense fallback={<SurfaceFallback />}><AdminApp basePath="/admin" /></Suspense>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
     </PublicVisitorProvider>
   )
 }
