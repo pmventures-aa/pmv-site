@@ -130,8 +130,14 @@ app.route('/', strPublicRoutes)
 app.route('/', cleaningPricingPublicRoutes)
 app.route('/', cleaningJobsPublicRoutes)
 
-app.get('/me', requireUser, async (c) => {
-  const user = c.get('user')
+// /me must reach an under-review provider too (access_scope 'provider_review'),
+// so it bootstraps its own session rather than using requireUser (which, like
+// every ordinary gate, rejects that scope). The workspace loader is safe for a
+// provisional vendor — it only reads their own team_members row. The review
+// shell keys off user.access_scope to decide what the client renders.
+app.get('/me', async (c) => {
+  const user = await getUser(c.env, c.req.raw)
+  if (!user) return c.json({ error: 'unauthorized' }, 401)
   const workspace = await loadWorkspaceContext(c.env, user)
   return c.json({ user, workspace })
 })

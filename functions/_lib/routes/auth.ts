@@ -230,7 +230,7 @@ authRoutes.post('/vendor-signup', async (c) => {
   const statements = existing
     ? [
       c.env.DB.prepare(
-        `UPDATE users SET password_hash = ?, full_name = ?, phone = COALESCE(?, phone) WHERE id = ?`,
+        `UPDATE users SET password_hash = ?, full_name = ?, phone = COALESCE(?, phone), status = 'provisional' WHERE id = ?`,
       ).bind(hash, fullName, phone || null, id),
       c.env.DB.prepare(
         `UPDATE team_members SET title = ?, party_type = 'vendor', vendor_category = COALESCE(?, vendor_category), network_status = 'vetting', display_name = COALESCE(?, display_name) WHERE user_id = ?`,
@@ -239,7 +239,7 @@ authRoutes.post('/vendor-signup', async (c) => {
     : [
       c.env.DB.prepare(
         `INSERT INTO users (id, email, password_hash, role, full_name, phone, two_factor_enabled, status)
-         VALUES (?, ?, ?, 'staff', ?, ?, 0, 'pending')`,
+         VALUES (?, ?, ?, 'staff', ?, ?, 0, 'provisional')`,
       ).bind(id, e, hash, fullName, phone || null),
       c.env.DB.prepare(
         `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category, network_status, display_name)
@@ -297,7 +297,7 @@ authRoutes.post('/vendor-signup', async (c) => {
     }).catch((err) => console.error('[account-email] vendor receipt failed', err)),
   )
 
-  return c.json({ ok: true, status: 'pending' }, 201)
+  return c.json({ ok: true, status: 'provisional' }, 201)
 })
 
 // ---------- first-admin bootstrap (only works while there are zero users) ----------
@@ -463,15 +463,24 @@ authRoutes.post('/login', async (c) => {
     return c.json({ error: 'too many attempts. Try again in 15 minutes.' }, 429)
   }
 
-  const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(e).first<any>()
+  const user = await c.env.DB.prepare(
+    `SELECT u.*, tm.party_type AS party_type
+     FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id
+     WHERE u.email = ?`,
+  ).bind(e).first<any>()
+  // Who may sign in: any 'active' account, plus an under-review vendor whose
+  // account is still 'provisional'. The provisional vendor lands in the
+  // read-only review shell (access_scope 'provider_review', derived live in
+  // getUser); every ordinary gate keeps them out of HQ regardless.
+  const admittedStatus = !!user && (user.status === 'active' || (user.status === 'provisional' && user.party_type === 'vendor'))
   let ok = false
-  if (user && user.status === 'active' && user.password_hash) {
+  if (user && admittedStatus && user.password_hash) {
     ok = await verifyPassword(password, user.password_hash, c.env.SESSION_SECRET)
   } else {
     await verifyPassword(password, 'pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', c.env.SESSION_SECRET)
   }
 
-  if (!user || user.status !== 'active' || !ok) {
+  if (!user || !admittedStatus || !ok) {
     await recordFailure(c.env, e, ip)
     await logAudit(c.env, {
       actorUserId: user?.id ?? null,
