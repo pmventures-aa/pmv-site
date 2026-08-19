@@ -78,6 +78,7 @@ import { geoRoutes } from '../_lib/routes/geo'
 import { loadWorkspaceContext } from '../_lib/workspaceContext'
 import { logAuth0StartupWarnings } from '../_lib/routes/auth0'
 import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
+import { providerReviewAdminRoutes, providerReviewSelfRoutes } from '../_lib/routes/providerReview'
 import { portalCalendarRoutes, adminCalendarRoutes } from '../_lib/routes/calendarRoutes'
 import { externalCalendarRoutes, externalCalendarWebhookRoutes } from '../_lib/routes/externalCalendar'
 import { strPublicRoutes, strAdminRoutes, strPortalRoutes } from '../_lib/routes/strRoutes'
@@ -142,6 +143,7 @@ app.route('/portal', serviceOfferingApplicationRoutes)
 app.route('/portal', serviceApplicationRoutes)
 app.route('/portal', trustedContactRoutes)
 app.route('/portal', selfRoutes)
+app.route('/portal', providerReviewSelfRoutes)
 app.route('/portal', portalRoutes)
 app.route('/portal', portalCalendarRoutes)
 app.route('/portal', strPortalRoutes)
@@ -198,6 +200,7 @@ app.route('/admin', crmRoutes)
 app.route('/admin', fieldWorkRoutes)
 app.route('/admin', fieldLocationRoutes)
 app.route('/admin', workAssignmentRoutes)
+app.route('/admin', providerReviewAdminRoutes)
 app.route('/admin', adminCalendarRoutes)
 // External calendar (Google, later Microsoft) OAuth + sync surface. Kept
 // under /admin so it inherits the requireUser middleware chain; webhook
