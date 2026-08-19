@@ -3,4 +3,4 @@ Allow: /
 Disallow: /portal
 Disallow: /secure
 
-Sitemap: https://pinnaclemanagementventures.com/sitemap.xml
+Sitemap: https://www.pinnaclemanagementventures.com/sitemap.xml

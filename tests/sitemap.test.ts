@@ -7,7 +7,7 @@ import { CLEANING_SERVICE_AREAS } from '../shared/cleaningServiceAreas'
 // until the new /cleaning/<slug> URL is listed in public/sitemap.xml.
 const sitemap = readFileSync(new URL('../public/sitemap.xml', import.meta.url), 'utf8')
 const robots = readFileSync(new URL('../public/robots.txt', import.meta.url), 'utf8')
-const BASE = 'https://pinnaclemanagementventures.com'
+const BASE = 'https://www.pinnaclemanagementventures.com'
 
 describe('sitemap', () => {
   it('lists every cleaning service-area page', () => {

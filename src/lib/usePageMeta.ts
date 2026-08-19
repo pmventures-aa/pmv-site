@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 
 const SITE_NAME = 'Pinnacle Management Ventures'
-const SITE_URL = 'https://pinnaclemanagementventures.com'
+// Canonical host is www, matching the sitemap and the static tags in index.html
+// so search engines consolidate on one hostname.
+const SITE_URL = 'https://www.pinnaclemanagementventures.com'
 const DEFAULT_DESCRIPTION =
   'Pinnacle Management Ventures provides South Florida property cleaning, inspections, eviction and REO support, document and mobile services, administrative help, and business operations support.'
 const SOCIAL_IMAGE = '/logo-crest-on-dark.png'

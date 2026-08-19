@@ -10,7 +10,7 @@ import { usePageMeta } from '../../lib/usePageMeta'
 import { useJsonLd } from '../../lib/useJsonLd'
 import { findServiceArea, nearbyAreas, areasByCounty, CLEANING_SERVICE_AREAS } from '../../../shared/cleaningServiceAreas'
 
-const SITE_URL = 'https://pinnaclemanagementventures.com'
+const SITE_URL = 'https://www.pinnaclemanagementventures.com'
 
 // ---------------------------------------------------------------------------
 // Single service-area landing page: /cleaning/:area
