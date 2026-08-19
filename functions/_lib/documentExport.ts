@@ -56,9 +56,17 @@ export async function buildPdf(input: { title: string; html: string; branded?: b
     y = 792 - PAD
   }
   const footer = () => {
+    // Match the on-screen colophon exactly: firm name left, "Confidential"
+    // centered, contact right. (Previously "Confidential" was grouped with the
+    // email on the right, so it looked shifted right in the export vs. the UI.)
     page.drawText(FIRM_NAME, { x: PAD, y: 22, size: 7, font: regular, color: SLATE })
-    const right = branded ? `Confidential  ·  ${SUPPORT_EMAIL}` : FIRM_NAME
-    page.drawText(right, { x: 612 - PAD - regular.widthOfTextAtSize(right, 7), y: 22, size: 7, font: regular, color: SLATE })
+    if (branded) {
+      const mid = 'Confidential'
+      page.drawText(mid, { x: (612 - regular.widthOfTextAtSize(mid, 7)) / 2, y: 22, size: 7, font: regular, color: SLATE })
+      page.drawText(SUPPORT_EMAIL, { x: 612 - PAD - regular.widthOfTextAtSize(SUPPORT_EMAIL, 7), y: 22, size: 7, font: regular, color: SLATE })
+    } else {
+      page.drawText(FIRM_NAME, { x: 612 - PAD - regular.widthOfTextAtSize(FIRM_NAME, 7), y: 22, size: 7, font: regular, color: SLATE })
+    }
   }
   const ensure = (h: number) => {
     if (y - h < 44) { footer(); newPage() }
