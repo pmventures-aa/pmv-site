@@ -8,7 +8,9 @@ import {
 import { LetterheadCrest } from './LetterheadCrest'
 import { DocumentExportMenu } from './DocumentExportMenu'
 import { DOC_FONTS, DOC_FONT_GROUPS, DOC_HIGHLIGHT, DOC_INK, DOC_SIZES, toEditorHtml } from '../../../shared/docHtml'
+import { DOC_PAGE_SIZES, docPageSize, isDocMargin, isDocPageSize, type DocMarginKey, type DocPageSizeKey } from '../../../shared/docLayout'
 import { FIRM_NAME, FIRM_PHONE, FIRM_REGION, FIRM_SITE_HOST, FIRM_TAGLINE, SUPPORT_EMAIL } from '../../../shared/letterhead'
+import { api } from '../../lib/api'
 import './documentCanvas.css'
 
 type CanvasDocument = {
@@ -19,6 +21,8 @@ type CanvasDocument = {
   original_name:string|null
   text_content:string|null
   is_branded?:number
+  page_size?:string|null
+  page_margins?:string|null
 }
 
 type DocxBlock =
@@ -81,12 +85,22 @@ async function parseDocx(bytes:ArrayBuffer):Promise<DocxBlock[]>{
 
 export function DocumentCanvas({document,text,onTextChange,readOnly=false,fullPage=false,fullPageHref}:{document:CanvasDocument;text:string;onTextChange:(v:string)=>void;readOnly?:boolean;fullPage?:boolean;fullPageHref?:string}){
   const [zoom,setZoom]=useState(100),[docx,setDocx]=useState<DocxBlock[]|null>(null),[docxError,setDocxError]=useState(''),[loading,setLoading]=useState(false),[reloadKey,setReloadKey]=useState(0)
-  const [margins,setMargins]=useState<'normal'|'narrow'|'wide'>('normal')
+  const [pageSize,setPageSize]=useState<DocPageSizeKey>(isDocPageSize(document.page_size)?document.page_size:'letter')
+  const [margins,setMargins]=useState<DocMarginKey>(isDocMargin(document.page_margins)?document.page_margins:'normal')
   const ext=extension(document.original_name), mime=document.mime_type||''
   const url=`/api/admin/documents-workspace/${document.id}/file?v=${reloadKey}`
   const isPdf=mime==='application/pdf'||ext==='pdf', isImage=mime.startsWith('image/'), isDocx=ext==='docx'||mime.includes('wordprocessingml')
   const branded=document.is_branded!==0
   const editableText=document.document_type==='text' && !readOnly
+  const paper=docPageSize(pageSize)
+  // Page size + margins persist on the document itself, so preview, browser
+  // print (@page below), and PDF export all read the same geometry.
+  function persistLayout(next:{page_size?:DocPageSizeKey;page_margins?:DocMarginKey}){
+    if(!editableText)return
+    api.patch(`/admin/documents-workspace/${document.id}`,next).catch(()=>{})
+  }
+  function changePageSize(v:DocPageSizeKey){ setPageSize(v); persistLayout({page_size:v}) }
+  function changeMargins(v:DocMarginKey){ setMargins(v); persistLayout({page_margins:v}) }
   useEffect(()=>{
     setDocx(null);setDocxError('')
     if(!isDocx)return
@@ -99,7 +113,10 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false,fullPa
     <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-navy-950/90 px-3 py-2 sm:px-4">
       <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{document.title}</p><p className="text-[11px] text-slate-500">{typeLabel} · {readOnly?'read-only reference':'formatting lives in the bar below, not on the page'}</p></div>
       <div className="flex items-center gap-1.5">
-        {document.document_type==='text'&&<select className="doc-ribbon-select mr-1" value={margins} onChange={(e)=>setMargins(e.target.value as typeof margins)} title="Page margins" style={{height:'2rem'}}>
+        {document.document_type==='text'&&<select className="doc-ribbon-select mr-1" value={pageSize} onChange={(e)=>changePageSize(e.target.value as DocPageSizeKey)} title="Page size" style={{height:'2rem'}}>
+          {DOC_PAGE_SIZES.map((s)=><option key={s.key} value={s.key}>{s.label}</option>)}
+        </select>}
+        {document.document_type==='text'&&<select className="doc-ribbon-select mr-1" value={margins} onChange={(e)=>changeMargins(e.target.value as DocMarginKey)} title="Page margins" style={{height:'2rem'}}>
           <option value="normal">Normal margins</option>
           <option value="narrow">Narrow margins</option>
           <option value="wide">Wide margins</option>
@@ -117,7 +134,7 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false,fullPa
     {editableText && <FormatRibbon onChange={onTextChange}/>}
     <div className={`relative overflow-auto bg-[#2a3037] p-4 sm:p-7 ${fullPage?'h-[calc(100vh-138px)] min-h-[540px]':'h-[calc(100vh-255px)] min-h-[600px]'}`}>
       {isPdf&&<div className="mx-auto h-full min-h-[560px] w-full overflow-hidden bg-white shadow-2xl" style={{maxWidth:`${Math.round(900*zoom/100)}px`}}><iframe key={reloadKey} title={document.title} src={`${url}#toolbar=0&navpanes=1&view=FitH`} className="h-full w-full bg-white"/></div>}
-      {document.document_type==='text'&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center',marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}><article className={`doc-paper doc-margins-${margins}`}>{branded&&<PaperBrand/>}<div className="doc-body"><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</article></div>}
+      {document.document_type==='text'&&<><style>{`@media print{@page{size:${paper.css};margin:0}}`}</style><div className="mx-auto origin-top" style={{width:`${paper.screen.w}px`,transform:`scale(${zoom/100})`,transformOrigin:'top center',marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}><article className={`doc-paper doc-margins-${margins} doc-size-${pageSize}`}>{branded&&<PaperBrand/>}<div className="doc-body"><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</article></div></>}
       {isImage&&<div className="mx-auto flex min-h-[500px] items-start justify-center"><img src={url} alt={document.title} style={{width:`${zoom}%`,maxWidth:'none'}} className="bg-white shadow-2xl"/></div>}
       {isDocx&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center'}}><article className="doc-paper">{branded&&<PaperBrand/>}<div className="doc-body">{loading?<PreviewMessage text="Rendering DOCX…"/>:docxError?<PreviewMessage text={docxError}/>:docx?.map((b,i)=>b.type==='table'?<table key={i} className="my-5 w-full border-collapse text-sm"><tbody>{b.rows.map((row,r)=><tr key={r}>{row.map((cell,c)=><td key={c} className="border border-slate-300 p-2 align-top">{cell}</td>)}</tr>)}</tbody></table>:b.style?.toLowerCase().includes('heading')?<h2 key={i} className="mb-3 mt-6 font-serif text-xl font-semibold">{b.text}</h2>:<p key={i} className="mb-3 whitespace-pre-wrap font-serif text-[15px] leading-7">{b.text||' '}</p>)}</div>{branded&&<PaperFooter/>}</article></div>}
       {!isPdf&&!isImage&&!isDocx&&document.document_type!=='text'&&<div className="mx-auto grid min-h-[520px] max-w-2xl place-items-center bg-white p-10 text-center shadow-2xl"><div><FileText size={52} className="mx-auto text-slate-300"/><h3 className="mt-5 text-lg font-semibold text-slate-800">Preview unavailable for this file type</h3><p className="mt-2 text-sm leading-6 text-slate-500">The file remains stored securely in Document Hub. Open or download it to work with the original format.</p><a href={url} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Open document</a></div></div>}
