@@ -1,8 +1,57 @@
-import { AnimatePresence, motion, useInView, useMotionValue, useReducedMotion, useSpring, type HTMLMotionProps, type Variants } from 'motion/react'
+import { AnimatePresence, motion, useInView, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform, type HTMLMotionProps, type MotionValue, type Variants } from 'motion/react'
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { ServiceInfo } from '../../data/services'
 import { ViewTransitionLink } from './ViewTransitionLink'
 import { pmvFadeUp, pmvMotion, pmvStagger } from '../../lib/motionTheme'
+
+// Spring-smoothed 0..1 progress of an element passing through the viewport.
+// Level-2 building block: map this to small transforms so movement follows the
+// visitor with momentum instead of snapping 1:1 to raw scroll.
+export function useSectionProgress(ref: React.RefObject<HTMLElement | null>): MotionValue<number> {
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
+  return useSpring(scrollYProgress, { stiffness: 60, damping: 22, mass: 0.5 })
+}
+
+// Slow vertical drift as the visitor passes a block. A few pixels of parallax,
+// spring-smoothed, stilled for reduced motion. One dominant idea; use sparingly.
+export function Drift({ children, className = '', distance = 14 }: { children: ReactNode; className?: string; distance?: number }) {
+  const reduce = useReducedMotion()
+  const ref = useRef<HTMLDivElement>(null)
+  const progress = useSectionProgress(ref)
+  const y = useTransform(progress, [0, 1], [distance, -distance])
+  return (
+    <div ref={ref} className={className}>
+      <motion.div style={reduce ? undefined : { y, willChange: 'transform' }}>{children}</motion.div>
+    </div>
+  )
+}
+
+// A heading that rises out of a clipped mask instead of a plain fade, so the
+// page's most important lines get a distinct, editorial entrance. Reduced
+// motion falls back to a simple opacity settle. Renders a div wrapper; pass the
+// heading element as children.
+export function RevealHeading({ children, className = '' }: { children: ReactNode; className?: string }) {
+  const reduce = useReducedMotion()
+  if (reduce) {
+    return (
+      <motion.div className={className} initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, margin: '-64px' }} transition={{ duration: 0.4 }}>
+        {children}
+      </motion.div>
+    )
+  }
+  return (
+    <div className={`overflow-hidden pb-[0.12em] ${className}`}>
+      <motion.div
+        initial={{ y: '115%' }}
+        whileInView={{ y: '0%' }}
+        viewport={{ once: true, margin: '-72px' }}
+        transition={{ type: 'spring', stiffness: 150, damping: 24, mass: 0.9 }}
+      >
+        {children}
+      </motion.div>
+    </div>
+  )
+}
 
 // Editorial helpers for the public site. Shared product transitions live in
 // lib/motionTheme so the portal and HQ can use the same timing more quietly.
