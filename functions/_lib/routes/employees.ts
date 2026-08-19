@@ -76,6 +76,7 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
             tm.can_view_reports, tm.can_view_audit_log, tm.can_manage_communications, tm.is_owner,
             tm.party_type, tm.vendor_category, tm.role_definition_id, rd.name role_name,
             tm.network_status, tm.availability_status, tm.is_preferred_provider, tm.service_area_summary,
+            tm.provider_code, tm.display_name,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id) AS tasks_assigned,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status = 'done') AS tasks_completed,
             (SELECT COUNT(*) FROM client_tasks WHERE assigned_staff_user_id = u.id AND status != 'done' AND due_date IS NOT NULL AND due_date < date('now')) AS tasks_overdue,

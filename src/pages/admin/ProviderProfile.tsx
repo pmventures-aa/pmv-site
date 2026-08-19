@@ -141,7 +141,7 @@ export default function ProviderProfile() {
   const e = data.employee
   const provider = e.party_type === 'vendor'
   const agreement = data.provider_agreements[0]
-  const subtitle = [e.vendor_category || e.role_name || e.title, e.email, e.phone].filter(Boolean).join(' · ')
+  const subtitle = [e.display_name && e.display_name !== e.full_name ? `Goes by ${e.display_name}` : null, e.vendor_category || e.role_name || e.title, e.email, e.phone].filter(Boolean).join(' · ')
 
   return (
     <div>
@@ -166,6 +166,7 @@ export default function ProviderProfile() {
             {canDispatchPerson(e) && (
               <Link to={networkDispatchHref(p, e.id)} className="btn-gold">Dispatch</Link>
             )}
+            {provider && e.provider_code ? <Tag>{e.provider_code}</Tag> : null}
             {e.is_preferred_provider ? <Tag tone="gold"><Star size={12} className="fill-gold" />Preferred</Tag> : null}
           </div>
         }

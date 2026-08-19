@@ -10,6 +10,7 @@ import { PdfForm, appendAttachments, NAVY as NAVY_TEXT, type AttachmentInput, ty
 
 export interface VendorApplicationPdfInput {
   userId: string
+  providerCode?: string | null
   submittedAt: string
   provider: {
     name: string
@@ -67,7 +68,7 @@ export async function renderVendorApplicationPdf(input: VendorApplicationPdfInpu
     { label: 'Business / practice', value: input.provider.companyName || str(app.company_name) },
     { label: 'Entity type', value: str(app.entity_type) },
     { label: 'Uses an EIN', value: yesNo(app.has_ein) },
-    { label: 'Provider ID', value: input.userId },
+    { label: 'Provider ID', value: input.providerCode || input.userId },
     { label: 'Submitted', value: input.submittedAt, full: true },
   ])
 
