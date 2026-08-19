@@ -13,6 +13,7 @@ import { worldFromPublicParams } from '../../lib/workspace'
 import { PriceAnchor } from '../../components/public/PriceAnchor'
 import { CaseStudyStrip } from '../../components/public/Proof'
 import { StoryImage, ProcessJourney, ProjectScenario, ProofRail } from '../../components/public/story'
+import { RevealHeading } from '../../components/public/motion'
 import { BrandPanel } from '../../components/public/BrandPanel'
 import { getServiceStory, DEFAULT_JOURNEY, DEFAULT_DELIVERABLES } from '../../data/serviceStories'
 
@@ -82,7 +83,7 @@ export default function ServiceDetail() {
       </BreadcrumbSlot>
       <section className="container-pmv py-12 sm:py-16">
         <div><TagLine tag={service.tag} popular={service.popular} /></div>
-        <h1 className="pmv-h1 mt-3 max-w-4xl">{service.title}</h1>
+        <RevealHeading className="mt-3"><h1 className="pmv-h1 max-w-4xl">{service.title}</h1></RevealHeading>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-300">{service.heroDescription}</p>
         <PriceAnchor serviceKey={service.key} offeringPrefixes={service.offeringPrefixes} />
         <div className="mt-8 flex flex-wrap gap-3">

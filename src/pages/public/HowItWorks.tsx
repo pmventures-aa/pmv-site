@@ -2,7 +2,7 @@ import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { CtaBand, btnOutline, btnPrimary } from '../../components/public/ui'
-import { Reveal } from '../../components/public/motion'
+import { Reveal, RevealHeading } from '../../components/public/motion'
 import { usePageMeta } from '../../lib/usePageMeta'
 import { CLIENT_LOGIN, GET_HELP, howItWorks, principles } from '../../data/publicSite'
 
@@ -21,7 +21,7 @@ export default function HowItWorks() {
           <div className="container-pmv py-16 sm:py-20">
             <Reveal className="max-w-3xl">
               <p className="eyebrow">How It Works</p>
-              <h1 className="pmv-h1 mt-4">You do not need to diagnose the service first.</h1>
+              <RevealHeading className="mt-4"><h1 className="pmv-h1">You do not need to diagnose the service first.</h1></RevealHeading>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
                 Start with the situation. We review the matter, establish ownership, coordinate what is needed, and follow through until the agreed work is complete.
               </p>

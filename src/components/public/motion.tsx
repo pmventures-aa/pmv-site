@@ -39,17 +39,25 @@ export function RevealHeading({ children, className = '' }: { children: ReactNod
       </motion.div>
     )
   }
+  // The whileInView trigger lives on the OUTER (untranslated) container, not the
+  // masked inner element. Observing the translated inner box pushed its
+  // IntersectionObserver rect out of place, so an above-the-fold heading could
+  // stay stuck at y:115% (hidden) and never reveal. This drives it via variants
+  // on the element that actually sits where the reader sees it.
   return (
-    <div className={`overflow-hidden pb-[0.12em] ${className}`}>
+    <motion.div
+      className={`overflow-hidden pb-[0.12em] ${className}`}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: '-72px' }}
+    >
       <motion.div
-        initial={{ y: '115%' }}
-        whileInView={{ y: '0%' }}
-        viewport={{ once: true, margin: '-72px' }}
+        variants={{ hidden: { y: '115%' }, show: { y: '0%' } }}
         transition={{ type: 'spring', stiffness: 150, damping: 24, mass: 0.9 }}
       >
         {children}
       </motion.div>
-    </div>
+    </motion.div>
   )
 }
 

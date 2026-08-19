@@ -2,7 +2,7 @@ import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { ViewTransitionLink } from '../../components/public/ViewTransitionLink'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
-import { AmbientGlow, Reveal } from '../../components/public/motion'
+import { AmbientGlow, Reveal, RevealHeading } from '../../components/public/motion'
 import { btnOutline, btnPrimary, CtaBand } from '../../components/public/ui'
 import { usePageMeta } from '../../lib/usePageMeta'
 import { CaseStudyStrip } from '../../components/public/Proof'
@@ -115,7 +115,7 @@ function GuidePage({guide}:{guide:ProjectGuide}){
   const audience=params.get('audience')||undefined
   const requestUrl=`/scope-request?guide=${encodeURIComponent(guide.slug)}${audience?`&audience=${encodeURIComponent(audience)}`:''}&source=project-${encodeURIComponent(guide.slug)}`
   return <div className="min-h-screen bg-navy-950"><Header/><main>
-    <section className="pmv-hero-story relative overflow-hidden border-b border-white/10"><AmbientGlow/><div className="pmv-hero-gold" aria-hidden="true"/><div className="container-pmv relative z-10 py-16 sm:py-20 lg:py-24"><Reveal className="max-w-4xl"><p className="eyebrow">{guide.eyebrow}</p><h1 className="pmv-h1 mt-4">{guide.title}</h1><p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">{guide.summary}</p><div className="mt-8 flex flex-wrap gap-3"><ViewTransitionLink className={btnPrimary} to={requestUrl}>Scope This Project</ViewTransitionLink><ViewTransitionLink className={btnOutline} to="/contact">Talk With Pinnacle</ViewTransitionLink></div></Reveal></div></section>
+    <section className="pmv-hero-story relative overflow-hidden border-b border-white/10"><AmbientGlow/><div className="pmv-hero-gold" aria-hidden="true"/><div className="container-pmv relative z-10 py-16 sm:py-20 lg:py-24"><Reveal className="max-w-4xl"><p className="eyebrow">{guide.eyebrow}</p><RevealHeading className="mt-4"><h1 className="pmv-h1">{guide.title}</h1></RevealHeading><p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">{guide.summary}</p><div className="mt-8 flex flex-wrap gap-3"><ViewTransitionLink className={btnPrimary} to={requestUrl}>Scope This Project</ViewTransitionLink><ViewTransitionLink className={btnOutline} to="/contact">Talk With Pinnacle</ViewTransitionLink></div></Reveal></div></section>
 
     <section className="container-pmv py-14 sm:py-18"><div className="grid gap-10 lg:grid-cols-[.72fr_1.28fr]"><Reveal><p className="eyebrow">A good fit when</p><h2 className="mt-3 font-display text-3xl font-semibold text-white">You know something needs to move, but the handoffs are the hard part.</h2></Reveal><Reveal><div className="divide-y divide-white/10 border-y border-white/10">{guide.fit.map((item,i)=><div key={item} className="flex gap-4 py-5"><span className="font-display text-xs text-gold/70">0{i+1}</span><p className="text-sm leading-7 text-slate-300">{item}</p></div>)}</div></Reveal></div></section>
 
