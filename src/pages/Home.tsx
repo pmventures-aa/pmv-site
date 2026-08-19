@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Header } from '../components/public/Header'
 import { Footer } from '../components/public/Footer'
@@ -11,6 +10,7 @@ import { usePageMeta } from '../lib/usePageMeta'
 import { usePublicVisitor } from '../lib/publicContext'
 import type { OperatingWorld } from '../../shared/workspace'
 import { HeroGuideRail } from '../components/public/HeroGuideRail'
+import { OrbitalFlow } from '../components/public/OrbitalFlow'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
 import { StoryImage, type RailPanel } from '../components/public/story'
@@ -121,10 +121,11 @@ export default function Home() {
 
         <HomeCleaningSection />
 
-        <LifecycleRail
+        <OrbitalFlow
           eyebrow="How the work moves"
-          heading="From a first request to a finished result."
-          panels={LIFECYCLE}
+          heading="Always coordinating, from request to resolved."
+          intro="Every Pinnacle matter runs through one connected system. You tell us what you need, and we move it from intake to a documented result while you get on with your day."
+          stages={LIFECYCLE.map((s) => ({ key: s.title, title: s.title, detail: s.detail }))}
         />
 
         <section className="container-pmv py-16 sm:py-24">
@@ -310,136 +311,3 @@ function HomeCleaningSection() {
 // A smooth, aligned scroll-snap carousel of the Pinnacle lifecycle. Replaces the
 // pinned scroll-jacking rail: it flows with a normal swipe/scroll, snaps cleanly,
 // and shows the scene art per step.
-// Rotate the step-badge accent so the rail carries the full coastal palette
-// (gold + sea + coral) instead of reading as one long stretch of gold.
-const RAIL_ACCENTS = [
-  'border-gold/40 text-gold',
-  'border-sea-400/50 text-sea-300',
-  'border-coral-400/50 text-coral-300',
-]
-
-function LifecycleRail({ eyebrow, heading, panels }: { eyebrow: string; heading: string; panels: RailPanel[] }) {
-  const reduce = useReducedMotion()
-  const scroller = useRef<HTMLDivElement>(null)
-  const [edges, setEdges] = useState({ left: false, right: true })
-  const drag = useRef<{ startX: number; startLeft: number; active: boolean; moved: boolean }>({ startX: 0, startLeft: 0, active: false, moved: false })
-  // Auto-advance pauses while the pointer is over the rail or the user is
-  // dragging, so it never fights a manual interaction.
-  const paused = useRef(false)
-
-  const syncEdges = () => {
-    const el = scroller.current
-    if (!el) return
-    setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft < el.scrollWidth - el.clientWidth - 4 })
-  }
-  useEffect(() => {
-    syncEdges()
-    const el = scroller.current
-    if (!el) return
-    el.addEventListener('scroll', syncEdges, { passive: true })
-    window.addEventListener('resize', syncEdges)
-    return () => { el.removeEventListener('scroll', syncEdges); window.removeEventListener('resize', syncEdges) }
-  }, [])
-
-  const step = () => {
-    const el = scroller.current
-    if (!el) return 0
-    const card = el.querySelector('article') as HTMLElement | null
-    return card ? card.offsetWidth + 16 : el.clientWidth * 0.85
-  }
-  const scrollByCards = (dir: 1 | -1) => {
-    const el = scroller.current
-    if (!el) return
-    el.scrollBy({ left: dir * step(), behavior: 'smooth' })
-  }
-
-  // Gentle automatic advance; loops back to the start at the end. Off entirely
-  // for reduced-motion, and it never moves the page (only this overflow rail).
-  useEffect(() => {
-    if (reduce) return
-    const el = scroller.current
-    if (!el) return
-    const id = window.setInterval(() => {
-      if (paused.current || drag.current.active) return
-      const atEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 4
-      if (atEnd) el.scrollTo({ left: 0, behavior: 'smooth' })
-      else el.scrollBy({ left: step(), behavior: 'smooth' })
-    }, 3800)
-    return () => window.clearInterval(id)
-  }, [reduce])
-
-  // Click-drag to scroll on pointer devices; native swipe still works on touch.
-  const onPointerDown = (e: React.PointerEvent) => {
-    const el = scroller.current
-    if (!el || e.pointerType === 'touch') return
-    drag.current = { startX: e.clientX, startLeft: el.scrollLeft, active: true, moved: false }
-  }
-  const onPointerMove = (e: React.PointerEvent) => {
-    const el = scroller.current
-    if (!el || !drag.current.active) return
-    const dx = e.clientX - drag.current.startX
-    if (Math.abs(dx) > 4) drag.current.moved = true
-    el.scrollLeft = drag.current.startLeft - dx
-  }
-  const endDrag = () => { drag.current.active = false }
-
-  return (
-    <section className="border-y border-white/[.07] bg-navy-900/30 py-16 sm:py-24">
-      <div className="container-pmv">
-        <Reveal className="max-w-2xl">
-          <p className="eyebrow">{eyebrow}</p>
-          <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-4xl">{heading}</h2>
-          <p className="mt-4 text-sm text-slate-400">Six steps every Pinnacle matter follows. It advances on its own, or drag, swipe, and use the arrows.</p>
-        </Reveal>
-        <div className="mt-6 hidden gap-2 sm:flex">
-          {([[-1, ChevronLeft, edges.left, 'Previous'], [1, ChevronRight, edges.right, 'Next']] as const).map(([dir, Icon, enabled, label]) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => scrollByCards(dir)}
-              disabled={!enabled}
-              aria-label={label}
-              className="grid h-10 w-10 place-items-center rounded-full border border-white/15 text-slate-200 transition-colors hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-white/15 disabled:hover:text-slate-200"
-            >
-              <Icon className="h-5 w-5" />
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="mt-8">
-        <div
-          ref={scroller}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerLeave={endDrag}
-          onMouseEnter={() => { paused.current = true }}
-          onMouseLeave={() => { paused.current = false }}
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-[max(1.5rem,calc((100vw-72rem)/2))] pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {panels.map((panel, i) => (
-            <article key={panel.n} className="snap-start shrink-0 basis-[82%] sm:basis-[48%] lg:basis-[31%] xl:basis-[23.5%]">
-              <div className="overflow-hidden rounded-xl border border-white/10 bg-navy-950/40">
-                <StoryImage slot={panel.slot} aspect="aspect-[16/10]" rounded="rounded-none" reveal={false} />
-                <div className="p-5">
-                  <div className="flex items-center gap-2">
-                    <span className={`grid h-7 w-7 place-items-center rounded-full border font-display text-xs font-bold ${RAIL_ACCENTS[i % RAIL_ACCENTS.length]}`}>{panel.n}</span>
-                    <h3 className="font-display text-lg font-semibold text-white">{panel.title}</h3>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-400">{panel.detail}</p>
-                  {panel.labels && panel.labels.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {panel.labels.map((label) => (
-                        <span key={label} className="rounded-full border border-white/10 bg-white/[.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
