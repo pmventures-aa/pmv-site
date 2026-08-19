@@ -22,6 +22,7 @@ import { CLIENT_PORTAL_URL, sendAccountWelcome, sendVendorApplicationReceived } 
 import { PROVIDER_AGREEMENT_VERSION, normalizeProviderSignature } from '../../../shared/providerAgreement'
 import { getCurrentProviderAgreementVersion } from '../managedTemplates'
 import { toDisplayCase } from '../../../shared/displayCase'
+import { isValidEmail, isValidPhone } from '../../../shared/contactValidation'
 import { advanceInquiryLifecycle } from '../lifecycle'
 import { getInviteByToken } from '../invites'
 import { canCompleteStagedVendorSignup, type ExistingAccount } from '../vendorStaging'
@@ -172,6 +173,7 @@ authRoutes.post('/vendor-signup', async (c) => {
     email: string
     password: string
     full_name: string
+    display_name?: string
     phone?: string
     company_name?: string
     vendor_category?: string
@@ -185,12 +187,14 @@ authRoutes.post('/vendor-signup', async (c) => {
 
   const e = norm(body.email)
   const fullName = toDisplayCase(cleanName(body.full_name))
+  const displayName = typeof body.display_name === 'string' ? body.display_name.trim().slice(0, 120) : ''
   const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) : ''
   const vendorCategory = typeof body.vendor_category === 'string' ? body.vendor_category.trim().slice(0, 100) : ''
   const companyName = typeof body.company_name === 'string' ? toDisplayCase(body.company_name).slice(0, 200) : ''
   const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 2000) : ''
 
-  if (!e || !e.includes('@')) return c.json({ error: 'a valid email is required' }, 400)
+  if (!isValidEmail(e)) return c.json({ error: 'a valid email is required' }, 400)
+  if (!phone || !isValidPhone(phone)) return c.json({ error: 'a valid phone number is required' }, 400)
   if (!fullName) return c.json({ error: 'your name is required' }, 400)
   if (!vendorCategory) return c.json({ error: 'please describe what you provide' }, 400)
   const currentAgreementVersion = await getCurrentProviderAgreementVersion(c.env)
@@ -228,8 +232,8 @@ authRoutes.post('/vendor-signup', async (c) => {
         `UPDATE users SET password_hash = ?, full_name = ?, phone = COALESCE(?, phone) WHERE id = ?`,
       ).bind(hash, fullName, phone || null, id),
       c.env.DB.prepare(
-        `UPDATE team_members SET title = ?, party_type = 'vendor', vendor_category = COALESCE(?, vendor_category), network_status = 'vetting' WHERE user_id = ?`,
-      ).bind(title, vendorCategory, id),
+        `UPDATE team_members SET title = ?, party_type = 'vendor', vendor_category = COALESCE(?, vendor_category), network_status = 'vetting', display_name = COALESCE(?, display_name) WHERE user_id = ?`,
+      ).bind(title, vendorCategory, displayName || null, id),
     ]
     : [
       c.env.DB.prepare(
@@ -237,9 +241,9 @@ authRoutes.post('/vendor-signup', async (c) => {
          VALUES (?, ?, ?, 'staff', ?, ?, 0, 'pending')`,
       ).bind(id, e, hash, fullName, phone || null),
       c.env.DB.prepare(
-        `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category, network_status)
-         VALUES (?, ?, 'support_specialist', ?, 'vendor', ?, 'vetting')`,
-      ).bind(uuid(), id, title, vendorCategory),
+        `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category, network_status, display_name)
+         VALUES (?, ?, 'support_specialist', ?, 'vendor', ?, 'vetting', ?)`,
+      ).bind(uuid(), id, title, vendorCategory, displayName || fullName),
     ]
 
   await c.env.DB.batch([
@@ -256,9 +260,9 @@ authRoutes.post('/vendor-signup', async (c) => {
     const member = await c.env.DB.prepare('SELECT id FROM team_members WHERE user_id = ?').bind(id).first<{ id: string }>()
     if (!member) {
       await c.env.DB.prepare(
-        `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category, network_status)
-         VALUES (?, ?, 'support_specialist', ?, 'vendor', ?, 'vetting')`,
-      ).bind(uuid(), id, title, vendorCategory).run()
+        `INSERT INTO team_members (id, user_id, staff_role, title, party_type, vendor_category, network_status, display_name)
+         VALUES (?, ?, 'support_specialist', ?, 'vendor', ?, 'vetting', ?)`,
+      ).bind(uuid(), id, title, vendorCategory, displayName || fullName).run()
     }
   }
 
