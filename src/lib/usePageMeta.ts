@@ -31,7 +31,10 @@ function ensureOg(property: string, content: string) {
 // index.html sets the initial title and description. Public routes use this
 // lightweight helper to keep metadata accurate as visitors move through the
 // client-side application, then restore the previous values on unmount.
-export function usePageMeta(title: string, description = DEFAULT_DESCRIPTION) {
+// `exactTitle` renders the title verbatim instead of appending "| Site Name".
+// Use it on the home page so the title leads with the brand, which is the
+// signal Google uses to show the site name beside the result.
+export function usePageMeta(title: string, description = DEFAULT_DESCRIPTION, opts: { exactTitle?: boolean } = {}) {
   useEffect(() => {
     const prevTitle = document.title
     const meta = document.querySelector('meta[name="description"]')
@@ -39,8 +42,9 @@ export function usePageMeta(title: string, description = DEFAULT_DESCRIPTION) {
     const canonical = document.querySelector('link[rel="canonical"]')
     const prevCanonical = canonical?.getAttribute('href') ?? null
     const url = `${SITE_URL}${window.location.pathname}`
+    const fullTitle = opts.exactTitle ? title : `${title} | ${SITE_NAME}`
 
-    document.title = `${title} | ${SITE_NAME}`
+    document.title = fullTitle
     meta?.setAttribute('content', description)
 
     let canonicalEl: HTMLLinkElement | null = canonical as HTMLLinkElement | null
@@ -54,7 +58,7 @@ export function usePageMeta(title: string, description = DEFAULT_DESCRIPTION) {
     ensureMeta('robots', 'index, follow')
     ensureOg('og:site_name', SITE_NAME)
     ensureOg('og:type', 'website')
-    ensureOg('og:title', `${title} | ${SITE_NAME}`)
+    ensureOg('og:title', fullTitle)
     ensureOg('og:description', description)
     ensureOg('og:url', url)
     ensureOg('og:image', `${SITE_URL}${SOCIAL_IMAGE}`)
