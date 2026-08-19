@@ -6,8 +6,20 @@ import { uuid } from '../crypto'
 import { generateVendorApplicationPdf } from '../vendorApplicationRecord'
 import { safeUploadName, validateUploadSignature } from '../fileValidation'
 import { ALL_APPLICATION_DOC_KEYS } from '../../../shared/providerApplication'
+import { listExternalIdentities, userHasPassword } from '../auth0Identities'
+import { isValidPhone } from '../../../shared/contactValidation'
+import { toDisplayCase } from '../../../shared/displayCase'
 
 export const employeeRoutes = new Hono<AppEnv>()
+
+// Friendly label for a social sign-in connection (Auth0 connection string).
+function ssoLabel(connection: string): string {
+  const c = (connection || '').toLowerCase()
+  if (c.includes('google')) return 'Google'
+  if (c.includes('windows') || c.includes('microsoft')) return 'Microsoft'
+  if (c.includes('apple')) return 'Apple'
+  return connection || 'SSO'
+}
 
 // Editable text columns on provider_credentials (w9_on_file is handled
 // separately as a boolean).
@@ -161,8 +173,18 @@ employeeRoutes.get('/employees/:id', requireStaff, requireNamedPermission('manag
     console.error('[employees] provider credentials unavailable', err)
   }
 
+  // How this account signs in: any linked social identities (Google/Microsoft)
+  // and whether a password is set. Lets HQ see at a glance that a provider uses
+  // SSO — the reason self-fill exists for those accounts.
+  const [ssoIdentities, hasPassword] = await Promise.all([
+    listExternalIdentities(c.env, id).catch(() => []),
+    userHasPassword(c.env, id).catch(() => false),
+  ])
+
   return c.json({
     employee,
+    sso_identities: ssoIdentities.map((i) => ({ connection: i.connection, label: ssoLabel(i.connection), email: i.email, last_login_at: i.last_login_at })),
+    has_password: hasPassword,
     login_history: logins.results ?? [],
     tasks: tasks.results ?? [],
     notes: notes.results ?? [],
@@ -219,6 +241,34 @@ employeeRoutes.patch('/employees/:id/network', requireStaff, async (c) => {
        is_preferred_provider = excluded.is_preferred_provider,
        service_area_summary = excluded.service_area_summary`,
   ).bind(uuid(), id, target.staff_role || 'representative', target.party_type || 'employee', networkStatus, availability, preferred, area).run()
+  return c.json({ ok: true })
+})
+
+// Edit a provider's core identity fields — the same fields a provider can
+// self-fill (legal name, display name, phone) plus the vendor category. Staff
+// use this to correct details, complete an SSO applicant's blanks, or keep the
+// record accurate over time. Writes only to the caller's target row.
+employeeRoutes.patch('/employees/:id/profile', requireStaff, requireNamedPermission('manage_team'), async (c) => {
+  const id = c.req.param('id') || ''
+  const target = await c.env.DB.prepare(
+    `SELECT u.id, u.role, tm.party_type FROM users u LEFT JOIN team_members tm ON tm.user_id = u.id WHERE u.id = ?`,
+  ).bind(id).first<{ id: string; role: string; party_type: string | null }>()
+  if (!target || !['staff', 'admin'].includes(target.role)) return c.json({ error: 'provider not found' }, 404)
+
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
+  const fullName = toDisplayCase(typeof body.full_name === 'string' ? body.full_name.trim().slice(0, 120) : '')
+  const displayName = typeof body.display_name === 'string' ? body.display_name.trim().slice(0, 120) : ''
+  const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) : ''
+  const vendorCategory = typeof body.vendor_category === 'string' ? body.vendor_category.trim().slice(0, 100) : ''
+  if (!fullName) return c.json({ error: 'a full legal name is required' }, 400)
+  if (phone && !isValidPhone(phone)) return c.json({ error: 'enter a valid phone number' }, 400)
+
+  await c.env.DB.prepare('UPDATE users SET full_name = ?, phone = ? WHERE id = ?').bind(fullName, phone || null, id).run()
+  await c.env.DB.prepare(
+    `INSERT INTO team_members(id,user_id,staff_role,party_type,display_name,vendor_category)
+     VALUES(?,?,?,?,?,?)
+     ON CONFLICT(user_id) DO UPDATE SET display_name = excluded.display_name, vendor_category = excluded.vendor_category`,
+  ).bind(uuid(), id, 'representative', target.party_type || 'employee', displayName || null, vendorCategory || null).run()
   return c.json({ ok: true })
 })
 
