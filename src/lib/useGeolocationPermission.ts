@@ -46,6 +46,13 @@ export interface GeoState {
   position: GeolocationPosition | null
   error: string | null
   busy: boolean
+  // True once the browser (Permissions API or a silent probe) has actually
+  // answered - as opposed to the optimistic 'granted' we restore from
+  // localStorage on mount. Auto-start watchers must gate on this, or a device
+  // whose real browser state is 'prompt' gets the permission dialog on every
+  // page open (the localStorage hint said granted, so a watch was started
+  // before the browser confirmed).
+  confirmed: boolean
 }
 
 // Local remembered app-level state. This never REPLACES the browser
@@ -111,6 +118,7 @@ export function useGeolocationPermission(): GeoState & {
   const [position, setPosition] = useState<GeolocationPosition | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
   const [ctaHidden, setCtaHidden] = useState(() => {
     try { return typeof window !== 'undefined' && window.localStorage.getItem(HINT_KEY) === '1' } catch { return false }
   })
@@ -120,6 +128,10 @@ export function useGeolocationPermission(): GeoState & {
   // flip granted -> prompt/denied transitions into 'revoked' so the UI
   // can distinguish "never enabled" from "had it, lost it".
   const applyPermission = useCallback((next: GeoPermission) => {
+    // Every applyPermission call originates from a real browser signal
+    // (Permissions API, a silent probe, or an explicit request), so reaching
+    // here means the browser has answered - safe to gate auto-start on.
+    setConfirmed(true)
     setPermission((prev) => {
       const prior = priorRef.current
       let resolved = next
@@ -237,5 +249,5 @@ export function useGeolocationPermission(): GeoState & {
     try { window.localStorage.setItem(HINT_KEY, '1') } catch { /* fine */ }
   }, [])
 
-  return { permission, position, error, busy, request, refresh, hideCta, ctaHidden }
+  return { permission, position, error, busy, confirmed, request, refresh, hideCta, ctaHidden }
 }
