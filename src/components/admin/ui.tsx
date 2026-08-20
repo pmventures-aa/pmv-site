@@ -41,6 +41,29 @@ export function SkeletonStatCard(){return <Panel className="p-4"><Skeleton class
 export function SkeletonTable({rows=4,cols=4}:{rows?:number;cols?:number}){return <div className="space-y-2">{Array.from({length:rows}).map((_,r)=><div key={r} className="flex gap-3">{Array.from({length:cols}).map((_,c)=><Skeleton key={c} className="h-3.5 flex-1"/>)}</div>)}</div>}
 export function NoAccess({label='this section'}:{label?:string}){return <Panel className="max-w-lg"><p className="text-sm font-bold text-white">Access Restricted</p><p className="mt-2 text-sm text-slate-400">You do not have access to {label}. Ask an administrator to update your permissions in Settings.</p></Panel>}
 
+// Mobile-friendly data tables. Wide admin tables (min-w 560-980px) clip their
+// trailing columns when scrolled on a phone, so each one pairs a card list for
+// narrow screens (CardList + DataCard + CardRow) with the full table on md+
+// (wrap the existing table in TableScroll). Keeping the desktop table markup
+// untouched means only the mobile presentation changes.
+export function TableScroll({ className='', minW, children }: { className?:string; minW?:string; children:ReactNode }) {
+  return <div className={`hidden overflow-x-auto rounded-lg border border-white/10 md:block ${className}`}>{minW?<div className={minW}>{children}</div>:children}</div>
+}
+export function CardList({ className='', children }: { className?:string; children:ReactNode }) {
+  return <ul className={`space-y-2.5 md:hidden ${className}`}>{children}</ul>
+}
+export function DataCard({ accent, onClick, className='', children }: { accent?:'gold'|'sea'|'coral'|'green'|'red'|'rose'; onClick?:()=>void; className?:string; children:ReactNode }) {
+  const rail=accent?`relative overflow-hidden before:absolute before:inset-y-0 before:left-0 before:w-1 ${STAT_ACCENT[accent==='rose'?'red':accent]}`:''
+  const interactive=onClick?'w-full cursor-pointer text-left transition hover:border-gold/35 hover:bg-white/[.04]':''
+  const cls=`rounded-lg border border-white/10 bg-white/[.02] p-4 ${rail} ${interactive} ${className}`
+  return onClick?<li><button type="button" onClick={onClick} className={cls}>{children}</button></li>:<li className={cls}>{children}</li>
+}
+// A label/value row inside a DataCard, echoing the column header the value would
+// have carried in the desktop table so no context is lost on mobile.
+export function CardRow({ label, children, className='' }: { label:string; children:ReactNode; className?:string }) {
+  return <div className={`flex justify-between gap-3 text-xs ${className}`}><span className="shrink-0 uppercase tracking-wide text-slate-500">{label}</span><span className="min-w-0 text-right text-slate-300">{children}</span></div>
+}
+
 export type Tone='gold'|'green'|'blue'|'slate'|'red'|'sea'|'coral'
 const toneMap:Record<Tone,string>={gold:'bg-gold/10 text-gold border-gold/25',green:'bg-emerald-400/10 text-emerald-300 border-emerald-400/25',blue:'bg-sky-400/10 text-sky-300 border-sky-400/25',slate:'bg-white/[.035] text-slate-300 border-white/10',red:'bg-rose-400/10 text-rose-300 border-rose-400/25',sea:'bg-sea-400/10 text-sea-300 border-sea-400/25',coral:'bg-coral-400/10 text-coral-300 border-coral-400/25'}
 export function Tag({children,tone='slate'}:{children:ReactNode;tone?:Tone}){return <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wide ${toneMap[tone]}`}>{children}</span>}

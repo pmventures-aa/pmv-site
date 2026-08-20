@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { PageIntro, Panel, Tag, EmptyState, inputCls, btnOutline, SkeletonTable } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag, EmptyState, inputCls, btnOutline, SkeletonTable, CardList, DataCard, CardRow } from '../../components/admin/ui'
 import { Avatar } from '../../components/kit/Avatar'
 import { useAppPath } from '../../lib/basePath'
 import { clientEmailHref, clientInboxHref } from '../../lib/engagements'
@@ -84,7 +84,8 @@ export default function ClientsList() {
         <Panel className="overflow-x-auto !p-0"><div className="p-6"><EmptyState label={clients.length === 0 ? 'No clients yet.' : 'No clients match your search.'} /></div></Panel>
       ) : (
         <RecentListShell footer={<RecentWindowBar extra={windowed.extra} expanded={windowed.expanded} onToggle={() => windowed.setExpanded((v) => !v)} showing={windowed.showing} total={windowed.total} noun="clients" />}>
-          <div className="overflow-x-auto">
+          <CardList className="p-3">{windowed.visible.map((c) => <DataCard key={c.id}><div className="flex items-center gap-3"><Avatar userId={c.id} name={c.full_name || c.email} size={40} /><div className="min-w-0"><Link to={p(`clients/${c.public_ref}/overview`)} className="block truncate font-medium text-white">{c.full_name || c.email}</Link><p className="truncate text-xs text-slate-500">{c.email}</p></div></div><div className="mt-3 space-y-1.5"><CardRow label="Business">{c.business_name ?? 'Not provided'}</CardRow><CardRow label="Onboarding"><Tag tone={c.onboarding_completed ? 'green' : 'gold'}>{c.onboarding_completed ? 'Complete' : 'Pending'}</Tag></CardRow><CardRow label="Joined">{new Date(c.created_at.replace(' ', 'T') + 'Z').toLocaleDateString()}</CardRow></div><div className="mt-3 flex flex-wrap gap-4 border-t border-white/5 pt-3"><Link to={clientEmailHref(p, { id: c.id, email: c.email, name: c.full_name })} className="text-xs font-semibold text-gold hover:underline">Email</Link><Link to={clientInboxHref(p, c.id)} className="text-xs font-semibold text-slate-400 hover:text-gold hover:underline">Message</Link></div></DataCard>)}</CardList>
+          <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
