@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   $createParagraphNode,
   $getRoot,
@@ -479,7 +479,41 @@ function Toolbar({
   )
 }
 
-export function RichTextComposer({
+// The rich editor is a large, third-party-backed component. If Lexical throws
+// while opening or rendering a letter, it must degrade to a plain editable
+// field rather than crash the entire HQ workspace boundary. This local boundary
+// keeps the failure contained to the editor and keeps the letter editable.
+class ComposerBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(error: Error) { console.error('RichTextComposer crashed; showing plain editor', error) }
+  render() { return this.state.failed ? this.props.fallback : this.props.children }
+}
+
+export function RichTextComposer(props: RichTextComposerProps) {
+  const { value, onChange, surface = 'hq', fill = false, placeholder } = props
+  const letter = surface === 'letter'
+  const fallback = (
+    <div className={`flex min-h-0 flex-col ${fill ? 'h-full overflow-hidden' : ''} ${letter ? 'bg-transparent' : 'rounded-md border border-white/10 bg-navy-900'}`}>
+      <p className={`shrink-0 px-4 py-2 text-[12px] ${letter ? 'border-b border-[#e7e4dc] bg-[#fff8e1] text-[#7a5b00]' : 'border-b border-amber-400/20 bg-amber-400/[.06] text-amber-200'}`}>
+        Rich formatting is temporarily unavailable for this letter. You can still edit the content below and save.
+      </p>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`min-h-[240px] w-full flex-1 resize-none px-4 py-3 font-mono text-[13px] leading-6 outline-none ${letter ? 'bg-[#faf8f3] text-[#1b2430]' : 'bg-navy-900 text-slate-100'}`}
+      />
+    </div>
+  )
+  return (
+    <ComposerBoundary fallback={fallback}>
+      <RichTextComposerInner {...props} />
+    </ComposerBoundary>
+  )
+}
+
+function RichTextComposerInner({
   value,
   onChange,
   onUploadImage,
@@ -506,11 +540,18 @@ export function RichTextComposer({
       editorState: (editor: LexicalEditor) => {
         const html = initialHTML || value
         if (!html) return
-        const dom = new DOMParser().parseFromString(html, 'text/html')
-        const nodes = $generateNodesFromDOM(editor, dom)
-        const root = $getRoot()
-        root.clear()
-        if (nodes.length > 0) root.append(...nodes)
+        // Parsing stored HTML into Lexical nodes can throw on markup the schema
+        // does not expect. That must never take down the whole HQ workspace, so
+        // fall back to an empty document and let the editable fallback handle it.
+        try {
+          const dom = new DOMParser().parseFromString(html, 'text/html')
+          const nodes = $generateNodesFromDOM(editor, dom)
+          const root = $getRoot()
+          root.clear()
+          if (nodes.length > 0) root.append(...nodes)
+        } catch (err) {
+          console.error('RichTextComposer: could not parse initial HTML', err)
+        }
       },
     }),
     [initialHTML, surface, value],
@@ -521,11 +562,15 @@ export function RichTextComposer({
     if (!editor || value === syncHandle.current.lastEmitted) return
     syncHandle.current.lastEmitted = value
     editor.update(() => {
-      const dom = new DOMParser().parseFromString(value || '<p><br></p>', 'text/html')
-      const nodes = $generateNodesFromDOM(editor, dom)
-      const root = $getRoot()
-      root.clear()
-      if (nodes.length > 0) root.append(...nodes)
+      try {
+        const dom = new DOMParser().parseFromString(value || '<p><br></p>', 'text/html')
+        const nodes = $generateNodesFromDOM(editor, dom)
+        const root = $getRoot()
+        root.clear()
+        if (nodes.length > 0) root.append(...nodes)
+      } catch (err) {
+        console.error('RichTextComposer: could not sync HTML value', err)
+      }
     })
   }, [value])
 
