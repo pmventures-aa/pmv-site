@@ -4,6 +4,15 @@ import { AlertTriangle, RotateCw } from 'lucide-react'
 interface Props { children: ReactNode; resetKey?: string }
 interface State { error: Error | null }
 
+// A failed dynamic import (a stale chunk after a deploy) throws a distinctive
+// error. A soft re-render cannot recover from it - only fetching the fresh
+// bundle can - so we do one guarded full reload instead of leaving the operator
+// stuck clicking a button that re-crashes.
+function isChunkLoadError(error: Error): boolean {
+  const msg = `${error?.name || ''} ${error?.message || ''}`
+  return /ChunkLoadError|Loading chunk|dynamically imported module|Importing a module script failed|Failed to fetch dynamically/i.test(msg)
+}
+
 export class AdminPageBoundary extends Component<Props, State> {
   state: State = { error: null }
 
@@ -11,6 +20,18 @@ export class AdminPageBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('HQ workspace render failure', error, info.componentStack)
+    if (isChunkLoadError(error) && typeof window !== 'undefined') {
+      // Reload once for a stale bundle; a sentinel prevents a reload loop if the
+      // fresh bundle still fails for some other reason.
+      const KEY = 'pmv_hq_chunk_reload'
+      try {
+        if (!sessionStorage.getItem(KEY)) {
+          sessionStorage.setItem(KEY, String(Date.now()))
+          window.location.reload()
+          return
+        }
+      } catch { /* sessionStorage unavailable; fall through to the manual UI */ }
+    }
   }
 
   componentDidUpdate(prev: Props) {
@@ -31,8 +52,11 @@ export class AdminPageBoundary extends Component<Props, State> {
     return <div role="alert" className="mx-auto mt-12 max-w-xl rounded-2xl border border-amber-400/20 bg-amber-400/[.04] p-6 text-center">
       <AlertTriangle className="mx-auto text-amber-300" size={28}/>
       <h1 className="mt-4 text-lg font-semibold text-white">This workspace needs to be reloaded</h1>
-      <p className="mt-2 text-sm leading-6 text-slate-400">Your navigation and account are still available. Open another section, or reload this one to recover its latest data.</p>
-      <button type="button" onClick={() => this.setState({ error: null })} className="mt-5 inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2.5 text-sm font-semibold text-gold hover:bg-gold/15"><RotateCw size={15}/>Reload workspace</button>
+      <p className="mt-2 text-sm leading-6 text-slate-400">Your navigation and account are still available. Try this section again, or reload the page to fetch the latest version.</p>
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        <button type="button" onClick={() => this.setState({ error: null })} className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2.5 text-sm font-semibold text-gold hover:bg-gold/15"><RotateCw size={15}/>Try this section again</button>
+        <button type="button" onClick={() => { try { sessionStorage.removeItem('pmv_hq_chunk_reload') } catch { /* ignore */ } window.location.reload() }} className="inline-flex items-center gap-2 rounded-lg border border-white/12 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-white/[.05]">Reload the page</button>
+      </div>
     </div>
   }
 }
