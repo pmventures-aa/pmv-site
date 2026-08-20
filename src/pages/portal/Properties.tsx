@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Building2, ChevronRight, MapPin } from 'lucide-react'
+import { motion } from 'motion/react'
+import { ArrowRight, Building2, MapPin, Plus } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { Card, EmptyState, PageHeader, StatusBadge } from '../../components/ui'
+import { pmvFadeUp, pmvStagger } from '../../lib/motionTheme'
 import { inputCls } from '../auth/AuthLayout'
 import {
   occupancyLabel, propertyCityLine, propertyDisplayName, propertyStatusLabel, propertyTypeLabel,
@@ -65,7 +67,12 @@ export default function Properties() {
         eyebrow="Addresses"
         title="Properties"
         subtitle="Occupancy, access, open work, and files on each address."
-        action={<button className="btn-gold" onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancel' : '+ Add property'}</button>}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to={p('support')} className="btn-outline inline-flex items-center gap-1.5"><ArrowRight size={14} /> Start a request</Link>
+            <button className="btn-gold inline-flex items-center gap-1.5" onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancel' : <><Plus size={14} /> Add property</>}</button>
+          </div>
+        }
       />
 
       {showForm && (
@@ -91,30 +98,40 @@ export default function Properties() {
       {loading ? <Card><p className="text-sm text-slate-400">Loading properties…</p></Card> : items.length === 0 ? (
         <Card><EmptyState label="No properties on file yet. Add an address to give Pinnacle a place to attach work." /></Card>
       ) : (
-        <ul className="space-y-2">
+        <motion.ul variants={pmvStagger} initial="hidden" animate="show" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {items.map((row) => {
             const city = propertyCityLine(row)
             return (
-              <li key={row.id}>
-                <Link to={p(`property-management/${row.id}`)} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-navy-900/70 px-3 py-2.5 transition hover:border-gold/30">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Building2 size={16} className="shrink-0 text-gold/80" />
-                      <p className="truncate font-semibold text-white">{propertyDisplayName(row)}</p>
+              <motion.li key={row.id} variants={pmvFadeUp}>
+                <Link
+                  to={p(`property-management/${row.id}`)}
+                  className="group block h-full overflow-hidden rounded-xl border border-white/10 bg-navy-900/60 transition duration-200 hover:-translate-y-0.5 hover:border-gold/35 hover:shadow-[0_12px_30px_rgba(0,0,0,.28)]"
+                >
+                  <div className="relative h-20 overflow-hidden bg-gradient-to-br from-gold/[.14] via-white/[.03] to-transparent">
+                    <Building2 size={72} strokeWidth={1} className="absolute -bottom-3 -right-2 text-white/[.06] transition-transform duration-300 group-hover:scale-105" aria-hidden="true" />
+                    <div className="absolute right-2 top-2">
                       <StatusBadge tone={row.status === 'active' ? 'green' : row.status === 'sold' ? 'slate' : 'gold'}>{propertyStatusLabel(row.status)}</StatusBadge>
                     </div>
+                    <div className="absolute bottom-2 left-3 flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/12 bg-navy-950/70 text-gold"><Building2 size={16} /></span>
+                    </div>
+                  </div>
+                  <div className="p-3.5">
+                    <p className="truncate font-semibold text-white" title={propertyDisplayName(row)}>{propertyDisplayName(row)}</p>
                     <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-slate-400">
                       <MapPin size={12} className="shrink-0" />
                       {row.address}{row.unit ? ` · ${row.unit}` : ''}{city ? ` · ${city}` : ''}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">{propertyTypeLabel(row.property_type)} · {occupancyLabel(row.occupancy)}</p>
+                    <div className="mt-2.5 flex items-center justify-between border-t border-white/[.06] pt-2.5">
+                      <p className="text-xs text-slate-500">{propertyTypeLabel(row.property_type)} · {occupancyLabel(row.occupancy)}</p>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 transition group-hover:text-gold">Open <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" /></span>
+                    </div>
                   </div>
-                  <ChevronRight size={16} className="shrink-0 text-slate-600" />
                 </Link>
-              </li>
+              </motion.li>
             )
           })}
-        </ul>
+        </motion.ul>
       )}
     </div>
   )
