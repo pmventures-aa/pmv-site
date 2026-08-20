@@ -57,18 +57,21 @@ describe('useGeolocationPermission state model', () => {
   })
 })
 
-describe('LocationAutoStart banner respects the fuller state model', () => {
-  const source = readFileSync(new URL('../src/components/admin/LocationAutoStart.tsx', import.meta.url), 'utf8')
+describe('revoked/denied location surfaces via the top-bar icon, not a banner', () => {
+  const autoStart = readFileSync(new URL('../src/components/admin/LocationAutoStart.tsx', import.meta.url), 'utf8')
+  const box = readFileSync(new URL('../src/components/admin/TopbarLocation.tsx', import.meta.url), 'utf8')
 
-  it('re-shows the setup banner on a revoked grant, even when ctaHidden is set', () => {
-    // The revoked branch must not gate on !ctaHidden - the user needs
-    // to know sharing has stopped regardless of a prior "Not now".
-    expect(source).toMatch(/permission === 'revoked'/)
+  it('LocationAutoStart no longer renders any location banner', () => {
+    // The big mobile banner was removed in favour of one native prompt per
+    // login plus the persistent top-bar icon.
+    expect(autoStart).not.toContain('Location access was turned off')
+    expect(autoStart).not.toContain('Let HQ find you')
+    expect(autoStart).toContain('return null')
   })
 
-  it('does not present revoked with the first-time copy', () => {
-    // Copy must differentiate: "was turned off" vs "let HQ find you".
-    expect(source).toContain('Location access was turned off')
+  it('the top-bar icon distinguishes revoked/denied and offers re-enable', () => {
+    expect(box).toMatch(/permission === 'revoked'/)
+    expect(box).toContain("permission === 'denied'")
   })
 })
 

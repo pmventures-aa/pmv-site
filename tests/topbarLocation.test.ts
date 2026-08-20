@@ -21,6 +21,16 @@ describe('location: authorize once, then static', () => {
     expect(network).toContain('geoPerm.confirmed')
   })
 
+  it('replaces the big mobile banner with a single native prompt per login', () => {
+    // No custom banner copy or Allow/Not now buttons - just the OS/browser
+    // dialog, fired once per session, then the top-bar icon takes over.
+    expect(autoStart).not.toContain('Let HQ find you')
+    expect(autoStart).not.toContain('Allow location')
+    expect(autoStart).not.toContain('Not now')
+    expect(autoStart).toContain("'pmv:hq-location-prompted'")
+    expect(autoStart).toContain('request()')
+  })
+
   it('live sharing is a module-level singleton (one watch, shared across surfaces)', () => {
     expect(share).toMatch(/let\s+watchId/)
     expect(share).toMatch(/let\s+sharing/)
