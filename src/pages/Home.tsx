@@ -10,10 +10,10 @@ import { usePageMeta } from '../lib/usePageMeta'
 import { usePublicVisitor } from '../lib/publicContext'
 import type { OperatingWorld } from '../../shared/workspace'
 import { HeroGuideRail } from '../components/public/HeroGuideRail'
-import { OrbitalFlow } from '../components/public/OrbitalFlow'
+import { WorkflowStory, type WorkflowStage } from '../components/public/WorkflowStory'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
-import { StoryImage, type RailPanel } from '../components/public/story'
+import { StoryImage } from '../components/public/story'
 import { ServiceConstellation } from '../components/public/ServiceConstellation'
 import { CLIENT_LOGIN, GET_HELP, founder, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 import { getCleaningConfig } from '../lib/cleaningApi'
@@ -21,13 +21,12 @@ import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricin
 
 // How a request moves - the reusable Pinnacle lifecycle, shown as a bounded
 // horizontal story on desktop and a swipe carousel on mobile.
-const LIFECYCLE: RailPanel[] = [
-  { n: '01', title: 'Request', detail: 'Tell us what needs to happen - where, when, and what matters most. No account required.', slot: 'business_owner', labels: ['Intake logged'] },
-  { n: '02', title: 'Review', detail: 'We review the matter and confirm exactly what it needs before anything starts.', slot: 'review' },
-  { n: '03', title: 'Coordinate', detail: 'The right Pinnacle contact or vetted local provider is assigned and briefed.', slot: 'coordination', labels: ['Provider assigned'] },
-  { n: '04', title: 'Execute', detail: 'The work happens on the ground, documented as it goes.', slot: 'field_inspection', labels: ['On site'] },
-  { n: '05', title: 'Verify', detail: 'Evidence, timestamps, and status are captured and checked.', slot: 'documentation', labels: ['Geo · time stamped'] },
-  { n: '06', title: 'Complete', detail: 'You receive the result, the record, and a clear next step.', slot: 'completion', labels: ['Report delivered'] },
+const WORKFLOW: WorkflowStage[] = [
+  { key: 'request', title: 'Request', detail: 'Tell us what needs to happen, where and when, and what matters most. No account required.', signal: 'Intake logged' },
+  { key: 'coordination', title: 'Coordination', detail: 'We confirm the work and assign the right Pinnacle contact or vetted local provider, fully briefed.', signal: 'Provider assigned' },
+  { key: 'execution', title: 'Execution', detail: 'The work happens on the ground, handled and documented as it goes.', signal: 'On site' },
+  { key: 'documentation', title: 'Documentation', detail: 'Evidence, timestamps, and status are captured and verified.', signal: 'Geo and time stamped' },
+  { key: 'completion', title: 'Completion', detail: 'You receive the result, the record, and a clear next step.', signal: 'Report delivered' },
 ]
 
 const WORLD_BY_PATHWAY: Record<string, OperatingWorld> = { business: 'business', property: 'property', personal: 'documents' }
@@ -129,11 +128,11 @@ export default function Home() {
 
         <HomeCleaningSection />
 
-        <OrbitalFlow
+        <WorkflowStory
           eyebrow="How the work moves"
-          heading="Always coordinating, from request to resolved."
+          heading="From request to resolved, on one path."
           intro="Every Pinnacle matter runs through one connected system. You tell us what you need, and we move it from intake to a documented result while you get on with your day."
-          stages={LIFECYCLE.map((s) => ({ key: s.title, title: s.title, detail: s.detail }))}
+          stages={WORKFLOW}
         />
 
         <section className="container-pmv py-16 sm:py-24">
