@@ -43,19 +43,20 @@ export function WorkflowStory({
   return (
     <section className="border-y border-white/[.07] bg-navy-900/20">
       <div className="container-pmv py-16 sm:py-24">
+        <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:gap-16">
         <motion.header
           initial={reduce ? false : { opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-80px' }}
           transition={reduce ? { duration: 0 } : pmvMotion.gentle}
-          className="max-w-2xl"
+          className="lg:sticky lg:top-28 lg:self-start"
         >
           <p className="eyebrow">{eyebrow}</p>
-          <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">{heading}</h2>
-          {intro && <p className="mt-5 max-w-xl text-base leading-7 text-slate-400">{intro}</p>}
+          <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-4xl">{heading}</h2>
+          {intro && <p className="mt-5 text-base leading-7 text-slate-400">{intro}</p>}
         </motion.header>
 
-        <ol ref={railRef} className="relative mt-12 sm:mt-16">
+        <ol ref={railRef} className="relative mt-2 lg:mt-0">
           {/* Spine: a faint track with a gold fill that grows as the reader scrolls. */}
           <div className="absolute left-[15px] top-2 bottom-2 w-px bg-white/12 sm:left-[19px]" aria-hidden="true">
             <motion.div
@@ -68,7 +69,7 @@ export function WorkflowStory({
             <li key={stage.key} className="relative pl-12 pb-10 last:pb-0 sm:pl-16">
               {/* Stage marker. Lights gold as it scrolls into view. */}
               <motion.span
-                className="absolute left-0 top-0 grid h-8 w-8 place-items-center rounded-full border text-[11px] font-bold sm:h-10 sm:w-10 sm:text-xs"
+                className="absolute left-0 top-0 grid h-8 w-8 place-items-center rounded-full border text-[11px] font-bold leading-none tabular-nums sm:h-10 sm:w-10 sm:text-xs"
                 initial={reduce ? false : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(148,163,184,1)', backgroundColor: 'rgba(5,14,25,0.9)' }}
                 whileInView={{ borderColor: 'rgba(201,162,39,0.7)', color: '#E3CC7A', backgroundColor: 'rgba(201,162,39,0.12)' }}
                 viewport={{ once: true, margin: '-45% 0px -45% 0px' }}
@@ -95,6 +96,7 @@ export function WorkflowStory({
             </li>
           ))}
         </ol>
+        </div>
       </div>
     </section>
   )

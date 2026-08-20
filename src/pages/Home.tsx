@@ -16,7 +16,7 @@ import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
 import { StoryImage } from '../components/public/story'
 import { ServiceConstellation } from '../components/public/ServiceConstellation'
 import { Icon } from '../components/kit/Icon'
-import { CLIENT_LOGIN, GET_HELP, founder, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
+import { CLIENT_LOGIN, GET_HELP, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 import { getCleaningConfig } from '../lib/cleaningApi'
 import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricing'
 
@@ -200,21 +200,6 @@ export default function Home() {
               <div className="overflow-hidden rounded-xl border border-white/10 bg-navy-900/40 p-4 sm:p-6">
                 <MotionStage />
               </div>
-            </Reveal>
-          </div>
-        </section>
-
-        <section className="border-y border-white/[.07] bg-navy-900/30">
-          <div className="container-pmv grid gap-10 py-16 sm:py-20 lg:grid-cols-[.85fr_1.15fr] lg:items-center">
-            <Reveal>
-              <p className="eyebrow">Founder</p>
-              <h2 className="mt-3 font-display text-3xl font-bold text-white sm:text-4xl">{founder.name}</h2>
-              <p className="mt-2 text-sm font-semibold uppercase tracking-[.12em] text-gold">{founder.title}</p>
-            </Reveal>
-            <Reveal>
-              <p className="text-base leading-8 text-slate-300">{founder.lead}</p>
-              <p className="mt-4 text-base leading-8 text-slate-400">{founder.close}</p>
-              <ViewTransitionLink to="/about" className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">About Pinnacle <span aria-hidden="true">→</span></ViewTransitionLink>
             </Reveal>
           </div>
         </section>
