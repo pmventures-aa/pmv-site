@@ -44,7 +44,10 @@ describe('operating worlds', () => {
     expect(vendorApplicationCopy(['property_field']).eyebrow).not.toBe(vendorApplicationCopy(['ron']).eyebrow)
     expect(hqEmployeeExperience('Field Operations').createLabel).toBe('New field work')
     expect(hqEmployeeExperience('Document Specialist').quickActions[0].to).toBe('document-center')
-    expect(vendorNavForWorld('property')[0].label).toBe('Field assignments')
-    expect(vendorNavForWorld('documents')[0].label).toBe('Signing assignments')
+    // Index 0 is the vendor Home dashboard; the assignments item follows it.
+    expect(vendorNavForWorld('property')[0].label).toBe('Home')
+    expect(vendorNavForWorld('documents')[0].label).toBe('Home')
+    expect(vendorNavForWorld('property').find((i) => i.key === 'assignments')?.label).toBe('Field assignments')
+    expect(vendorNavForWorld('documents').find((i) => i.key === 'assignments')?.label).toBe('Signing assignments')
   })
 })
