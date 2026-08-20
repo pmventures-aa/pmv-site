@@ -115,6 +115,7 @@ export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
       ? 'Signing assignments'
       : 'My assignments'
   const items: NavItem[] = [
+    {key:'home',label:'Home',to:'',icon:Home},
     {key:'assignments',label:assignmentLabel,to:'field-work/mine',icon:MapPinned},
     {key:'messages',label:'Inbox',to:'messages',icon:MessageSquare,section:'Work'},
     {key:'security-center',label:'Security',to:'security-center',icon:ShieldCheck,section:'Account'},

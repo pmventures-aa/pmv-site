@@ -40,6 +40,7 @@ const ReportingCenter = lazy(() => import('./ReportingCenter'))
 const ManagementCenter = lazy(() => import('./ManagementCenter'))
 import ClientBannersAdmin from './ClientBannersAdmin'
 const AutomationCenter = lazy(() => import('./AutomationCenter'))
+const VendorHome = lazy(() => import('./VendorHome'))
 const JourneyAutomation = lazy(() => import('./JourneyAutomation'))
 import SecurityCenter from './SecurityCenter'
 import InvoicesAdmin from './InvoicesAdmin'
@@ -93,8 +94,8 @@ function AdminShell(){
   return <AdminLayout nav={nav} badge={copy.badge}/>
 }
 function AdminIndex(){
-  const {workspace}=useAuth(); const p=useAppPath()
-  if(workspace.party_type==='vendor') return <Navigate to={p('field-work/mine')} replace />
+  const {workspace}=useAuth()
+  if(workspace.party_type==='vendor') return <VendorHome/>
   return <AdminDashboard/>
 }
 function CatchAll(){const p=useAppPath();return <Navigate to={p()} replace/>}
