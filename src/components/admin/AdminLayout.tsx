@@ -187,7 +187,7 @@ export function AdminLayout({ nav, badge: _badge }: { nav: NavItem[]; badge?: st
           </div>
         </div>
         <AnimatePresence mode="sync" initial={false}>
-          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={mailWorkspace ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-0' : hideHqNav ? 'flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4' : 'flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4'}><AdminPageBoundary><Suspense fallback={<InlineLoading variant="orb" />}><Outlet /></Suspense></AdminPageBoundary></motion.main>
+          <motion.main key={location.pathname} variants={pmvPanel} initial="hidden" animate="show" exit="exit" className={mailWorkspace ? 'flex min-h-0 flex-1 flex-col overflow-hidden p-0' : hideHqNav ? 'flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-6 lg:py-4' : 'flex-1 px-3 py-3 sm:px-5 lg:px-6 lg:py-4'}><AdminPageBoundary resetKey={location.pathname + location.search}><Suspense fallback={<InlineLoading variant="orb" />}><Outlet /></Suspense></AdminPageBoundary></motion.main>
         </AnimatePresence>
       </div>
     </div>

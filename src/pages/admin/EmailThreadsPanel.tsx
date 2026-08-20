@@ -422,7 +422,7 @@ function EmailThreadDetail({
 
               {m.error && <div className="mx-3 mb-2 mt-2 rounded-lg border border-red-400/25 bg-red-400/[.06] p-2.5 text-[11px] text-red-200 md:mx-4 md:mt-2">Delivery error: {m.error}</div>}
 
-              <div className="signature-preview prose prose-sm mx-3 mb-3 mt-1 max-w-none rounded-lg bg-white p-4 font-serif text-[15px] leading-7 text-[#1b2430] md:mx-4 md:mb-4 md:mt-3 md:rounded-md md:p-5" dangerouslySetInnerHTML={{ __html: previewSignatureHtml(m.body_html || '') || (m.body_text ? `<pre class="whitespace-pre-wrap font-serif">${escapeHtml(m.body_text)}</pre>` : '<em>(empty)</em>') }}/>
+              <div className="signature-preview prose prose-sm mx-3 mb-3 mt-1 max-w-none rounded-lg bg-white p-4 font-serif text-[15px] leading-7 text-[#1b2430] md:mx-4 md:mb-4 md:mt-3 md:rounded-md md:p-5" dangerouslySetInnerHTML={{ __html: safeMessageHtml(m.body_html, m.body_text) }}/>
 
               {attachments.length > 0 && (
                 <div className="border-t border-white/10 px-3 py-2 md:px-4">
@@ -489,4 +489,17 @@ function safeArray<T>(json: string | null | undefined): T[] {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
+// Render one message's body defensively. previewSignatureHtml parses stored
+// email HTML from external senders; if it ever throws on a malformed body we
+// fall back to the plain text (or a notice) instead of letting the exception
+// take down the whole Messages workspace via the error boundary.
+function safeMessageHtml(bodyHtml: string | null, bodyText: string | null): string {
+  const plain = bodyText ? `<pre class="whitespace-pre-wrap font-serif">${escapeHtml(bodyText)}</pre>` : ''
+  try {
+    return previewSignatureHtml(bodyHtml || '') || plain || '<em>(empty)</em>'
+  } catch {
+    return plain || '<em>(could not render this message)</em>'
+  }
 }
