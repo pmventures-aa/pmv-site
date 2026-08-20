@@ -21,22 +21,48 @@ export const selfRoutes = new Hono<AppEnv>()
 selfRoutes.get('/profile', requireClient, async (c) => {
   const user = c.get('user')
   const profile = await c.env.DB.prepare('SELECT * FROM client_profiles WHERE user_id = ?').bind(user.id).first()
-  return c.json({ profile })
+  const contact = await c.env.DB.prepare('SELECT full_name, phone, email FROM users WHERE id = ?').bind(user.id).first()
+  return c.json({ profile, contact })
 })
 
 selfRoutes.patch('/profile', requireClient, async (c) => {
   const user = c.get('user')
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>))
+
+  // Business fields live on client_profiles.
   const fields: Record<string, string | null> = {}
   for (const key of ['business_name', 'entity_type', 'ein', 'state'] as const) {
     if (typeof body[key] === 'string') fields[key] = (body[key] as string).trim().slice(0, 200)
   }
   const cols = Object.keys(fields)
-  if (cols.length === 0) return c.json({ error: 'no valid fields supplied' }, 400)
-  const setClause = cols.map((k) => `${k} = ?`).join(', ')
-  await c.env.DB.prepare(`UPDATE client_profiles SET ${setClause} WHERE user_id = ?`)
-    .bind(...cols.map((k) => fields[k]), user.id)
-    .run()
+  if (cols.length > 0) {
+    const setClause = cols.map((k) => `${k} = ?`).join(', ')
+    await c.env.DB.prepare(`UPDATE client_profiles SET ${setClause} WHERE user_id = ?`)
+      .bind(...cols.map((k) => fields[k]), user.id)
+      .run()
+  }
+
+  // Contact fields live on users. The client may edit their own name and phone;
+  // email is a login credential and is intentionally NOT editable here (changes
+  // go through a staff-reviewed request). Changing the phone clears its verified
+  // flag so it can be re-confirmed.
+  const userSets: string[] = []
+  const userVals: (string | null)[] = []
+  if (typeof body.full_name === 'string') {
+    const fullName = body.full_name.trim().slice(0, 120)
+    const parts = fullName.split(/\s+/).filter(Boolean)
+    userSets.push('full_name = ?', 'first_name = ?', 'last_name = ?')
+    userVals.push(fullName, parts[0] || '', parts.slice(1).join(' ') || '')
+  }
+  if (typeof body.phone === 'string') {
+    userSets.push('phone = ?', 'phone_verified = 0')
+    userVals.push(body.phone.trim().slice(0, 40))
+  }
+  if (userSets.length > 0) {
+    await c.env.DB.prepare(`UPDATE users SET ${userSets.join(', ')} WHERE id = ?`).bind(...userVals, user.id).run()
+  }
+
+  if (cols.length === 0 && userSets.length === 0) return c.json({ error: 'no valid fields supplied' }, 400)
   return c.json({ ok: true })
 })
 
