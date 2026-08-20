@@ -6,7 +6,8 @@ describe('HQ mobile auto-location', () => {
 
   it('only fires on a phone viewport (no desktop trigger)', () => {
     expect(source).toContain("matchMedia('(max-width: 767px)')")
-    expect(source).toContain('lg:hidden')
+    // Both effects (silent start + one-time prompt) gate on isMobile.
+    expect(source).toContain('if (!isMobile) return')
   })
 
   it('auto-starts silently when permission is already granted, and only when idle', () => {
@@ -19,9 +20,13 @@ describe('HQ mobile auto-location', () => {
     expect(source).toContain('onActiveAssignment')
   })
 
-  it('does not re-nag after a denial or dismissal', () => {
-    expect(source).toContain('!geoPerm.ctaHidden')
-    expect(source).toContain('geoPerm.hideCta')
+  it('asks once per login and never re-nags (native prompt, no custom banner)', () => {
+    // Only prompts while the state is genuinely undetermined, and only once per
+    // session - so a denial (permission !== 'prompt') or a prior ask never
+    // re-triggers the dialog. There is no banner and no hideCta anymore.
+    expect(source).toContain("geoPerm.permission !== 'prompt'")
+    expect(source).toContain("'pmv:hq-location-prompted'")
+    expect(source).not.toContain('geoPerm.hideCta')
   })
 
   it('reuses the shared live-location hook instead of a second watch implementation', () => {
