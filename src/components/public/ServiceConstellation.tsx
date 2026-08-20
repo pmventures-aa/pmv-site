@@ -12,15 +12,22 @@ import { pmvMotion } from '../../lib/motionTheme'
 export interface ConstellationNode {
   label: string
   to: string
+  accent: string
 }
 
+// Each capability carries a brand accent (gold / sea / coral) so the network
+// reads as distinct services rather than one uniform gold spoke set. Kept subtle
+// - a dot on the node and a faint tint on its line - so the palette stays calm.
+const GOLD = '#D9B84A'
+const SEA = '#46BDB2'
+const CORAL = '#F0906F'
 const NODES: ConstellationNode[] = [
-  { label: 'Property & Field', to: '/services/property-field' },
-  { label: 'Business Operations', to: '/services/business-operations' },
-  { label: 'Documents & Notary', to: '/services/mobile-documents' },
-  { label: 'Cleaning & Turnovers', to: '/cleaning' },
-  { label: 'Monthly Care Plans', to: '/care-plans' },
-  { label: 'Short-Term Rentals', to: '/short-term-rental-support' },
+  { label: 'Property & Field', to: '/services/property-field', accent: SEA },
+  { label: 'Business Operations', to: '/services/business-operations', accent: GOLD },
+  { label: 'Documents & Notary', to: '/services/mobile-documents', accent: CORAL },
+  { label: 'Cleaning & Turnovers', to: '/cleaning', accent: SEA },
+  { label: 'Monthly Care Plans', to: '/care-plans', accent: GOLD },
+  { label: 'Short-Term Rentals', to: '/short-term-rental-support', accent: CORAL },
 ]
 
 // Node centers on a circle (percent of the square canvas), first node at top.
@@ -58,8 +65,9 @@ export function ServiceConstellation({ nodes = NODES }: { nodes?: ConstellationN
             y1="50"
             x2={p.x}
             y2={p.y}
-            stroke={active === i ? 'rgba(201,162,39,0.9)' : 'rgba(255,255,255,0.16)'}
-            strokeWidth={active === i ? 0.7 : 0.4}
+            stroke={nodes[i].accent}
+            strokeWidth={active === i ? 0.8 : 0.45}
+            strokeOpacity={active === i ? 0.95 : 0.4}
             initial={reduce ? false : { pathLength: 0, opacity: 0 }}
             whileInView={{ pathLength: 1, opacity: 1 }}
             viewport={{ once: true, margin: '-60px' }}
@@ -102,8 +110,10 @@ export function ServiceConstellation({ nodes = NODES }: { nodes?: ConstellationN
               onMouseLeave={() => setActive(null)}
               onFocus={() => setActive(i)}
               onBlur={() => setActive(null)}
-              className="block whitespace-nowrap rounded-full border border-white/12 bg-navy-950/85 px-2 py-1.5 text-center text-[10px] font-semibold text-slate-200 backdrop-blur transition hover:border-gold/50 hover:text-gold sm:px-2.5 sm:text-xs"
+              style={active === i ? { borderColor: node.accent, color: node.accent } : undefined}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/12 bg-navy-950/85 px-2 py-1.5 text-center text-[10px] font-semibold text-slate-200 backdrop-blur transition hover:text-white sm:px-2.5 sm:text-xs"
             >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: node.accent }} aria-hidden="true" />
               {node.label}
             </ViewTransitionLink>
           </motion.div>
