@@ -26,6 +26,7 @@ export function Footer() {
               <ul className="space-y-2.5 text-sm font-medium text-slate-400">
                 <li><ViewTransitionLink to="/about" className="hover:text-gold">About</ViewTransitionLink></li>
                 <li><ViewTransitionLink to="/how-it-works" className="hover:text-gold">How It Works</ViewTransitionLink></li>
+                <li><ViewTransitionLink to="/coverage" className="hover:text-gold">Coverage</ViewTransitionLink></li>
                 <li><ViewTransitionLink to="/contact" className="hover:text-gold">Contact</ViewTransitionLink></li>
                 <li><ViewTransitionLink to="/professionals" className="hover:text-gold">Professional Network</ViewTransitionLink></li>
               </ul>
