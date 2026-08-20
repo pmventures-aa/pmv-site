@@ -94,7 +94,7 @@ function ServiceRow({ service, world }: { service: ServiceInfo; world: Operating
     <ViewTransitionLink to={`/services/${service.slug}`} onClick={() => { if (world !== 'general') visitor.setWorld(world) }} className="group grid gap-4 border-t border-white/10 py-6 transition-colors hover:border-gold/35 sm:grid-cols-[minmax(180px,.65fr)_1.35fr_auto] sm:items-center">
       <div><p className="text-xs font-semibold uppercase tracking-[.13em] text-gold/75">{service.tag}</p><h3 className="mt-2 text-lg font-semibold text-white transition group-hover:text-gold">{service.title}</h3></div>
       <p className="max-w-2xl text-sm leading-6 text-slate-400">{service.shortDescription}</p>
-      <span className="text-sm font-medium text-gold">View service <span className="inline-block transition-transform group-hover:translate-x-1">→</span></span>
+      <span className="text-sm font-medium text-gold">View service <span aria-hidden="true" className="inline-block transition-transform group-hover:translate-x-1">→</span></span>
     </ViewTransitionLink>
   )
 }

@@ -92,7 +92,10 @@ export function KineticHeading({
     ? { hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.4 } } }
     : { hidden: { y: '115%' }, show: { y: '0%', transition: { type: 'spring', stiffness: 150, damping: 24, mass: 0.9 } } }
   return (
-    <motion.span className={`block ${className}`} variants={container} {...activation}>
+    // The visible copy is split into masked line spans; give the whole heading a
+    // single spaced accessible name so screen readers do not run the lines
+    // together ("Support.One" -> "Support. One").
+    <motion.span className={`block ${className}`} aria-label={lines.map((l) => l.text).join(' ')} variants={container} {...activation}>
       {lines.map((l, i) => (
         <span key={i} className="block overflow-hidden pb-[0.12em]">
           <motion.span className={`block ${l.className ?? ''}`} variants={line}>
