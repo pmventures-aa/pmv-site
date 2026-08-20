@@ -106,10 +106,10 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
       </nav>
 
       <div className="relative shrink-0 border-t border-white/[.08] pt-3">
-        <button type="button" onClick={() => setProfileOpen((v) => !v)} className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition hover:bg-white/[.035]">
+        <button type="button" onClick={() => setProfileOpen((v) => !v)} className="group flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition hover:bg-white/[.035]">
           {user && <Avatar userId={user.id} name={user.full_name} size={30} editable uploadPath="/me/avatar" />}
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white">{user?.full_name || user?.email}</p><p className="truncate text-xs text-slate-500">{user?.email}</p></div>
-          <ChevronDown size={14} className={`shrink-0 text-slate-600 transition ${profileOpen ? 'rotate-180' : ''}`} />
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 transition group-hover:text-gold"><ChevronDown size={16} className={`transition ${profileOpen ? 'rotate-180' : ''}`} /></span>
         </button>
         <AnimatePresence initial={false}>{profileOpen && (
           <motion.div initial={{opacity:0,y:6,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:5,scale:.985}} transition={pmvMotion.ui} className="absolute bottom-full left-0 right-0 mb-1.5 overflow-hidden rounded-md border border-white/[.08] bg-navy-900 shadow-xl">
