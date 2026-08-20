@@ -15,6 +15,7 @@ import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
 import { StoryImage } from '../components/public/story'
 import { ServiceConstellation } from '../components/public/ServiceConstellation'
+import { Icon } from '../components/kit/Icon'
 import { CLIENT_LOGIN, GET_HELP, founder, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 import { getCleaningConfig } from '../lib/cleaningApi'
 import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricing'
@@ -107,7 +108,7 @@ export default function Home() {
                 <ul className="mt-5 space-y-1.5 text-sm text-slate-300">
                   {item.items.map((capability) => <li key={capability}>{capability}</li>)}
                 </ul>
-                <ViewTransitionLink to={item.to} onClick={() => visitor.setWorld(WORLD_BY_PATHWAY[item.key])} className={`mt-6 inline-flex text-sm font-semibold hover:underline ${PATH_ACCENTS[i % PATH_ACCENTS.length]}`}>Explore {item.label} →</ViewTransitionLink>
+                <ViewTransitionLink to={item.to} onClick={() => visitor.setWorld(WORLD_BY_PATHWAY[item.key])} className={`mt-6 inline-flex text-sm font-semibold hover:underline ${PATH_ACCENTS[i % PATH_ACCENTS.length]}`}>Explore {item.label} <span aria-hidden="true">→</span></ViewTransitionLink>
               </motion.article>
             ))}
           </StaggerGroup>
@@ -187,7 +188,7 @@ export default function Home() {
               </p>
               <ul className="mt-6 space-y-2 text-sm text-slate-300">
                 {portalHighlights.map((item) => (
-                  <li key={item} className="flex items-start gap-2"><span className="mt-1 text-gold">✓</span>{item}</li>
+                  <li key={item} className="flex items-start gap-2"><Icon name="check" size={16} aria-hidden="true" className="mt-1 shrink-0 text-gold" />{item}</li>
                 ))}
               </ul>
               <div className="mt-8 flex flex-wrap gap-3">
@@ -213,7 +214,7 @@ export default function Home() {
             <Reveal>
               <p className="text-base leading-8 text-slate-300">{founder.lead}</p>
               <p className="mt-4 text-base leading-8 text-slate-400">{founder.close}</p>
-              <ViewTransitionLink to="/about" className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">About Pinnacle →</ViewTransitionLink>
+              <ViewTransitionLink to="/about" className="mt-6 inline-flex text-sm font-semibold text-gold hover:underline">About Pinnacle <span aria-hidden="true">→</span></ViewTransitionLink>
             </Reveal>
           </div>
         </section>
@@ -225,7 +226,7 @@ export default function Home() {
                 <p className="eyebrow">Monthly plans</p>
                 <h2 className="mt-4 max-w-2xl font-display text-3xl font-bold text-white sm:text-4xl">When the work repeats, put it on a plan.</h2>
               </div>
-              <ViewTransitionLink to="/care-plans" className="text-sm font-semibold text-gold hover:underline">See monthly plans →</ViewTransitionLink>
+              <ViewTransitionLink to="/care-plans" className="text-sm font-semibold text-gold hover:underline">See monthly plans <span aria-hidden="true">→</span></ViewTransitionLink>
             </Reveal>
             <div className="mt-8 grid gap-3 lg:grid-cols-3">
               {[
