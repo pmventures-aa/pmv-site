@@ -24,6 +24,48 @@ export const PMV_WORKFLOW: WorkflowStage[] = [
   { key: 'completion', title: 'Completion', detail: 'You receive the result, the record, and a clear next step.', signal: 'Report delivered' },
 ]
 
+// Brand-accent sparkles that quietly fill the space beside the story on desktop
+// and give the section some color. Each twinkles on its own rhythm; reduced
+// motion shows them still. Decorative only.
+const GOLD = '#E3CC7A'
+const SEA = '#7FD3CB'
+const CORAL = '#F4A892'
+const SPARKS: { x: string; y: string; s: number; c: string; d: number }[] = [
+  { x: '6%', y: '14%', s: 20, c: GOLD, d: 0 },
+  { x: '40%', y: '2%', s: 12, c: SEA, d: 0.7 },
+  { x: '66%', y: '20%', s: 26, c: CORAL, d: 0.35 },
+  { x: '18%', y: '48%', s: 14, c: SEA, d: 1.1 },
+  { x: '52%', y: '60%', s: 17, c: GOLD, d: 0.5 },
+  { x: '82%', y: '50%', s: 12, c: GOLD, d: 1.4 },
+  { x: '72%', y: '82%', s: 20, c: SEA, d: 0.9 },
+  { x: '30%', y: '78%', s: 13, c: CORAL, d: 1.2 },
+]
+
+function SparkleField() {
+  const reduce = useReducedMotion()
+  return (
+    <div className="pointer-events-none relative mt-12 hidden h-52 w-full max-w-sm lg:block" aria-hidden="true">
+      {/* soft warm glow behind the sparkles */}
+      <div className="absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(201,162,39,0.12),transparent_70%)]" />
+      {SPARKS.map((sp, i) => (
+        <motion.svg
+          key={i}
+          viewBox="0 0 24 24"
+          width={sp.s}
+          height={sp.s}
+          className="absolute"
+          style={{ left: sp.x, top: sp.y, color: sp.c }}
+          initial={reduce ? { opacity: 0.6 } : { opacity: 0.25, scale: 0.85 }}
+          animate={reduce ? { opacity: 0.6 } : { opacity: [0.25, 1, 0.25], scale: [0.85, 1, 0.85] }}
+          transition={reduce ? undefined : { duration: 3.4, repeat: Infinity, ease: 'easeInOut', delay: sp.d }}
+        >
+          <path fill="currentColor" d="M12 0c.6 4.7 2.3 6.4 7 7-4.7.6-6.4 2.3-7 7-.6-4.7-2.3-6.4-7-7 4.7-.6 6.4-2.3 7-7Z" />
+        </motion.svg>
+      ))}
+    </div>
+  )
+}
+
 export function WorkflowStory({
   eyebrow,
   heading,
@@ -54,6 +96,7 @@ export function WorkflowStory({
           <p className="eyebrow">{eyebrow}</p>
           <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-4xl">{heading}</h2>
           {intro && <p className="mt-5 text-base leading-7 text-slate-400">{intro}</p>}
+          <SparkleField />
         </motion.header>
 
         <ol ref={railRef} className="relative mt-2 lg:mt-0">
@@ -69,13 +112,13 @@ export function WorkflowStory({
             <li key={stage.key} className="relative pl-12 pb-10 last:pb-0 sm:pl-16">
               {/* Stage marker. Lights gold as it scrolls into view. */}
               <motion.span
-                className="absolute left-0 top-0 grid h-8 w-8 place-items-center rounded-full border text-[11px] font-bold leading-none tabular-nums sm:h-10 sm:w-10 sm:text-xs"
-                initial={reduce ? false : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(148,163,184,1)', backgroundColor: 'rgba(5,14,25,0.9)' }}
-                whileInView={{ borderColor: 'rgba(201,162,39,0.7)', color: '#E3CC7A', backgroundColor: 'rgba(201,162,39,0.12)' }}
+                className="absolute left-0 top-0 z-10 grid h-9 w-9 place-items-center rounded-full border sm:h-11 sm:w-11"
+                initial={reduce ? false : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(148,163,184,1)', backgroundColor: 'rgb(6,15,26)', boxShadow: '0 0 0 0 rgba(201,162,39,0)' }}
+                whileInView={{ borderColor: 'rgba(201,162,39,0.7)', color: '#E3CC7A', backgroundColor: 'rgb(6,15,26)', boxShadow: '0 0 0 4px rgba(201,162,39,0.10)' }}
                 viewport={{ once: true, margin: '-45% 0px -45% 0px' }}
                 transition={reduce ? { duration: 0 } : { duration: 0.3 }}
               >
-                {String(i + 1).padStart(2, '0')}
+                <span className="block font-display text-[13px] font-bold leading-none tabular-nums sm:text-sm">{String(i + 1).padStart(2, '0')}</span>
               </motion.span>
 
               <motion.div
