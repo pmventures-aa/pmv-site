@@ -116,15 +116,15 @@ export default function Properties() {
                       <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/12 bg-navy-950/70 text-gold"><Building2 size={16} /></span>
                     </div>
                   </div>
-                  <div className="p-3.5">
+                  <div className="min-w-0 p-3.5">
                     <p className="truncate font-semibold text-white" title={propertyDisplayName(row)}>{propertyDisplayName(row)}</p>
-                    <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-slate-400">
+                    <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-400">
                       <MapPin size={12} className="shrink-0" />
-                      {row.address}{row.unit ? ` · ${row.unit}` : ''}{city ? ` · ${city}` : ''}
+                      <span className="min-w-0 truncate">{row.address}{row.unit ? ` · ${row.unit}` : ''}{city ? ` · ${city}` : ''}</span>
                     </p>
-                    <div className="mt-2.5 flex items-center justify-between border-t border-white/[.06] pt-2.5">
-                      <p className="text-xs text-slate-500">{propertyTypeLabel(row.property_type)} · {occupancyLabel(row.occupancy)}</p>
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 transition group-hover:text-gold">Open <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" /></span>
+                    <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-white/[.06] pt-2.5">
+                      <p className="min-w-0 truncate text-xs text-slate-500">{propertyTypeLabel(row.property_type)} · {occupancyLabel(row.occupancy)}</p>
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-slate-500 transition group-hover:text-gold">Open <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" /></span>
                     </div>
                   </div>
                 </Link>
