@@ -67,6 +67,9 @@ export function DashboardWelcome({
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/80">{time.label} · {dateLabel}</p>
               <h1 className="mt-0.5 font-display text-xl font-medium text-white">{displayName}, welcome in.</h1>
               {subtitle && <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.16em] text-slate-600" title="EAGLE">
+                <span className="text-gold/70">E</span>ndeavor <span className="text-gold/70">A</span>lways to <span className="text-gold/70">G</span>row, <span className="text-gold/70">L</span>earn and <span className="text-gold/70">E</span>nhance
+              </p>
             </div>
           </div>
           <div className="min-w-0 max-w-md">

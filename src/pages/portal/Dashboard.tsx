@@ -9,6 +9,7 @@ import { useAuth } from '../../lib/auth'
 import { useAppPath } from '../../lib/basePath'
 import { SlaClock } from '../../components/kit/SlaClock'
 import { GetStartedPrompt } from '../../components/portal/GetStartedPrompt'
+import { JourneyProgress } from '../../components/portal/JourneyProgress'
 import { pmvFadeUp, pmvStagger } from '../../lib/motionTheme'
 import { clientWorkspace } from '../../lib/workspace'
 import { nextActionHref, responsibilityBanner, matterPresentation } from '../../../shared/matterWorkspace'
@@ -211,6 +212,15 @@ export default function Dashboard() {
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(240px,300px)]">
         <div className="min-w-0 space-y-5">
+          <motion.div variants={pmvFadeUp}>
+            <JourneyProgress
+              startTo={copy.primaryCta.to}
+              jobs={[
+                ...(data?.active_matters ?? []).map((m) => ({ id: `m-${m.id}`, label: m.title, status: m.client_stage || m.status || 'open', to: 'matters' })),
+                ...(data?.enabled_services ?? []).map((s) => ({ id: `s-${s.service_key}`, label: s.name, status: s.status || 'active', to: 'services' })),
+              ].slice(0, 6)}
+            />
+          </motion.div>
           {nextMove && (
             <motion.section variants={pmvFadeUp} className="rounded-md border border-gold/20 bg-gold/[.04] px-4 py-3">
               <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-gold/80">{nextMove.eyebrow}</p>
