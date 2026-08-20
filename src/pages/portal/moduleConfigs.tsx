@@ -13,7 +13,7 @@ export const callsConfig: ModuleConfig = {
   createLabel: '+ Request a call',
   createFields: [{ key: 'topic', label: 'What would you like to discuss?', type: 'textarea', required: true }],
   columns: [
-    { key: 'topic', label: 'Topic' },
+    { key: 'topic', label: 'Topic', description: true },
     { key: 'scheduled_at', label: 'Scheduled', render: (r) => (r.scheduled_at ? new Date(r.scheduled_at).toLocaleString() : 'Not yet scheduled') },
     { key: 'created_at', label: 'Requested', render: (r) => dt(r.created_at) },
   ],
@@ -109,7 +109,7 @@ export const fundingConfig: ModuleConfig = {
   }),
   columns: [
     { key: 'amount_requested_cents', label: 'Amount', render: (r) => (r.amount_requested_cents ? `$${(r.amount_requested_cents / 100).toLocaleString()}` : 'Not provided') },
-    { key: 'use_of_funds', label: 'Use of funds', render: (r) => <span className="line-clamp-1 max-w-xs">{r.use_of_funds}</span> },
+    { key: 'use_of_funds', label: 'Use of funds', description: true, render: (r) => r.use_of_funds || 'Not provided' },
     { key: 'created_at', label: 'Submitted', render: (r) => dt(r.created_at) },
   ],
   statusField: 'status',

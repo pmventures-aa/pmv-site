@@ -17,6 +17,10 @@ export interface ColumnConfig {
   key: string
   label: string
   render?: (row: any) => React.ReactNode
+  // Long free-text column (e.g. a description). On the desktop table it is
+  // truncated to one line to keep rows tight; on the mobile card it renders
+  // full-width and wraps so the client can actually read their own text.
+  description?: boolean
 }
 
 export interface ModuleConfig {
@@ -210,18 +214,27 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
             <ul className="divide-y divide-white/10 md:hidden">
               {items.map((row, i) => (
                 <li key={row.id ?? i} className="space-y-1.5 px-3 py-3">
-                  {config.columns.map((col, index) => (
-                    <div key={col.key} className={index === 0 ? '' : 'flex items-start justify-between gap-3 text-xs'}>
-                      {index === 0 ? (
-                        <p className="text-sm font-semibold text-white">{col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')}</p>
-                      ) : (
-                        <>
-                          <span className="text-slate-500">{col.label}</span>
-                          <span className="text-right text-slate-200">{col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')}</span>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                  {config.columns.map((col, index) => {
+                    const value = col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')
+                    if (index === 0) {
+                      return <p key={col.key} className="text-sm font-semibold text-white">{value}</p>
+                    }
+                    if (col.description) {
+                      // Full-width, wrapping block so long text stays readable.
+                      return (
+                        <div key={col.key}>
+                          <span className="block text-xs text-slate-500">{col.label}</span>
+                          <p className="mt-0.5 whitespace-pre-line break-words text-xs text-slate-200">{value}</p>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div key={col.key} className="flex items-start justify-between gap-3 text-xs">
+                        <span className="shrink-0 text-slate-500">{col.label}</span>
+                        <span className="min-w-0 break-words text-right text-slate-200">{value}</span>
+                      </div>
+                    )
+                  })}
                   {config.statusField && <div className="pt-1">{statusControls(row)}</div>}
                   {config.rowActions && <div className="pt-1">{config.rowActions(row)}</div>}
                 </li>
@@ -243,7 +256,7 @@ export function ModulePage({ config }: { config: ModuleConfig }) {
                 {items.map((row, i) => (
                   <tr key={row.id ?? i} className="border-b border-white/5 last:border-0">
                     {config.columns.map((col) => (
-                      <td key={col.key} className="whitespace-nowrap px-3 py-2 text-slate-200">
+                      <td key={col.key} className={`px-3 py-2 text-slate-200 ${col.description ? 'max-w-[22rem] truncate' : 'whitespace-nowrap'}`}>
                         {col.render ? col.render(row) : String(row[col.key] ?? 'Not provided')}
                       </td>
                     ))}

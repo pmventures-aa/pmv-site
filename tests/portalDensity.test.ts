@@ -8,6 +8,8 @@ describe('client portal density', () => {
   const welcome = readFileSync(new URL('../src/components/DashboardWelcome.tsx', import.meta.url), 'utf8')
   const dashboard = readFileSync(new URL('../src/pages/portal/Dashboard.tsx', import.meta.url), 'utf8')
   const billing = readFileSync(new URL('../src/pages/portal/Billing.tsx', import.meta.url), 'utf8')
+  const modulePage = readFileSync(new URL('../src/pages/portal/ModulePage.tsx', import.meta.url), 'utf8')
+  const moduleConfigs = readFileSync(new URL('../src/pages/portal/moduleConfigs.tsx', import.meta.url), 'utf8')
 
   it('scopes compact chrome to the client shell', () => {
     expect(shell).toContain('portal-app')
@@ -31,6 +33,23 @@ describe('client portal density', () => {
     expect(dashboard).not.toContain('rounded-2xl')
     expect(dashboard).not.toContain('rounded-full')
     expect(dashboard).toContain('rounded-md border border-gold/20')
+  })
+
+  it('keeps the page header action in a stable spot so a toggling label does not jump', () => {
+    // Header stacks on mobile (action on its own row) and only goes inline on
+    // sm+, so "+ New application" <-> "Cancel" never leaps beside the title.
+    expect(ui).toContain('flex flex-col gap-3 sm:flex-row')
+  })
+
+  it('shows long free-text columns in full on the mobile card, truncates only on the desktop table', () => {
+    // A description column renders full-width and wrapping on mobile...
+    expect(modulePage).toContain('col.description')
+    expect(modulePage).toContain('whitespace-pre-line break-words')
+    // ...and is the ONLY thing truncated in the desktop table cell.
+    expect(modulePage).toContain("col.description ? 'max-w-[22rem] truncate' : 'whitespace-nowrap'")
+    // The funding "use of funds" text must not be hard-clamped in its renderer.
+    expect(moduleConfigs).toContain("key: 'use_of_funds', label: 'Use of funds', description: true")
+    expect(moduleConfigs).not.toContain('line-clamp-1 max-w-xs')
   })
 
   it('keeps billing as a list, not a lecture or hover-lift card', () => {

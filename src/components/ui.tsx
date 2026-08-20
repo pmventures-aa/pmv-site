@@ -114,7 +114,11 @@ export function BrandMark3D({ size = 120, className = '', decorative = false, va
 }
 
 export function PageHeader({ eyebrow, title, subtitle, action }: { eyebrow: string; title: string; subtitle?: string; action?: React.ReactNode }) {
-  return <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">{eyebrow}</p><h1 className="mt-0.5 text-xl font-semibold text-white">{title}</h1>{subtitle && <p className="mt-0.5 max-w-2xl text-sm text-slate-400">{subtitle}</p>}</div>{action}</div>
+  // On mobile the action sits on its own row below the heading block, so a
+  // toggling label (e.g. "+ New application" <-> "Cancel") keeps a stable
+  // position instead of jumping up beside the title as it changes width. On
+  // sm+ it moves inline to the right.
+  return <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"><div className="min-w-0"><p className="eyebrow">{eyebrow}</p><h1 className="mt-0.5 text-xl font-semibold text-white">{title}</h1>{subtitle && <p className="mt-0.5 max-w-2xl text-sm text-slate-400">{subtitle}</p>}</div>{action && <div className="shrink-0">{action}</div>}</div>
 }
 
 export function EmptyState({ label }: { label: string }) {
