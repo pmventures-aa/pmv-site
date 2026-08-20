@@ -53,6 +53,7 @@ export function EmailTemplatesPanel() {
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [previewHtml, setPreviewHtml] = useState('')
   const [showPreview, setShowPreview] = useState(() => typeof window === 'undefined' || !window.matchMedia('(max-width: 1023px)').matches)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -62,8 +63,14 @@ export function EmailTemplatesPanel() {
 
   const load = useCallback(async (preferId?: string) => {
     setLoading(true)
+    setLoadFailed(false)
     try {
-      const r = await api.get<{ templates: HqEmailTemplate[]; sample_vars: Record<string, string> }>('/admin/email-templates')
+      // Guard against a request that never settles so the panel can't get stuck
+      // on "Loading email templates…" forever - surface a retry instead.
+      const r = await Promise.race([
+        api.get<{ templates: HqEmailTemplate[]; sample_vars: Record<string, string> }>('/admin/email-templates'),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Loading templates timed out. Check your connection and retry.')), 15000)),
+      ])
       setTemplates(r.templates)
       setSampleVars(r.sample_vars || {})
       const wanted = preferId || searchParams.get('template') || searchParams.get('slug')
@@ -73,7 +80,8 @@ export function EmailTemplatesPanel() {
         setDraft(toDraft(match))
       }
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Could not load email templates.')
+      setLoadFailed(true)
+      toast.error(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Could not load email templates.')
     } finally {
       setLoading(false)
     }
@@ -221,6 +229,14 @@ export function EmailTemplatesPanel() {
   }
 
   if (loading) return <p className="p-6 text-sm text-slate-400">Loading email templates…</p>
+  if (loadFailed && templates.length === 0) {
+    return (
+      <div className="space-y-3 p-6">
+        <p className="text-sm text-slate-400">Couldn't load email templates.</p>
+        <button type="button" onClick={() => void load()} className="text-sm font-semibold text-gold hover:underline">Retry</button>
+      </div>
+    )
+  }
   if (!selected || !draft) {
     return (
       <div className="space-y-4">
