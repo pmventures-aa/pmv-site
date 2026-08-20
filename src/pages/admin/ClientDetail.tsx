@@ -263,7 +263,9 @@ function Section({
           <EmptyState label={emptyLabel} />
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        <ul className="space-y-2.5 p-3 md:hidden">{rows.map((r, i) => <li key={r.id ?? i} className="rounded-lg border border-white/10 bg-white/[.02] p-3"><div className="space-y-1.5">{columns.map((c) => <div key={c.key} className="flex justify-between gap-3 text-xs"><span className="shrink-0 uppercase tracking-wide text-slate-500">{c.label}</span><span className="min-w-0 text-right text-slate-200">{c.render ? c.render(r) : String(r[c.key] ?? 'Not provided')}</span></div>)}{statusKey && onStatusChange && <div className="flex items-center justify-between gap-3 text-xs"><span className="shrink-0 uppercase tracking-wide text-slate-500">Status</span><select className="rounded-md border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white" value={r[statusKey]} onChange={(e) => onStatusChange(r.id, e.target.value)}>{(statusOptions[statusOptionsKey ?? ''] ?? []).map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</select></div>}</div>{(archiveEntity || assignEntity) && <div className="mt-3 flex justify-end gap-3 border-t border-white/5 pt-3">{assignEntity && r.assigned_staff_user_id !== user?.id && <button onClick={() => assignSelf(r.id)} className="text-xs font-medium text-gold hover:underline">Assign to me</button>}{archiveEntity && <button onClick={() => archive(r.id)} className="text-xs font-medium text-slate-500 hover:text-rose-300">Archive</button>}</div>}</li>)}</ul>
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
@@ -316,6 +318,7 @@ function Section({
             </tbody>
           </table>
         </div>
+        </>
       ))}
     </Panel>
   )
