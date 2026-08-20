@@ -21,6 +21,7 @@ const MobileDocumentHub = lazy(() => import('./pages/public/ServiceHubs').then((
 const ProjectGuidePage = lazy(() => import('./pages/public/ProjectGuides'))
 const About = lazy(() => import('./pages/public/About'))
 const HowItWorks = lazy(() => import('./pages/public/HowItWorks'))
+const Coverage = lazy(() => import('./pages/public/Coverage'))
 const Resources = lazy(() => import('./pages/public/Resources'))
 const ServiceArea = lazy(() => import('./pages/public/ServiceArea'))
 const Contact = lazy(() => import('./pages/public/Contact'))
@@ -111,6 +112,7 @@ function App() {
         <Route path="/start-a-request" element={<Navigate to="/scope-request" replace />} />
         <Route path="/request-assistance" element={<Navigate to="/scope-request" replace />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/coverage" element={<Coverage />} />
         <Route path="/resources" element={<Resources />} />
         <Route path="/instant-quote" element={<InstantQuote />} />
         <Route path="/quote/:token" element={<QuoteView />} />

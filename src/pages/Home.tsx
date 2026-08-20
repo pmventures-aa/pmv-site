@@ -151,8 +151,8 @@ export default function Home() {
               <p className="mt-5 max-w-lg text-base leading-7 text-slate-400">
                 Pinnacle coordinates remote professional support nationwide, with hands-on field coverage throughout South Florida. One point of contact keeps the people, documents, and next steps moving together.
               </p>
-              <ViewTransitionLink to="/how-it-works" className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-gold hover:underline">
-                Explore how Pinnacle works <span aria-hidden="true">→</span>
+              <ViewTransitionLink to="/coverage" className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-gold hover:underline">
+                See where we work <span aria-hidden="true">→</span>
               </ViewTransitionLink>
             </Reveal>
             <Reveal delay={0.05}>
