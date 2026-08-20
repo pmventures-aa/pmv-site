@@ -112,7 +112,18 @@ function PkgCard({ pkg, busy, onSavePackage, onSaveTier }: {
 
       <div className="mt-5">
         <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Bedroom tiers</p>
-        <div className="mt-2 overflow-x-auto">
+        <ul className="mt-2 space-y-3 md:hidden">
+          {pkg.tiers.map((tier) => (
+            <li key={tier.id} className="rounded-lg border border-white/10 bg-white/[.02] p-3">
+              <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Tier</span><input className={inputCls} value={tiers[tier.id]?.label ?? tier.tier_label} onChange={(e) => setTier(tier.id, 'label', e.target.value)} /></label>
+              <p className="mt-2 flex justify-between text-xs text-slate-400"><span>{tier.max_bedrooms == null ? '5+ bedrooms' : `Up to ${tier.max_bedrooms} bedrooms`}</span><span>Starting from ${(tier.starting_from / 100).toLocaleString()}</span></p>
+              <label className="mt-2 block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Client charge (USD)</span><input className={inputCls} type="number" min={0} step="0.01" value={tiers[tier.id]?.client ?? ''} onChange={(e) => setTier(tier.id, 'client', e.target.value)} /></label>
+              <label className="mt-2 block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Provider payout (USD)</span><input className={inputCls} type="number" min={0} step="0.01" value={tiers[tier.id]?.payout ?? ''} onChange={(e) => setTier(tier.id, 'payout', e.target.value)} /></label>
+              <button type="button" className={`${btnPrimary} mt-3 w-full justify-center`} disabled={busy} onClick={() => onSaveTier(tier, { tier_label: tiers[tier.id]?.label, client_price_cents: tiers[tier.id]?.client != null ? Math.round(Number(tiers[tier.id]?.client) * 100) : undefined, provider_payout_cents: tiers[tier.id]?.payout != null ? Math.round(Number(tiers[tier.id]?.payout) * 100) : undefined })}>{busy ? <Loader2 size={14} className="animate-spin" /> : <><Save size={14} /> Save tier</>}</button>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-2 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead>
               <tr className="border-b border-white/10 text-[10px] font-bold uppercase tracking-wide text-slate-500">
