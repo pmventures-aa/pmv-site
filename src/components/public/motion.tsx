@@ -61,6 +61,66 @@ export function RevealHeading({ children, className = '' }: { children: ReactNod
   )
 }
 
+// A headline that reveals line by line out of clipped masks, each line staggered
+// after the last, so the page's marquee copy gets an editorial, kinetic entrance
+// without ever changing the words. Reduced motion falls back to a plain per-line
+// fade with no transform and no stagger. `trigger` is 'mount' for above-the-fold
+// hero copy (an IntersectionObserver can miss copy that starts on screen) or
+// 'inView' for headings further down the page.
+export interface KineticLine { text: string; className?: string }
+export function KineticHeading({
+  lines,
+  className = '',
+  trigger = 'mount',
+  stagger = 0.12,
+}: {
+  lines: KineticLine[]
+  className?: string
+  trigger?: 'mount' | 'inView'
+  stagger?: number
+}) {
+  const reduce = useReducedMotion()
+  const activation =
+    trigger === 'mount'
+      ? { initial: 'hidden' as const, animate: 'show' as const }
+      : { initial: 'hidden' as const, whileInView: 'show' as const, viewport: { once: true, margin: '-72px' } }
+  const container: Variants = {
+    hidden: {},
+    show: { transition: { staggerChildren: reduce ? 0 : stagger, delayChildren: 0.12 } },
+  }
+  const line: Variants = reduce
+    ? { hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.4 } } }
+    : { hidden: { y: '115%' }, show: { y: '0%', transition: { type: 'spring', stiffness: 150, damping: 24, mass: 0.9 } } }
+  return (
+    <motion.span className={`block ${className}`} variants={container} {...activation}>
+      {lines.map((l, i) => (
+        <span key={i} className="block overflow-hidden pb-[0.12em]">
+          <motion.span className={`block ${l.className ?? ''}`} variants={line}>
+            {l.text}
+          </motion.span>
+        </span>
+      ))}
+    </motion.span>
+  )
+}
+
+// A quiet gold hairline that draws itself in from the left as a section boundary
+// scrolls into view: a piece of connective tissue between chapters of the page.
+// Reduced motion renders the finished rule with no draw. Decorative only.
+export function SectionTransition({ className = '' }: { className?: string }) {
+  const reduce = useReducedMotion()
+  return (
+    <motion.div
+      aria-hidden="true"
+      className={`mx-auto h-px w-full origin-left bg-gradient-to-r from-transparent via-gold/40 to-transparent ${className}`}
+      initial={reduce ? false : { scaleX: 0, opacity: 0 }}
+      whileInView={{ scaleX: 1, opacity: 1 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={reduce ? { duration: 0 } : pmvMotion.premium}
+    />
+  )
+}
+
 // Editorial helpers for the public site. Shared product transitions live in
 // lib/motionTheme so the portal and HQ can use the same timing more quietly.
 

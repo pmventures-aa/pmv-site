@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { Header } from '../components/public/Header'
 import { Footer } from '../components/public/Footer'
 import { btnOutline, btnPrimary, CtaBand, MotionStage } from '../components/public/ui'
-import { AmbientGlow, Reveal, StaggerGroup, StaggerOnMount, staggerItem } from '../components/public/motion'
+import { AmbientGlow, KineticHeading, Reveal, SectionTransition, StaggerGroup, StaggerOnMount, staggerItem } from '../components/public/motion'
 import { ViewTransitionLink } from '../components/public/ViewTransitionLink'
 import { usePageMeta } from '../lib/usePageMeta'
 import { usePublicVisitor } from '../lib/publicContext'
@@ -54,7 +54,7 @@ export default function Home() {
   )
   const heroCtaLabel = visitor.state.returning && visitor.state.world && visitor.state.world !== 'general'
     ? `Continue Your ${WORLD_LABEL[visitor.state.world] ?? 'Help'} Request`
-    : 'Tell Us What You Need Help With'
+    : 'What do you need done?'
 
   return (
     <div className="min-h-screen bg-navy-950">
@@ -65,10 +65,15 @@ export default function Home() {
           <div className="container-pmv relative z-10 grid min-h-[calc(100vh-68px)] gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
             <StaggerOnMount>
               <motion.p variants={staggerItem} className="eyebrow">Nationwide professional support · South Florida field services</motion.p>
-              <motion.h1 variants={staggerItem} className="pmv-h1 mt-6">
-                <span className="block">Professional Support.</span>
-                <span className="pmv-gold-text block">One Call Away.</span>
-              </motion.h1>
+              <h1 className="pmv-h1 mt-6">
+                <KineticHeading
+                  trigger="mount"
+                  lines={[
+                    { text: 'Professional Support.' },
+                    { text: 'One Call Away.', className: 'pmv-gold-text' },
+                  ]}
+                />
+              </h1>
               <motion.p variants={staggerItem} className="mt-7 max-w-3xl text-lg leading-8 text-slate-300 sm:text-xl">
                 Business, property, and administrative matters handled through one trusted point of contact.
               </motion.p>
@@ -88,6 +93,8 @@ export default function Home() {
             </motion.div>
           </div>
         </section>
+
+        <SectionTransition className="max-w-[72rem] px-4" />
 
         <section className="container-pmv py-16 sm:py-24">
           <Reveal className="grid gap-6 lg:grid-cols-[.72fr_1.28fr] lg:items-end">
