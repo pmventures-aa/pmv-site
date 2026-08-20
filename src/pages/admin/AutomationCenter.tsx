@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Pause, Play, RefreshCw, Settings2 } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, Tag, btnPrimary, btnOutline, EmptyState, SkeletonTable, inputCls } from '../../components/admin/ui'
+import { PageIntro, Panel, Tag, btnPrimary, btnOutline, EmptyState, SkeletonTable, inputCls, CardList, DataCard, CardRow } from '../../components/admin/ui'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { RecentListShell, RecentWindowBar, filterByNeedle, useRecentWindow } from '../../components/admin/RecentWindow'
 import { toast } from '../../components/kit/toast'
@@ -335,7 +335,8 @@ function HistoryTable({
       )}
       {runs.length === 0 ? <EmptyState label="No automation runs match these filters." /> : (
         <RecentListShell footer={<RecentWindowBar extra={windowed.extra} expanded={windowed.expanded} onToggle={() => windowed.setExpanded((v) => !v)} showing={windowed.showing} total={windowed.total} noun="runs" />}>
-          <div className="overflow-x-auto">
+          <CardList className="p-3">{windowed.visible.map((r) => { const detail = parseDetail(r.detail_json); const open = openRun === r.id; return <DataCard key={r.id}><button type="button" className="block text-left font-semibold text-white hover:text-gold" onClick={() => onOpen(open ? null : r.id)}>{labelFor(r.automation_key)}</button>{open && <div className="mt-2 rounded-lg border border-white/10 bg-black/20 p-3 text-[11px] leading-5 text-slate-400">{detail?.error ? <p className="text-rose-200">{String(detail.error)}</p> : null}{Array.isArray(detail?.errors) && (detail.errors as string[]).length > 0 && <ul className="mt-1 list-disc space-y-1 pl-4">{(detail.errors as string[]).map((item) => <li key={item}>{item}</li>)}</ul>}{!detail?.error && !Array.isArray(detail?.errors) && <pre className="whitespace-pre-wrap">{JSON.stringify(detail || { note: 'No additional detail recorded.' }, null, 2)}</pre>}</div>}<div className="mt-3 space-y-1.5"><CardRow label="Trigger"><span className="capitalize">{r.trigger_type}</span></CardRow><CardRow label="Status"><Tag tone={tone[r.status] || 'slate'}>{r.status}</Tag></CardRow><CardRow label="Processed">{r.items_processed}</CardRow><CardRow label="Succeeded">{r.items_succeeded}</CardRow><CardRow label="Failed"><span className={r.items_failed ? 'text-rose-300' : ''}>{r.items_failed}</span></CardRow><CardRow label="Duration">{duration(r)}</CardRow><CardRow label="Started">{fmt(r.started_at)}</CardRow></div></DataCard> })}</CardList>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[980px] text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left text-xs font-bold uppercase tracking-wide text-slate-500">

@@ -166,7 +166,7 @@ export default function StaffSettings() {
         </div>
 
         {isAdmin && users.length > 0 && (
-          <Panel className="mb-5 overflow-x-auto !p-0">
+          <Panel className="mb-5 hidden overflow-x-auto !p-0 md:block">
             <h3 className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-white">Effective grants</h3>
             <table className="w-full min-w-[720px] text-sm">
               <thead>

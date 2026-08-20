@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Plus, Search } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline, SkeletonTable } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline, SkeletonTable, CardList, DataCard, CardRow } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { services } from '../../data/services'
 import { ScopeIntakePicker } from '../../components/admin/ScopeIntakePicker'
@@ -263,7 +263,9 @@ export default function QuotesAdmin() {
 
         {quotes === null ? <p className="text-sm text-slate-400">Loading quotes…</p>
           : visible.length === 0 ? <EmptyState label={quotes.length === 0 ? 'No quotes yet. Create one, send the link, and it will show up here.' : 'Nothing matches this view.'} />
-          : <div className="overflow-x-auto rounded-xl border border-white/10">
+          : <>
+            <CardList className="pt-1">{visible.map((quote) => { const action = quoteNextAction(quote.status, quote.invoice_id); return <DataCard key={quote.id}><button type="button" onClick={() => openDetail(quote.id)} className="block w-full text-left"><b className="block text-white">{quote.quote_number}</b><span className="text-xs text-slate-500">{quote.title}</span></button><div className="mt-3 space-y-1.5"><CardRow label="Recipient"><span className="inline-flex flex-col items-end"><b className="text-slate-200">{quote.recipient_name}</b><span className="text-slate-500">{quote.recipient_company || quote.recipient_email}</span></span></CardRow><CardRow label="Status"><span className="inline-flex flex-col items-end gap-0.5"><Tag tone={quoteStatusTone(quote.status)}>{quoteStatusLabel(quote.status)}</Tag><span className="text-[11px] text-slate-500">{quote.invoice_number ? `Invoice ${quote.invoice_number}` : quoteIdleLabel(quote)}</span></span></CardRow><CardRow label="Total"><span className="font-semibold text-white">{quoteMoney(quote.total_cents)}</span></CardRow></div><div className="mt-3 flex flex-wrap gap-2 border-t border-white/5 pt-3">{action === 'send' && <button className={btnPrimary} onClick={() => void sendQuote(quote)}>Send</button>}{action === 'copy' && <button className={btnOutline} onClick={() => void copyLink(quote)}>Copy link</button>}{action === 'convert' && <button className={btnPrimary} onClick={() => openDetail(quote.id)}>Convert</button>}{action === 'open-invoice' && quote.invoice_id && <button className={btnOutline} onClick={() => navigate(`${p('invoices')}?invoice=${encodeURIComponent(quote.invoice_id!)}`)}>Open invoice</button>}{action === 'none' && <button className="text-xs font-bold text-gold hover:underline" onClick={() => openDetail(quote.id)}>Open</button>}</div></DataCard> })}</CardList>
+            <div className="hidden overflow-x-auto rounded-xl border border-white/10 md:block">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="bg-white/[0.025] text-[10px] uppercase tracking-wide text-slate-500">
                   <tr><th className="px-4 py-3 font-medium">Quote</th><th className="px-4 py-3 font-medium">Recipient</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 font-medium">Total</th><th className="px-4 py-3 font-medium">Next</th></tr>
@@ -289,7 +291,8 @@ export default function QuotesAdmin() {
                   })}
                 </tbody>
               </table>
-            </div>}
+            </div>
+            </>}
       </>
     )}
   </div>

@@ -232,7 +232,9 @@ export default function JourneyAutomation() {
           {deliveries.length === 0 ? (
             <p className="p-4 text-sm text-slate-500">No journey emails have sent yet.</p>
           ) : (
-            <table className="w-full min-w-[520px] text-sm">
+            <>
+            <ul className="divide-y divide-white/5 md:hidden">{deliveries.slice(0, 40).map((d, i) => <li key={`${d.user_id}-${d.step_key}-${i}`} className="p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="block truncate font-medium text-white">{d.full_name || d.email}</span>{d.full_name && <span className="block truncate text-xs text-slate-500">{d.email}</span>}</div><StatusBadge tone={deliveryTone(d.status)}>{d.status}</StatusBadge></div><div className="mt-2 flex justify-between gap-3 text-xs text-slate-400"><span className="capitalize">{prettyStep(d.step_key)}</span><span>{fmt(d.sent_at)}</span></div></li>)}</ul>
+            <table className="hidden w-full min-w-[520px] text-sm md:table">
               <thead>
                 <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-3 py-2 font-medium">Recipient</th>
@@ -255,6 +257,7 @@ export default function JourneyAutomation() {
                 ))}
               </tbody>
             </table>
+            </>
           )}
         </Card>
       </div>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnPrimary, Tag } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, NoAccess, inputCls, btnPrimary, Tag, CardList, DataCard, CardRow } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { ConfirmDialog } from '../../components/kit/ConfirmDialog'
 import { useAuth } from '../../lib/auth'
@@ -193,7 +193,9 @@ export default function AssignmentsAdmin() {
         {assignments.length === 0 ? (
           <div className="p-6"><EmptyState label="No assignments yet." /></div>
         ) : (
-          <table className="w-full min-w-[680px] text-sm">
+          <>
+          <CardList className="p-3">{assignments.map((a) => <DataCard key={a.id}><p className="font-medium text-white">{a.staff_name || a.staff_email}</p><div className="mt-3 space-y-1.5"><CardRow label="Client">{a.client_name || a.client_email}</CardRow><CardRow label="Routing">{a.is_primary ? <Tag tone="gold">Primary rep</Tag> : isAdmin ? <button disabled={primaryBusy === a.id} onClick={() => makePrimary(a)} className="text-xs font-medium text-gold hover:underline disabled:opacity-50">{primaryBusy === a.id ? 'Saving…' : 'Make primary'}</button> : <span className="text-slate-500">Team access</span>}</CardRow></div>{isAdmin && <div className="mt-3 flex justify-end border-t border-white/5 pt-3"><button onClick={() => setPendingRemove(a)} className="text-xs font-medium text-rose-300 hover:underline">Remove</button></div>}</DataCard>)}</CardList>
+          <table className="hidden w-full min-w-[680px] text-sm md:table">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-3 font-medium">Staff</th>
@@ -231,6 +233,7 @@ export default function AssignmentsAdmin() {
               ))}
             </tbody>
           </table>
+          </>
         )}
       </Panel>
 

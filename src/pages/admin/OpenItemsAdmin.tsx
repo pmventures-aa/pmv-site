@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { PageIntro, Panel, EmptyState, SkeletonTable } from '../../components/admin/ui'
+import { PageIntro, Panel, EmptyState, SkeletonTable, CardList, DataCard, CardRow } from '../../components/admin/ui'
 import { useAppPath } from '../../lib/basePath'
 import { clientEmailHref } from '../../lib/engagements'
 import { useLiveRefresh } from '../../lib/liveRefresh'
@@ -58,7 +58,8 @@ function OpenItemsTable({ items, cfg, p, itemType }: { items: any[]; cfg: (typeo
   const windowed = useRecentWindow(items)
   return (
     <RecentListShell footer={<RecentWindowBar extra={windowed.extra} expanded={windowed.expanded} onToggle={() => windowed.setExpanded((v) => !v)} showing={windowed.showing} total={windowed.total} noun="items" />}>
-      <div className="overflow-x-auto">
+      <CardList className="p-3">{windowed.visible.map((r) => <DataCard key={r.id}><Link to={p(`clients/${r.client_user_id}`)} className="block font-medium text-white">{r.client_name || r.client_email}</Link><div className="mt-3 space-y-1.5"><CardRow label={cfg.titleKey ? 'Item' : 'Amount'}>{cfg.titleKey ? r[cfg.titleKey] : `$${(r.amount_cents / 100).toLocaleString()}`}</CardRow><CardRow label="Detail">{cfg.extra(r)}</CardRow><CardRow label="Created">{new Date(r.created_at.replace(' ', 'T') + 'Z').toLocaleDateString()}</CardRow></div><div className="mt-3 flex flex-wrap gap-3 border-t border-white/5 pt-3">{itemType === 'invoices' && <Link to={`${p('invoices')}?invoice=${encodeURIComponent(r.id)}`} className="text-xs font-semibold text-gold hover:underline">Open invoice</Link>}<Link to={clientEmailHref(p, { id: r.client_user_id, email: r.client_email, name: r.client_name })} className="text-xs font-semibold text-gold hover:underline">Email</Link></div></DataCard>)}</CardList>
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[640px] text-sm">
           <thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-slate-500"><th className="px-5 py-3 font-medium">Client</th><th className="px-5 py-3 font-medium">{cfg.titleKey ? 'Item' : 'Amount'}</th><th className="px-5 py-3 font-medium">Detail</th><th className="px-5 py-3 font-medium">Created</th><th className="px-5 py-3 font-medium">Engage</th></tr></thead>
           <tbody>{windowed.visible.map((r) => <tr key={r.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]"><td className="px-5 py-3"><Link to={p(`clients/${r.client_user_id}`)} className="font-medium text-white hover:text-gold">{r.client_name || r.client_email}</Link></td><td className="px-5 py-3 text-slate-200">{cfg.titleKey ? r[cfg.titleKey] : `$${(r.amount_cents / 100).toLocaleString()}`}</td><td className="px-5 py-3 text-slate-400">{cfg.extra(r)}</td><td className="px-5 py-3 text-slate-400">{new Date(r.created_at.replace(' ', 'T') + 'Z').toLocaleDateString()}</td><td className="px-5 py-3"><div className="flex flex-wrap gap-3">{itemType === 'invoices' && <Link to={`${p('invoices')}?invoice=${encodeURIComponent(r.id)}`} className="text-xs font-semibold text-gold hover:underline">Open invoice</Link>}<Link to={clientEmailHref(p, { id: r.client_user_id, email: r.client_email, name: r.client_name })} className="text-xs font-semibold text-gold hover:underline">Email</Link></div></td></tr>)}</tbody>
