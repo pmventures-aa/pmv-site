@@ -322,7 +322,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
       <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10"><motion.div className="h-full bg-gold" animate={{width:`${progressPct}%`}} transition={{type:'spring',stiffness:120,damping:22}}/></div>
       <AnimatePresence mode="wait" initial={false}>
         <motion.p key={helperLine} initial={{opacity:0,y:4}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:.2}} className="mt-3 flex items-start gap-2 text-sm leading-6 text-slate-300">
-          <span aria-hidden className="mt-0.5 text-gold">✦</span><span>{helperLine}</span>
+          <Icon name="sparkles" size={15} aria-hidden="true" className="mt-0.5 shrink-0 text-gold" /><span>{helperLine}</span>
         </motion.p>
       </AnimatePresence>
     </div>

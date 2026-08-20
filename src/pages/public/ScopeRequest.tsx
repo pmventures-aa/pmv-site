@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { ScopeWizard } from '../../components/public/ScopeWizard'
-import { AmbientGlow } from '../../components/public/motion'
+import { AmbientGlow, KineticHeading } from '../../components/public/motion'
 import { Breadcrumbs, BreadcrumbSlot } from '../../components/public/Breadcrumbs'
 import { usePageMeta } from '../../lib/usePageMeta'
 import { usePublicVisitor } from '../../lib/publicContext'
@@ -34,5 +34,5 @@ export default function ScopeRequest(){
   useEffect(() => { if (world !== 'general') visitor.setWorld(world) }, [world])
   const copy=entry||publicIntakeCopy(world)
   usePageMeta(`${copy.title.replace(/\.$/, '')} | Pinnacle Management Ventures`, copy.body)
-  return <div className="min-h-screen bg-navy-950"><Header/><main><section className="relative overflow-hidden border-b border-white/10"><AmbientGlow/><div className="container-pmv relative z-10 py-12 sm:py-16"><BreadcrumbSlot><Breadcrumbs items={[{ label: 'Start a request' }]} /></BreadcrumbSlot><div className="mb-8 max-w-3xl"><p className="eyebrow">{copy.eyebrow}</p><h1 className="pmv-h1 mt-3">{copy.title}</h1><p className="mt-4 text-lg leading-8 text-slate-300">{copy.body}</p></div><ScopeWizard/></div></section></main><Footer/></div>
+  return <div className="min-h-screen bg-navy-950"><Header/><main><section className="relative overflow-hidden border-b border-white/10"><AmbientGlow/><div className="container-pmv relative z-10 py-12 sm:py-16"><BreadcrumbSlot><Breadcrumbs items={[{ label: 'Start a request' }]} /></BreadcrumbSlot><div className="mb-8 max-w-3xl"><p className="eyebrow">{copy.eyebrow}</p><h1 className="pmv-h1 mt-3"><KineticHeading trigger="mount" lines={[{ text: copy.title }]} /></h1><p className="mt-4 text-lg leading-8 text-slate-300">{copy.body}</p></div><ScopeWizard/></div></section></main><Footer/></div>
 }
