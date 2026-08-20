@@ -8,6 +8,7 @@ describe('public site clarity', () => {
   const footer = readFileSync(new URL('../src/components/public/Footer.tsx', import.meta.url), 'utf8')
   const main = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8')
   const login = readFileSync(new URL('../src/pages/auth/Login.tsx', import.meta.url), 'utf8')
+  const about = readFileSync(new URL('../src/pages/public/About.tsx', import.meta.url), 'utf8')
 
   it('keeps the three public pathways and Get Help as the conversion CTA', () => {
     expect(pathways.map((item) => item.key)).toEqual(['business', 'property', 'personal'])
@@ -25,7 +26,10 @@ describe('public site clarity', () => {
     expect(home).toContain('Tell Us What You Need Help With')
     expect(home).toContain('What brings you to Pinnacle?')
     expect(home).toContain('Know What')
-    expect(home).toContain('{founder.name}')
+    // The founder bio lives on /about, not the home page - the home stays about
+    // the client's work, not the owner.
+    expect(home).not.toContain('{founder.name}')
+    expect(about).toContain('{founder.name}')
     expect(founder.name).toBe('Cody R. Jenkins')
     expect(howItWorks).toHaveLength(4)
   })
