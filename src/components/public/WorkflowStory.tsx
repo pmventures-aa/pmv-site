@@ -1,5 +1,4 @@
-import { useRef } from 'react'
-import { motion, useReducedMotion, useScroll, useSpring } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { pmvMotion } from '../../lib/motionTheme'
 
 // The path every Pinnacle matter travels, told as a scroll story: a gold spine
@@ -78,9 +77,6 @@ export function WorkflowStory({
   stages: WorkflowStage[]
 }) {
   const reduce = useReducedMotion()
-  const railRef = useRef<HTMLOListElement>(null)
-  const { scrollYProgress } = useScroll({ target: railRef, offset: ['start 0.7', 'end 0.6'] })
-  const fill = useSpring(scrollYProgress, { stiffness: 80, damping: 26, mass: 0.6 })
 
   return (
     <section className="border-y border-white/[.07] bg-navy-900/20">
@@ -99,18 +95,27 @@ export function WorkflowStory({
           <SparkleField />
         </motion.header>
 
-        <ol ref={railRef} className="relative mt-2 lg:mt-0">
-          {/* Spine: a faint track with a gold fill that grows as the reader scrolls. */}
-          <div className="absolute left-[15px] top-2 bottom-2 w-px bg-white/12 sm:left-[19px]" aria-hidden="true">
-            <motion.div
-              className="h-full w-full origin-top bg-gradient-to-b from-gold via-gold to-gold/40"
-              style={reduce ? { scaleY: 1 } : { scaleY: fill }}
-            />
-          </div>
-
+        <ol className="relative mt-2 lg:mt-0">
           {stages.map((stage, i) => (
             <li key={stage.key} className="relative pl-12 pb-10 last:pb-0 sm:pl-16">
-              {/* Stage marker. Lights gold as it scrolls into view. */}
+              {/* Connector: lives only in the gap below this marker, never through the
+                  digits. It draws down from the bottom of this circle toward the next
+                  one as the reader scrolls, so the path completes one stage at a time.
+                  The last stage has no connector. */}
+              {i < stages.length - 1 && (
+                <div className="absolute left-[18px] top-9 bottom-0 w-px -translate-x-1/2 bg-white/10 sm:left-[22px] sm:top-11" aria-hidden="true">
+                  <motion.div
+                    className="h-full w-full origin-top bg-gradient-to-b from-gold via-gold to-gold/60"
+                    initial={reduce ? false : { scaleY: 0 }}
+                    whileInView={{ scaleY: 1 }}
+                    viewport={{ once: true, margin: '-40% 0px -35% 0px' }}
+                    transition={reduce ? { duration: 0 } : { duration: 0.5, ease: 'easeInOut' }}
+                    style={reduce ? { scaleY: 1 } : undefined}
+                  />
+                </div>
+              )}
+
+              {/* Stage marker. Its ring completes gold as it scrolls into view. */}
               <motion.span
                 className="absolute left-0 top-0 z-10 grid h-9 w-9 place-items-center rounded-full border sm:h-11 sm:w-11"
                 initial={reduce ? false : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(148,163,184,1)', backgroundColor: 'rgb(6,15,26)', boxShadow: '0 0 0 0 rgba(201,162,39,0)' }}
