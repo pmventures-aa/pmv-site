@@ -5,7 +5,7 @@ import { Reveal, RevealHeading } from '../../components/public/motion'
 import { CtaBand, btnOutline, btnPrimary } from '../../components/public/ui'
 import { Icon, type IconName } from '../../components/kit/Icon'
 import { BrandMark3D } from '../../components/ui'
-import { StoryImage, NetworkStory } from '../../components/public/story'
+import { NetworkStory } from '../../components/public/story'
 import { BrandPanel } from '../../components/public/BrandPanel'
 import { usePageMeta } from '../../lib/usePageMeta'
 import { GET_HELP, founder, principles } from '../../data/publicSite'
@@ -36,7 +36,7 @@ export default function About(){
 
     <section className="border-y border-white/10"><div className="container-pmv py-14 sm:py-16"><Reveal className="mx-auto max-w-3xl"><BrandPanel src="/brand/pmv-brand-panel.webp" alt="Pinnacle Management Ventures brand mark: professional support, nationwide solutions, trusted, reliable, results driven." illustrative={false}/></Reveal></div></section>
 
-    <section className="border-y border-white/10 bg-navy-900/30"><div className="container-pmv grid gap-10 py-14 sm:py-16 lg:grid-cols-[.8fr_1.2fr] lg:items-center"><Reveal><p className="eyebrow">Leadership</p><h2 className="mt-3 font-display text-3xl font-medium text-white">{founder.name}</h2><p className="mt-2 text-sm font-semibold uppercase tracking-[.12em] text-gold">{founder.title}</p><StoryImage slot="business_owner" className="mt-6 max-w-sm" aspect="aspect-[4/3]" /></Reveal><Reveal><p className="text-base leading-8 text-slate-300">{founder.lead}</p><p className="mt-4 text-base leading-8 text-slate-400">{founder.close}</p></Reveal></div></section>
+    <section className="border-y border-white/10 bg-navy-900/30"><div className="container-pmv grid gap-10 py-14 sm:py-16 lg:grid-cols-[.8fr_1.2fr] lg:items-center"><Reveal><p className="eyebrow">Leadership</p><h2 className="mt-3 font-display text-3xl font-medium text-white">{founder.name}</h2><p className="mt-2 text-sm font-semibold uppercase tracking-[.12em] text-gold">{founder.title}</p></Reveal><Reveal><p className="text-base leading-8 text-slate-300">{founder.lead}</p><p className="mt-4 text-base leading-8 text-slate-400">{founder.close}</p></Reveal></div></section>
 
     <section className="border-b border-white/10 bg-navy-900/30 py-14 sm:py-16">
       <NetworkStory
