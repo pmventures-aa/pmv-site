@@ -66,14 +66,14 @@ export function ConnectedSignInMethods({
 
   const canUnlink = hasPassword || identities.length > 1
   const copy = description || (tone === 'hq'
-    ? 'Link Google or Microsoft after signing in with your Pinnacle email and password. HQ and provider access still follow your role and permissions.'
-    : 'Link Google or Microsoft after you are signed in with your Pinnacle email and password. Pinnacle still controls what you can access.')
+    ? 'Add a faster sign-in. Link your Google or Microsoft account and you can use it to sign in next time instead of typing your password. Your Pinnacle email and password keep working, and HQ access still follows your role and permissions.'
+    : 'Add a faster sign-in. Link your Google or Microsoft account and you can use it to sign in next time instead of typing your password - your Pinnacle email and password keep working exactly the same.')
 
   if (!socialAllowed) return null
 
   return (
     <div>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-gold">Connected sign-in methods</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-gold">Faster sign-in</h2>
       <p className="mt-2 text-xs leading-5 text-slate-500">{copy}</p>
       {auth0Enabled && (
         <div className="mt-4 max-w-md">
