@@ -14,7 +14,7 @@ import { OrbitalFlow } from '../components/public/OrbitalFlow'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
 import { StoryImage, type RailPanel } from '../components/public/story'
-import { BrandPanel } from '../components/public/BrandPanel'
+import { ServiceConstellation } from '../components/public/ServiceConstellation'
 import { CLIENT_LOGIN, GET_HELP, founder, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
 import { getCleaningConfig } from '../lib/cleaningApi'
 import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricing'
@@ -164,7 +164,7 @@ export default function Home() {
               </ViewTransitionLink>
             </Reveal>
             <Reveal delay={0.05}>
-              <BrandPanel src="/brand/one-network-nationwide-coverage.webp" alt="Illustrative United States network graphic showing Pinnacle Management Ventures coordinating support nationwide with South Florida highlighted." />
+              <ServiceConstellation />
             </Reveal>
           </div>
         </section>
