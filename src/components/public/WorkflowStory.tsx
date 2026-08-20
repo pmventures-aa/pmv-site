@@ -14,6 +14,16 @@ export interface WorkflowStage {
   signal: string
 }
 
+// The canonical Pinnacle path, shared by every surface that tells this story so
+// the site never describes the workflow two different ways.
+export const PMV_WORKFLOW: WorkflowStage[] = [
+  { key: 'request', title: 'Request', detail: 'Tell us what needs to happen, where and when, and what matters most. No account required.', signal: 'Intake logged' },
+  { key: 'coordination', title: 'Coordination', detail: 'We confirm the work and assign the right Pinnacle contact or vetted local provider, fully briefed.', signal: 'Provider assigned' },
+  { key: 'execution', title: 'Execution', detail: 'The work happens on the ground, handled and documented as it goes.', signal: 'On site' },
+  { key: 'documentation', title: 'Documentation', detail: 'Evidence, timestamps, and status are captured and verified.', signal: 'Geo and time stamped' },
+  { key: 'completion', title: 'Completion', detail: 'You receive the result, the record, and a clear next step.', signal: 'Report delivered' },
+]
+
 export function WorkflowStory({
   eyebrow,
   heading,
