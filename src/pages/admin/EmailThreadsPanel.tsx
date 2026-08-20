@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CheckCheck, ChevronLeft, MailPlus, MoreVertical, PenLine, RefreshCw, Reply, Send, XCircle } from 'lucide-react'
+import { CheckCheck, ChevronLeft, MailPlus, MoreVertical, PenLine, RefreshCw, Reply, Send, Users, XCircle } from 'lucide-react'
 import { api, ApiError } from '../../lib/api'
 import { useLiveRefresh } from '../../lib/liveRefresh'
 import { Tag, btnPrimary, btnSecondary } from '../../components/admin/ui'
@@ -221,12 +221,19 @@ export function EmailThreadsPanel() {
       <ResendWebhookPanel compact />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-navy-900/40 md:flex-row">
         <aside className={`w-full shrink-0 flex-col border-b border-white/10 md:flex md:w-[320px] md:border-b-0 md:border-r ${selectedId ? 'hidden' : 'flex'}`}>
+          <div className="border-b border-white/10 px-2.5 pb-2 pt-2.5">
+            <div className="flex items-center gap-1.5">
+              <Users size={12} className="text-gold/80" />
+              <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/80">Shared inbox</p>
+            </div>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">Pinnacle's shared mailbox. The whole HQ team can see and reply to these, not just you.</p>
+          </div>
           <div className="flex items-center gap-2 border-b border-white/10 p-2.5">
             <button type="button" className={btnPrimary} onClick={startCompose}><MailPlus size={14}/>New Email</button>
             <button type="button" className={btnSecondary} onClick={() => { void load(); void loadDetail() }} aria-label="Refresh mail" title="Refresh mail">
               <RefreshCw size={14}/>
             </button>
-            <p className="ml-auto text-[11px] font-semibold text-slate-500">{unread ? `${unread} unread` : 'Inbox'}</p>
+            <p className="ml-auto text-[11px] font-semibold text-slate-500">{unread ? `${unread} unread` : 'Shared'}</p>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {threads.length === 0 && <p className="p-4 text-xs text-slate-500">No email threads yet. Compose one to start.</p>}
