@@ -30,6 +30,12 @@ describe('workflow story', () => {
     expect(services).not.toContain('request-to-completion')
   })
 
+  it('is reused on the service hub pages in place of ProcessJourney', () => {
+    const hubs = read('../src/pages/public/ServiceHubs.tsx')
+    expect(hubs).toContain('<WorkflowStory')
+    expect(hubs).not.toContain('ProcessJourney')
+  })
+
   it('carries the brief five-stage sequence from one shared source', () => {
     expect(comp).toContain('export const PMV_WORKFLOW')
     for (const key of ['request', 'coordination', 'execution', 'documentation', 'completion']) {
