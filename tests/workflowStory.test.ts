@@ -9,6 +9,7 @@ const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8'
 describe('workflow story', () => {
   const comp = read('../src/components/public/WorkflowStory.tsx')
   const home = read('../src/pages/Home.tsx')
+  const services = read('../src/pages/public/ServicesOverview.tsx')
 
   it('is a scroll-driven story with a progress spine', () => {
     expect(comp).toContain('useScroll')
@@ -24,9 +25,18 @@ describe('workflow story', () => {
     expect(home).not.toContain('OrbitalFlow')
   })
 
-  it('carries the brief five-stage sequence', () => {
+  it('is reused on the services page in place of the static workflow image', () => {
+    expect(services).toContain('<WorkflowStory')
+    expect(services).not.toContain('request-to-completion')
+  })
+
+  it('carries the brief five-stage sequence from one shared source', () => {
+    expect(comp).toContain('export const PMV_WORKFLOW')
     for (const key of ['request', 'coordination', 'execution', 'documentation', 'completion']) {
-      expect(home).toContain(`key: '${key}'`)
+      expect(comp).toContain(`key: '${key}'`)
     }
+    // Both surfaces pull from the shared constant, not their own copies.
+    expect(home).toContain('PMV_WORKFLOW')
+    expect(services).toContain('PMV_WORKFLOW')
   })
 })

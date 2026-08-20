@@ -10,7 +10,7 @@ import { usePageMeta } from '../lib/usePageMeta'
 import { usePublicVisitor } from '../lib/publicContext'
 import type { OperatingWorld } from '../../shared/workspace'
 import { HeroGuideRail } from '../components/public/HeroGuideRail'
-import { WorkflowStory, type WorkflowStage } from '../components/public/WorkflowStory'
+import { WorkflowStory, PMV_WORKFLOW } from '../components/public/WorkflowStory'
 import { ScopeWizard } from '../components/public/ScopeWizard'
 import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
 import { StoryImage } from '../components/public/story'
@@ -21,14 +21,6 @@ import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricin
 
 // How a request moves - the reusable Pinnacle lifecycle, shown as a bounded
 // horizontal story on desktop and a swipe carousel on mobile.
-const WORKFLOW: WorkflowStage[] = [
-  { key: 'request', title: 'Request', detail: 'Tell us what needs to happen, where and when, and what matters most. No account required.', signal: 'Intake logged' },
-  { key: 'coordination', title: 'Coordination', detail: 'We confirm the work and assign the right Pinnacle contact or vetted local provider, fully briefed.', signal: 'Provider assigned' },
-  { key: 'execution', title: 'Execution', detail: 'The work happens on the ground, handled and documented as it goes.', signal: 'On site' },
-  { key: 'documentation', title: 'Documentation', detail: 'Evidence, timestamps, and status are captured and verified.', signal: 'Geo and time stamped' },
-  { key: 'completion', title: 'Completion', detail: 'You receive the result, the record, and a clear next step.', signal: 'Report delivered' },
-]
-
 const WORLD_BY_PATHWAY: Record<string, OperatingWorld> = { business: 'business', property: 'property', personal: 'documents' }
 // One coastal accent per path so the three lanes read as distinct.
 const PATH_ACCENTS = ['text-gold', 'text-sea-300', 'text-coral-300']
@@ -132,7 +124,7 @@ export default function Home() {
           eyebrow="How the work moves"
           heading="From request to resolved, on one path."
           intro="Every Pinnacle matter runs through one connected system. You tell us what you need, and we move it from intake to a documented result while you get on with your day."
-          stages={WORKFLOW}
+          stages={PMV_WORKFLOW}
         />
 
         <section className="container-pmv py-16 sm:py-24">
