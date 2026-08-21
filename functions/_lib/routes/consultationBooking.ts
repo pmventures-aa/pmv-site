@@ -29,6 +29,7 @@ import { renderRelationshipEvent } from '../emailTemplates/relationship'
 import { PUBLIC_SITE_BASE } from '../scopeFunnel'
 import { isSlotBookable } from '../../../shared/availability'
 import { loadScheduleRow, loadSchedule, loadBusyIntervals } from './availability'
+import { createZoomMeeting, deleteZoomMeeting, isZoomConfigured } from '../zoom'
 
 export const consultationBookingPublicRoutes = new Hono<AppEnv>()
 export const consultationBookingAdminRoutes = new Hono<AppEnv>()
@@ -132,37 +133,66 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
   const inquiryId = uuid()
   const whenLabel = localLabel(startIso, schedule.timezone)
 
-  await c.env.DB.batch([
-    // The calendar row staff work from. Internal until someone confirms it, so
-    // an unverified email can never surface an event in a client's portal.
-    c.env.DB.prepare(
-      `INSERT INTO calendar_events
-         (id, title, description, starts_at, ends_at, all_day, timezone, event_type, status,
-          location_type, visibility, client_visible, assigned_user_id)
-       VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'proposed', ?, 'internal', 0, ?)`,
-    ).bind(
-      eventId,
-      `Consultation: ${name}`,
-      [topic ? `Topic: ${topic}` : '', `Booked online by ${name} <${email}>${phone ? ` (${phone})` : ''}`]
-        .filter(Boolean).join('\n\n'),
-      startIso, endIso, schedule.timezone, row.event_type, row.location_type, row.host_user_id,
-    ),
-    // The CRM lead, same shape every other public funnel produces.
-    c.env.DB.prepare(
-      `INSERT INTO contact_inquiries
-         (id, name, email, phone, service_key, message, source, lifecycle_stage, first_name, last_name, updated_at)
-       VALUES (?, ?, ?, ?, NULL, ?, 'consultation_booking', 'lead', ?, ?, datetime('now'))`,
-    ).bind(inquiryId, name, email, phone || null, topic || `Consultation booked for ${whenLabel}`, first, last),
-    c.env.DB.prepare(
-      `INSERT INTO consultation_bookings
-         (id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone,
-          topic, matched_user_id, starts_at, ends_at, timezone, created_ip)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      bookingId, publicToken, row.id, eventId, inquiryId, name, email, phone || null,
-      topic || null, matched?.id ?? null, startIso, endIso, schedule.timezone, ip,
-    ),
-  ])
+  // Generate the meeting BEFORE writing, so the confirmation email can carry
+  // the link rather than promising a second email. Strictly best-effort: a
+  // Zoom outage degrades to a booking with no link, never to a lost booking.
+  // Only the join url comes back from createZoomMeeting; the host start_url is
+  // a bearer credential and never leaves that module.
+  let meeting: { meetingId: string; joinUrl: string } | null = null
+  if (isZoomConfigured(c.env) && row.location_type === 'virtual') {
+    const created = await createZoomMeeting(c.env, {
+      topic: `Pinnacle consultation: ${name}`,
+      startsAt: startIso,
+      durationMinutes: schedule.slotMinutes,
+      timezone: schedule.timezone,
+      agenda: topic || undefined,
+    })
+    if (created.ok) meeting = { meetingId: created.value.meetingId, joinUrl: created.value.joinUrl }
+    else console.error('[zoom] consultation meeting create failed', created.reason, created.detail)
+  }
+
+  try {
+    await c.env.DB.batch([
+      // The calendar row staff work from. Internal until someone confirms it, so
+      // an unverified email can never surface an event in a client's portal.
+      // meeting_url here is what feeds the ICS invite's LOCATION field.
+      c.env.DB.prepare(
+        `INSERT INTO calendar_events
+           (id, title, description, starts_at, ends_at, all_day, timezone, event_type, status,
+            location_type, meeting_url, visibility, client_visible, assigned_user_id)
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'proposed', ?, ?, 'internal', 0, ?)`,
+      ).bind(
+        eventId,
+        `Consultation: ${name}`,
+        [topic ? `Topic: ${topic}` : '', `Booked online by ${name} <${email}>${phone ? ` (${phone})` : ''}`]
+          .filter(Boolean).join('\n\n'),
+        startIso, endIso, schedule.timezone, row.event_type, row.location_type,
+        meeting?.joinUrl ?? null, row.host_user_id,
+      ),
+      // The CRM lead, same shape every other public funnel produces.
+      c.env.DB.prepare(
+        `INSERT INTO contact_inquiries
+           (id, name, email, phone, service_key, message, source, lifecycle_stage, first_name, last_name, updated_at)
+         VALUES (?, ?, ?, ?, NULL, ?, 'consultation_booking', 'lead', ?, ?, datetime('now'))`,
+      ).bind(inquiryId, name, email, phone || null, topic || `Consultation booked for ${whenLabel}`, first, last),
+      c.env.DB.prepare(
+        `INSERT INTO consultation_bookings
+           (id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone,
+            topic, matched_user_id, starts_at, ends_at, timezone, created_ip,
+            meeting_provider, meeting_external_id, meeting_url)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        bookingId, publicToken, row.id, eventId, inquiryId, name, email, phone || null,
+        topic || null, matched?.id ?? null, startIso, endIso, schedule.timezone, ip,
+        meeting ? 'zoom' : null, meeting?.meetingId ?? null, meeting?.joinUrl ?? null,
+      ),
+    ])
+  } catch (err) {
+    // The meeting exists but nothing references it. Clean it up rather than
+    // leaving a phantom on the host's Zoom calendar.
+    if (meeting) await deleteZoomMeeting(c.env, meeting.meetingId).catch(() => {})
+    throw err
+  }
 
   const manageUrl = `${PUBLIC_SITE_BASE}/consultation/booking?ref=${encodeURIComponent(publicToken)}`
 
@@ -176,9 +206,15 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
     title: 'Your consultation is on the calendar',
     body: `You are booked for ${whenLabel}. The call is scheduled for ${schedule.slotMinutes} minutes.\n\n`
       + `${topic ? `You told us you wanted to cover: ${topic}\n\n` : ''}`
-      + 'We will send joining details before the call. Use the link below if you need to cancel or you booked the wrong time.',
+      + (meeting
+        ? `Join the call here when it is time: ${meeting.joinUrl}\n\nYou will wait briefly in the waiting room until we let you in.\n\n`
+        : 'We will send joining details before the call.\n\n')
+      + 'Use the link below if you need to cancel or you booked the wrong time.',
+    // The CTA stays the manage page even when a join link exists: the join
+    // link is only useful at one moment, the manage page always is.
     ctaLabel: 'Manage My Booking',
     ctaUrl: manageUrl,
+    ...(meeting ? { footerLink: { label: 'Join the call', url: meeting.joinUrl } } : {}),
   })
 
   await Promise.allSettled([
@@ -198,7 +234,14 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
       html: `<p><strong>${escapeHtml(name)}</strong> booked a consultation.</p>`
         + `<p>When: ${escapeHtml(whenLabel)}<br>Email: ${escapeHtml(email)}`
         + `${phone ? `<br>Phone: ${escapeHtml(phone)}` : ''}</p>`
-        + `${topic ? `<p>Topic: ${escapeHtml(topic)}</p>` : ''}`,
+        + `${topic ? `<p>Topic: ${escapeHtml(topic)}</p>` : ''}`
+        // Say so loudly when no link was generated, so someone adds one
+        // rather than everybody discovering it at the start of the call.
+        + (meeting
+          ? `<p>Zoom link: ${escapeHtml(meeting.joinUrl)}</p>`
+          : isZoomConfigured(c.env)
+            ? '<p><strong>No Zoom link was generated for this booking.</strong> Add joining details before the call.</p>'
+            : ''),
       fallbackMode: 'no_recipients',
     }),
   ])
@@ -267,9 +310,10 @@ consultationBookingPublicRoutes.get('/consultation/booking/:ref', async (c) => {
 consultationBookingPublicRoutes.post('/consultation/booking/:ref/cancel', async (c) => {
   const ref = c.req.param('ref') ?? ''
   const row = await c.env.DB.prepare(
-    `SELECT id, calendar_event_id, contact_name, email, starts_at, timezone, status
+    `SELECT id, calendar_event_id, contact_name, email, starts_at, timezone, status,
+            meeting_provider, meeting_external_id
        FROM consultation_bookings WHERE public_token = ?`,
-  ).bind(ref).first<{ id: string; calendar_event_id: string | null; contact_name: string; email: string; starts_at: string; timezone: string; status: string }>()
+  ).bind(ref).first<{ id: string; calendar_event_id: string | null; contact_name: string; email: string; starts_at: string; timezone: string; status: string; meeting_provider: string | null; meeting_external_id: string | null }>()
   if (!row) return c.json({ error: 'Booking not found' }, 404)
   // Cancelling an already-cancelled booking is a no-op, not an error: the
   // visitor may simply have hit the link twice.
@@ -282,19 +326,30 @@ consultationBookingPublicRoutes.post('/consultation/booking/:ref/cancel', async 
   const statements = [
     c.env.DB.prepare(
       `UPDATE consultation_bookings
-          SET status = 'cancelled', cancelled_at = datetime('now'), cancelled_reason = ?, updated_at = datetime('now')
+          SET status = 'cancelled', cancelled_at = datetime('now'), cancelled_reason = ?,
+              meeting_url = NULL, updated_at = datetime('now')
         WHERE id = ?`,
     ).bind(reason || null, row.id),
   ]
   if (row.calendar_event_id) {
     // Cancel rather than delete, so the slot frees up while the history stays.
+    // The meeting url goes with it: a cancelled call must not leave a live
+    // join link sitting in the calendar or in an ICS update.
     statements.push(
       c.env.DB.prepare(
-        "UPDATE calendar_events SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?",
+        "UPDATE calendar_events SET status = 'cancelled', meeting_url = NULL, updated_at = datetime('now') WHERE id = ?",
       ).bind(row.calendar_event_id),
     )
   }
   await c.env.DB.batch(statements)
+
+  // Tear down the meeting so it stops occupying the host's Zoom calendar and
+  // the old link stops working. Best-effort, and after the write: the
+  // cancellation is already true regardless of what Zoom says.
+  if (row.meeting_provider === 'zoom' && row.meeting_external_id) {
+    const removed = await deleteZoomMeeting(c.env, row.meeting_external_id)
+    if (!removed.ok) console.error('[zoom] consultation meeting delete failed', removed.reason, removed.detail)
+  }
 
   await notifyStaff(c.env, {
     staffUserIds: [],

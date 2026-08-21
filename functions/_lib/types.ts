@@ -28,6 +28,16 @@ export interface Env {
   AUTH0_LOGOUT_URL?: string
   AUTH0_CONNECTION_GOOGLE?: string
   AUTH0_CONNECTION_MICROSOFT?: string
+  // Zoom Server-to-Server OAuth, used to create consultation meetings.
+  // Account-level credentials: no per-user consent flow. All three must be
+  // present or meeting generation stays off and bookings simply carry no
+  // link. Set as encrypted secrets, never in wrangler.toml.
+  ZOOM_ACCOUNT_ID?: string
+  ZOOM_CLIENT_ID?: string
+  ZOOM_CLIENT_SECRET?: string
+  // Which Zoom user hosts generated meetings. An email address, or 'me' to
+  // use the credential's own account. Not a secret.
+  ZOOM_HOST_EMAIL?: string
 }
 
 export type Role = 'client' | 'staff' | 'admin' | 'trusted_contact'
