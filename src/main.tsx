@@ -47,6 +47,8 @@ const CleaningAirbnb = lazy(() => import('./pages/public/Cleaning').then((m) => 
 const CleaningRecurring = lazy(() => import('./pages/public/Cleaning').then((m) => ({ default: m.CleaningRecurring })))
 const CleaningArea = lazy(() => import('./pages/public/CleaningArea').then((m) => ({ default: m.CleaningArea })))
 const CleaningAreasIndex = lazy(() => import('./pages/public/CleaningArea').then((m) => ({ default: m.CleaningAreasIndex })))
+const Consultation = lazy(() => import('./pages/public/Consultation'))
+const ConsultationBooking = lazy(() => import('./pages/public/Consultation').then((m) => ({ default: m.ConsultationBooking })))
 const NotFound = lazy(() => import('./pages/public/NotFound'))
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider } from './lib/theme'
@@ -115,6 +117,9 @@ function App() {
         <Route path="/coverage" element={<Coverage />} />
         <Route path="/resources" element={<Resources />} />
         <Route path="/instant-quote" element={<InstantQuote />} />
+        <Route path="/consultation" element={<Consultation />} />
+        <Route path="/consultation/booking" element={<ConsultationBooking />} />
+        <Route path="/book-a-consultation" element={<Navigate to="/consultation" replace />} />
         <Route path="/quote/:token" element={<QuoteView />} />
         <Route path="/care-plans" element={<CarePlans />} />
         <Route path="/care-plans/confirmation" element={<CarePlansConfirmation />} />
