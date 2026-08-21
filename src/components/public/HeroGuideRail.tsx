@@ -30,7 +30,10 @@ export function HeroGuideRail() {
 
   return (
     <div className="relative flex min-h-[440px] items-end pt-16 sm:pt-20">
-      <div className="pointer-events-none absolute -top-6 right-0 opacity-40 sm:-top-10 sm:right-2" aria-hidden="true">
+      {/* Decorative watermark crest. Hidden on phones, where the single-column
+          layout left it floating in dead space above the guide card and reading
+          as low quality; on sm+ it sits as a subtle mark behind the rail. */}
+      <div className="pointer-events-none absolute right-0 top-0 hidden opacity-40 sm:-top-10 sm:right-2 sm:block" aria-hidden="true">
         <Crest size={160} tone="light" decorative />
       </div>
       <div

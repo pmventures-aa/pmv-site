@@ -21,11 +21,17 @@ export class AdminPageBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('HQ workspace render failure', error, info.componentStack)
     if (isChunkLoadError(error) && typeof window !== 'undefined') {
-      // Reload once for a stale bundle; a sentinel prevents a reload loop if the
-      // fresh bundle still fails for some other reason.
+      // Reload for a stale bundle, but guard against a tight reload loop. Using a
+      // short time window rather than a one-time session flag matters when a long
+      // HQ session spans several deploys: each fresh stale-chunk event (minutes
+      // apart) still self-heals, while a bundle that crashes immediately on load
+      // (a second failure within the window) falls through to the manual UI
+      // instead of looping.
       const KEY = 'pmv_hq_chunk_reload'
+      const LOOP_WINDOW_MS = 12000
       try {
-        if (!sessionStorage.getItem(KEY)) {
+        const last = Number(sessionStorage.getItem(KEY) || 0)
+        if (!Number.isFinite(last) || Date.now() - last > LOOP_WINDOW_MS) {
           sessionStorage.setItem(KEY, String(Date.now()))
           window.location.reload()
           return
