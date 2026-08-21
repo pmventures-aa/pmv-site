@@ -10,6 +10,10 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    # The vitest suite peaks near Node's default ~4GB heap; give it headroom so
+    # a normal run does not flake with "JavaScript heap out of memory".
+    env:
+      NODE_OPTIONS: --max-old-space-size=5120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
