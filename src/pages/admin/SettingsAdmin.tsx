@@ -76,6 +76,18 @@ export default function SettingsAdmin() {
     return visibleTabs.filter(item => `${item.label} ${item.short} ${item.terms}`.toLowerCase().includes(needle))
   }, [query, visibleTabs])
   const current = visibleTabs.find(item => item.key === tab) || visibleTabs[0]
+  // Below xl the sections are a select, not the nav list, and the select used
+  // to ignore the search box entirely: typing "calendar" on a phone filtered
+  // a list that was not on screen and left the dropdown unchanged. It now
+  // narrows too, always keeping the current tab so the select never renders
+  // with a value it has no option for, and falling back to everything when a
+  // search matches nothing rather than emptying the only control there is.
+  const selectableTabs = useMemo(() => {
+    const base = matchingTabs.length ? matchingTabs : visibleTabs
+    return base.some(item => item.key === tab)
+      ? base
+      : [...base, ...visibleTabs.filter(item => item.key === tab)]
+  }, [matchingTabs, visibleTabs, tab])
 
   useEffect(() => {
     const fromUrl = searchParams.get('tab')
@@ -118,7 +130,7 @@ export default function SettingsAdmin() {
             </div>
 
             <select className={`${inputCls} mb-3 xl:hidden`} value={tab} onChange={e => setTab(e.target.value as TabKey)} aria-label="Settings section">
-              {visibleTabs.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+              {selectableTabs.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
             </select>
 
             <nav className="hidden space-y-1 xl:block" aria-label="Settings sections">
