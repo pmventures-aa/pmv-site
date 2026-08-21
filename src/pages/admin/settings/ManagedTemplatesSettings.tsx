@@ -1,26 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Copy, ExternalLink, Eye, Pencil, Plus, Save, Send, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bold, Copy, ExternalLink, Eye, Heading, Italic, Link2, List, ListOrdered, Pencil, Plus, Save, Send, Trash2 } from 'lucide-react'
 import { api, ApiError } from '../../../lib/api'
 import { Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline, btnSecondary } from '../../../components/admin/ui'
 import { toast } from '../../../components/kit/toast'
 import { VariableInsertMenu } from '../../../components/admin/VariableInsertMenu'
+import { RichText } from '../../../components/RichText'
 import { buildEmailPreviewVars, resolveTemplateTokens, extractTemplateTokens, isKnownEmailVariable } from '../../../../shared/emailVariables'
 import type { ManagedAgreementSection } from '../../../../shared/providerAgreementContent'
-
-// Render a section body the same way the public agreement does (blank-line
-// paragraphs, "- " bullet lists), but with {{tokens}} resolved to sample values
-// so the editor preview shows what a reader will actually see.
-function PreviewBody({ body, vars }: { body: string; vars: Record<string, string> }) {
-  const resolved = resolveTemplateTokens(body, vars)
-  const blocks = resolved.split(/\n\s*\n/).filter(Boolean)
-  return <>{blocks.map((block, index) => {
-    const lines = block.split('\n').filter(Boolean)
-    if (lines.length > 0 && lines.every((line) => line.startsWith('- '))) {
-      return <ul key={index} className="ml-5 list-disc space-y-1 text-sm leading-6 text-slate-300">{lines.map((line, i) => <li key={i}>{line.slice(2)}</li>)}</ul>
-    }
-    return <p key={index} className="text-sm leading-6 text-slate-300">{block}</p>
-  })}</>
-}
 
 interface TemplateSummary {
   id: string
@@ -57,6 +43,8 @@ const CATEGORIES = [
 ] as const
 
 const blankCreate = { name: '', category: 'document', description: '', template_key: '' }
+
+const fmtBtn = 'grid h-7 w-7 place-items-center rounded text-slate-400 transition hover:bg-white/[.06] hover:text-white'
 
 function usedBy(template: { template_key: string; category: string }) {
   if (template.template_key === 'provider-agreement') return 'Provider application and public agreement page'
@@ -98,14 +86,47 @@ export default function ManagedTemplatesSettings() {
   // Insert a {{token}} at the caret in a section body (or append if the field is
   // not focused), then restore focus and caret just past the inserted token.
   function insertToken(index: number, token: string) {
+    editBody(index, (body, start) => ({ value: body.slice(0, start) + token + body.slice(start), caret: start + token.length }))
+  }
+
+  // Shared caret-aware edit for a section body: transform receives the current
+  // body and selection and returns the new body plus where to leave the caret.
+  // The formatting toolbar and variable insert both go through this so the
+  // markdown-subset stays the single stored format (no HTML is ever stored).
+  function editBody(index: number, transform: (body: string, start: number, end: number) => { value: string; caret: number }) {
+    const el = bodyRefs.current[index]
     setDraft((current) => {
       if (!current) return current
-      const el = bodyRefs.current[index]
       const body = current.sections[index].body
-      const pos = el && document.activeElement === el ? el.selectionStart : body.length
-      const nextBody = body.slice(0, pos) + token + body.slice(pos)
-      requestAnimationFrame(() => { if (el) { el.focus(); const caret = pos + token.length; el.setSelectionRange(caret, caret) } })
-      return { ...current, sections: current.sections.map((section, position) => position === index ? { ...section, body: nextBody } : section) }
+      const focused = el && document.activeElement === el
+      const start = focused ? el.selectionStart : body.length
+      const end = focused ? el.selectionEnd : body.length
+      const { value, caret } = transform(body, start, end)
+      requestAnimationFrame(() => { if (el) { el.focus(); el.setSelectionRange(caret, caret) } })
+      return { ...current, sections: current.sections.map((section, position) => position === index ? { ...section, body: value } : section) }
+    })
+  }
+  // Wrap the selection with an inline marker (**bold**, *italic*).
+  function wrapSelection(index: number, marker: string) {
+    editBody(index, (body, start, end) => {
+      const sel = body.slice(start, end) || 'text'
+      return { value: body.slice(0, start) + marker + sel + marker + body.slice(end), caret: start + marker.length + sel.length + marker.length }
+    })
+  }
+  // Prefix the line the caret sits on (headings, list items).
+  function prefixLine(index: number, prefix: string) {
+    editBody(index, (body, start) => {
+      const lineStart = body.lastIndexOf('\n', start - 1) + 1
+      return { value: body.slice(0, lineStart) + prefix + body.slice(lineStart), caret: start + prefix.length }
+    })
+  }
+  function insertLink(index: number) {
+    const url = window.prompt('Link URL (https://…)')?.trim()
+    if (!url) return
+    editBody(index, (body, start, end) => {
+      const sel = body.slice(start, end) || 'link text'
+      const md = `[${sel}](${url})`
+      return { value: body.slice(0, start) + md + body.slice(end), caret: start + md.length }
     })
   }
 
@@ -316,7 +337,7 @@ export default function ManagedTemplatesSettings() {
           <div className="space-y-6">{draft.sections.map((section, index) => (
             <section key={`${section.id}-${index}`}>
               <h4 className="mb-2 font-display text-base font-bold text-white">{resolveTemplateTokens(section.title, previewVars) || `Section ${index + 1}`}</h4>
-              <div className="space-y-2"><PreviewBody body={section.body} vars={previewVars} /></div>
+              <RichText source={resolveTemplateTokens(section.body, previewVars)} className="text-sm leading-7 text-slate-300" />
             </section>
           ))}</div>
         </div>
@@ -332,12 +353,19 @@ export default function ManagedTemplatesSettings() {
               </div>
             </div>
             <input className={`${inputCls} mt-3 font-bold`} value={section.title} onChange={(e) => updateSection(index, 'title', e.target.value)} placeholder="Section title" />
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-slate-500">Body</span>
-              <VariableInsertMenu onInsert={(token) => insertToken(index, token)} />
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <div className="flex items-center gap-0.5 rounded-md border border-white/10 bg-white/[.02] p-0.5">
+                <button type="button" title="Bold" aria-label="Bold" className={fmtBtn} onClick={() => wrapSelection(index, '**')}><Bold size={13} /></button>
+                <button type="button" title="Italic" aria-label="Italic" className={fmtBtn} onClick={() => wrapSelection(index, '*')}><Italic size={13} /></button>
+                <button type="button" title="Heading" aria-label="Heading" className={fmtBtn} onClick={() => prefixLine(index, '# ')}><Heading size={13} /></button>
+                <button type="button" title="Bullet list" aria-label="Bullet list" className={fmtBtn} onClick={() => prefixLine(index, '- ')}><List size={13} /></button>
+                <button type="button" title="Numbered list" aria-label="Numbered list" className={fmtBtn} onClick={() => prefixLine(index, '1. ')}><ListOrdered size={13} /></button>
+                <button type="button" title="Link" aria-label="Link" className={fmtBtn} onClick={() => insertLink(index)}><Link2 size={13} /></button>
+              </div>
+              <VariableInsertMenu onInsert={(token) => insertToken(index, token)} className="ml-auto" />
             </div>
-            <textarea ref={(el) => { bodyRefs.current[index] = el }} className={`${inputCls} mt-1.5 min-h-44 font-mono text-xs leading-6`} value={section.body} onChange={(e) => updateSection(index, 'body', e.target.value)} placeholder="Section text. Start list items with - " />
-            <p className="mt-2 text-[11px] text-slate-600">Separate paragraphs with a blank line. Start every list item with “- ”. Insert {'{{variables}}'} from the menu; they fill in when the template is used.</p>
+            <textarea ref={(el) => { bodyRefs.current[index] = el }} className={`${inputCls} mt-1.5 min-h-44 font-mono text-xs leading-6`} value={section.body} onChange={(e) => updateSection(index, 'body', e.target.value)} placeholder="Section text. Use the toolbar to format, or type **bold**, *italic*, # Heading, - bullet." />
+            <p className="mt-2 text-[11px] text-slate-600">Formatting: **bold**, *italic*, # Heading, ## Subheading, - bullet, 1. numbered, [label](https://link). Blank line separates paragraphs. Insert {'{{variables}}'} from the menu; they fill in when the template is used.</p>
           </section>
         ))}</div>
       )}
