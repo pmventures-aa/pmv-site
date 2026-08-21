@@ -4,9 +4,13 @@ import { Panel, EmptyState, Skeleton, inputCls, btnPrimary, btnOutline, Tag } fr
 import { api, ApiError } from '../../../lib/api'
 import {
   WEEKDAY_LABELS,
+  addDaysToDateKey,
+  dateKeyWeekday,
   defaultBusinessWindows,
   formatHhMm,
   parseHhMm,
+  utcMsToDateKey,
+  zonedWallTimeToUtcMs,
   type AvailabilityWindow,
 } from '../../../../shared/availability'
 
@@ -18,6 +22,71 @@ import {
 // stays correct across daylight saving without anything being regenerated.
 
 interface Blackout { id: string; startsAt: string; endsAt: string; reason?: string | null }
+
+const MINUTES_PER_DAY = 24 * 60
+
+/** Local midnight of dateKey IN THE SCHEDULE'S ZONE, as an ISO instant. */
+function dayStartIso(dateKey: string, timezone: string): string {
+  return new Date(zonedWallTimeToUtcMs(dateKey, 0, timezone)).toISOString()
+}
+
+/**
+ * A datetime-local value ("2026-08-25T14:30") as an instant in the schedule's
+ * zone. new Date() on that string reads it as the BROWSER's wall time, which
+ * silently shifts the block whenever the admin is not sitting in the
+ * schedule's timezone.
+ */
+function wallTimeToIso(value: string, timezone: string): string | null {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value)
+  if (!match) return null
+  const minuteOfDay = Number(match[2]) * 60 + Number(match[3])
+  if (!Number.isFinite(minuteOfDay) || minuteOfDay >= MINUTES_PER_DAY) return null
+  return new Date(zonedWallTimeToUtcMs(match[1], minuteOfDay, timezone)).toISOString()
+}
+
+/** Today in the schedule's zone, which is not always today in the browser's. */
+function todayKey(timezone: string): string {
+  return utcMsToDateKey(Date.now(), timezone)
+}
+
+/** The next dateKey on the given weekday, or today when today already is. */
+function nextWeekdayKey(timezone: string, weekday: number): string {
+  const start = todayKey(timezone)
+  const delta = (weekday - dateKeyWeekday(start) + 7) % 7
+  return addDaysToDateKey(start, delta)
+}
+
+/**
+ * How a stored blackout reads back to a human, in the schedule's zone.
+ *
+ * Whole days are by far the common case and deserve to look like days rather
+ * than a pair of midnight timestamps. Anything else falls back to times.
+ */
+function describeBlackout(b: Blackout, timezone: string): string {
+  const startMs = Date.parse(b.startsAt)
+  const endMs = Date.parse(b.endsAt)
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return 'Invalid dates'
+
+  const startKey = utcMsToDateKey(startMs, timezone)
+  const wholeDays = startMs === zonedWallTimeToUtcMs(startKey, 0, timezone)
+    && endMs === zonedWallTimeToUtcMs(utcMsToDateKey(endMs, timezone), 0, timezone)
+    && endMs > startMs
+
+  const day = (ms: number) => new Intl.DateTimeFormat(undefined, {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: timezone,
+  }).format(new Date(ms))
+  const time = (ms: number) => new Intl.DateTimeFormat(undefined, {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: timezone,
+  }).format(new Date(ms))
+
+  if (!wholeDays) return `${time(startMs)} to ${time(endMs)}`
+  // The stored end is midnight of the day AFTER the last blocked day.
+  const lastKey = addDaysToDateKey(utcMsToDateKey(endMs, timezone), -1)
+  const lastMs = zonedWallTimeToUtcMs(lastKey, 0, timezone)
+  return lastKey === startKey
+    ? `${day(startMs)}, all day`
+    : `${day(startMs)} to ${day(lastMs)}, all day`
+}
 
 interface Schedule {
   id: string
@@ -72,6 +141,7 @@ export default function ConsultationBookingSettings() {
   const [preview, setPreview] = useState<PreviewResponse | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [blackoutDraft, setBlackoutDraft] = useState({ startsAt: '', endsAt: '', reason: '' })
+  const [dayDraft, setDayDraft] = useState({ date: '', days: 1, reason: '' })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -173,16 +243,40 @@ export default function ConsultationBookingSettings() {
     }
   }
 
+  /**
+   * Block whole days, resolved in the SCHEDULE'S timezone rather than the
+   * browser's. new Date('2026-08-25T00:00') means midnight where the admin is
+   * standing, so blocking a day from a different timezone used to shift the
+   * block by the offset between them and leave part of the real day bookable.
+   */
+  async function blockDays(dateKey: string, days: number, reason: string) {
+    if (!schedule || !dateKey || days < 1) return
+    setError('')
+    try {
+      const res = await api.post<{ blackout: Blackout }>(`/admin/availability/schedules/${schedule.id}/blackouts`, {
+        startsAt: dayStartIso(dateKey, schedule.timezone),
+        endsAt: dayStartIso(addDaysToDateKey(dateKey, days), schedule.timezone),
+        reason,
+      })
+      patch({ blackouts: [...schedule.blackouts, res.blackout] })
+      setDayDraft({ date: '', days: 1, reason: '' })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not block those days.')
+    }
+  }
+
   async function addBlackout() {
     if (!schedule || !blackoutDraft.startsAt || !blackoutDraft.endsAt) return
     setError('')
+    // Read in the schedule's zone, matching the day blocks above and the label
+    // on the field. Treating it as the browser's zone made the same input mean
+    // different hours depending on where the admin happened to be.
+    const startsAt = wallTimeToIso(blackoutDraft.startsAt, schedule.timezone)
+    const endsAt = wallTimeToIso(blackoutDraft.endsAt, schedule.timezone)
+    if (!startsAt || !endsAt) { setError('Enter a valid start and end time.'); return }
     try {
-      // datetime-local gives wall time with no zone; treat it as the browser's
-      // own zone, which is what the person typing it means.
       const res = await api.post<{ blackout: Blackout }>(`/admin/availability/schedules/${schedule.id}/blackouts`, {
-        startsAt: new Date(blackoutDraft.startsAt).toISOString(),
-        endsAt: new Date(blackoutDraft.endsAt).toISOString(),
-        reason: blackoutDraft.reason,
+        startsAt, endsAt, reason: blackoutDraft.reason,
       })
       patch({ blackouts: [...schedule.blackouts, res.blackout] })
       setBlackoutDraft({ startsAt: '', endsAt: '', reason: '' })
@@ -380,16 +474,31 @@ export default function ConsultationBookingSettings() {
       <Panel>
         <h3 className="text-sm font-bold text-white">Time off</h3>
         <p className="mt-1.5 text-xs leading-5 text-slate-400">
-          One-off blocks that remove time from the schedule. Entered in your own timezone.
+          One-off blocks that remove time from the schedule. Days are resolved in {schedule.timezone}, the schedule's own zone, so a block means the same day wherever you happen to be when you set it.
         </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {([
+            ['Today', () => todayKey(schedule.timezone), 1],
+            ['Tomorrow', () => addDaysToDateKey(todayKey(schedule.timezone), 1), 1],
+            ['This weekend', () => nextWeekdayKey(schedule.timezone, 6), 2],
+            ['Next week', () => addDaysToDateKey(nextWeekdayKey(schedule.timezone, 1), 0), 5],
+          ] as Array<[string, () => string, number]>).map(([chipLabel, resolve, days]) => (
+            <button
+              key={chipLabel} type="button"
+              onClick={() => void blockDays(resolve(), days, '')}
+              className="rounded-full border border-white/[.12] bg-white/[.03] px-3 py-1.5 text-xs font-bold text-slate-300 transition hover:border-gold/30 hover:text-white"
+            >
+              {chipLabel}
+            </button>
+          ))}
+        </div>
         <div className="mt-4 space-y-2">
           {schedule.blackouts.length === 0 && <EmptyState label="No time off scheduled." />}
           {schedule.blackouts.map((b) => (
             <div key={b.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/[.08] bg-white/[.02] px-3 py-2.5">
               <div className="min-w-0">
-                <p className="text-xs font-bold text-white">
-                  {new Date(b.startsAt).toLocaleString()} to {new Date(b.endsAt).toLocaleString()}
-                </p>
+                <p className="text-xs font-bold text-white">{describeBlackout(b, schedule.timezone)}</p>
                 {b.reason && <p className="mt-0.5 text-xs text-slate-400">{b.reason}</p>}
               </div>
               <button
@@ -401,30 +510,68 @@ export default function ConsultationBookingSettings() {
             </div>
           ))}
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_1.2fr_auto] sm:items-end">
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1.2fr_auto] sm:items-end">
           <label className="text-xs font-bold text-slate-300">
-            From
+            Block from
             <input
-              type="datetime-local" className={`${inputCls} mt-2`} value={blackoutDraft.startsAt}
-              onChange={(e) => setBlackoutDraft((d) => ({ ...d, startsAt: e.target.value }))}
+              type="date" className={`${inputCls} mt-2`} value={dayDraft.date}
+              min={todayKey(schedule.timezone)}
+              onChange={(e) => setDayDraft((d) => ({ ...d, date: e.target.value }))}
             />
           </label>
           <label className="text-xs font-bold text-slate-300">
-            To
+            Days
             <input
-              type="datetime-local" className={`${inputCls} mt-2`} value={blackoutDraft.endsAt}
-              onChange={(e) => setBlackoutDraft((d) => ({ ...d, endsAt: e.target.value }))}
+              type="number" min={1} max={90} className={`${inputCls} mt-2 sm:w-24`} value={dayDraft.days}
+              onChange={(e) => setDayDraft((d) => ({ ...d, days: Math.max(1, Math.min(90, Number(e.target.value) || 1)) }))}
             />
           </label>
           <label className="text-xs font-bold text-slate-300">
             Reason (optional)
             <input
-              className={`${inputCls} mt-2`} value={blackoutDraft.reason}
-              onChange={(e) => setBlackoutDraft((d) => ({ ...d, reason: e.target.value }))}
+              className={`${inputCls} mt-2`} value={dayDraft.reason}
+              onChange={(e) => setDayDraft((d) => ({ ...d, reason: e.target.value }))}
             />
           </label>
-          <button type="button" onClick={() => void addBlackout()} className={`${btnOutline} min-h-10`}>Add</button>
+          <button
+            type="button" disabled={!dayDraft.date}
+            onClick={() => void blockDays(dayDraft.date, dayDraft.days, dayDraft.reason)}
+            className={`${btnOutline} min-h-10`}
+          >
+            <Plus className="h-3.5 w-3.5" /> Block
+          </button>
         </div>
+
+        {/* Part of a day is the rarer case, so it stops competing with the
+            common one. Still here, just not first. */}
+        <details className="mt-4 rounded-lg border border-white/[.08] bg-white/[.015] px-3 py-2.5">
+          <summary className="cursor-pointer text-xs font-bold text-slate-300">Block part of a day instead</summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_1.2fr_auto] sm:items-end">
+            <label className="text-xs font-bold text-slate-300">
+              From
+              <input
+                type="datetime-local" className={`${inputCls} mt-2`} value={blackoutDraft.startsAt}
+                onChange={(e) => setBlackoutDraft((d) => ({ ...d, startsAt: e.target.value }))}
+              />
+            </label>
+            <label className="text-xs font-bold text-slate-300">
+              To
+              <input
+                type="datetime-local" className={`${inputCls} mt-2`} value={blackoutDraft.endsAt}
+                onChange={(e) => setBlackoutDraft((d) => ({ ...d, endsAt: e.target.value }))}
+              />
+            </label>
+            <label className="text-xs font-bold text-slate-300">
+              Reason (optional)
+              <input
+                className={`${inputCls} mt-2`} value={blackoutDraft.reason}
+                onChange={(e) => setBlackoutDraft((d) => ({ ...d, reason: e.target.value }))}
+              />
+            </label>
+            <button type="button" onClick={() => void addBlackout()} className={`${btnOutline} min-h-10`}>Add</button>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">Times here are read in {schedule.timezone}.</p>
+        </details>
       </Panel>
 
       <Panel>
