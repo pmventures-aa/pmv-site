@@ -28,17 +28,27 @@ externalCalendarRoutes.get('/external-calendar/google/status', requireUser, asyn
     last_synced_at?: string | null
     last_sync_status?: string
     last_sync_error?: string | null
+    status?: string
+    needs_reconnect?: boolean
+    last_error?: string | null
   } = { connected: false }
   try {
+    // Deliberately NOT filtered to status='active'. A grant that has expired
+    // or been revoked is marked 'error', and filtering those out made a dead
+    // connection indistinguishable from never having connected: the settings
+    // page said "Not connected" while availability quietly stopped blocking
+    // slots. A broken connection is a different thing from no connection and
+    // has to say so.
     const row = await c.env.DB.prepare(
       `SELECT a.email, a.target_calendar_id, a.target_calendar_name, a.connected_at,
+              a.status, a.last_error,
               s.last_synced_at, s.last_sync_status, s.last_sync_error
        FROM calendar_provider_accounts a
        LEFT JOIN calendar_sync_state s ON s.account_id = a.id
-       WHERE a.user_id = ? AND a.provider = 'google' AND a.status = 'active'
+       WHERE a.user_id = ? AND a.provider = 'google' AND a.status != 'disconnected'
        LIMIT 1`,
     ).bind(user.id).first<any>()
-    if (row) account = { connected: true, ...row }
+    if (row) account = { connected: true, ...row, needs_reconnect: row.status === 'error' }
   } catch {
     // Table may not exist yet in a partially migrated environment - fall
     // through to "not connected" rather than 500ing the settings UI.
