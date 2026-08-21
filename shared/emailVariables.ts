@@ -209,6 +209,22 @@ export function findUnresolvedTokens(rendered: string): string[] {
   return extractTemplateTokens(rendered)
 }
 
+// Substitute every {{token}} in a template string with a resolved value.
+// Unknown or unprovided tokens become '' by default (matching the email
+// renderer, so no raw {{token}} ever reaches a reader); pass keepUnknown to
+// leave them intact for an in-editor preview that wants to show what is missing.
+export function resolveTemplateTokens(
+  source: string | null | undefined,
+  vars: Record<string, string>,
+  opts?: { keepUnknown?: boolean },
+): string {
+  if (!source) return ''
+  return source.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (whole, key: string) => {
+    if (Object.prototype.hasOwnProperty.call(vars, key)) return vars[key]
+    return opts?.keepUnknown ? whole : ''
+  })
+}
+
 // Sample data for the preview panel. Anything not in this map falls back to
 // the per-variable example on the EmailVariable definition.
 export function buildEmailPreviewVars(overrides?: Record<string, string>): Record<string, string> {

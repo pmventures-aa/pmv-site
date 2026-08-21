@@ -1,9 +1,26 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, Copy, ExternalLink, Plus, Save, Send, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowDown, ArrowUp, Copy, ExternalLink, Eye, Pencil, Plus, Save, Send, Trash2 } from 'lucide-react'
 import { api, ApiError } from '../../../lib/api'
 import { Panel, EmptyState, Tag, inputCls, btnPrimary, btnOutline, btnSecondary } from '../../../components/admin/ui'
 import { toast } from '../../../components/kit/toast'
+import { VariableInsertMenu } from '../../../components/admin/VariableInsertMenu'
+import { buildEmailPreviewVars, resolveTemplateTokens, extractTemplateTokens, isKnownEmailVariable } from '../../../../shared/emailVariables'
 import type { ManagedAgreementSection } from '../../../../shared/providerAgreementContent'
+
+// Render a section body the same way the public agreement does (blank-line
+// paragraphs, "- " bullet lists), but with {{tokens}} resolved to sample values
+// so the editor preview shows what a reader will actually see.
+function PreviewBody({ body, vars }: { body: string; vars: Record<string, string> }) {
+  const resolved = resolveTemplateTokens(body, vars)
+  const blocks = resolved.split(/\n\s*\n/).filter(Boolean)
+  return <>{blocks.map((block, index) => {
+    const lines = block.split('\n').filter(Boolean)
+    if (lines.length > 0 && lines.every((line) => line.startsWith('- '))) {
+      return <ul key={index} className="ml-5 list-disc space-y-1 text-sm leading-6 text-slate-300">{lines.map((line, i) => <li key={i}>{line.slice(2)}</li>)}</ul>
+    }
+    return <p key={index} className="text-sm leading-6 text-slate-300">{block}</p>
+  })}</>
+}
 
 interface TemplateSummary {
   id: string
@@ -61,6 +78,36 @@ export default function ManagedTemplatesSettings() {
   const [creating, setCreating] = useState(false)
   const [createForm, setCreateForm] = useState(blankCreate)
   const [showArchived, setShowArchived] = useState(false)
+  const [preview, setPreview] = useState(false)
+  const bodyRefs = useRef<Record<number, HTMLTextAreaElement | null>>({})
+  const previewVars = useMemo(() => buildEmailPreviewVars(), [])
+
+  // Every {{token}} referenced across the draft that the registry does not know
+  // about. These resolve to empty strings on send, so we warn rather than block.
+  const unknownTokens = useMemo(() => {
+    if (!draft) return [] as string[]
+    const seen = new Set<string>()
+    for (const section of draft.sections) {
+      for (const token of [...extractTemplateTokens(section.title), ...extractTemplateTokens(section.body)]) {
+        if (!isKnownEmailVariable(token)) seen.add(token)
+      }
+    }
+    return Array.from(seen)
+  }, [draft])
+
+  // Insert a {{token}} at the caret in a section body (or append if the field is
+  // not focused), then restore focus and caret just past the inserted token.
+  function insertToken(index: number, token: string) {
+    setDraft((current) => {
+      if (!current) return current
+      const el = bodyRefs.current[index]
+      const body = current.sections[index].body
+      const pos = el && document.activeElement === el ? el.selectionStart : body.length
+      const nextBody = body.slice(0, pos) + token + body.slice(pos)
+      requestAnimationFrame(() => { if (el) { el.focus(); const caret = pos + token.length; el.setSelectionRange(caret, caret) } })
+      return { ...current, sections: current.sections.map((section, position) => position === index ? { ...section, body: nextBody } : section) }
+    })
+  }
 
   const loadList = useCallback(async () => {
     const result = await api.get<{ templates: TemplateSummary[] }>('/admin/managed-templates')
@@ -225,6 +272,7 @@ export default function ManagedTemplatesSettings() {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Used by: {usedBy(draft)}. Edits stay private until you publish a saved version.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button type="button" className={btnOutline} onClick={() => setPreview((v) => !v)}>{preview ? <><Pencil size={14} /> Edit</> : <><Eye size={14} /> Preview</>}</button>
           {draft.template_key === 'provider-agreement' && <a className={btnOutline} href="/provider-agreement" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Public copy</a>}
           <button type="button" className={btnOutline} disabled={busy} onClick={() => void duplicate()}><Copy size={14} /> Duplicate</button>
           {draft.template_key !== 'provider-agreement' && (
@@ -256,22 +304,44 @@ export default function ManagedTemplatesSettings() {
         </div>
       )}
 
-      <div className="mt-7 space-y-4">{draft.sections.map((section, index) => (
-        <section key={`${section.id}-${index}`} className="rounded-xl border border-white/[.08] bg-white/[.018] p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500">Section {String(index + 1).padStart(2, '0')}</p>
-            <div className="flex gap-1">
-              <button type="button" aria-label="Move section up" className={btnSecondary} onClick={() => moveSection(index, -1)} disabled={index === 0}><ArrowUp size={13} /></button>
-              <button type="button" aria-label="Move section down" className={btnSecondary} onClick={() => moveSection(index, 1)} disabled={index === draft.sections.length - 1}><ArrowDown size={13} /></button>
-              <button type="button" aria-label="Delete section" className={btnSecondary} onClick={() => setDraft({ ...draft, sections: draft.sections.filter((_, position) => position !== index) })}><Trash2 size={13} /></button>
+      {unknownTokens.length > 0 && !preview && (
+        <div className="mt-6 rounded-lg border border-amber-400/25 bg-amber-400/[.05] px-4 py-3 text-xs leading-5 text-amber-200/90">
+          Unrecognized variables: {unknownTokens.map((t) => `{{${t}}}`).join(', ')}. These render as empty text when the template is used. Pick from the Insert variable menu to avoid typos.
+        </div>
+      )}
+
+      {preview ? (
+        <div className="mt-7 rounded-xl border border-white/[.08] bg-navy-950/40 p-5">
+          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[.14em] text-gold/70">Preview with sample values</p>
+          <div className="space-y-6">{draft.sections.map((section, index) => (
+            <section key={`${section.id}-${index}`}>
+              <h4 className="mb-2 font-display text-base font-bold text-white">{resolveTemplateTokens(section.title, previewVars) || `Section ${index + 1}`}</h4>
+              <div className="space-y-2"><PreviewBody body={section.body} vars={previewVars} /></div>
+            </section>
+          ))}</div>
+        </div>
+      ) : (
+        <div className="mt-7 space-y-4">{draft.sections.map((section, index) => (
+          <section key={`${section.id}-${index}`} className="rounded-xl border border-white/[.08] bg-white/[.018] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500">Section {String(index + 1).padStart(2, '0')}</p>
+              <div className="flex gap-1">
+                <button type="button" aria-label="Move section up" className={btnSecondary} onClick={() => moveSection(index, -1)} disabled={index === 0}><ArrowUp size={13} /></button>
+                <button type="button" aria-label="Move section down" className={btnSecondary} onClick={() => moveSection(index, 1)} disabled={index === draft.sections.length - 1}><ArrowDown size={13} /></button>
+                <button type="button" aria-label="Delete section" className={btnSecondary} onClick={() => setDraft({ ...draft, sections: draft.sections.filter((_, position) => position !== index) })}><Trash2 size={13} /></button>
+              </div>
             </div>
-          </div>
-          <input className={`${inputCls} mt-3 font-bold`} value={section.title} onChange={(e) => updateSection(index, 'title', e.target.value)} placeholder="Section title" />
-          <textarea className={`${inputCls} mt-3 min-h-44 font-mono text-xs leading-6`} value={section.body} onChange={(e) => updateSection(index, 'body', e.target.value)} placeholder="Section text. Start list items with - " />
-          <p className="mt-2 text-[11px] text-slate-600">Separate paragraphs with a blank line. Start every list item with “- ”.</p>
-        </section>
-      ))}</div>
-      <button type="button" className={`${btnOutline} mt-4`} onClick={() => setDraft({ ...draft, sections: [...draft.sections, { id: `section-${draft.sections.length + 1}`, title: '', body: '' }] })}><Plus size={14} /> Add section</button>
+            <input className={`${inputCls} mt-3 font-bold`} value={section.title} onChange={(e) => updateSection(index, 'title', e.target.value)} placeholder="Section title" />
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold text-slate-500">Body</span>
+              <VariableInsertMenu onInsert={(token) => insertToken(index, token)} />
+            </div>
+            <textarea ref={(el) => { bodyRefs.current[index] = el }} className={`${inputCls} mt-1.5 min-h-44 font-mono text-xs leading-6`} value={section.body} onChange={(e) => updateSection(index, 'body', e.target.value)} placeholder="Section text. Start list items with - " />
+            <p className="mt-2 text-[11px] text-slate-600">Separate paragraphs with a blank line. Start every list item with “- ”. Insert {'{{variables}}'} from the menu; they fill in when the template is used.</p>
+          </section>
+        ))}</div>
+      )}
+      {!preview && <button type="button" className={`${btnOutline} mt-4`} onClick={() => setDraft({ ...draft, sections: [...draft.sections, { id: `section-${draft.sections.length + 1}`, title: '', body: '' }] })}><Plus size={14} /> Add section</button>}
       <label className="mt-6 block"><span className="mb-1 block text-xs font-bold text-slate-400">Internal change note</span><input className={inputCls} value={changeNote} onChange={(e) => setChangeNote(e.target.value)} placeholder="What changed and why?" /></label>
       <div className="mt-5 flex flex-wrap gap-2">
         <button type="button" className={btnPrimary} disabled={busy} onClick={() => void saveDraft()}><Save size={14} /> {busy ? 'Saving…' : 'Save new draft version'}</button>
