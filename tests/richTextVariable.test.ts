@@ -6,6 +6,7 @@ import { extractTemplateTokens, isKnownEmailVariable } from '../shared/emailVari
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 const node = read('../src/components/admin/richTextVariable.tsx')
 const composer = read('../src/components/admin/RichTextComposer.tsx')
+const schema = read('../src/components/admin/richTextSchema.ts')
 
 // Variables used to be plain text: the insert menu emitted the characters
 // "{{first_name}}" and nothing stopped someone backspacing into
@@ -28,7 +29,10 @@ describe('variable chips are atomic', () => {
   })
 
   it('is registered with the editor schema', () => {
-    expect(composer).toContain('VariableNode,')
+    // The node list moved into richTextSchema so it cannot drift away from the
+    // markdown transformer list; see tests/richTextSchema.test.ts.
+    expect(schema).toContain('VariableNode,')
+    expect(composer).toContain('nodes: COMPOSER_NODES')
     expect(composer).toContain('<VariableChipPlugin />')
     expect(composer).toContain('registerVariableChips(editor)')
   })

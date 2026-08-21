@@ -54,7 +54,8 @@ import { IndexeddbPersistence } from 'y-indexeddb'
 import { AlignCenter, AlignLeft, AlignRight, Highlighter, Merge, Search, Sparkles, Table, X } from 'lucide-react'
 import { DOC_FONTS, DOC_SIZES } from '../../../shared/docHtml'
 import { $createPmvImageNode, PmvImageNode } from './richTextImage'
-import { VariableNode, registerVariableChips } from './richTextVariable'
+import { registerVariableChips } from './richTextVariable'
+import { COMPOSER_NODES, LETTER_TRANSFORMERS } from './richTextSchema'
 
 const LETTER_COLORS = [
   { label: 'Navy', value: '#0a1728' },
@@ -579,7 +580,7 @@ function RichTextComposerInner({
       onError: (error: Error) => {
         console.error(error)
       },
-      nodes: [PmvImageNode, VariableNode, HeadingNode, QuoteNode, LinkNode, ListNode, ListItemNode, TableNode, TableCellNode, TableRowNode],
+      nodes: COMPOSER_NODES,
       editorState: (editor: LexicalEditor) => {
         const html = initialHTML || value
         if (!html) return
@@ -629,7 +630,7 @@ function RichTextComposerInner({
         <LinkPlugin />
         <ListPlugin />
         <TablePlugin hasHorizontalScroll />
-        <MarkdownShortcutPlugin />
+        <MarkdownShortcutPlugin transformers={LETTER_TRANSFORMERS} />
         <VariableChipPlugin />
         <ChangeEmitter onChange={onChange} handle={syncHandle} />
         <div className={`relative min-h-0 ${fill ? (letterFlow ? 'flex-1 overflow-y-auto' : 'flex-1 overflow-hidden') : ''}`}>
