@@ -54,6 +54,7 @@ import { IndexeddbPersistence } from 'y-indexeddb'
 import { AlignCenter, AlignLeft, AlignRight, Highlighter, Merge, Search, Sparkles, Table, X } from 'lucide-react'
 import { DOC_FONTS, DOC_SIZES } from '../../../shared/docHtml'
 import { $createPmvImageNode, PmvImageNode } from './richTextImage'
+import { VariableNode, registerVariableChips } from './richTextVariable'
 
 const LETTER_COLORS = [
   { label: 'Navy', value: '#0a1728' },
@@ -116,6 +117,15 @@ function createCollabProvider(id: string, yjsDocMap: Map<string, Y.Doc>): Provid
   new IndexeddbPersistence(`pmv-editor-${id}`, doc)
   provider.awareness.setLocalStateField('user', { name: 'Pinnacle staff', color: '#c9a227' })
   return provider as unknown as Provider
+}
+
+// Keeps "{{key}}" text and variable chips in sync. Registered as a transform
+// rather than a one-time pass so it covers loading a saved template, pasting
+// from another document, and typing a token by hand.
+function VariableChipPlugin() {
+  const [editor] = useLexicalComposerContext()
+  useEffect(() => registerVariableChips(editor), [editor])
+  return null
 }
 
 function ChangeEmitter({ onChange, handle }: { onChange: (html: string) => void; handle: { current: SyncHandle } }) {
@@ -569,7 +579,7 @@ function RichTextComposerInner({
       onError: (error: Error) => {
         console.error(error)
       },
-      nodes: [PmvImageNode, HeadingNode, QuoteNode, LinkNode, ListNode, ListItemNode, TableNode, TableCellNode, TableRowNode],
+      nodes: [PmvImageNode, VariableNode, HeadingNode, QuoteNode, LinkNode, ListNode, ListItemNode, TableNode, TableCellNode, TableRowNode],
       editorState: (editor: LexicalEditor) => {
         const html = initialHTML || value
         if (!html) return
@@ -620,6 +630,7 @@ function RichTextComposerInner({
         <ListPlugin />
         <TablePlugin hasHorizontalScroll />
         <MarkdownShortcutPlugin />
+        <VariableChipPlugin />
         <ChangeEmitter onChange={onChange} handle={syncHandle} />
         <div className={`relative min-h-0 ${fill ? (letterFlow ? 'flex-1 overflow-y-auto' : 'flex-1 overflow-hidden') : ''}`}>
           <div className={`relative ${fill && !letterFlow ? 'h-full' : ''}`}>
