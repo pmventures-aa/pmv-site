@@ -19,6 +19,15 @@ describe('HQ workspace resilience', () => {
     expect(layout).toContain('resetKey={location.pathname + location.search}')
   })
 
+  it('self-heals a stale chunk on each deploy, not just the first, via a time window', () => {
+    expect(boundary).toContain('isChunkLoadError')
+    expect(boundary).toContain('window.location.reload()')
+    // The reload guard is a time window, so a long session spanning several
+    // deploys heals every stale-chunk event instead of dead-ending after one.
+    expect(boundary).toContain('LOOP_WINDOW_MS')
+    expect(boundary).toMatch(/Date\.now\(\)\s*-\s*last\s*>\s*LOOP_WINDOW_MS/)
+  })
+
   it('renders each email body defensively so one bad message cannot crash Messages', () => {
     expect(email).toContain('function safeMessageHtml')
     expect(email).toContain('safeMessageHtml(m.body_html, m.body_text)')
