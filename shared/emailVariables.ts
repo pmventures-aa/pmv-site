@@ -76,9 +76,18 @@ export const EMAIL_VARIABLES: EmailVariable[] = [
   { key: 'assigned_contact', label: 'Assigned contact', description: 'The Pinnacle team member assigned to this matter or service.', category: 'matter', example: 'Cody Marshall' },
   { key: 'service_name', label: 'Service name', description: 'The Pinnacle service this record relates to.', category: 'matter', example: 'Mobile notary' },
   { key: 'service_status', label: 'Service status', description: 'Current status of the service request.', category: 'matter', example: 'Assigned' },
+  { key: 'service_type', label: 'Service type', description: 'The kind of work being performed.', category: 'matter', example: 'Deep clean and turnover' },
+  { key: 'service_date', label: 'Service date', description: 'The date the service is scheduled for.', category: 'matter', example: 'August 22, 2026' },
+  { key: 'service_window', label: 'Service window', description: 'The arrival window for the visit.', category: 'matter', example: '10:00 AM - 2:00 PM' },
+  { key: 'assigned_provider_name', label: 'Assigned provider', description: 'The independent professional assigned to the work.', category: 'matter', example: 'Mia Alvarez' },
+  { key: 'completion_notes', label: 'Completion notes', description: 'Notes recorded when the work was reported complete.', category: 'matter', example: 'All rooms cleaned; reported a slow bathroom drain.' },
+  { key: 'staff_name', label: 'Staff member', description: 'The Pinnacle team member involved in this record.', category: 'matter', example: 'Alex Morgan' },
 
   // Calendar / Appointment
   { key: 'appointment_title', label: 'Appointment title', description: 'Short title of the appointment.', category: 'calendar', example: 'Client kickoff call' },
+  { key: 'appointment_date', label: 'Appointment date', description: 'Date of the appointment.', category: 'calendar', example: 'August 22, 2026' },
+  { key: 'appointment_time', label: 'Appointment time', description: 'Start time of the appointment.', category: 'calendar', example: '2:30 PM' },
+  { key: 'appointment_location', label: 'Appointment location', description: 'Where the appointment takes place, physical or virtual.', category: 'calendar', example: '1200 Palm Trail, Delray Beach FL' },
   { key: 'event_title', label: 'Event title', description: 'Calendar event title.', category: 'calendar', example: 'Site walkthrough' },
   { key: 'event_date', label: 'Event date', description: 'Human-readable event date.', category: 'calendar', example: 'August 20, 2026' },
   { key: 'event_time', label: 'Event time', description: 'Human-readable event start time.', category: 'calendar', example: '10:30 AM' },
@@ -89,6 +98,7 @@ export const EMAIL_VARIABLES: EmailVariable[] = [
 
   // Documents & e-sign
   { key: 'document_name', label: 'Document name', description: 'The referenced document title.', category: 'document', example: '2025 W-9.pdf' },
+  { key: 'document_url', label: 'Document link', description: 'Secure link to view the document in the portal.', category: 'document', example: 'https://client.pinnaclemanagementventures.com/documents/abc' },
   { key: 'document_status', label: 'Document status', description: 'Client-friendly document status.', category: 'document', example: 'Under review' },
   { key: 'agreement_name', label: 'Agreement name', description: 'Title of an e-sign agreement.', category: 'document', example: 'Pinnacle Service Agreement' },
   { key: 'signature_due_date', label: 'Signature due date', description: 'Deadline for completing signatures.', category: 'document', example: 'August 22, 2026' },
@@ -99,6 +109,10 @@ export const EMAIL_VARIABLES: EmailVariable[] = [
   { key: 'balance_due', label: 'Balance due', description: 'Remaining balance on the invoice.', category: 'billing', example: '$549.00' },
   { key: 'due_date', label: 'Due date', description: 'When the invoice is due.', category: 'billing', example: 'August 20, 2026' },
   { key: 'invoice_description', label: 'Invoice description', description: 'Short description of what the invoice covers.', category: 'billing', example: 'Field service and travel for August visit.' },
+  { key: 'invoice_url', label: 'Invoice link', description: 'Link to review the invoice in the portal.', category: 'billing', example: 'https://client.pinnaclemanagementventures.com/invoices/1042' },
+  { key: 'payment_url', label: 'Payment link', description: 'Secure link to pay the invoice.', category: 'billing', example: 'https://client.pinnaclemanagementventures.com/invoices/1042/pay' },
+  { key: 'quote_number', label: 'Quote number', description: 'Human-readable quote number.', category: 'billing', example: 'Q-221' },
+  { key: 'quote_expiration_date', label: 'Quote expiration', description: 'The date the quoted pricing lapses.', category: 'billing', example: 'September 3, 2026' },
   { key: 'quote_amount', label: 'Quote amount', description: 'The total quoted amount.', category: 'billing', example: '$640.00' },
   { key: 'quote_url', label: 'Quote URL', description: 'Deep link to the client-facing quote.', category: 'billing', example: 'https://client.pinnaclemanagementventures.com/quote/abc' },
 
@@ -137,6 +151,7 @@ export const EMAIL_VARIABLES: EmailVariable[] = [
   { key: 'current_year', label: 'Current year', description: 'Four-digit current year.', category: 'system', example: '2026', system: true },
   { key: 'pinnacle_phone', label: 'Pinnacle phone', description: 'The firm phone number.', category: 'system', example: '(561) 388-7879', system: true },
   { key: 'pinnacle_email', label: 'Pinnacle email', description: 'The firm reply-to email.', category: 'system', example: 'hello@pinnaclemanagementventures.com', system: true },
+  { key: 'support_email', label: 'Support email', description: 'The address recipients should write to for help.', category: 'system', example: 'support@pinnaclemanagementventures.com', system: true },
   { key: 'company_name', label: 'Company name', description: 'The firm display name.', category: 'system', example: 'Pinnacle Management Ventures', system: true },
   { key: 'sender_name', label: 'Sender name', description: 'The name of the HQ staff member who triggered this email.', category: 'system', example: 'Alex Morgan' },
   { key: 'sender_title', label: 'Sender title', description: 'The sender\'s role or title at Pinnacle.', category: 'system', example: 'Client Services Lead' },

@@ -2,6 +2,17 @@
 
 Master copy library for every transactional email and system notification. Each template is production-ready: drop the body into the notification system, register any new variables in `shared/emailVariables.ts`, and map the template key.
 
+## Wiring status
+
+These templates are wired into the live system, not just documented here.
+
+- **Catalog:** `shared/hqEmailTemplates.ts` (`HQ_EMAIL_CATALOG`) holds the sendable templates, editable in HQ under Email Templates. It now carries 63 entries: the 46 that already existed plus 17 added from this library (the second staff-event variant, the five cleaning lifecycle emails, and the 11 additions covering payments, quotes, e-sign, appointments, and account security).
+- **Variables:** every `{{token}}` used by a catalog template is registered in `shared/emailVariables.ts`, so it appears in the Insert Variable menu with a description and a sample value.
+- **HQ internal alerts (23-37):** these run through the notification center, whose per-event copy is stored in the database and edited in Settings -> Notifications rather than in the code catalog. The copy below is the reference text for those events.
+- **Guard:** `tests/hqEmailCatalogWiring.test.ts` fails the build if any template references an unregistered variable, leaks a raw `{{token}}` when rendered with sample data, duplicates a slug, or declares a CTA without a destination.
+
+Naming note: this document uses the descriptive variable names from the brief (`recipient_first_name`). The shipped catalog uses the system's established equivalents (`first_name`), which the resolvers already populate. The meaning is identical; prefer the catalog's names when editing live templates.
+
 **Conventions that apply to every template**
 - The branded header (crest, firm name) and footer (contact details, legal line) are applied by the email layout. Bodies below intentionally end without a signature block; the layout supplies "Pinnacle Management Ventures" and contact info.
 - Variables are `{{lowercase_snake_case}}`. Optional content uses `{{#if variable}}...{{/if}}`.
