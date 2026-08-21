@@ -142,6 +142,7 @@ export const EMAIL_VARIABLES: EmailVariable[] = [
   { key: 'sender_title', label: 'Sender title', description: 'The sender\'s role or title at Pinnacle.', category: 'system', example: 'Client Services Lead' },
   { key: 'platform_name', label: 'Platform name', description: '"Pinnacle HQ" or "your Pinnacle Client Portal" depending on the recipient.', category: 'system', example: 'your Pinnacle Client Portal', system: true },
   { key: 'reminder_message', label: 'Reminder message', description: 'Short reminder body inserted into portal reminder emails.', category: 'system', example: 'You have a document waiting for review.', applicableTo: ['portal_reminder'] },
+  { key: 'setup_note', label: 'Setup link note', description: 'Short note explaining the one-time secure setup link and how long it lasts.', category: 'system', example: 'Your secure setup link can be used once and expires in 24 hours.', system: true },
   { key: 'action_label', label: 'Button label', description: 'Text shown on the email\'s call to action button.', category: 'system', example: 'Open My Client Portal', system: true },
   { key: 'action_url', label: 'Button URL', description: 'Where the email\'s call to action button goes.', category: 'system', example: 'https://client.pinnaclemanagementventures.com/', system: true },
   { key: 'registered_at', label: 'Registered at', description: 'When the record was created.', category: 'system', example: 'August 16, 2026 at 9:04 AM ET' },

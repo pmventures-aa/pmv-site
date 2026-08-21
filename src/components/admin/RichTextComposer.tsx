@@ -4,9 +4,11 @@ import {
   $getRoot,
   $getSelection,
   $insertNodes,
+  $isElementNode,
   $isRangeSelection,
   type EditorThemeClasses,
   type LexicalEditor,
+  type LexicalNode,
   type RangeSelection,
   type TextNode,
 } from 'lexical'
@@ -479,10 +481,30 @@ function Toolbar({
   )
 }
 
+// Root only accepts block-level nodes; wrap any stray inline/text nodes that
+// parsing produced in a paragraph so appending them can never corrupt the tree.
+function appendHtmlToRoot(editor: LexicalEditor, html: string) {
+  const dom = new DOMParser().parseFromString(html, 'text/html')
+  const nodes = $generateNodesFromDOM(editor, dom)
+  const root = $getRoot()
+  root.clear()
+  const safe = nodes.map((node: LexicalNode) => ($isElementNode(node) ? node : $createParagraphNode().append(node)))
+  if (safe.length > 0) root.append(...safe)
+}
+
+// Reduce arbitrary HTML to readable text. Used to recover a working rich editor
+// when a letter's stored markup cannot be parsed back into the schema, so staff
+// keep rich formatting (with the text preserved) instead of a plain textarea.
+function stripHtmlToText(html: string): string {
+  try {
+    const doc = new DOMParser().parseFromString(html || '', 'text/html')
+    return (doc.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim()
+  } catch { return '' }
+}
+
 // The rich editor is a large, third-party-backed component. If Lexical throws
-// while opening or rendering a letter, it must degrade to a plain editable
-// field rather than crash the entire HQ workspace boundary. This local boundary
-// keeps the failure contained to the editor and keeps the letter editable.
+// while opening or rendering a letter, it must degrade rather than crash the
+// entire HQ workspace boundary. This local boundary keeps the failure contained.
 class ComposerBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() { return { failed: true } }
@@ -493,10 +515,11 @@ class ComposerBoundary extends Component<{ fallback: ReactNode; children: ReactN
 export function RichTextComposer(props: RichTextComposerProps) {
   const { value, onChange, surface = 'hq', fill = false, placeholder } = props
   const letter = surface === 'letter'
-  const fallback = (
+  // Last-resort plain editor, only if even a text-seeded rich editor cannot mount.
+  const plainFallback = (
     <div className={`flex min-h-0 flex-col ${fill ? 'h-full overflow-hidden' : ''} ${letter ? 'bg-transparent' : 'rounded-md border border-white/10 bg-navy-900'}`}>
       <p className={`shrink-0 px-4 py-2 text-[12px] ${letter ? 'border-b border-[#e7e4dc] bg-[#fff8e1] text-[#7a5b00]' : 'border-b border-amber-400/20 bg-amber-400/[.06] text-amber-200'}`}>
-        Rich formatting is temporarily unavailable for this letter. You can still edit the content below and save.
+        Rich formatting could not load for this letter. You can still edit the content below and save.
       </p>
       <textarea
         value={value}
@@ -506,8 +529,18 @@ export function RichTextComposer(props: RichTextComposerProps) {
       />
     </div>
   )
+  // If the rich editor crashes opening the stored markup, recover into a fresh
+  // rich editor seeded with just the letter's text - so rich formatting stays
+  // available (formatting reset, wording preserved) instead of dropping to a
+  // plain box. A distinct key forces a clean remount so it does not re-crash on
+  // the same markup.
+  const recovered = (
+    <ComposerBoundary fallback={plainFallback}>
+      <RichTextComposerInner {...props} key="recovered-plain" value={stripHtmlToText(value)} />
+    </ComposerBoundary>
+  )
   return (
-    <ComposerBoundary fallback={fallback}>
+    <ComposerBoundary fallback={recovered}>
       <RichTextComposerInner {...props} />
     </ComposerBoundary>
   )
@@ -544,11 +577,7 @@ function RichTextComposerInner({
         // does not expect. That must never take down the whole HQ workspace, so
         // fall back to an empty document and let the editable fallback handle it.
         try {
-          const dom = new DOMParser().parseFromString(html, 'text/html')
-          const nodes = $generateNodesFromDOM(editor, dom)
-          const root = $getRoot()
-          root.clear()
-          if (nodes.length > 0) root.append(...nodes)
+          appendHtmlToRoot(editor, html)
         } catch (err) {
           console.error('RichTextComposer: could not parse initial HTML', err)
         }
@@ -563,11 +592,7 @@ function RichTextComposerInner({
     syncHandle.current.lastEmitted = value
     editor.update(() => {
       try {
-        const dom = new DOMParser().parseFromString(value || '<p><br></p>', 'text/html')
-        const nodes = $generateNodesFromDOM(editor, dom)
-        const root = $getRoot()
-        root.clear()
-        if (nodes.length > 0) root.append(...nodes)
+        appendHtmlToRoot(editor, value || '<p><br></p>')
       } catch (err) {
         console.error('RichTextComposer: could not sync HTML value', err)
       }
