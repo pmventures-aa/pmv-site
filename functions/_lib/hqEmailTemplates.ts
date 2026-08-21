@@ -102,8 +102,8 @@ export async function ensureHqEmailTemplates(env: Env): Promise<void> {
     }
 
     const events = await env.DB.prepare(
-      `SELECT event_key, label, category, description FROM notification_event_catalog WHERE active = 1`,
-    ).all<{ event_key: string; label: string; category: string; description: string | null }>()
+      `SELECT event_key, label, category, description, audience FROM notification_event_catalog WHERE active = 1`,
+    ).all<{ event_key: string; label: string; category: string; description: string | null; audience: string | null }>()
     for (const event of events.results || []) {
       const slug = `notify_${event.event_key}`
       const existing = await env.DB.prepare('SELECT id FROM hq_email_templates WHERE slug = ?').bind(slug).first()
@@ -127,7 +127,10 @@ export async function ensureHqEmailTemplates(env: Env): Promise<void> {
         override?.enabled === 0 ? 0 : 1,
         override?.subject || '{{event_subject}}',
         override?.preheader || '{{event_subject}}',
-        override?.eyebrow || 'Pinnacle HQ notification',
+        // Audience matters: these rows now drive client notifications too, and
+        // labelling a client's email "Pinnacle HQ notification" reads as
+        // internal mail leaking out.
+        override?.eyebrow || (event.audience === 'client' ? 'Your Pinnacle relationship' : 'Pinnacle HQ notification'),
         override?.title || '{{event_subject}}',
         override?.body_html || '{{event_body}}',
         JSON.stringify(['event_subject', 'event_body', 'first_name']),
