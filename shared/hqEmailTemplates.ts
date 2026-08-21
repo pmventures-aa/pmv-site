@@ -997,6 +997,324 @@ export const HQ_EMAIL_CATALOG: HqEmailCatalogEntry[] = [
   },
 
   // -----------------------------------------------------------------
+  // CLEANING + TURNOVER SERVICE LIFECYCLE
+  // -----------------------------------------------------------------
+  {
+    slug: 'staff_event_reminder',
+    name: 'Staff event reminder or update',
+    category: 'account',
+    description: 'Reminder before an internal event, or notice that its details changed.',
+    sortOrder: 12,
+    tokens: ['first_name', 'event_title', 'event_date', 'event_time', 'event_location', 'action_label', 'action_url'],
+    subject: 'Reminder: {{event_title}} on {{event_date}}',
+    preheader: 'Current details and your RSVP.',
+    eyebrow: 'Team event',
+    title: 'Reminder: {{event_title}}',
+    ctaLabel: 'Update RSVP',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'A quick update on {{event_title}}.')
+      + kv('When', '{{event_date}} at {{event_time}}')
+      + kv('Where', '{{event_location}}')
+      + p('If your plans have changed either way, please update your RSVP so the headcount stays accurate.'),
+  },
+  {
+    slug: 'cleaning_booking_received',
+    name: 'Cleaning booking received',
+    category: 'notification',
+    description: 'Confirms a cleaning request arrived. Explicitly not a scheduling confirmation.',
+    sortOrder: 124,
+    tokens: ['first_name', 'property_name', 'service_type', 'action_label', 'action_url'],
+    subject: 'We received your cleaning request',
+    preheader: 'Received and in scheduling. Confirmation to follow.',
+    eyebrow: 'Cleaning',
+    title: 'Request received',
+    ctaLabel: 'View Request',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'Your cleaning request for {{property_name}} is in.')
+      + p('To set expectations: this confirms we received the request, and scheduling comes next. We will match coverage and send a separate confirmation with the final date, window, and assigned professional.')
+      + signature,
+  },
+  {
+    slug: 'cleaning_scheduled',
+    name: 'Cleaning scheduled',
+    category: 'notification',
+    description: 'Confirms the property, date, window, and preparation notes once cleaning is scheduled.',
+    sortOrder: 125,
+    tokens: ['first_name', 'property_name', 'service_date', 'service_window', 'service_type', 'action_label', 'action_url'],
+    subject: 'Cleaning scheduled for {{service_date}}',
+    preheader: 'Date, window, and how to prepare.',
+    eyebrow: 'Cleaning',
+    title: 'You are on the schedule',
+    ctaLabel: 'View Booking',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'Your cleaning is scheduled.')
+      + kv('Property', '{{property_name}}')
+      + kv('Date', '{{service_date}}')
+      + kv('Window', '{{service_window}}')
+      + kv('Service', '{{service_type}}')
+      + p('If the date stops working for you, let us know as early as you can and we will adjust coverage.')
+      + signature,
+  },
+  {
+    slug: 'cleaner_assigned',
+    name: 'Cleaner assigned',
+    category: 'notification',
+    description: 'Tells the client which independent professional will handle the cleaning.',
+    sortOrder: 126,
+    tokens: ['first_name', 'property_name', 'service_date', 'assigned_provider_name', 'action_label', 'action_url'],
+    subject: 'Cleaning coverage confirmed for {{property_name}}',
+    preheader: 'Your assigned professional and visit details.',
+    eyebrow: 'Cleaning',
+    title: 'Coverage is set',
+    ctaLabel: 'View Booking',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'Cleaning coverage for your upcoming service is confirmed.')
+      + kv('Property', '{{property_name}}')
+      + kv('Date', '{{service_date}}')
+      + kv('Assigned', '{{assigned_provider_name}}, an independent professional from the Pinnacle network')
+      + p('We have briefed them on the property and scope, and we track the job from arrival through completion. You do not need to coordinate anything directly.')
+      + signature,
+  },
+  {
+    slug: 'cleaning_completed',
+    name: 'Cleaning completed',
+    category: 'notification',
+    description: 'Reports completion and points to documentation and the way to raise a concern.',
+    sortOrder: 127,
+    tokens: ['first_name', 'property_name', 'completed_at', 'completion_notes', 'action_label', 'action_url'],
+    subject: 'Cleaning complete at {{property_name}}',
+    preheader: 'Completion details and documentation are ready.',
+    eyebrow: 'Cleaning',
+    title: 'All done',
+    ctaLabel: 'View Completion Details',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'The cleaning at {{property_name}} has been reported complete as of {{completed_at}}.')
+      + '{{#if completion_notes}}' + kv('Notes from the visit', '{{completion_notes}}') + '{{/if}}'
+      + p('Where documentation was captured, you will find photos, checklist, and timestamps with the job record. If anything does not meet your expectations, tell us within a day or two while the details are fresh.')
+      + signature,
+  },
+  {
+    slug: 'cleaning_issue_reported',
+    name: 'Cleaning issue reported',
+    category: 'notification',
+    description: 'Acknowledges a reported cleaning issue without promising a resolution time.',
+    sortOrder: 128,
+    tokens: ['first_name', 'property_name', 'issue_summary', 'action_label', 'action_url'],
+    subject: 'An issue was reported at {{property_name}}',
+    preheader: 'What was reported and how we are handling it.',
+    eyebrow: 'Cleaning',
+    title: 'We are on it',
+    ctaLabel: 'View Issue',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'An issue was reported in connection with the cleaning at {{property_name}}, and we want you to hear it from us first.')
+      + kv('Reported', '{{issue_summary}}')
+      + p('Pinnacle is coordinating the review. We are gathering the details and will come back to you with what we find and the proposed next step. If you have photos or context that would help, adding them now speeds everything up.')
+      + signature,
+  },
+  // -----------------------------------------------------------------
+  // PAYMENTS, QUOTES, AND E-SIGN LIFECYCLE
+  // -----------------------------------------------------------------
+  {
+    slug: 'payment_received',
+    name: 'Payment received',
+    category: 'billing',
+    description: 'Receipt confirming a payment posted to an invoice.',
+    sortOrder: 129,
+    tokens: ['first_name', 'invoice_number', 'amount', 'balance_due', 'action_label', 'action_url'],
+    subject: 'Payment received, thank you',
+    preheader: 'Your receipt for invoice {{invoice_number}}.',
+    eyebrow: 'Billing',
+    title: 'Payment confirmed',
+    ctaLabel: 'View Receipt',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'Thank you. Your payment has been received and applied.')
+      + kv('Invoice', '{{invoice_number}}')
+      + kv('Amount received', '{{amount}}')
+      + '{{#if balance_due}}' + kv('Remaining balance', '{{balance_due}}') + '{{/if}}'
+      + p('This email is your receipt, and a copy also lives with the invoice in your portal.')
+      + signature,
+  },
+  {
+    slug: 'invoice_past_due',
+    name: 'Invoice past due',
+    category: 'billing',
+    description: 'Firm but non-threatening notice once an invoice passes its due date.',
+    sortOrder: 130,
+    tokens: ['first_name', 'invoice_number', 'balance_due', 'due_date', 'support_email', 'action_label', 'action_url'],
+    subject: 'Invoice {{invoice_number}} is past due',
+    preheader: 'Outstanding balance and the fastest way to resolve it.',
+    eyebrow: 'Billing',
+    title: 'Let us get this settled',
+    ctaLabel: 'Pay Invoice',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'Our records show an invoice on your account has passed its due date.')
+      + kv('Invoice', '{{invoice_number}}')
+      + kv('Balance', '{{balance_due}}')
+      + kv('Was due', '{{due_date}}')
+      + p('If payment is already on its way, thank you. It can take a short while to reflect.', 'If something is making payment difficult, or you believe this is in error, please tell us at {{support_email}}. Talking to us early always beats letting it sit.')
+      + signature,
+  },
+  {
+    slug: 'quote_accepted',
+    name: 'Quote accepted',
+    category: 'billing',
+    description: 'Confirms a quote acceptance and explains what happens next.',
+    sortOrder: 131,
+    tokens: ['first_name', 'quote_number', 'quote_amount', 'action_label', 'action_url'],
+    subject: 'Quote {{quote_number}} accepted',
+    preheader: 'Your acceptance is recorded and planning begins.',
+    eyebrow: 'Quotes',
+    title: 'Thank you, we are on it',
+    ctaLabel: 'Track Your Request',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'Your acceptance of quote {{quote_number}} ({{quote_amount}}) is recorded. Thank you for the go-ahead.')
+      + p('Next we turn the quote into a working plan: confirming scope, lining up scheduling and the right people, and opening the request in your portal so you can follow progress. If anything needs a decision from you along the way, we will ask directly.')
+      + signature,
+  },
+  {
+    slug: 'quote_expiring',
+    name: 'Quote expiring soon',
+    category: 'billing',
+    description: 'Heads-up before quoted pricing lapses. Sent once, never after expiry.',
+    sortOrder: 132,
+    tokens: ['first_name', 'quote_number', 'quote_amount', 'quote_expiration_date', 'action_label', 'action_url'],
+    subject: 'Your quote expires {{quote_expiration_date}}',
+    preheader: 'A heads-up before the pricing window closes.',
+    eyebrow: 'Quotes',
+    title: 'Before this quote lapses',
+    ctaLabel: 'Review Quote',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'A quick heads-up rather than a push: quote {{quote_number}} ({{quote_amount}}) is set to expire on {{quote_expiration_date}}.')
+      + p('Quotes carry an expiration so pricing stays accurate, not to pressure a decision. If you need more time, want to adjust the scope, or have questions holding you back, reply and we will refresh or rework it.')
+      + signature,
+  },
+  {
+    slug: 'signature_requested',
+    name: 'Signature requested',
+    category: 'notification',
+    description: 'Sent when an e-sign envelope goes out to a signer.',
+    sortOrder: 133,
+    tokens: ['first_name', 'document_name', 'signature_due_date', 'action_label', 'action_url'],
+    subject: 'Signature requested: {{document_name}}',
+    preheader: 'Review and sign securely. The link is unique to you.',
+    eyebrow: 'Documents',
+    title: 'A document needs your signature',
+    ctaLabel: 'Review and Sign',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'Pinnacle Management Ventures has sent you a document for review and signature.')
+      + kv('Document', '{{document_name}}')
+      + '{{#if signature_due_date}}' + kv('Please complete by', '{{signature_due_date}}') + '{{/if}}'
+      + p('The signing page walks you through it: verify your identity, review each page, and sign where indicated. It works on a phone or a computer, and your progress saves as you go.', 'Take the time you need to read before signing. If anything is unclear, reply to this email before you sign rather than after.'),
+  },
+  {
+    slug: 'signature_reminder',
+    name: 'Signature reminder',
+    category: 'notification',
+    description: 'Reminder to a signer who has not completed the envelope.',
+    sortOrder: 134,
+    tokens: ['first_name', 'document_name', 'action_label', 'action_url'],
+    subject: 'Still waiting: {{document_name}} needs your signature',
+    preheader: 'A few minutes finishes it.',
+    eyebrow: 'Documents',
+    title: 'A gentle nudge',
+    ctaLabel: 'Review and Sign',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'Just a reminder that {{document_name}} is still waiting for your signature.')
+      + p('Signing takes only a few minutes, and anything you already filled in has been saved. If something is stopping you from signing, reply to this email and we will help.', 'If you have already signed, thank you, and you can disregard this.'),
+  },
+  {
+    slug: 'signature_completed',
+    name: 'Signature completed',
+    category: 'notification',
+    description: 'Sent to all parties once an envelope is fully signed.',
+    sortOrder: 135,
+    tokens: ['first_name', 'document_name', 'completed_at', 'action_label', 'action_url'],
+    subject: 'Fully signed: {{document_name}}',
+    preheader: 'Your completed copy and signing record are ready.',
+    eyebrow: 'Documents',
+    title: 'All signatures are in',
+    ctaLabel: 'View Signed Document',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'Good news. {{document_name}} is now fully signed by all parties as of {{completed_at}}.')
+      + p('The finalized document, together with its signing record of who signed and when, is stored securely and available from your portal. It is worth saving a copy for your own files.', 'Nothing further is needed. This completes the signing process.')
+      + signature,
+  },
+  // -----------------------------------------------------------------
+  // APPOINTMENT LIFECYCLE + ACCOUNT SECURITY
+  // -----------------------------------------------------------------
+  {
+    slug: 'appointment_reminder',
+    name: 'Appointment reminder',
+    category: 'notification',
+    description: 'Reminder sent a set interval before a confirmed appointment.',
+    sortOrder: 136,
+    tokens: ['first_name', 'appointment_title', 'appointment_date', 'appointment_time', 'appointment_location', 'action_label', 'action_url'],
+    subject: 'Reminder: {{appointment_title}} on {{appointment_date}}',
+    preheader: 'Time, location, and anything to bring.',
+    eyebrow: 'Appointments',
+    title: 'See you soon',
+    ctaLabel: 'View Appointment',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'A reminder about your upcoming appointment.')
+      + kv('What', '{{appointment_title}}')
+      + kv('When', '{{appointment_date}} at {{appointment_time}}')
+      + kv('Where', '{{appointment_location}}')
+      + p('If the time no longer works, rescheduling now is easy and keeps the slot useful for someone else.')
+      + signature,
+  },
+  {
+    slug: 'appointment_updated',
+    name: 'Appointment updated or canceled',
+    category: 'notification',
+    description: 'Sent when an appointment is rescheduled or canceled. Empty date renders the cancellation form.',
+    sortOrder: 137,
+    tokens: ['first_name', 'appointment_title', 'appointment_date', 'appointment_time', 'appointment_location', 'action_label', 'action_url'],
+    subject: 'Change to your {{appointment_title}} appointment',
+    preheader: 'The updated details, clearly marked.',
+    eyebrow: 'Appointments',
+    title: 'Your appointment changed',
+    ctaLabel: 'View Appointment',
+    ctaUrlToken: 'action_url',
+    bodyHtml: p('Hi {{first_name}},', 'There has been a change to your {{appointment_title}} appointment.')
+      + '{{#if appointment_date}}' + kv('Now scheduled', '{{appointment_date}} at {{appointment_time}}') + kv('Where', '{{appointment_location}}') + '{{/if}}'
+      + '{{#unless appointment_date}}' + p('This appointment has been canceled. If this was unexpected or you would like to rebook, we are glad to help you find a new time.') + '{{/unless}}'
+      + p('We apologize for any inconvenience. The appointment page always shows the current details.')
+      + signature,
+  },
+  {
+    slug: 'password_changed',
+    name: 'Password changed',
+    category: 'account',
+    description: 'Security alarm sent whenever an account password changes. Never suppressible.',
+    sortOrder: 138,
+    tokens: ['first_name', 'support_email', 'action_label', 'action_url'],
+    subject: 'Your Pinnacle password was changed',
+    preheader: 'If this was you, no action is needed.',
+    eyebrow: 'Account security',
+    title: 'Password updated',
+    ctaLabel: 'Secure My Account',
+    ctaUrlToken: 'action_url',
+    securityNote: 'If you did not make this change, reset your password immediately and contact us.',
+    bodyHtml: p('Hi {{first_name}},', 'The password for your Pinnacle account was just changed.')
+      + p('<strong>If this was you:</strong> no action is needed. This note is simply the record.')
+      + p('<strong>If this was not you:</strong> treat it as urgent. Reset your password using the button below and contact us at {{support_email}} so we can review the account with you.'),
+  },
+  {
+    slug: 'provider_application_declined',
+    name: 'Provider application declined',
+    category: 'account',
+    description: 'Respectful decline. No CTA, since no action is required.',
+    sortOrder: 139,
+    tokens: ['first_name'],
+    subject: 'An update on your Pinnacle application',
+    preheader: 'The outcome of your network application.',
+    eyebrow: 'Provider network',
+    title: 'Thank you for applying',
+    bodyHtml: p('Hi {{first_name}},', 'Thank you for taking the time to apply to the Pinnacle Management Ventures professional network. After review, we are not able to move your application forward at this time.')
+      + p('Decisions reflect our current needs, coverage, and fit. They are not a judgment of your work overall, and our needs change as the network grows. You are welcome to apply again in the future if your services or coverage change.')
+      + p('We appreciate your interest and wish you well.'),
+  },
+  // -----------------------------------------------------------------
   // Fallback wrapper (used by legacy notification pipeline)
   // -----------------------------------------------------------------
   {
