@@ -9,6 +9,7 @@ import { HQ_EMAIL_CATEGORY_LABEL, type HqEmailTemplate } from '../../lib/hqEmail
 import { LetterheadCrest } from '../../components/admin/LetterheadCrest'
 import { FIRM_NAME, FIRM_TAGLINE } from '../../../shared/letterhead'
 import { emailVariablesByCategory, isKnownEmailVariable, extractAllReferencedTokens } from '../../../shared/emailVariables'
+import { categoryCounts, customizedCount, filterTemplates, isCustomized, type StatusFilter } from '../../lib/templateFilter'
 
 const CATEGORY_ORDER = ['account', 'invite', 'billing', 'nurture', 'field', 'notification', 'custom'] as const
 
@@ -51,6 +52,8 @@ export function EmailTemplatesPanel() {
   const [selectedId, setSelectedId] = useState(searchParams.get('template') || '')
   const [draft, setDraft] = useState<Draft | null>(null)
   const [query, setQuery] = useState('')
+  const [category, setCategory] = useState<string>('all')
+  const [status, setStatus] = useState<StatusFilter>('all')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -102,18 +105,21 @@ export function EmailTemplatesPanel() {
     }, { replace: true })
   }
 
+  // Search now covers the body, so a half-remembered phrase finds the email.
   const groups = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const filtered = templates.filter((row) => {
-      if (!q) return true
-      return `${row.name} ${row.slug} ${row.description || ''} ${row.subject}`.toLowerCase().includes(q)
-    })
-    return CATEGORY_ORDER.map((category) => ({
-      category,
-      label: HQ_EMAIL_CATEGORY_LABEL[category],
-      rows: filtered.filter((row) => row.category === category),
+    const filtered = filterTemplates(templates, { query, category, status })
+    return CATEGORY_ORDER.map((key) => ({
+      category: key,
+      label: HQ_EMAIL_CATEGORY_LABEL[key],
+      rows: filtered.filter((row) => row.category === key),
     })).filter((group) => group.rows.length)
-  }, [templates, query])
+  }, [templates, query, category, status])
+
+  // Counted before the category filter, so a chip shows what picking it would
+  // give rather than collapsing to zero while another chip is active.
+  const counts = useMemo(() => categoryCounts(templates, { query, status }), [templates, query, status])
+  const totalShown = useMemo(() => [...counts.values()].reduce((a, b) => a + b, 0), [counts])
+  const editedCount = useMemo(() => customizedCount(templates), [templates])
 
   async function save() {
     if (!selected || !draft) return
@@ -262,7 +268,56 @@ export function EmailTemplatesPanel() {
               <Plus size={16} />
             </button>
           </div>
+
+          <div className="shrink-0 space-y-2 border-b border-white/5 px-3 pb-2.5">
+            <div className="flex flex-wrap gap-1">
+              {(['all', 'customized', 'shipped', 'off'] as StatusFilter[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={status === key}
+                  onClick={() => setStatus(key)}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize transition ${
+                    status === key ? 'bg-gold/20 text-gold' : 'text-slate-500 hover:text-white'
+                  }`}
+                >
+                  {key === 'customized' ? `Edited${editedCount ? ` (${editedCount})` : ''}` : key}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                aria-pressed={category === 'all'}
+                onClick={() => setCategory('all')}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                  category === 'all' ? 'bg-white/[.10] text-white' : 'text-slate-500 hover:text-white'
+                }`}
+              >
+                All {totalShown}
+              </button>
+              {CATEGORY_ORDER.filter((key) => counts.get(key)).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={category === key}
+                  onClick={() => setCategory(key)}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                    category === key ? 'bg-white/[.10] text-white' : 'text-slate-500 hover:text-white'
+                  }`}
+                >
+                  {HQ_EMAIL_CATEGORY_LABEL[key]} {counts.get(key)}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="min-h-0 flex-1 overflow-y-auto">
+            {!groups.length && (
+              <p className="px-3 py-8 text-center text-xs text-slate-500">
+                No templates match. Clear the filters or widen the search.
+              </p>
+            )}
             {groups.map((group) => (
               <div key={group.category} className="border-b border-white/5 py-2">
                 <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[.16em] text-gold/80">{group.label}</p>
@@ -274,7 +329,10 @@ export function EmailTemplatesPanel() {
                     className={`flex w-full flex-col px-3 py-2 text-left ${row.id === selected.id ? 'bg-white/[.06] text-white' : 'text-slate-400 hover:bg-white/[.03] hover:text-white'}`}
                   >
                     <span className="text-sm font-semibold">{row.name}</span>
-                    <span className="mt-0.5 text-[11px] text-slate-500">{row.enabled ? 'Active' : 'Off'} · {row.is_system ? 'System' : 'Custom'}</span>
+                    <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
+                      <span>{row.enabled ? 'Active' : 'Off'} · {row.is_system ? 'System' : 'Custom'}</span>
+                      {isCustomized(row) && <span className="rounded bg-gold/15 px-1 text-[10px] font-bold text-gold">Edited</span>}
+                    </span>
                   </button>
                 ))}
               </div>
