@@ -5,7 +5,7 @@ const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8'
 const client = read('../functions/_lib/clientNotifications.ts')
 const staff = read('../functions/_lib/email.ts')
 const seed = read('../functions/_lib/hqEmailTemplates.ts')
-const migration = read('../migrations/0096_client_notification_eyebrow.sql')
+const migration = read('../migrations/0098_consultation_booking_rebuild.sql')
 
 // Client notifications used to read ONLY notification_template_overrides while
 // staff notifications read hq_email_templates first. That split is why editing

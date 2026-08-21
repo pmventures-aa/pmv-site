@@ -1,19 +1,17 @@
--- Correct the eyebrow on already-seeded client notification templates.
+-- Regressed to a no-op. Superseded by 0098_consultation_booking_rebuild.sql.
 --
--- notify_* rows in hq_email_templates were seeded before those rows drove
--- anything client-facing, so every one of them carries the staff eyebrow
--- "Pinnacle HQ notification". Client notifications now read these rows, and a
--- client receiving mail labelled that way reads as internal mail leaking out.
+-- This migration originally created the client notification eyebrow correction.
 --
--- Only rows still carrying the exact seeded default are touched. If someone
--- has already edited the eyebrow, theirs is left alone rather than being
--- overwritten by a migration they did not ask for.
+-- The four-step consultation set (0094 through 0097) was state-dependent:
+-- 0097 ended in a bare ALTER TABLE ADD COLUMN, and SQLite has no
+-- ADD COLUMN IF NOT EXISTS. Applying the schema by hand in the D1 console --
+-- the only route available without wrangler credentials -- therefore left a
+-- landmine, because the next `wrangler d1 migrations apply` would reach 0097,
+-- abort on a duplicate column, and stop the run partway through.
+--
+-- 0098 restates all four steps in their final shape using only statements that
+-- no-op when the object already exists. These files are kept, rather than
+-- deleted, so the migration numbering stays stable and any database that has
+-- already recorded them as applied stays consistent.
 
-UPDATE hq_email_templates
-   SET eyebrow = 'Your Pinnacle relationship',
-       updated_at = datetime('now')
- WHERE slug LIKE 'notify\_%' ESCAPE '\'
-   AND eyebrow = 'Pinnacle HQ notification'
-   AND substr(slug, 8) IN (
-     SELECT event_key FROM notification_event_catalog WHERE audience = 'client'
-   );
+SELECT 'superseded by 0098_consultation_booking_rebuild' AS note;
