@@ -19,11 +19,13 @@ describe('auth boot watchdog', () => {
 })
 
 describe('every email body editor is rich', () => {
-  it('Brand Studio templates use the rich composer with variable chips and a source toggle', () => {
+  it('Brand Studio no longer edits email bodies at all', () => {
+    // Its template editor was never wired to a send path, so it was removed
+    // rather than kept in sync. Email copy is edited in HQ -> Email Templates,
+    // covered by tests/templateConsolidation.test.ts.
     const studio = read('../src/pages/mail/BrandingStudio.tsx')
-    expect(studio).toContain('RichTextComposer')
-    expect(studio).toContain('insertTemplateVar')
-    expect(studio).toContain("showSource?'Rich editor':'HTML source'")
+    expect(studio).not.toContain("tab==='templates'")
+    expect(studio).toContain('Email Templates')
   })
   it('Notification Settings event emails use the rich composer', () => {
     const notif = read('../src/pages/admin/settings/NotificationSettings.tsx')

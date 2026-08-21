@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { requireStaff } from '../mid'
-import { hasCapability } from '../capabilities'
+import { hasGrantedPermission, isOwnerAccount } from '../capabilities'
 import { sendEmail } from '../email'
 import {
   ensureHqEmailTemplates,
@@ -21,10 +21,13 @@ hqEmailTemplateRoutes.use('*', requireStaff)
 
 const clean = (v: unknown, n: number) => typeof v === 'string' ? v.trim().slice(0, n) : ''
 
+// Editing this copy changes what lands in clients' inboxes, so the baseline is
+// owner-only. Anyone else holds it because someone deliberately granted
+// manage_email_templates, not because they happen to be an admin or hold a
+// broad settings permission.
 async function canManage(env: AppEnv['Bindings'], user: { id: string; role: string }) {
-  return user.role === 'admin'
-    || await hasCapability(env, user as any, 'can_manage_communications')
-    || await hasCapability(env, user as any, 'can_manage_settings')
+  return await isOwnerAccount(env, user as any)
+    || await hasGrantedPermission(env, user as any, 'manage_email_templates')
 }
 
 function publicRow(row: HqEmailTemplateRow) {

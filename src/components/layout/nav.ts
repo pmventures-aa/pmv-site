@@ -1,5 +1,5 @@
 import {
-  Home, Layers, FileText, MessageSquare, Calendar, Receipt, HelpCircle, Building2, Users,
+  Home, Layers, FileText, MessageSquare, Mails, Calendar, Receipt, HelpCircle, Building2, Users,
   Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned,
   Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, Video, Sparkles, Send, type LucideIcon,
 } from 'lucide-react'
@@ -78,6 +78,9 @@ export const adminNav: NavItem[] = [
   {key:'clients',label:'Clients',to:'clients',icon:Users,section:'Revenue'},
   {key:'inquiries',label:'Leads',to:'inquiries',icon:UserPlus,section:'Revenue'},
   {key:'messages',label:'Messages',to:'messages',icon:MessageSquare,section:'Service'},
+  // Email copy is a destination people go to on purpose, not something to
+  // find while reading mail. It stays reachable as a Messages tab too.
+  {key:'email-templates',label:'Email Templates',to:'email-templates',icon:Mails,section:'Service'},
   {key:'cases',label:'Cases & SLA',to:'cases',icon:HelpCircle,section:'Service'},
   {key:'document-center',label:'Documents',to:'document-center',icon:FileText,section:'Service'},
   {key:'calendar',label:'Calendar',to:'calendar',icon:Calendar,section:'Delivery'},
