@@ -78,7 +78,7 @@ async function withTimeout(url: string, init: RequestInit): Promise<Response> {
  * Returns null rather than throwing for every "not connected" shape, because
  * the caller's job is to render availability, not to explain Google.
  */
-async function accessTokenFor(env: Env, userId: string): Promise<{ token: string; calendarId: string } | null> {
+export async function googleAccessTokenFor(env: Env, userId: string): Promise<{ token: string; calendarId: string } | null> {
   const cfg = googleConfig(env)
   if (!isConfigured(cfg)) return null
 
@@ -136,7 +136,7 @@ export async function googleBusySpans(env: Env, userId: string, fromIso: string,
     if (cached) return JSON.parse(cached) as BusySpan[]
   } catch { /* a cache miss is not a failure */ }
 
-  const auth = await accessTokenFor(env, userId)
+  const auth = await googleAccessTokenFor(env, userId)
   if (!auth) return []
 
   let response: Response
@@ -171,5 +171,5 @@ export async function googleBusySpans(env: Env, userId: string, fromIso: string,
 
 /** Whether this user has a Google calendar connected and usable. */
 export async function googleCalendarConnected(env: Env, userId: string): Promise<boolean> {
-  return (await accessTokenFor(env, userId)) !== null
+  return (await googleAccessTokenFor(env, userId)) !== null
 }

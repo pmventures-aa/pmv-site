@@ -49,6 +49,7 @@ interface Store {
   events: Array<Record<string, unknown>>
   inquiries: Array<Record<string, unknown>>
   bookings: Array<Record<string, unknown>>
+  calendarLinks: Array<Record<string, unknown>>
   users: Array<{ id: string; email: string }>
   kv: Map<string, string>
   failBookingInsert?: boolean
@@ -75,6 +76,7 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     events: [],
     inquiries: [],
     bookings: [],
+    calendarLinks: [],
     users: [],
     kv: new Map(),
     ...overrides,
@@ -96,8 +98,16 @@ function makeEnv(store: Store): Env {
           const hit = store.users.find((u) => u.email.toLowerCase() === String(bound[0]).toLowerCase())
           return (hit ? { id: hit.id } : null) as T | null
         }
-        if (s.includes('from consultation_bookings where public_token')) {
-          return (store.bookings.find((b) => b.public_token === bound[0]) ?? null) as T | null
+        if (s.includes('from consultation_bookings') && s.includes('public_token')) {
+          const hit = store.bookings.find((b) => b.public_token === bound[0])
+          if (!hit) return null
+          // The cancel route joins the schedule for its host, so the Google
+          // event can be deleted from the calendar it was written to.
+          const schedule = store.schedules.find((r) => r.id === hit.schedule_id)
+          return { ...hit, host_user_id: schedule?.host_user_id ?? null } as T | null
+        }
+        if (s.includes('from consultation_calendar_links')) {
+          return (store.calendarLinks.find((l) => l.booking_id === bound[0]) ?? null) as T | null
         }
         throw new Error(`unhandled first SQL: ${sql}`)
       },
@@ -135,6 +145,19 @@ function makeEnv(store: Store): Env {
         if (store.failBookingInsert) throw new Error('simulated write failure')
         const [id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone, , meeting_provider, meeting_external_id, meeting_url, meeting_format] = bound
         store.bookings.push({ id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone, status: 'booked', meeting_provider, meeting_external_id, meeting_url, meeting_format })
+        return { success: true }
+      }
+      if (s.startsWith('insert into consultation_calendar_links')) {
+        const [booking_id, external_event_id, calendar_id, last_error] = bound
+        const existing = store.calendarLinks.find((l) => l.booking_id === booking_id)
+        if (existing) Object.assign(existing, { external_event_id, calendar_id, last_error })
+        else store.calendarLinks.push({ booking_id, provider: 'google', external_event_id, calendar_id, last_error })
+        return { success: true }
+      }
+      if (s.startsWith('update consultation_calendar_links')) {
+        const [booking_id] = bound
+        const row = store.calendarLinks.find((l) => l.booking_id === booking_id)
+        if (row) Object.assign(row, { external_event_id: null })
         return { success: true }
       }
       if (s.startsWith('update consultation_bookings')) {
