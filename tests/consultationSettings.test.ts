@@ -23,8 +23,16 @@ describe('consultation booking settings', () => {
     expect(panel).toContain('formatHhMm')
     expect(panel).toContain('parseHhMm')
     expect(panel).toContain('type="time"')
-    // No instant conversion in the editor; the engine handles that per day.
-    expect(panel).not.toContain('zonedWallTimeToUtcMs')
+    // The grid saves minutes from local midnight, exactly as stored: no
+    // instant conversion, so the engine can resolve each day itself and a
+    // schedule survives daylight saving without being regenerated.
+    expect(panel).toContain('windows: schedule.windows')
+    expect(panel).toContain("field: 'startMinute' | 'endMinute'")
+    // Blackouts ARE instants and do convert, so the converter's presence in
+    // this file is no longer evidence that the grid converts. Pin the grid's
+    // own payload instead of the file's imports.
+    expect(panel).not.toMatch(/startMinute:\s*zonedWallTimeToUtcMs/)
+    expect(panel).not.toMatch(/windows[\s\S]{0,200}toISOString\(\)/)
   })
 
   it('lets a host be chosen so their calendar blocks slots', () => {
