@@ -3,13 +3,15 @@ import type { Env } from '../functions/_lib/types'
 
 // Email and audit are best-effort side channels; stub them so the D1 mock only
 // has to model the booking tables.
-const sent: Array<{ to: string; subject: string }> = []
-const staffNotices: Array<{ kind: string; subject: string }> = []
+const sent: Array<{ to: string; subject: string; text: string }> = []
+const staffNotices: Array<{ kind: string; subject: string; html: string }> = []
 vi.mock('../functions/_lib/email', () => ({
   escapeHtml: (s: string) => s,
-  sendEmail: vi.fn(async (_env: Env, o: { to: string; subject: string }) => { sent.push({ to: o.to, subject: o.subject }) }),
-  notifyStaff: vi.fn(async (_env: Env, o: { kind: string; subject: string }) => {
-    staffNotices.push({ kind: o.kind, subject: o.subject })
+  sendEmail: vi.fn(async (_env: Env, o: { to: string; subject: string; text?: string }) => {
+    sent.push({ to: o.to, subject: o.subject, text: o.text ?? '' })
+  }),
+  notifyStaff: vi.fn(async (_env: Env, o: { kind: string; subject: string; html: string }) => {
+    staffNotices.push({ kind: o.kind, subject: o.subject, html: o.html })
     return { recipients: [], usedFallback: true }
   }),
 }))
@@ -19,6 +21,23 @@ vi.mock('../functions/_lib/auditLog', () => ({
   actorIp: () => null,
   actorUserAgent: () => null,
   actorGeo: () => null,
+}))
+
+// Zoom is stubbed so the booking tests exercise the wiring, not the API.
+// tests/zoom.test.ts covers the client itself.
+let zoomOn = false
+let zoomFails = false
+const zoomCreated: Array<{ startsAt: string; durationMinutes: number }> = []
+const zoomDeleted: string[] = []
+vi.mock('../functions/_lib/zoom', () => ({
+  isZoomConfigured: () => zoomOn,
+  createZoomMeeting: vi.fn(async (_env: unknown, input: { startsAt: string; durationMinutes: number }) => {
+    if (zoomFails) return { ok: false as const, reason: 'request_failed' as const, detail: 'simulated' }
+    zoomCreated.push({ startsAt: input.startsAt, durationMinutes: input.durationMinutes })
+    return { ok: true as const, value: { meetingId: 'zoom-1', joinUrl: 'https://zoom.us/j/zoom-1', password: '1234' } }
+  }),
+  deleteZoomMeeting: vi.fn(async (_env: unknown, id: string) => { zoomDeleted.push(id); return { ok: true as const, value: true as const } }),
+  updateZoomMeeting: vi.fn(async () => ({ ok: true as const, value: true as const })),
 }))
 
 import { consultationBookingPublicRoutes } from '../functions/_lib/routes/consultationBooking'
@@ -32,6 +51,7 @@ interface Store {
   bookings: Array<Record<string, unknown>>
   users: Array<{ id: string; email: string }>
   kv: Map<string, string>
+  failBookingInsert?: boolean
 }
 
 function schedule(overrides: Record<string, unknown> = {}) {
@@ -102,8 +122,8 @@ function makeEnv(store: Store): Env {
     }
     function apply() {
       if (s.startsWith('insert into calendar_events')) {
-        const [id, title, description, starts_at, ends_at, timezone, event_type, location_type, assigned_user_id] = bound
-        store.events.push({ id, title, description, starts_at, ends_at, timezone, event_type, status: 'proposed', location_type, visibility: 'internal', client_visible: 0, assigned_user_id })
+        const [id, title, description, starts_at, ends_at, timezone, event_type, location_type, meeting_url, assigned_user_id] = bound
+        store.events.push({ id, title, description, starts_at, ends_at, timezone, event_type, status: 'proposed', location_type, meeting_url, visibility: 'internal', client_visible: 0, assigned_user_id })
         return { success: true }
       }
       if (s.startsWith('insert into contact_inquiries')) {
@@ -112,20 +132,21 @@ function makeEnv(store: Store): Env {
         return { success: true }
       }
       if (s.startsWith('insert into consultation_bookings')) {
-        const [id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone] = bound
-        store.bookings.push({ id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone, status: 'booked', meeting_url: null })
+        if (store.failBookingInsert) throw new Error('simulated write failure')
+        const [id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone, , meeting_provider, meeting_external_id, meeting_url] = bound
+        store.bookings.push({ id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone, status: 'booked', meeting_provider, meeting_external_id, meeting_url })
         return { success: true }
       }
       if (s.startsWith('update consultation_bookings')) {
         const [reason, id] = bound
         const row = store.bookings.find((b) => b.id === id)
-        if (row) Object.assign(row, { status: 'cancelled', cancelled_reason: reason })
+        if (row) Object.assign(row, { status: 'cancelled', cancelled_reason: reason, meeting_url: null })
         return { success: true }
       }
       if (s.startsWith('update calendar_events set status')) {
         const [id] = bound
         const row = store.events.find((e) => e.id === id)
-        if (row) Object.assign(row, { status: 'cancelled' })
+        if (row) Object.assign(row, { status: 'cancelled', meeting_url: null })
         return { success: true }
       }
       throw new Error(`unhandled write SQL: ${sql}`)
@@ -163,6 +184,10 @@ beforeEach(() => {
   sent.length = 0
   staffNotices.length = 0
   audits.length = 0
+  zoomCreated.length = 0
+  zoomDeleted.length = 0
+  zoomOn = false
+  zoomFails = false
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-05-29T12:00:00Z'))
 })
@@ -252,6 +277,82 @@ describe('taking a booking', () => {
       put: async () => { throw new Error('kv down') },
     }
     expect((await post(env, '/consultation/book', VALID)).status).toBe(201)
+  })
+})
+
+describe('zoom meeting generation', () => {
+  it('attaches a join link to the booking, the calendar event, and the email', async () => {
+    zoomOn = true
+    const store = makeStore()
+    await post(makeEnv(store), '/consultation/book', VALID)
+    expect(zoomCreated).toHaveLength(1)
+    expect(zoomCreated[0].startsAt).toBe(SLOT)
+    expect(zoomCreated[0].durationMinutes).toBe(60)
+    expect(store.bookings[0].meeting_url).toBe('https://zoom.us/j/zoom-1')
+    expect(store.bookings[0].meeting_provider).toBe('zoom')
+    expect(store.bookings[0].meeting_external_id).toBe('zoom-1')
+    // The calendar row carries it too, which is what feeds the ICS invite.
+    expect(store.events[0].meeting_url).toBe('https://zoom.us/j/zoom-1')
+    expect(sent[0].text).toContain('https://zoom.us/j/zoom-1')
+  })
+
+  it('still takes the booking when Zoom is unavailable', async () => {
+    zoomOn = true
+    zoomFails = true
+    const store = makeStore()
+    const res = await post(makeEnv(store), '/consultation/book', VALID)
+    expect(res.status).toBe(201)
+    expect(store.bookings).toHaveLength(1)
+    expect(store.bookings[0].meeting_url).toBeNull()
+    expect(store.bookings[0].meeting_provider).toBeNull()
+    // Staff are told loudly, so someone adds joining details before the call.
+    expect(staffNotices[0].html).toContain('No Zoom link was generated')
+  })
+
+  it('promises joining details later rather than a broken link', async () => {
+    zoomOn = true
+    zoomFails = true
+    await post(makeEnv(makeStore()), '/consultation/book', VALID)
+    expect(sent[0].text).toContain('We will send joining details before the call')
+    expect(sent[0].text).not.toContain('zoom.us')
+  })
+
+  it('creates nothing when Zoom is not configured', async () => {
+    zoomOn = false
+    const store = makeStore()
+    await post(makeEnv(store), '/consultation/book', VALID)
+    expect(zoomCreated).toHaveLength(0)
+    expect(store.bookings[0].meeting_url).toBeNull()
+    // Not configured is not a problem to nag staff about.
+    expect(staffNotices[0].html).not.toContain('No Zoom link')
+  })
+
+  it('skips meeting generation for a schedule that is not virtual', async () => {
+    zoomOn = true
+    const store = makeStore({ schedules: [schedule({ location_type: 'phone' })] })
+    await post(makeEnv(store), '/consultation/book', VALID)
+    expect(zoomCreated).toHaveLength(0)
+  })
+
+  it('cleans up the meeting when the booking write fails', async () => {
+    zoomOn = true
+    const store = makeStore({ failBookingInsert: true })
+    await post(makeEnv(store), '/consultation/book', VALID).catch(() => undefined)
+    // No orphan left sitting on the host's Zoom calendar.
+    expect(zoomDeleted).toEqual(['zoom-1'])
+  })
+
+  it('tears the meeting down on cancellation', async () => {
+    zoomOn = true
+    const store = makeStore()
+    const env = makeEnv(store)
+    const res = await post(env, '/consultation/book', VALID)
+    const ref = (await res.json() as { booking: { ref: string } }).booking.ref
+    await post(env, `/consultation/booking/${ref}/cancel`, {})
+    expect(zoomDeleted).toEqual(['zoom-1'])
+    // The dead link is cleared from both records, not just hidden.
+    expect(store.bookings[0].meeting_url).toBeNull()
+    expect(store.events[0].meeting_url).toBeNull()
   })
 })
 
