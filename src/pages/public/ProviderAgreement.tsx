@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
-import { LegalPage, P, UL, type LegalSection } from '../../components/public/LegalPage'
+import { useEffect, useMemo, useState } from 'react'
+import { LegalPage, type LegalSection } from '../../components/public/LegalPage'
+import { RichText } from '../../components/RichText'
 import { usePageMeta } from '../../lib/usePageMeta'
 import { api } from '../../lib/api'
 import { PROVIDER_AGREEMENT_VERSION } from '../../../shared/providerAgreement'
@@ -12,21 +13,11 @@ interface PublishedTemplate {
   sections: ManagedAgreementSection[]
 }
 
-function sectionContent(body: string) {
-  return body.split(/\n\s*\n/).filter(Boolean).map((block, index) => {
-    const lines = block.split('\n').filter(Boolean)
-    if (lines.every((line) => line.startsWith('- '))) {
-      return <UL key={index}>{lines.map((line) => <li key={line}>{line.slice(2)}</li>)}</UL>
-    }
-    return <P key={index}>{block}</P>
-  })
-}
-
 function legalSections(rows: ManagedAgreementSection[]): LegalSection[] {
   return rows.map((section) => ({
     id: section.id,
     title: section.title,
-    content: <Fragment>{sectionContent(section.body)}</Fragment>,
+    content: <RichText source={section.body} />,
   }))
 }
 
