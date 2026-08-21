@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, RefreshCw, Unplug } from 'lucide-react'
 import { api, ApiError } from '../../../lib/api'
 import { Panel, btnPrimary, btnOutline } from '../../../components/admin/ui'
@@ -40,6 +40,8 @@ export default function CalendarSyncSettings() {
   const [status, setStatus] = useState<Status | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<'connect' | 'sync' | 'disconnect' | null>(null)
+  // Consent happens in another tab, so nothing in this one knows it finished.
+  const awaitingConsent = useRef(false)
 
   const load = useCallback(async () => {
     try {
@@ -54,12 +56,39 @@ export default function CalendarSyncSettings() {
 
   useEffect(() => { void load() }, [load])
 
+  // The status card used to be fetched once, on mount. Consent runs in a
+  // separate tab, so coming back from Google left this tab rendering state
+  // captured BEFORE the grant existed: it still said "Not connected" and the
+  // only cure was knowing to reload the page. Re-read when this tab is looked
+  // at again after a connect was started. Both events are needed: a closing
+  // popup fires focus, and a phone switching tabs fires visibilitychange.
+  useEffect(() => {
+    function recheck() {
+      if (!awaitingConsent.current) return
+      if (document.visibilityState === 'hidden') return
+      awaitingConsent.current = false
+      void load()
+    }
+    window.addEventListener('focus', recheck)
+    document.addEventListener('visibilitychange', recheck)
+    return () => {
+      window.removeEventListener('focus', recheck)
+      document.removeEventListener('visibilitychange', recheck)
+    }
+  }, [load])
+
   async function connect() {
     setBusy('connect')
     try {
       const res = await api.get<{ url: string }>('/admin/external-calendar/google/connect')
-      window.open(res.url, '_blank', 'noopener')
+      awaitingConsent.current = true
+      const popup = window.open(res.url, '_blank', 'noopener')
+      // Mobile browsers routinely refuse window.open. Sending this tab to
+      // Google is better than a Connect button that silently does nothing;
+      // the visibility listener above picks the status back up on return.
+      if (!popup) window.location.href = res.url
     } catch (err) {
+      awaitingConsent.current = false
       toast.error(err instanceof ApiError ? err.message : 'Could not start Google connection.')
     } finally { setBusy(null) }
   }
@@ -163,9 +192,16 @@ export default function CalendarSyncSettings() {
                   <p className="mt-1 text-sm text-white">Not connected</p>
                   <p className="mt-1 text-xs text-slate-500">Connect your Google account so Pinnacle events land on your calendar and supported external edits flow back.</p>
                 </div>
-                <button type="button" onClick={connect} disabled={busy === 'connect'} className={btnPrimary}>
-                  {busy === 'connect' ? <Loader2 size={14} className="animate-spin" /> : null} Connect
-                </button>
+                <div className="flex shrink-0 gap-2">
+                  <button type="button" onClick={connect} disabled={busy === 'connect'} className={btnPrimary}>
+                    {busy === 'connect' ? <Loader2 size={14} className="animate-spin" /> : null} Connect
+                  </button>
+                  {/* Always available, so a connection that already succeeded
+                      is never hidden behind an event that did not fire. */}
+                  <button type="button" onClick={() => { void load() }} className={btnOutline}>
+                    <RefreshCw size={14} /> Recheck
+                  </button>
+                </div>
               </div>
             </div>
           )}
