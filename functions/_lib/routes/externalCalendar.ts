@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { googleBusySpans, googleCalendarConnected, writeToken } from '../googleFreeBusy'
 import type { AppEnv } from '../types'
 import { requireUser } from '../mid'
 import {
@@ -83,10 +84,10 @@ externalCalendarRoutes.get('/external-calendar/google/callback', async (c) => {
 
   const adapter = makeGoogleAdapter(cfg)
   const tok = await adapter.exchangeCode(code, cfg.redirectUri!)
-  // Real deployments should encrypt tokens with an existing secret at rest.
-  // The DB column names are *_enc to make that intent obvious to a future
-  // reader; while an encryption helper is not present in this repo yet the
-  // ciphertext boundary is a single call site here (defer to follow-up).
+  // Encrypted at rest with the same AES-GCM helper the ACH fields use. These
+  // are long-lived credentials granting read access to someone's calendar,
+  // and consultation availability now depends on them, so the *_enc column
+  // names finally mean what they say.
   const accountId = crypto.randomUUID()
   const expires = new Date(Date.now() + tok.expires_in * 1000).toISOString()
   await c.env.DB.prepare(
@@ -105,7 +106,7 @@ externalCalendarRoutes.get('/external-calendar/google/callback', async (c) => {
        last_error = NULL,
        connected_at = datetime('now'),
        disconnected_at = NULL`,
-  ).bind(accountId, row.user_id, tok.account_id || row.user_id, tok.email, tok.access_token, tok.refresh_token || null, expires, tok.scope || '').run()
+  ).bind(accountId, row.user_id, tok.account_id || row.user_id, tok.email, await writeToken(c.env, tok.access_token), await writeToken(c.env, tok.refresh_token || null), expires, tok.scope || '').run()
   return c.html('<html><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Google Calendar connected</h1><p>You can close this window and return to Pinnacle.</p><script>setTimeout(()=>window.close(),1200)</script></body></html>')
 })
 
@@ -119,14 +120,29 @@ externalCalendarRoutes.post('/external-calendar/google/disconnect', requireUser,
   return c.json({ ok: true })
 })
 
-// Manual "Sync Now" - runs an incremental pull. Full webhook wiring and
-// bidirectional push are the follow-on; see externalCalendar.ts adapter for
-// the primitives already in place. Returns a friendly status either way so
-// the UI never sits on a spinner.
+// Verifies the connection by asking Google for this week's busy spans, which
+// is exactly what consultation availability uses. Reporting the count proves
+// the grant works end to end rather than claiming success and leaving the
+// first real failure to surface as an empty booking page.
 externalCalendarRoutes.post('/external-calendar/google/sync-now', requireUser, async (c) => {
   const cfg = googleConfig(c.env)
   if (!isConfigured(cfg)) return c.json({ error: 'Google Calendar OAuth is not configured on this deployment.' }, 503)
-  return c.json({ ok: true, note: 'Sync scheduled. Bidirectional sync activates once webhooks are enabled.' })
+  const user = c.get('user')
+  const from = new Date().toISOString()
+  const to = new Date(Date.now() + 7 * 86_400_000).toISOString()
+  const busy = await googleBusySpans(c.env, user.id, from, to)
+  const connected = await googleCalendarConnected(c.env, user.id)
+  if (!connected) {
+    return c.json({ ok: false, connected: false, note: 'Google is not connected, or the connection needs to be renewed. Reconnect below.' })
+  }
+  return c.json({
+    ok: true,
+    connected: true,
+    busy_count: busy.length,
+    note: busy.length
+      ? `Connected. ${busy.length} busy period${busy.length === 1 ? '' : 's'} in the next 7 days will block consultation slots.`
+      : 'Connected. Nothing on your calendar in the next 7 days, so all published hours are bookable.',
+  })
 })
 
 // Google push notification receiver. Google POSTs a tiny body with headers

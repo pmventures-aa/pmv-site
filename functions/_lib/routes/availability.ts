@@ -18,6 +18,7 @@
 import { Hono } from 'hono'
 import type { AppEnv, Env } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
+import { googleBusySpans } from '../googleFreeBusy'
 import { uuid } from '../crypto'
 import { actorGeo, actorIp, actorUserAgent, logAudit } from '../auditLog'
 import {
@@ -173,11 +174,22 @@ export async function loadBusyIntervals(
         AND COALESCE(ends_at, starts_at) > ?`,
   ).bind(...scope.params, toIso, fromIso).all<{ starts_at: string; ends_at: string | null }>()
 
-  return (results ?? []).map((r) => ({
+  const pinnacle = (results ?? []).map((r) => ({
     startsAt: r.starts_at,
     // A stored event with no end still occupies its slot length.
     endsAt: r.ends_at ?? new Date(Date.parse(r.starts_at.replace(' ', 'T') + 'Z') + row.slot_minutes * 60_000).toISOString(),
   }))
+
+  // The host's own calendar, if they have connected one. Without this a
+  // schedule only knows about work booked through Pinnacle, so anything on
+  // the host's real calendar stays bookable and double-books them.
+  //
+  // Freebusy only: spans, never titles or attendees. And it fails open, so a
+  // Google outage leaves slots bookable rather than making the booking page
+  // look fully booked.
+  if (!row.host_user_id) return pinnacle
+  const external = await googleBusySpans(env, row.host_user_id, fromIso, toIso)
+  return external.length ? [...pinnacle, ...external] : pinnacle
 }
 
 // Resolve and bound the requested date range. Defaults to the next 30 days.
