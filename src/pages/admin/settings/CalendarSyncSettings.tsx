@@ -15,6 +15,9 @@ type Status = {
     connected_at?: string
     last_synced_at?: string | null
     last_sync_status?: string
+    status?: string
+    needs_reconnect?: boolean
+    last_error?: string | null
     last_sync_error?: string | null
   }
 }
@@ -98,22 +101,54 @@ export default function CalendarSyncSettings() {
               Google Calendar OAuth is not configured on this deployment. Ask your owner to set the Google credentials before connecting an account.
             </div>
           ) : status.account.connected ? (
-            <div className="rounded-xl border border-emerald-300/25 bg-emerald-400/[.05] p-4">
+            <div className={`rounded-xl border p-4 ${
+              status.account.needs_reconnect
+                ? 'border-rose-400/30 bg-rose-400/[.06]'
+                : 'border-emerald-300/25 bg-emerald-400/[.05]'
+            }`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-[.14em] text-emerald-300">Google Calendar</p>
-                  <p className="mt-1 truncate text-sm font-bold text-white">Connected as {status.account.email || 'this account'}</p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Sync: two-way when webhooks are enabled · Calendar: {status.account.target_calendar_name || status.account.target_calendar_id || 'primary'} · Last sync: {timeAgo(status.account.last_synced_at)}
+                  <p className={`text-xs font-bold uppercase tracking-[.14em] ${status.account.needs_reconnect ? 'text-rose-300' : 'text-emerald-300'}`}>
+                    Google Calendar
                   </p>
-                  {status.account.last_sync_error && (
-                    <p className="mt-2 text-xs text-rose-300">Last error: {status.account.last_sync_error}</p>
+                  {status.account.needs_reconnect ? (
+                    <>
+                      <p className="mt-1 truncate text-sm font-bold text-white">
+                        Reconnect needed for {status.account.email || 'this account'}
+                      </p>
+                      {/* Says what it COSTS, not just that it broke. Freebusy
+                          fails open, so a dead grant looks like an empty
+                          calendar rather than an error. */}
+                      <p className="mt-1 text-xs text-rose-200">
+                        Your calendar is not blocking consultation slots right now, so times you are busy can still be booked.
+                        Reconnect to restore it.
+                      </p>
+                      {status.account.last_error && (
+                        <p className="mt-2 text-xs text-slate-400">Google said: {status.account.last_error}</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-1 truncate text-sm font-bold text-white">Connected as {status.account.email || 'this account'}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Busy times block consultation slots · Calendar: {status.account.target_calendar_name || status.account.target_calendar_id || 'primary'} · Last checked: {timeAgo(status.account.last_synced_at)}
+                      </p>
+                      {status.account.last_sync_error && (
+                        <p className="mt-2 text-xs text-rose-300">Last error: {status.account.last_sync_error}</p>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <button type="button" onClick={syncNow} disabled={busy === 'sync'} className={btnOutline}>
-                    {busy === 'sync' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Sync now
-                  </button>
+                  {status.account.needs_reconnect ? (
+                    <button type="button" onClick={connect} disabled={busy === 'connect'} className={btnPrimary}>
+                      {busy === 'connect' ? <Loader2 size={14} className="animate-spin" /> : null} Reconnect
+                    </button>
+                  ) : (
+                    <button type="button" onClick={syncNow} disabled={busy === 'sync'} className={btnOutline}>
+                      {busy === 'sync' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Sync now
+                    </button>
+                  )}
                   <button type="button" onClick={disconnect} disabled={busy === 'disconnect'} className={btnOutline}>
                     <Unplug size={14} /> Disconnect
                   </button>
