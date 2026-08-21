@@ -25,14 +25,16 @@ export function safeHref(url: string): string | null {
   return /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(url.trim()) ? url.trim() : null
 }
 
-const INLINE_RE = /(\*\*([^*]+)\*\*)|(\[([^\]]+)\]\(([^)\s]+)\))|(\*([^*]+)\*)|(_([^_]+)_)/g
-
 export function parseInline(text: string): Inline[] {
+  // A fresh regex per call: parseInline recurses into itself for the contents of
+  // bold/italic/link runs, and a shared /g regex's lastIndex would be clobbered
+  // by the inner call mid-iteration - which previously spun the outer loop
+  // forever and exhausted memory.
+  const re = /(\*\*([^*]+)\*\*)|(\[([^\]]+)\]\(([^)\s]+)\))|(\*([^*]+)\*)|(_([^_]+)_)/g
   const out: Inline[] = []
   let last = 0
   let m: RegExpExecArray | null
-  INLINE_RE.lastIndex = 0
-  while ((m = INLINE_RE.exec(text)) !== null) {
+  while ((m = re.exec(text)) !== null) {
     if (m.index > last) out.push({ text: text.slice(last, m.index) })
     if (m[2] !== undefined) out.push({ bold: parseInline(m[2]) })
     else if (m[3] !== undefined) out.push({ link: m[5], children: parseInline(m[4]) })
