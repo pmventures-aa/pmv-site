@@ -66,14 +66,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
+    // The boot session check gates the entire app behind the loading screen.
+    // fetch() has no native timeout, so a hung /me request (a deploy mid-flip,
+    // a stalled edge connection) used to leave the site as a blank navy page
+    // forever. Race it against a watchdog: after 12s fall through to the
+    // logged-out view, and if the real response lands later with a valid
+    // session, apply it then.
+    const me = api.get<{ user: SessionUser; workspace?: WorkspaceContext }>('/me')
+    let timedOut = false
     try {
-      const data = await api.get<{ user: SessionUser; workspace?: WorkspaceContext }>('/me')
+      const data = await Promise.race([
+        me,
+        new Promise<never>((_, reject) => window.setTimeout(() => { timedOut = true; reject(new Error('auth boot timed out')) }, 12000)),
+      ])
       setUser(data.user)
       setWorkspace(applyWorkspace(data.workspace))
       ensureWelcomeSession()
     } catch {
       setUser(null)
       setWorkspace(emptyWorkspace())
+      if (timedOut) {
+        me.then((data) => {
+          setUser(data.user)
+          setWorkspace(applyWorkspace(data.workspace))
+          ensureWelcomeSession()
+        }).catch(() => {})
+      }
     } finally {
       setLoading(false)
     }
