@@ -80,6 +80,15 @@ interface BookingBody {
   email?: unknown
   phone?: unknown
   topic?: unknown
+  meetingFormat?: unknown
+}
+
+// A visitor may only choose a format the schedule actually offers. A phone
+// schedule stays a phone schedule; the choice exists to let someone opt OUT
+// of video, not to conjure a video call the host never offered.
+function resolveFormat(requested: unknown, scheduleLocationType: string): 'virtual' | 'phone' {
+  if (scheduleLocationType !== 'virtual') return 'phone'
+  return requested === 'phone' ? 'phone' : 'virtual'
 }
 
 consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
@@ -102,6 +111,13 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
   const row = await loadScheduleRow(c.env, CONSULTATION_SLUG)
   if (!row || !row.active || !row.public_bookable) {
     return c.json({ error: 'Online booking is not available right now. Call (561) 388-7879 and we will find a time.' }, 409)
+  }
+
+  const meetingFormat = resolveFormat(body.meetingFormat, row.location_type)
+  // We cannot call someone we have no number for, so a phone consultation
+  // needs one. Video does not, since the link goes to their email.
+  if (meetingFormat === 'phone' && !phone) {
+    return c.json({ error: 'Add a phone number so we know where to call you.' }, 400)
   }
 
   const schedule = await loadSchedule(c.env, row)
@@ -139,7 +155,7 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
   // Only the join url comes back from createZoomMeeting; the host start_url is
   // a bearer credential and never leaves that module.
   let meeting: { meetingId: string; joinUrl: string } | null = null
-  if (isZoomConfigured(c.env) && row.location_type === 'virtual') {
+  if (isZoomConfigured(c.env) && meetingFormat === 'virtual') {
     const created = await createZoomMeeting(c.env, {
       topic: `Pinnacle consultation: ${name}`,
       startsAt: startIso,
@@ -166,7 +182,7 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
         `Consultation: ${name}`,
         [topic ? `Topic: ${topic}` : '', `Booked online by ${name} <${email}>${phone ? ` (${phone})` : ''}`]
           .filter(Boolean).join('\n\n'),
-        startIso, endIso, schedule.timezone, row.event_type, row.location_type,
+        startIso, endIso, schedule.timezone, row.event_type, meetingFormat,
         meeting?.joinUrl ?? null, row.host_user_id,
       ),
       // The CRM lead, same shape every other public funnel produces.
@@ -179,12 +195,12 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
         `INSERT INTO consultation_bookings
            (id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone,
             topic, matched_user_id, starts_at, ends_at, timezone, created_ip,
-            meeting_provider, meeting_external_id, meeting_url)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            meeting_provider, meeting_external_id, meeting_url, meeting_format)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         bookingId, publicToken, row.id, eventId, inquiryId, name, email, phone || null,
         topic || null, matched?.id ?? null, startIso, endIso, schedule.timezone, ip,
-        meeting ? 'zoom' : null, meeting?.meetingId ?? null, meeting?.joinUrl ?? null,
+        meeting ? 'zoom' : null, meeting?.meetingId ?? null, meeting?.joinUrl ?? null, meetingFormat,
       ),
     ])
   } catch (err) {
@@ -208,7 +224,9 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
       + `${topic ? `You told us you wanted to cover: ${topic}\n\n` : ''}`
       + (meeting
         ? `Join the call here when it is time: ${meeting.joinUrl}\n\nYou will wait briefly in the waiting room until we let you in.\n\n`
-        : 'We will send joining details before the call.\n\n')
+        : meetingFormat === 'phone'
+          ? `We will call you on ${phone} at that time.\n\n`
+          : 'We will send joining details before the call.\n\n')
       + 'Use the link below if you need to cancel or you booked the wrong time.',
     // The CTA stays the manage page even when a join link exists: the join
     // link is only useful at one moment, the manage page always is.
@@ -237,9 +255,10 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
         + `${topic ? `<p>Topic: ${escapeHtml(topic)}</p>` : ''}`
         // Say so loudly when no link was generated, so someone adds one
         // rather than everybody discovering it at the start of the call.
+        + `<p>Format: ${meetingFormat === 'phone' ? 'Phone call' : 'Video call'}</p>`
         + (meeting
           ? `<p>Zoom link: ${escapeHtml(meeting.joinUrl)}</p>`
-          : isZoomConfigured(c.env)
+          : meetingFormat === 'virtual' && isZoomConfigured(c.env)
             ? '<p><strong>No Zoom link was generated for this booking.</strong> Add joining details before the call.</p>'
             : ''),
       fallbackMode: 'no_recipients',

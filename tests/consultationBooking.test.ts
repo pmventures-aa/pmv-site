@@ -133,8 +133,8 @@ function makeEnv(store: Store): Env {
       }
       if (s.startsWith('insert into consultation_bookings')) {
         if (store.failBookingInsert) throw new Error('simulated write failure')
-        const [id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone, , meeting_provider, meeting_external_id, meeting_url] = bound
-        store.bookings.push({ id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone, status: 'booked', meeting_provider, meeting_external_id, meeting_url })
+        const [id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone, , meeting_provider, meeting_external_id, meeting_url, meeting_format] = bound
+        store.bookings.push({ id, public_token, schedule_id, calendar_event_id, inquiry_id, contact_name, email, phone, topic, matched_user_id, starts_at, ends_at, timezone, status: 'booked', meeting_provider, meeting_external_id, meeting_url, meeting_format })
         return { success: true }
       }
       if (s.startsWith('update consultation_bookings')) {
@@ -412,5 +412,63 @@ describe('managing a booking by token', () => {
     const res = await consultationBookingPublicRoutes.request(`/consultation/booking/${ref}`, {}, env)
     const body = await res.json() as { booking: { meetingUrl: string | null } }
     expect(body.booking.meetingUrl).toBeNull()
+  })
+})
+
+
+describe('the visitor chooses the format', () => {
+  it('defaults to video on a virtual schedule and generates a link', async () => {
+    zoomOn = true
+    const store = makeStore()
+    await post(makeEnv(store), '/consultation/book', VALID)
+    expect(store.bookings[0].meeting_format).toBe('virtual')
+    expect(store.bookings[0].meeting_url).toBe('https://zoom.us/j/zoom-1')
+  })
+
+  it('skips Zoom entirely when the visitor picks phone', async () => {
+    zoomOn = true
+    const store = makeStore()
+    await post(makeEnv(store), '/consultation/book', { ...VALID, meetingFormat: 'phone', phone: '561-555-0100' })
+    expect(zoomCreated).toHaveLength(0)
+    expect(store.bookings[0].meeting_format).toBe('phone')
+    expect(store.bookings[0].meeting_url).toBeNull()
+  })
+
+  it('needs a number before it will book a phone call', async () => {
+    // We cannot call someone we have no number for.
+    const store = makeStore()
+    const res = await post(makeEnv(store), '/consultation/book', { ...VALID, meetingFormat: 'phone' })
+    expect(res.status).toBe(400)
+    expect(store.bookings).toHaveLength(0)
+  })
+
+  it('tells a phone booker we will call them, not that a link is coming', async () => {
+    const store = makeStore()
+    await post(makeEnv(store), '/consultation/book', { ...VALID, meetingFormat: 'phone', phone: '561-555-0100' })
+    expect(sent[0].text).toContain('We will call you on 561-555-0100')
+    expect(sent[0].text).not.toContain('joining details')
+  })
+
+  it('does not nag staff about a missing Zoom link on a phone booking', async () => {
+    zoomOn = true
+    await post(makeEnv(makeStore()), '/consultation/book', { ...VALID, meetingFormat: 'phone', phone: '561-555-0100' })
+    expect(staffNotices[0].html).toContain('Format: Phone call')
+    expect(staffNotices[0].html).not.toContain('No Zoom link')
+  })
+
+  it('will not conjure a video call on a phone-only schedule', async () => {
+    // The choice lets someone opt OUT of video, not into a format the host
+    // never offered.
+    zoomOn = true
+    const store = makeStore({ schedules: [schedule({ location_type: 'phone' })] })
+    await post(makeEnv(store), '/consultation/book', { ...VALID, meetingFormat: 'virtual', phone: '561-555-0100' })
+    expect(zoomCreated).toHaveLength(0)
+    expect(store.bookings[0].meeting_format).toBe('phone')
+  })
+
+  it('records the format on the calendar event too', async () => {
+    const store = makeStore()
+    await post(makeEnv(store), '/consultation/book', { ...VALID, meetingFormat: 'phone', phone: '561-555-0100' })
+    expect(store.events[0].location_type).toBe('phone')
   })
 })

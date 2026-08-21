@@ -69,6 +69,7 @@ export default function Consultation() {
   const [loadError, setLoadError] = useState('')
   const [selected, setSelected] = useState<Slot | null>(null)
   const [form, setForm] = useState({ name: '', email: '', phone: '', topic: '' })
+  const [meetingFormat, setMeetingFormat] = useState<'virtual' | 'phone'>('virtual')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [booked, setBooked] = useState<BookingResponse['booking'] | null>(null)
@@ -103,6 +104,7 @@ export default function Consultation() {
         email: form.email,
         phone: form.phone,
         topic: form.topic,
+        meetingFormat,
       })
       setBooked(response.booking)
     } catch (err) {
@@ -198,10 +200,39 @@ export default function Consultation() {
                       value={form.email} onChange={(e) => set('email', e.target.value)}
                     />
                   </label>
+                  {data.schedule?.locationType === 'virtual' && (
+                    <fieldset className="sm:col-span-2">
+                      <legend className="text-xs font-bold text-slate-300">How would you like to meet?</legend>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {([['virtual', 'Video call'], ['phone', 'Phone call']] as const).map(([value, text]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            disabled={!selected}
+                            aria-pressed={meetingFormat === value}
+                            onClick={() => setMeetingFormat(value)}
+                            className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition ${
+                              meetingFormat === value
+                                ? 'border-gold bg-gold/[.12] text-white'
+                                : 'border-white/10 bg-white/[.025] text-slate-300 hover:border-gold/40 hover:text-white'
+                            }`}
+                          >
+                            {text}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-xs text-slate-400">
+                        {meetingFormat === 'virtual'
+                          ? 'We will email you a video link with your confirmation.'
+                          : 'We will call the number below at your chosen time.'}
+                      </p>
+                    </fieldset>
+                  )}
                   <label className="text-xs font-bold text-slate-300 sm:col-span-2">
-                    Phone (optional)
+                    Phone {meetingFormat === 'phone' ? '' : '(optional)'}
                     <input
                       className="input mt-2" type="tel" autoComplete="tel" disabled={!selected}
+                      required={meetingFormat === 'phone'}
                       value={form.phone} onChange={(e) => set('phone', e.target.value)}
                     />
                   </label>
