@@ -85,6 +85,7 @@ import { strPublicRoutes, strAdminRoutes, strPortalRoutes } from '../_lib/routes
 import { cleaningPricingPublicRoutes, cleaningPricingAdminRoutes } from '../_lib/routes/cleaningPricing'
 import { cleaningJobsPublicRoutes, cleaningJobsAdminRoutes, cleaningJobsPortalRoutes } from '../_lib/routes/cleaningJobs'
 import { cleaningPropertyPortalRoutes, cleaningPropertyAdminRoutes } from '../_lib/routes/cleaningProperties'
+import { availabilityPublicRoutes, availabilityAdminRoutes } from '../_lib/routes/availability'
 
 const app = new Hono<AppEnv>().basePath('/api')
 
@@ -129,6 +130,7 @@ app.route('/', managedTemplatePublicRoutes)
 app.route('/', strPublicRoutes)
 app.route('/', cleaningPricingPublicRoutes)
 app.route('/', cleaningJobsPublicRoutes)
+app.route('/', availabilityPublicRoutes)
 
 // /me must reach an under-review provider too (access_scope 'provider_review'),
 // so it bootstraps its own session rather than using requireUser (which, like
@@ -158,6 +160,7 @@ app.route('/portal', cleaningPropertyPortalRoutes)
 app.route('/portal', messageRoutes)
 app.route('/portal', presenceRoutes)
 
+app.route('/admin', availabilityAdminRoutes)
 app.route('/admin', relationshipAutomationAdminRoutes)
 app.route('/admin', communicationsHubRoutes)
 app.route('/admin', conversationRoutes)
