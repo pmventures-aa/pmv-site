@@ -92,15 +92,40 @@ describe('token exchange', () => {
     expect(calls.filter((c) => c.url.includes('/oauth/token'))).toHaveLength(1)
   })
 
-  it('reports auth failure without echoing the response body', async () => {
+  it('reports auth failure with the reason Zoom gave', async () => {
     responder = () => json({ reason: 'Invalid client_id or client_secret' }, 401)
     const res = await getZoomToken(env())
     expect(res.ok).toBe(false)
     if (res.ok) return
     expect(res.reason).toBe('auth_failed')
-    // The detail string reaches logs, so it must not carry credential echoes.
-    expect(res.detail).not.toContain('client_secret')
     expect(res.detail).toContain('401')
+    // Withholding the body entirely used to be the rule here, and it left a
+    // real failure reading "returned 400" with no way to tell a wrong account
+    // id from an app that cannot use this grant at all. The reason is the
+    // whole diagnosis and it names no values.
+    expect(res.detail).toContain('Invalid client_id or client_secret')
+  })
+
+  it('never lets a credential value ride along in the detail', async () => {
+    // The words client_id and client_secret are Zoom's vocabulary and are
+    // safe. The configured VALUES are the thing that must never reach a log
+    // or a settings page, whatever Zoom chose to echo back.
+    responder = () => json({ reason: 'Invalid account_id acct-1, client secret-1, id client-1' }, 400)
+    const res = await getZoomToken(env())
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.detail).not.toContain('secret-1')
+    expect(res.detail).not.toContain('client-1')
+    expect(res.detail).not.toContain('acct-1')
+    expect(res.detail).toContain('[redacted]')
+  })
+
+  it('truncates a body that is trying to be a problem', async () => {
+    responder = () => json({ reason: 'x'.repeat(5000) }, 400)
+    const res = await getZoomToken(env())
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.detail.length).toBeLessThan(280)
   })
 
   it('survives a network failure rather than throwing', async () => {

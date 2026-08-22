@@ -156,7 +156,7 @@ export default function ConsultationBookingSettings() {
   const [dayDraft, setDayDraft] = useState({ date: '', days: 1, reason: '' })
   const [zoom, setZoom] = useState<ZoomStatus | null>(null)
   const [copied, setCopied] = useState(false)
-  const [zoomTest, setZoomTest] = useState<{ ok: boolean; detail?: string; hostEmail?: string; cleanedUp?: boolean } | null>(null)
+  const [zoomTest, setZoomTest] = useState<{ ok: boolean; reason?: string; detail?: string; hostEmail?: string; cleanedUp?: boolean } | null>(null)
   const [testingZoom, setTestingZoom] = useState(false)
 
   const load = useCallback(async () => {
@@ -270,7 +270,7 @@ export default function ConsultationBookingSettings() {
     setTestingZoom(true)
     setZoomTest(null)
     try {
-      const res = await api.post<{ ok: boolean; detail?: string; hostEmail?: string; cleanedUp?: boolean }>(
+      const res = await api.post<{ ok: boolean; reason?: string; detail?: string; hostEmail?: string; cleanedUp?: boolean }>(
         '/admin/availability/zoom/test', {},
       )
       setZoomTest(res)
@@ -568,10 +568,23 @@ export default function ConsultationBookingSettings() {
                     <>
                       <p className="font-bold">Zoom rejected the request. Bookings will be taken without a join link.</p>
                       {zoomTest.detail && <p className="mt-1 break-words font-mono text-[11px] text-slate-300">{zoomTest.detail}</p>}
-                      <p className="mt-2 text-slate-400">
-                        Usually one of: the Server-to-Server app is missing the meeting write scope, the app was never
-                        activated, or {zoomTest.hostEmail || 'the host address'} is not a licensed user on the account.
-                      </p>
+                      {/* The two failures need opposite investigations, and
+                          naming scopes for a rejected token sends you to the
+                          wrong screen entirely. */}
+                      {zoomTest.reason === 'auth_failed' ? (
+                        <p className="mt-2 text-slate-400">
+                          Zoom refused the credentials themselves, before any meeting was attempted. Usually the app is
+                          not a <strong>Server-to-Server OAuth</strong> app (a General or OAuth app cannot use this grant),
+                          or <code>ZOOM_ACCOUNT_ID</code> holds something other than the Account ID from the app&rsquo;s
+                          Credentials tab.
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-slate-400">
+                          The credentials worked and the meeting call was refused. Usually the Server-to-Server app is
+                          missing the meeting write scope, the app was never activated, or{' '}
+                          {zoomTest.hostEmail || 'the host address'} is not a licensed user on the account.
+                        </p>
+                      )}
                     </>
                   )}
                 </div>
