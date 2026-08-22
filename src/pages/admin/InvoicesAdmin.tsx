@@ -268,7 +268,7 @@ export default function InvoicesAdmin() {
   }
 
   return <div>
-    <PageIntro
+    <PageIntro section="Revenue"
       kicker="Revenue"
       title="Invoices"
       subtitle="Write an invoice, send it to the client portal, and mark it paid. Pinnacle records the amount and methods; it does not charge cards or ACH here."

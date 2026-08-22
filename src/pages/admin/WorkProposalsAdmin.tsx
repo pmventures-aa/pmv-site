@@ -411,7 +411,7 @@ export default function WorkProposalsAdmin() {
 
   return (
     <div className="space-y-4">
-      <PageIntro
+      <PageIntro section="Delivery"
         kicker="Delivery"
         title="Work Proposals"
         subtitle="Offer detailed work to a provider. They accept, and it waits here until you release it into a live assignment."

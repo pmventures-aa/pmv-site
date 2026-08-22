@@ -211,7 +211,7 @@ export default function UsersAdmin() {
     })
   }, [users, q, roleFilter, statusFilter])
 
-  if (forbidden) return <div><PageIntro kicker="Access" title="Users" /><NoAccess label="Users" /></div>
+  if (forbidden) return <div><PageIntro section="People" kicker="Access" title="Users" /><NoAccess label="Users" /></div>
 
   return (
     <div>

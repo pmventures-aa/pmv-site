@@ -132,7 +132,7 @@ export default function CasesAdmin() {
 
   return (
     <div>
-      <PageIntro
+      <PageIntro section="Service"
         kicker="Live workload"
         title="Cases & SLAs"
         subtitle="Every open client request across your team. Timers turn amber inside the last hour and red once a case goes past its SLA."

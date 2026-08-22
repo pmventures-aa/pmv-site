@@ -182,7 +182,7 @@ export default function ProviderNetworkAdmin() {
 
   return (
     <div>
-      <PageIntro
+      <PageIntro section="People"
         kicker="Professional network operations"
         title="Network & Dispatch"
         subtitle="Find the right notary, field pro, or internal contact by specialty, coverage, availability, and current load, then dispatch or email without leaving HQ."

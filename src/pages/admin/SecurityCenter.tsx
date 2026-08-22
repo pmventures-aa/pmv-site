@@ -28,7 +28,7 @@ export default function SecurityCenter(){
   const active=useMemo(()=>data?.sessions.filter(s=>s.active)||[],[data]);const historical=useMemo(()=>data?.sessions.filter(s=>!s.active)||[],[data])
   const canRevokeUser=(s:SessionRow)=>!!data?.owner&&scope==='all'&&!s.current&&s.user_id!==data.current_user_id
 
-  if(loading&&!data)return <div><PageIntro kicker="Security" title="Security Center" subtitle="Review active sessions, recent security activity, and account access."/><SkeletonTable rows={5} cols={5}/></div>
+  if(loading&&!data)return <div><PageIntro section="Administration" kicker="Security" title="Security Center" subtitle="Review active sessions, recent security activity, and account access."/><SkeletonTable rows={5} cols={5}/></div>
   return <div className="mx-auto max-w-[1500px]">
     <PageIntro kicker="Security & Access" title="Security Center" subtitle="Review signed-in devices, revoke access immediately, and monitor recent authentication and sensitive administrative activity." action={<button className={btnOutline} onClick={revokeOthers} disabled={busy==='others'}>{busy==='others'?'Revoking…':'Sign out other devices'}</button>}/>
     <Panel className="mb-6 !p-5"><ConnectedSignInMethods tone="hq" /></Panel>

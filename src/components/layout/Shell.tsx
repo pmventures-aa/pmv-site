@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { sectionNote, sectionRailClass, sectionTextClass } from '../../../shared/hqSectionColor'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight, LogOut, Bell, ShieldCheck, UserRound } from 'lucide-react'
@@ -88,8 +89,8 @@ export function Shell({ nav, badge, mobilePrimary = [...portalMobilePrimary] }: 
             return (
               <div key={group.section ?? `__top-${index}`} className="space-y-1">
                 {group.section && (
-                  <button type="button" onClick={() => toggleSection(group.section!)} className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500 transition hover:bg-white/[.025] hover:text-slate-300" aria-expanded={!collapsed}>
-                    <span>{group.section}</span>
+                  <button type="button" onClick={() => toggleSection(group.section!)} className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[.16em] transition hover:bg-white/[.025] ${sectionTextClass(group.section)}`} aria-expanded={!collapsed} title={sectionNote(group.section)}>
+                    <span className="flex items-center gap-2"><span className={`h-3 w-0.5 rounded-full ${sectionRailClass(group.section)}`} aria-hidden="true" />{group.section}</span>
                     {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                   </button>
                 )}

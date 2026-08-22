@@ -158,7 +158,7 @@ export default function FieldWorkAdmin({ mode = 'field' }: { mode?: 'field' | 'r
 
   return (
     <div>
-      <PageIntro
+      <PageIntro section="Delivery"
         kicker={isRon ? 'Remote notarization' : 'Field & mobile work'}
         title={isRon ? 'RON sessions' : 'Field assignments'}
         subtitle={isRon
