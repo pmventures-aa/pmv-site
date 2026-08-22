@@ -213,6 +213,8 @@ export default function ProviderAvailability() {
         </div>
       </Panel>
 
+      <FeedPanel />
+
       {error && <p role="alert" className="rounded-lg border border-rose-400/25 bg-rose-400/[.06] px-4 py-3 text-sm text-rose-200">{error}</p>}
     </div>
   )
@@ -295,5 +297,73 @@ function TimeOffCalendar({
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Subscribe once, see everything.
+ *
+ * The invites cover each assignment as it happens; this is the standing
+ * picture in whatever calendar the provider already uses. The URL is the
+ * credential, so it is shown only to its owner and can be rotated - which is
+ * what revoke has to mean when there is no login in front of it.
+ */
+function FeedPanel() {
+  const [url, setUrl] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    api.get<{ url: string }>('/admin/provider-calendar-feed')
+      .then((r) => setUrl(r.url))
+      .catch(() => { /* the rest of the page still works without it */ })
+  }, [])
+
+  async function rotate() {
+    setBusy(true)
+    try {
+      const res = await api.post<{ url: string }>('/admin/provider-calendar-feed/rotate', {})
+      setUrl(res.url)
+      toast.success('New link created. The old one has stopped updating.')
+    } catch {
+      toast.error('Could not create a new link.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2500)
+    } catch {
+      // Clipboard access is refused in plenty of ordinary situations, and the
+      // link is on screen as selectable text.
+      toast.error('Could not copy. Select the link and copy it by hand.')
+    }
+  }
+
+  if (!url) return null
+
+  return (
+    <Panel>
+      <h3 className="text-sm font-bold text-white">See your PMV work in your own calendar</h3>
+      <p className="mt-1.5 text-xs leading-5 text-slate-400">
+        Add this link once in Google Calendar, Apple Calendar, or Outlook and every assignment
+        appears there automatically. Nothing to install, and we still never read your calendar.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <code className="min-w-0 flex-1 truncate rounded-md border border-white/10 bg-navy-950 px-3 py-2 text-[11px] text-slate-300">{url}</code>
+        <button type="button" className={btnOutline} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</button>
+      </div>
+      <p className="mt-3 text-[11px] leading-5 text-slate-500">
+        Treat it like a password: anyone with the link can see your assignments. If it gets out,
+        create a new one and re-add it in your calendar.
+      </p>
+      <button type="button" className={`${btnOutline} mt-2`} disabled={busy} onClick={() => void rotate()}>
+        {busy ? 'Working...' : 'Create a new link'}
+      </button>
+    </Panel>
   )
 }
