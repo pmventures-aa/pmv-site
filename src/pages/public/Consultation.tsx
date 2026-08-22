@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { api, ApiError } from '../../lib/api'
 import { usePageMeta } from '../../lib/usePageMeta'
+import { WEEKDAY_INITIALS, firstOfMonth, monthGrid, shiftMonth } from '../../../shared/dayBlocking'
 
 // Public consultation booking.
 //
@@ -77,6 +79,7 @@ export default function Consultation() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [booked, setBooked] = useState<BookingResponse['booking'] | null>(null)
+  const [activeDay, setActiveDay] = useState<string | null>(null)
 
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -95,6 +98,13 @@ export default function Consultation() {
   useEffect(() => { void load() }, [])
 
   const days = useMemo(() => (data?.days ?? []).filter((d) => d.slots.length > 0), [data])
+
+  // Open on the next available day rather than an empty right-hand column.
+  // Re-runs after a 409 reload, and keeps the current day if it survived.
+  useEffect(() => {
+    if (!days.length) { setActiveDay(null); return }
+    setActiveDay((current) => (current && days.some((d) => d.dateKey === current)) ? current : days[0].dateKey)
+  }, [days])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -140,124 +150,241 @@ export default function Consultation() {
           {booked ? (
             <BookedPanel booking={booked} />
           ) : loading ? (
-            <p className="mt-10 text-sm text-slate-400">Loading available times...</p>
+            <LoadingPanel />
           ) : loadError ? (
             <FallbackPanel message={loadError} onRetry={() => void load()} />
           ) : !data?.bookable || !days.length ? (
             <FallbackPanel message="Online booking is not open right now." />
-          ) : (
-            <form onSubmit={submit} className="mt-10 space-y-8">
-              <section>
-                <h2 className="text-xl font-bold text-white">1. Choose a time</h2>
-                <p className="mt-2 text-sm text-slate-400">
-                  Times shown in your timezone ({viewerZone()}).
-                  {data.schedule ? ` Each call is ${data.schedule.slotMinutes} minutes.` : ''}
-                </p>
-                <div className="mt-5 space-y-6">
-                  {days.map((day) => (
-                    <div key={day.dateKey}>
-                      <h3 className="text-xs font-bold uppercase tracking-wide text-slate-300">{dayHeading(day)}</h3>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {day.slots.map((slot) => {
-                          const active = selected?.startsAt === slot.startsAt
-                          return (
-                            <button
-                              key={slot.startsAt}
-                              type="button"
-                              aria-pressed={active}
-                              onClick={() => setSelected(slot)}
-                              className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition ${
-                                active
-                                  ? 'border-gold bg-gold/[.12] text-white'
-                                  : 'border-white/10 bg-white/[.025] text-slate-300 hover:border-gold/40 hover:text-white'
-                              }`}
-                            >
-                              {timeLabel(slot.startsAt)}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
+          ) : selected ? (
+            <form onSubmit={submit} className="mt-9">
+              <button
+                type="button" onClick={() => setSelected(null)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 transition hover:text-gold"
+              >
+                <ChevronLeft className="h-4 w-4" /> Pick a different time
+              </button>
+              <div className="mt-4 rounded-2xl border border-gold/25 bg-gold/[.05] px-5 py-4">
+                <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold">Your time</p>
+                <p className="mt-1 font-display text-xl font-bold text-white">{longLabel(selected.startsAt)}</p>
+              </div>
 
-              <section className={selected ? '' : 'opacity-50'}>
-                <h2 className="text-xl font-bold text-white">2. Your details</h2>
-                {selected ? (
-                  <p className="mt-2 text-sm text-gold">Selected: {longLabel(selected.startsAt)}</p>
-                ) : (
-                  <p className="mt-2 text-sm text-slate-400">Pick a time above to continue.</p>
+              <div className="mt-5 grid gap-4 rounded-2xl border border-white/10 bg-white/[.025] p-5 sm:grid-cols-2 sm:p-7">
+                <label className="text-xs font-bold text-slate-300">
+                  Your name
+                  <input
+                    className="input mt-2" autoComplete="name" required autoFocus
+                    value={form.name} onChange={(e) => set('name', e.target.value)}
+                  />
+                </label>
+                <label className="text-xs font-bold text-slate-300">
+                  Email
+                  <input
+                    className="input mt-2" type="email" autoComplete="email" required
+                    value={form.email} onChange={(e) => set('email', e.target.value)}
+                  />
+                </label>
+                {data.schedule?.locationType === 'virtual' && (
+                  <fieldset className="sm:col-span-2">
+                    <legend className="text-xs font-bold text-slate-300">How would you like to meet?</legend>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {([['virtual', 'Video call'], ['phone', 'Phone call']] as const).map(([value, text]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={meetingFormat === value}
+                          onClick={() => setMeetingFormat(value)}
+                          className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition ${
+                            meetingFormat === value
+                              ? 'border-gold bg-gold/[.12] text-white'
+                              : 'border-white/10 bg-white/[.025] text-slate-300 hover:border-gold/40 hover:text-white'
+                          }`}
+                        >
+                          {text}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-slate-400">
+                      {meetingFormat === 'virtual'
+                        ? 'We will email you a video link with your confirmation.'
+                        : 'We will call the number below at your chosen time.'}
+                    </p>
+                  </fieldset>
                 )}
-                <div className="mt-5 grid gap-4 rounded-2xl border border-white/10 bg-white/[.025] p-5 sm:grid-cols-2 sm:p-7">
-                  <label className="text-xs font-bold text-slate-300">
-                    Your name
-                    <input
-                      className="input mt-2" autoComplete="name" required disabled={!selected}
-                      value={form.name} onChange={(e) => set('name', e.target.value)}
-                    />
-                  </label>
-                  <label className="text-xs font-bold text-slate-300">
-                    Email
-                    <input
-                      className="input mt-2" type="email" autoComplete="email" required disabled={!selected}
-                      value={form.email} onChange={(e) => set('email', e.target.value)}
-                    />
-                  </label>
-                  {data.schedule?.locationType === 'virtual' && (
-                    <fieldset className="sm:col-span-2">
-                      <legend className="text-xs font-bold text-slate-300">How would you like to meet?</legend>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {([['virtual', 'Video call'], ['phone', 'Phone call']] as const).map(([value, text]) => (
-                          <button
-                            key={value}
-                            type="button"
-                            disabled={!selected}
-                            aria-pressed={meetingFormat === value}
-                            onClick={() => setMeetingFormat(value)}
-                            className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition ${
-                              meetingFormat === value
-                                ? 'border-gold bg-gold/[.12] text-white'
-                                : 'border-white/10 bg-white/[.025] text-slate-300 hover:border-gold/40 hover:text-white'
-                            }`}
-                          >
-                            {text}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="mt-2 text-xs text-slate-400">
-                        {meetingFormat === 'virtual'
-                          ? 'We will email you a video link with your confirmation.'
-                          : 'We will call the number below at your chosen time.'}
-                      </p>
-                    </fieldset>
-                  )}
-                  <label className="text-xs font-bold text-slate-300 sm:col-span-2">
-                    Phone {meetingFormat === 'phone' ? '' : '(optional)'}
-                    <input
-                      className="input mt-2" type="tel" autoComplete="tel" disabled={!selected}
-                      required={meetingFormat === 'phone'}
-                      value={form.phone} onChange={(e) => set('phone', e.target.value)}
-                    />
-                  </label>
-                  <label className="text-xs font-bold text-slate-300 sm:col-span-2">
-                    What would you like to cover? (optional)
-                    <textarea
-                      className="input mt-2 min-h-24" rows={3} disabled={!selected}
-                      value={form.topic} onChange={(e) => set('topic', e.target.value)}
-                    />
-                  </label>
-                  {error && <p role="alert" className="text-sm text-red-200 sm:col-span-2">{error}</p>}
-                  <button type="submit" disabled={busy || !selected} className="btn-gold min-h-12 sm:col-span-2">
-                    {busy ? 'Booking...' : 'Confirm Booking'}
-                  </button>
-                </div>
-              </section>
+                <label className="text-xs font-bold text-slate-300 sm:col-span-2">
+                  Phone {meetingFormat === 'phone' ? '' : '(optional)'}
+                  <input
+                    className="input mt-2" type="tel" autoComplete="tel"
+                    required={meetingFormat === 'phone'}
+                    value={form.phone} onChange={(e) => set('phone', e.target.value)}
+                  />
+                </label>
+                <label className="text-xs font-bold text-slate-300 sm:col-span-2">
+                  What would you like to cover? (optional)
+                  <textarea
+                    className="input mt-2 min-h-24" rows={3}
+                    value={form.topic} onChange={(e) => set('topic', e.target.value)}
+                  />
+                </label>
+                {error && <p role="alert" className="text-sm text-red-200 sm:col-span-2">{error}</p>}
+                <button type="submit" disabled={busy} className="btn-gold min-h-12 sm:col-span-2">
+                  {busy ? 'Booking...' : 'Confirm Booking'}
+                </button>
+              </div>
             </form>
+          ) : (
+            <SlotPicker
+              days={days}
+              activeDay={activeDay}
+              onPickDay={setActiveDay}
+              onPickSlot={setSelected}
+              slotMinutes={data.schedule?.slotMinutes ?? 30}
+            />
           )}
         </div>
       </main>
       <Footer />
+    </div>
+  )
+}
+
+/**
+ * Date first, then that day's times.
+ *
+ * The previous version rendered every open slot on one page. Against the live
+ * schedule that is eighty buttons in a single scroll, which is a wall rather
+ * than a choice. Every scheduling tool people already know works the other
+ * way round: a month to pick a day, then the handful of times on it.
+ *
+ * The month grid comes from shared/dayBlocking, the same helper the HQ time-off
+ * calendar uses, so both calendars agree on what a month looks like.
+ */
+function SlotPicker({
+  days, activeDay, onPickDay, onPickSlot, slotMinutes,
+}: {
+  days: SlotDay[]
+  activeDay: string | null
+  onPickDay: (dateKey: string) => void
+  onPickSlot: (slot: Slot) => void
+  slotMinutes: number
+}) {
+  const byDay = useMemo(() => new Map(days.map((d) => [d.dateKey, d])), [days])
+  const firstKey = days[0]?.dateKey ?? ''
+  const [month, setMonth] = useState(() => firstOfMonth(activeDay || firstKey || '2026-01-01'))
+
+  // Follow the selection when it moves to another month, so "next available"
+  // never lands the user on a grid that does not contain it.
+  useEffect(() => {
+    if (activeDay) setMonth(firstOfMonth(activeDay))
+  }, [activeDay])
+
+  const grid = useMemo(() => monthGrid(month), [month])
+  const openDay = activeDay ? byDay.get(activeDay) : undefined
+  const lastKey = days[days.length - 1]?.dateKey ?? firstKey
+  const canGoBack = month > firstOfMonth(firstKey)
+  const canGoForward = month < firstOfMonth(lastKey)
+
+  return (
+    <div className="mt-9 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button" disabled={!canGoBack} onClick={() => setMonth((m) => shiftMonth(m, -1))}
+            className="rounded-lg p-2 text-slate-400 transition hover:text-gold disabled:opacity-25"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <p className="font-display text-base font-bold text-white">{grid.label}</p>
+          <button
+            type="button" disabled={!canGoForward} onClick={() => setMonth((m) => shiftMonth(m, 1))}
+            className="rounded-lg p-2 text-slate-400 transition hover:text-gold disabled:opacity-25"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 grid grid-cols-7 gap-1.5">
+          {WEEKDAY_INITIALS.map((initial, i) => (
+            <span key={i} className="py-1 text-center text-[10px] font-bold uppercase tracking-wide text-slate-600">{initial}</span>
+          ))}
+          {grid.weeks.flat().map((dateKey, i) => {
+            if (!dateKey) return <span key={`pad-${i}`} />
+            const open = byDay.has(dateKey)
+            const active = dateKey === activeDay
+            return (
+              <button
+                key={dateKey}
+                type="button"
+                disabled={!open}
+                onClick={() => onPickDay(dateKey)}
+                aria-pressed={active}
+                aria-label={`${dateKey}${open ? `, ${byDay.get(dateKey)?.slots.length} times available` : ', no times'}`}
+                className={`min-h-11 rounded-xl border text-sm font-bold tabular-nums transition ${
+                  active
+                    ? 'border-gold bg-gold/[.14] text-white'
+                    : open
+                      ? 'border-gold/25 bg-gold/[.05] text-slate-100 hover:border-gold/60 hover:bg-gold/[.10]'
+                      : 'cursor-not-allowed border-transparent text-slate-700'
+                }`}
+              >
+                {Number(dateKey.slice(8))}
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-4 text-xs text-slate-500">
+          Highlighted days have openings. Each call is {slotMinutes} minutes.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/[.025] p-5 sm:p-6">
+        {openDay ? (
+          <>
+            <p className="font-display text-base font-bold text-white">{dayHeading(openDay)}</p>
+            <p className="mt-1 text-xs text-slate-400">Times in your timezone ({viewerZone()}).</p>
+            {/* Capped height so a long day scrolls inside the card instead of
+                stretching the page past the calendar beside it. */}
+            <div className="mt-4 grid max-h-[22rem] gap-2 overflow-y-auto pr-1">
+              {openDay.slots.map((slot) => (
+                <button
+                  key={slot.startsAt}
+                  type="button"
+                  onClick={() => onPickSlot(slot)}
+                  className="min-h-11 shrink-0 rounded-xl border border-white/12 bg-white/[.03] px-4 text-sm font-semibold text-slate-200 transition hover:border-gold hover:bg-gold/[.10] hover:text-white"
+                >
+                  {timeLabel(slot.startsAt)}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-slate-400">Pick a highlighted day to see its times.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function LoadingPanel() {
+  return (
+    <div className="mt-9 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]" role="status" aria-label="Loading available times">
+      <div className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+        <div className="mx-auto h-4 w-32 animate-pulse rounded bg-white/[.07]" />
+        <div className="mt-5 grid grid-cols-7 gap-1.5">
+          {Array.from({ length: 35 }).map((_, i) => (
+            <div key={i} className="h-11 animate-pulse rounded-xl bg-white/[.05]" />
+          ))}
+        </div>
+      </div>
+      <div className="rounded-2xl border border-white/10 bg-white/[.025] p-6">
+        <div className="h-4 w-40 animate-pulse rounded bg-white/[.07]" />
+        <div className="mt-4 space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-11 animate-pulse rounded-xl bg-white/[.05]" />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
