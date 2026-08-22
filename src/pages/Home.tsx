@@ -52,12 +52,33 @@ export default function Home() {
     <div className="min-h-screen bg-navy-950">
       <Header />
       <main>
-        <section className="pmv-hero-story relative min-h-[calc(100vh-68px)] overflow-hidden border-b border-white/[.07]">
+        {/* The wizard used to sit eighth of nine sections, below a hero that
+            was a full viewport tall. The guided experience already existed;
+            visitors just had to scroll past everything else to reach it. It
+            now opens the page, and the hero follows. */}
+        <section className="container-pmv pb-4 pt-10 sm:pt-14">
+          <div className="grid gap-9 lg:grid-cols-[.58fr_1.42fr] lg:items-start lg:gap-14">
+            <div>
+              <p className="eyebrow">Start here</p>
+              <h1 className="pmv-h1 mt-4">What do you need handled?</h1>
+              <p className="mt-5 max-w-md text-base leading-7 text-slate-400">
+                You do not need to know the right service first. Answer a few short questions and we will work out the rest.
+              </p>
+              <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-white">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                Two minutes, no account, and a real person replies within two business hours.
+              </p>
+            </div>
+            <ScopeWizard source="home" compact />
+          </div>
+        </section>
+
+        <section className="pmv-hero-story relative overflow-hidden border-y border-white/[.07]">
           <AmbientGlow />
-          <div className="container-pmv relative z-10 grid min-h-[calc(100vh-68px)] gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
+          <div className="container-pmv relative z-10 grid gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
             <StaggerOnMount>
               <motion.p variants={staggerItem} className="eyebrow">Nationwide professional support · South Florida field services</motion.p>
-              <h1 className="pmv-h1 mt-6">
+              <h2 className="pmv-h1 mt-6">
                 <KineticHeading
                   trigger="mount"
                   lines={[
@@ -65,7 +86,7 @@ export default function Home() {
                     { text: 'One Call Away.', className: 'pmv-gold-text' },
                   ]}
                 />
-              </h1>
+              </h2>
               <motion.p variants={staggerItem} className="mt-7 max-w-3xl text-lg leading-8 text-slate-300 sm:text-xl">
                 Business, property, and administrative matters handled through one trusted point of contact.
               </motion.p>
@@ -230,17 +251,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="container-pmv py-16 sm:py-24">
-          <div className="grid gap-10 lg:grid-cols-[.58fr_1.42fr] lg:items-start lg:gap-14">
-            <Reveal>
-              <p className="eyebrow">Start a request</p>
-              <h2 className="mt-4 font-display text-3xl font-bold tracking-[-.035em] text-white sm:text-4xl">Two minutes. No account. Real reply.</h2>
-              <p className="mt-5 max-w-md text-sm leading-7 text-slate-400">Tell us what needs to happen, where, and when. We reply with what Pinnacle handles directly, what a qualified provider covers, and what it will run.</p>
-              <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-white"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />A real person replies within two business hours.</p>
-            </Reveal>
-            <ScopeWizard source="home" compact />
-          </div>
-        </section>
 
         <PublicMetricsBand />
         <CaseStudyStrip className="border-b border-white/10" />

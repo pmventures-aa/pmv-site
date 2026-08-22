@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { googleBusySpans, googleCalendarConnected, writeToken } from '../googleFreeBusy'
+import { googleBusySpans, googleCalendarConnected, readToken, writeToken } from '../googleFreeBusy'
 import type { AppEnv } from '../types'
 import { requireUser } from '../mid'
 import {
@@ -122,6 +122,31 @@ externalCalendarRoutes.get('/external-calendar/google/callback', async (c) => {
 
 externalCalendarRoutes.post('/external-calendar/google/disconnect', requireUser, async (c) => {
   const user = c.get('user')
+
+  // Tell Google first. Deleting our copy of the tokens only made the grant
+  // invisible to us: it stayed live in the user's Google account, listed under
+  // third-party access, with nothing there to revoke it from. Disconnect has
+  // to mean disconnected on both sides.
+  const cfg = googleConfig(c.env)
+  if (isConfigured(cfg)) {
+    const row = await c.env.DB.prepare(
+      `SELECT access_token_enc, refresh_token_enc FROM calendar_provider_accounts
+        WHERE user_id = ? AND provider = 'google'`,
+    ).bind(user.id).first<{ access_token_enc: string | null; refresh_token_enc: string | null }>().catch(() => null)
+
+    // Revoking either token kills the whole grant. The refresh token is the
+    // durable half, so prefer it; the access token may already have expired.
+    const token = (await readToken(c.env, row?.refresh_token_enc ?? null))
+      ?? (await readToken(c.env, row?.access_token_enc ?? null))
+    if (token) {
+      // Best-effort: a Google outage must not leave the user unable to
+      // disconnect locally. The local record is cleared either way.
+      await makeGoogleAdapter(cfg).revoke(token).catch((err) => {
+        console.error('[gcal] revoke failed', err instanceof Error ? err.message : err)
+      })
+    }
+  }
+
   try {
     await c.env.DB.prepare(
       `UPDATE calendar_provider_accounts SET status = 'disconnected', disconnected_at = datetime('now'), access_token_enc = NULL, refresh_token_enc = NULL WHERE user_id = ? AND provider = 'google'`,
