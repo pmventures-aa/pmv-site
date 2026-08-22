@@ -23,8 +23,10 @@ describe('the hero opens the page', () => {
     expect(home).toContain('Not sure which service you need? That is okay.')
   })
 
-  it('owns the first screen again', () => {
-    expect(home).toContain('min-h-[calc(100vh-68px)]')
+  it('commands the first screen without swallowing it whole', () => {
+    // It was a full viewport, which meant nothing else was ever visible on
+    // arrival. Tall enough to lead, short enough that the next block peeks.
+    expect(home).toContain('min-h-[78vh]')
   })
 
   it('carries the page h1, and only one', () => {
@@ -81,5 +83,48 @@ describe('the monthly plans say what they are', () => {
   it('frames the section so the three read as a set', () => {
     expect(home).toContain('Three retainers for the three kinds of work that come back every month')
     expect(home).toContain('Every plan is month to month')
+  })
+})
+
+// "Really really long scroll" was not padding alone: the same message was on
+// the page five times. The hero, "Three clear paths. One relationship.", "One
+// Relationship. Multiple Capabilities. Less Runaround.", the situations block
+// and the closing CTA all said some version of "you do not need to know which
+// service you need". Two of those sat back to back.
+
+describe('the page says each thing once', () => {
+  it('drops the section that restated the one above it', () => {
+    expect(home).not.toContain('Why Pinnacle')
+    expect(home).not.toContain('One Relationship. Multiple Capabilities.')
+    expect(home).not.toContain('whyPinnacle')
+  })
+
+  it('keeps the paths section, which is the actionable one of the pair', () => {
+    // It routes people; the one removed only asserted.
+    expect(home).toContain('Three clear paths. One relationship.')
+    expect(home).toContain('What brings you to Pinnacle?')
+  })
+
+  it('keeps the portal section that the removed bullets duplicated', () => {
+    expect(home).toContain('Client portal')
+  })
+})
+
+describe('the page is physically shorter', () => {
+  it('no section still uses the largest vertical padding', () => {
+    // py-16 sm:py-24 on seven stacked sections is a lot of empty screen.
+    expect(home).not.toContain('py-16 sm:py-24')
+  })
+
+  it('the hero no longer claims the entire first screen', () => {
+    // Letting the next block peek tells a visitor there is more, which does
+    // more for perceived length than any amount of copy trimming.
+    expect(home).not.toContain('min-h-[calc(100vh-68px)]')
+    expect(home).toContain('min-h-[78vh]')
+  })
+
+  it('still leads with the hero copy that was asked for', () => {
+    expect(home).toContain("text: 'Professional Support.'")
+    expect(home).toContain("text: 'One Call Away.'")
   })
 })
