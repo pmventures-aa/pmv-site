@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Copy, Plus, Trash2 } from 'lucide-react'
 import { Panel, EmptyState, Skeleton, inputCls, btnPrimary, btnOutline, Tag } from '../../../components/admin/ui'
 import { api, ApiError } from '../../../lib/api'
 import {
@@ -32,6 +32,10 @@ interface ZoomStatus {
 interface Blackout { id: string; startsAt: string; endsAt: string; reason?: string | null }
 
 const MINUTES_PER_DAY = 24 * 60
+
+// The short address to hand out. /consultation still answers and is what the
+// site links internally; this is the one that fits in a signature or a text.
+const BOOKING_LINK = 'https://pinnaclemanagementventures.com/book'
 
 /** Local midnight of dateKey IN THE SCHEDULE'S ZONE, as an ISO instant. */
 function dayStartIso(dateKey: string, timezone: string): string {
@@ -151,6 +155,9 @@ export default function ConsultationBookingSettings() {
   const [blackoutDraft, setBlackoutDraft] = useState({ startsAt: '', endsAt: '', reason: '' })
   const [dayDraft, setDayDraft] = useState({ date: '', days: 1, reason: '' })
   const [zoom, setZoom] = useState<ZoomStatus | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [zoomTest, setZoomTest] = useState<{ ok: boolean; detail?: string; hostEmail?: string; cleanedUp?: boolean } | null>(null)
+  const [testingZoom, setTestingZoom] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -259,6 +266,32 @@ export default function ConsultationBookingSettings() {
    * standing, so blocking a day from a different timezone used to shift the
    * block by the offset between them and leave part of the real day bookable.
    */
+  async function testZoom() {
+    setTestingZoom(true)
+    setZoomTest(null)
+    try {
+      const res = await api.post<{ ok: boolean; detail?: string; hostEmail?: string; cleanedUp?: boolean }>(
+        '/admin/availability/zoom/test', {},
+      )
+      setZoomTest(res)
+    } catch (err) {
+      setZoomTest({ ok: false, detail: err instanceof ApiError ? err.message : 'The test could not run.' })
+    } finally { setTestingZoom(false) }
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(BOOKING_LINK)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2500)
+    } catch {
+      // Clipboard access is refused in plenty of ordinary situations. The link
+      // is on screen as selectable text, so this is a convenience failing, not
+      // the feature failing.
+      setError('Could not copy. Select the link and copy it by hand.')
+    }
+  }
+
   async function blockDays(dateKey: string, days: number, reason: string) {
     if (!schedule || !dateKey || days < 1) return
     setError('')
@@ -318,8 +351,8 @@ export default function ConsultationBookingSettings() {
             <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/80">Public Booking</p>
             <h2 className="mt-2 text-xl font-extrabold tracking-tight text-white">Consultation scheduling</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-              Controls what visitors can book at /consultation. Times below are wall-clock times in the
-              schedule timezone, so they stay correct through daylight saving on their own.
+              Times below are wall-clock times in the schedule timezone, so they stay correct through
+              daylight saving on their own.
             </p>
           </div>
           <Tag tone={schedule.publicBookable && schedule.active ? 'green' : 'slate'}>
@@ -328,6 +361,24 @@ export default function ConsultationBookingSettings() {
         </div>
 
         <div className="mt-6 rounded-xl border border-white/[.08] bg-white/[.02] p-4">
+          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Your booking link</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <code className="min-w-0 break-all text-sm font-bold text-white">{BOOKING_LINK}</code>
+            <button type="button" onClick={() => void copyLink()} className={`${btnOutline} min-h-9 shrink-0`}>
+              <Copy className="h-3.5 w-3.5" /> {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-400">
+            Share this anywhere. Visitors pick a time and choose a video call or a phone call.
+            {' '}
+            {schedule.publicBookable && schedule.active
+              ? 'It is live now.'
+              : 'It shows a phone number instead of times until you publish below.'}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-500">/consultation still works and is what the site links to internally.</p>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-white/[.08] bg-white/[.02] p-4">
           <label className="flex items-start gap-3">
             <input
               type="checkbox" className="mt-1 accent-gold" checked={schedule.publicBookable}
@@ -492,6 +543,39 @@ export default function ConsultationBookingSettings() {
               <p className="mt-3 text-xs text-slate-400">
                 Meetings are created under <span className="font-bold text-slate-200">{zoom.hostEmail}</span>.
               </p>
+              {/* Credentials being SET is not the same as them working. The
+                  scope, the app's activation state and the host address can
+                  each fail while all three secrets are present. */}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button type="button" onClick={() => void testZoom()} disabled={testingZoom} className={`${btnOutline} min-h-9`}>
+                  {testingZoom ? 'Testing...' : 'Test connection'}
+                </button>
+                <span className="text-xs text-slate-500">Creates a meeting and deletes it again.</span>
+              </div>
+              {zoomTest && (
+                <div className={`mt-3 rounded-lg border p-3 text-xs leading-5 ${
+                  zoomTest.ok ? 'border-emerald-300/25 bg-emerald-400/[.05] text-emerald-200'
+                              : 'border-rose-400/30 bg-rose-400/[.06] text-rose-200'
+                }`}>
+                  {zoomTest.ok ? (
+                    <>
+                      <p className="font-bold">Zoom is working. Bookings will get a join link.</p>
+                      {zoomTest.cleanedUp === false && (
+                        <p className="mt-1 text-amber-200">The test meeting could not be deleted. Remove &ldquo;Pinnacle connection test&rdquo; from Zoom by hand.</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-bold">Zoom rejected the request. Bookings will be taken without a join link.</p>
+                      {zoomTest.detail && <p className="mt-1 break-words font-mono text-[11px] text-slate-300">{zoomTest.detail}</p>}
+                      <p className="mt-2 text-slate-400">
+                        Usually one of: the Server-to-Server app is missing the meeting write scope, the app was never
+                        activated, or {zoomTest.hostEmail || 'the host address'} is not a licensed user on the account.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <>
