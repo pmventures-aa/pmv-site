@@ -9,6 +9,7 @@ import { sendEmail } from '../email'
 import { hqUrl } from '../appUrls'
 import { renderVendorProposalEmail } from '../emailTemplates/vendorProposal'
 import { resolveEligibleFieldProvider } from '../fieldProviders'
+import { syncAssignmentToCalendar } from '../fieldAssignmentCalendar'
 import {
   canTransition,
   effectiveStatus,
@@ -458,6 +459,26 @@ vendorProposalRoutes.post('/vendor-proposals/:id/release', requireStaff, async (
     entityType: 'vendor_work_proposal',
     entityId: row.id,
     after: { assignment_id: assignmentId, total_cents: totalCents },
+  })
+
+  // Releasing is the moment work becomes real, so it is the moment the
+  // provider's calendar should know about it. The invite reschedules and
+  // cancels itself from here on.
+  await syncAssignmentToCalendar(c.env, {
+    id: assignmentId,
+    kind: row.kind,
+    service_key: row.service_key,
+    title: row.title,
+    site_label: row.site_label,
+    site_address: row.site_address,
+    site_city: row.site_city,
+    site_state: row.site_state,
+    site_postal_code: row.site_postal_code,
+    scheduled_at: scheduledAt,
+    client_user_id: row.client_user_id,
+    vendor_user_id: row.vendor_user_id,
+    assigned_by_user_id: user.id,
+    notes: row.summary,
   })
 
   if (row.vendor_email) {
