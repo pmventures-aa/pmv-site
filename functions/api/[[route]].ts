@@ -78,6 +78,7 @@ import { geoRoutes } from '../_lib/routes/geo'
 import { loadWorkspaceContext } from '../_lib/workspaceContext'
 import { logAuth0StartupWarnings } from '../_lib/routes/auth0'
 import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
+import { vendorProposalRoutes } from '../_lib/routes/vendorProposals'
 import { providerReviewAdminRoutes, providerReviewSelfRoutes } from '../_lib/routes/providerReview'
 import { portalCalendarRoutes, adminCalendarRoutes } from '../_lib/routes/calendarRoutes'
 import { externalCalendarRoutes, externalCalendarWebhookRoutes } from '../_lib/routes/externalCalendar'
@@ -212,6 +213,7 @@ app.route('/admin', crmRoutes)
 app.route('/admin', fieldWorkRoutes)
 app.route('/admin', fieldLocationRoutes)
 app.route('/admin', workAssignmentRoutes)
+app.route('/admin', vendorProposalRoutes)
 app.route('/admin', providerReviewAdminRoutes)
 app.route('/admin', adminCalendarRoutes)
 // External calendar (Google, later Microsoft) OAuth + sync surface. Kept
