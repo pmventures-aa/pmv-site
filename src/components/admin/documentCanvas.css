@@ -12,60 +12,61 @@
 .doc-swatch{height:1.05rem;width:1.05rem;border:1px solid rgba(255,255,255,.2);border-radius:999px}
 .doc-swatch-wrap{display:flex;align-items:center;gap:.25rem;padding:.2rem}
 
-/* US Letter page (8.5x11in at 96dpi). Side/top margins are CSS variables so a
-   margin preset changes the letterhead, body, and footer together and keeps
-   body content inside the same printable box as the letterhead. */
-.doc-paper{--doc-mx:72px;--doc-mt:64px;--doc-mb:48px;position:relative;width:816px;min-height:1056px;background:#fff;color:#1b2430;box-shadow:0 24px 60px rgba(0,0,0,.32);border:1px solid rgba(10,23,40,.10)}
-.doc-margins-narrow{--doc-mx:48px;--doc-mt:52px;--doc-mb:40px}
-.doc-margins-wide{--doc-mx:108px;--doc-mt:78px;--doc-mb:60px}
-/* Page sizes at 96dpi. Letter is the .doc-paper default (816×1056); Legal keeps
-   the 8.5in width but is taller, A4 is narrower and taller. Body min-height
-   tracks the page so a short document still fills a full page. */
-.doc-size-legal{min-height:1344px}
-.doc-size-legal .doc-body{min-height:1048px}
-.doc-size-a4{width:794px;min-height:1123px}
-.doc-size-a4 .doc-body{min-height:827px}
+/* The printed page. Every size and colour below comes from
+   shared/documentTheme via docPaperVars(), applied as inline custom properties
+   on .doc-paper, so the editor and the PDF/DOCX exporters are reading one set
+   of numbers instead of three copies that drift. The fallbacks keep the page
+   legible if the style prop is ever missing. --doc-page-w/h and --doc-mx/mt/mb
+   come from shared/docLayout for the chosen page size and margin preset. */
+.doc-paper{position:relative;width:var(--doc-page-w,816px);min-height:var(--doc-page-h,1056px);background:var(--doc-paper,#fff);color:var(--doc-ink,#1b2430);box-shadow:0 24px 60px rgba(0,0,0,.32);border:1px solid rgba(10,23,40,.10)}
 /* Faint guide showing the printable margin box. Screen only. */
 .doc-paper::after{content:"";position:absolute;pointer-events:none;top:calc(var(--doc-mt) - 18px);left:calc(var(--doc-mx) - 16px);right:calc(var(--doc-mx) - 16px);bottom:calc(var(--doc-mb) - 14px);border:1px dashed rgba(10,23,40,.09);border-radius:2px}
-.doc-letterhead{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1.15rem;padding:var(--doc-mt) var(--doc-mx) 22px}
-.doc-letterhead-rule{height:1px;margin:0 var(--doc-mx);background:linear-gradient(90deg,transparent,#c9c3b4 8%,#c9c3b4 92%,transparent)}
-.doc-letterhead-name{font-family:Georgia,"Times New Roman",serif;font-size:20px;font-weight:600;letter-spacing:.04em;color:#0a1728;line-height:1.15}
-.doc-letterhead-meta{margin-top:.35rem;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5b6573}
-.doc-letterhead-aside{text-align:right;font-size:11px;line-height:1.55;color:#64748b}
+.doc-letterhead{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:var(--doc-crest-gap);padding:var(--doc-mt) var(--doc-mx) var(--doc-head-pad)}
+.doc-letterhead-rule{height:var(--doc-rule-h);margin:0 var(--doc-mx);background:linear-gradient(90deg,transparent,var(--doc-rule) 8%,var(--doc-rule) 92%,transparent)}
+.doc-letterhead-name{font-family:Georgia,"Times New Roman",serif;font-size:var(--doc-name-size);font-weight:600;letter-spacing:var(--doc-name-track);color:var(--doc-heading);line-height:var(--doc-name-line)}
+.doc-letterhead-meta{margin-top:var(--doc-meta-top);font-size:var(--doc-meta-size);letter-spacing:var(--doc-meta-track);text-transform:uppercase;color:var(--doc-meta)}
+.doc-letterhead-aside{text-align:right;font-size:var(--doc-aside-size);line-height:var(--doc-aside-line);color:var(--doc-aside)}
 /* The letterhead + footer are page template, not body text: they live outside
    the contentEditable region so they can never be overwritten while editing. */
 .doc-letterhead,.doc-colophon{user-select:none}
-.doc-body{padding:28px var(--doc-mx) 48px;min-height:760px}
-.doc-colophon{display:flex;justify-content:space-between;gap:1rem;margin:8px var(--doc-mx) var(--doc-mb);padding-top:16px;border-top:1px solid #e7e4dc;color:#8b919c;font-size:9px;letter-spacing:.12em;text-transform:uppercase}
+.doc-body{padding:var(--doc-body-top) var(--doc-mx) 48px;min-height:var(--doc-body-min,760px)}
+.doc-colophon{display:flex;justify-content:space-between;gap:1rem;margin:var(--doc-colophon-gap) var(--doc-mx) var(--doc-mb);padding-top:var(--doc-colophon-pad);border-top:var(--doc-colophon-rule-h) solid var(--doc-colophon-rule);color:var(--doc-colophon);font-size:var(--doc-colophon-size);letter-spacing:var(--doc-colophon-track);text-transform:uppercase}
 .doc-colophon>span:nth-child(2){text-align:center}
 .doc-colophon>span:last-child{text-align:right}
-/* Browser print: drop the on-screen page chrome and set a real Letter page. */
+/* Browser print: drop the on-screen page chrome. The @page size keyword is
+   written inline by DocumentCanvas so it tracks the chosen page size. */
 @media print{
-  @page{size:letter;margin:0}
   .doc-paper{box-shadow:none;border:0;margin:0}
   .doc-paper::after{display:none}
 }
-.doc-page{min-height:720px;width:100%;background:transparent;outline:none;font-family:Georgia,"Times New Roman",serif;font-size:15px;line-height:1.75;color:#1b2430}
-.doc-page h1{font-size:1.7rem;font-weight:650;letter-spacing:.01em;margin:0 0 1rem;color:#0a1728}
-.doc-page h2{font-size:1.2rem;font-weight:650;margin:1.1rem 0 .55rem;color:#0a1728}
-.doc-page h3{font-size:1.02rem;font-weight:650;margin:.9rem 0 .4rem;color:#0a1728}
-.doc-page p{margin:0 0 .85rem}
-.doc-page ul,.doc-page ol{margin:.4rem 0 .9rem 1.4rem}
-.doc-page blockquote{margin:1rem 0;padding:.15rem 0 .15rem 1rem;border-left:2px solid #c9c3b4;color:#475569}
-.doc-page a{color:#0a1728;text-decoration:underline;text-underline-offset:3px}
+.doc-page{min-height:720px;width:100%;background:transparent;outline:none;font-family:Georgia,"Times New Roman",serif;font-size:var(--doc-body-size);line-height:var(--doc-body-line);color:var(--doc-ink)}
+.doc-page h1{font-size:var(--doc-h1-size);font-weight:650;letter-spacing:.01em;line-height:1.25;margin:var(--doc-h1-top) 0 var(--doc-h1-bottom);color:var(--doc-heading)}
+.doc-page h2{font-size:var(--doc-h2-size);font-weight:650;line-height:1.25;margin:var(--doc-h2-top) 0 var(--doc-h2-bottom);color:var(--doc-heading)}
+.doc-page h3{font-size:var(--doc-h3-size);font-weight:650;line-height:1.25;margin:var(--doc-h3-top) 0 var(--doc-h3-bottom);color:var(--doc-heading)}
+/* h4-h6 are "Heading 2" and "Heading 3" in the paragraph-style picker. They
+   had no styles at all, so choosing them dropped the reader into browser
+   defaults that looked nothing like the rest of the letter. */
+.doc-page h4{font-size:var(--doc-h4-size);font-weight:650;line-height:1.25;margin:var(--doc-h4-top) 0 var(--doc-h4-bottom);color:var(--doc-heading)}
+.doc-page h5{font-size:var(--doc-h5-size);font-weight:650;line-height:1.25;margin:var(--doc-h5-top) 0 var(--doc-h5-bottom);color:var(--doc-heading)}
+.doc-page h6{font-size:var(--doc-h6-size);font-weight:650;line-height:1.25;margin:var(--doc-h6-top) 0 var(--doc-h6-bottom);color:var(--doc-heading)}
+.doc-page p{margin:0 0 var(--doc-para-gap)}
+.doc-page ul,.doc-page ol{margin:var(--doc-list-top) 0 var(--doc-list-bottom) var(--doc-list-indent)}
+.doc-page blockquote{margin:var(--doc-quote-gap) 0;padding:.15rem 0 .15rem var(--doc-quote-indent);border-left:var(--doc-quote-rule-w) solid var(--doc-quote-rule);color:var(--doc-quote-text)}
+.doc-page pre{margin:0 0 var(--doc-para-gap);font-family:"Courier New",Courier,monospace;font-size:var(--doc-mono-size);line-height:1.4;white-space:pre-wrap;color:var(--doc-ink)}
+.doc-page a{color:var(--doc-link);text-decoration:underline;text-underline-offset:3px}
 .doc-link-row{display:flex;align-items:center;gap:.4rem}
 .doc-link-row input{height:1.85rem;min-width:12rem;border:1px solid rgba(255,255,255,.12);border-radius:.35rem;background:rgba(255,255,255,.05);color:#e2e8f0;font-size:11px;padding:0 .5rem}
 
 /* Inserted content: tables, rules, page breaks, signature lines, images. */
-.doc-page table.doc-table{width:100%;border-collapse:collapse;margin:.8rem 0}
-.doc-page table.doc-table th,.doc-page table.doc-table td{border:1px solid #cfd6df;padding:6px 9px;text-align:left;vertical-align:top;font-size:.95em}
-.doc-page table.doc-table th{background:#f3f5f8;font-weight:650}
-.doc-page hr{border:0;border-top:1px solid #cbd2db;margin:1.1rem 0}
+.doc-page table.doc-table{width:100%;border-collapse:collapse;margin:var(--doc-table-gap) 0}
+.doc-page table.doc-table th,.doc-page table.doc-table td{border:var(--doc-table-rule-w) solid var(--doc-table-rule);padding:var(--doc-table-pad-y) var(--doc-table-pad-x);text-align:left;vertical-align:top;font-size:var(--doc-table-size)}
+.doc-page table.doc-table th{background:var(--doc-table-head);font-weight:650}
+.doc-page hr{border:0;border-top:var(--doc-hr-h) solid var(--doc-hr);margin:var(--doc-hr-gap) 0}
 .doc-page .doc-pagebreak{height:0;border-top:1px dashed #b9c2cf;margin:1.5rem 0;position:relative}
-.doc-page .doc-pagebreak::after{content:"Page break";position:absolute;top:-.62em;left:50%;transform:translateX(-50%);background:#fff;padding:0 .5rem;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#94a3b8}
-.doc-page .doc-sigline{margin:1.7rem 0 .4rem;max-width:300px}
-.doc-page .doc-sigline-rule{display:block;border-bottom:1px solid #1b2430;height:1.5rem}
-.doc-page .doc-sigline-label{display:block;margin-top:.28rem;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#64748b}
+.doc-page .doc-pagebreak::after{content:"Page break";position:absolute;top:-.62em;left:50%;transform:translateX(-50%);background:var(--doc-paper,#fff);padding:0 .5rem;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#94a3b8}
+.doc-page .doc-sigline{margin:var(--doc-sig-top) 0 var(--doc-sig-bottom);max-width:var(--doc-sig-w)}
+.doc-page .doc-sigline-rule{display:block;border-bottom:var(--doc-sig-rule-h) solid var(--doc-sig-rule);height:var(--doc-sig-rule-box)}
+.doc-page .doc-sigline-label{display:block;margin-top:var(--doc-sig-label-top);font-size:var(--doc-sig-label-size);letter-spacing:var(--doc-sig-label-track);text-transform:uppercase;color:var(--doc-sig-label)}
 .doc-page img{max-width:100%;height:auto;border-radius:2px}
 /* The insert dropdown panel. */
 .doc-insert-menu{position:absolute;z-index:30;top:calc(100% + .35rem);left:0;min-width:12rem;padding:.35rem;border:1px solid rgba(255,255,255,.12);border-radius:.55rem;background:#0d1826;box-shadow:0 18px 44px rgba(0,0,0,.5)}

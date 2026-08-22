@@ -72,7 +72,10 @@ export default function DocumentFullPage() {
   const d = detail.document
   return (
     <div className="flex min-h-screen flex-col bg-[#0b1118]">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-navy-950/95 backdrop-blur">
+      {/* Above the editor ribbon, which is also sticky at z-20. At equal z-index
+          the ribbon won on document order and painted over the open Export
+          menu, which is why the menu looked clipped by the toolbar. */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-navy-950/95 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <Link to={p('document-center')} className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/10 bg-white/[.02] text-slate-400 transition hover:border-gold/35 hover:text-gold" title="Back to Document Hub" aria-label="Back to Document Hub">
