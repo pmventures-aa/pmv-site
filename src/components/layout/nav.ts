@@ -1,7 +1,7 @@
 import {
   Home, Layers, FileText, MessageSquare, Mails, Calendar, Receipt, HelpCircle, Building2, Users,
   Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned,
-  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, Video, Sparkles, Send, type LucideIcon,
+  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, Video, Sparkles, Send, HandCoins, type LucideIcon,
 } from 'lucide-react'
 import { clientWorkspace, type OperatingWorld } from '../../lib/workspace'
 
@@ -90,6 +90,9 @@ export const adminNav: NavItem[] = [
   // reuse the audit-trail plumbing, but the operational surface is
   // separate and should not share a nav tab with field visits.
   {key:'ron',label:'Remote Notarization',to:'ron',icon:Video,section:'Delivery'},
+  // Offers sent to providers before any work exists. Sits next to Field Work
+  // because a released proposal becomes exactly one of those assignments.
+  {key:'work-proposals',label:'Work Proposals',to:'work-proposals',icon:HandCoins,section:'Delivery'},
   {key:'str-operations',label:'STR Turnovers',to:'str/operations',icon:DoorOpen,section:'Delivery'},
   {key:'cleaning-dispatch',label:'Cleaning Dispatch',to:'cleaning/dispatch',icon:Sparkles,section:'Delivery'},
   {key:'cleaning-mine',label:'My Cleaning Jobs',to:'cleaning/mine',icon:ClipboardCheck,section:'Delivery'},
@@ -120,6 +123,7 @@ export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
   const items: NavItem[] = [
     {key:'home',label:'Home',to:'',icon:Home},
     {key:'assignments',label:assignmentLabel,to:'field-work/mine',icon:MapPinned},
+    {key:'work-offers',label:'Work offers',to:'work-offers',icon:HandCoins,section:'Work'},
     {key:'messages',label:'Inbox',to:'messages',icon:MessageSquare,section:'Work'},
     {key:'security-center',label:'Security',to:'security-center',icon:ShieldCheck,section:'Account'},
   ]
