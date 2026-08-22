@@ -26,7 +26,11 @@ describe('the failure is reachable without taking a booking', () => {
 
   it('reports a failed cleanup rather than hiding it', () => {
     expect(ui).toContain('zoomTest.cleanedUp === false')
-    expect(ui).toContain('Pinnacle connection test')
+    // Used to assert the words "Pinnacle connection test", from a message
+    // that told the user to go delete it by hand and said nothing about why.
+    // The surface now carries Zoom's reason and a button that does the work,
+    // so the assertion follows the intent rather than the old wording.
+    expect(ui).toContain('The test meeting was created but not deleted')
   })
 
   it('is admin-gated', () => {
@@ -130,5 +134,36 @@ describe('the advice matches which call failed', () => {
     // Activation no longer appears here.
     const createBranch = ui.slice(ui.indexOf('The credentials worked'))
     expect(createBranch.slice(0, 500)).not.toContain('never activated')
+  })
+})
+
+// The connection test used to report cleanup as a bare boolean, so "created
+// but not deleted" arrived with no way to tell a missing delete scope from a
+// wrong host. Create and delete are separate Zoom permissions, which makes
+// that state both real and specific.
+describe('a test meeting that could not be cleaned up', () => {
+  const route = readFileSync(new URL('../functions/_lib/routes/availability.ts', import.meta.url), 'utf8')
+  const page = readFileSync(new URL('../src/pages/admin/settings/ConsultationBookingSettings.tsx', import.meta.url), 'utf8')
+
+  it('returns Zoom\'s reason, not just a false', () => {
+    expect(route).toContain('cleanupDetail: removed.ok ? null : removed.detail')
+  })
+
+  it('names the meeting that was stranded so it can be removed later', () => {
+    expect(route).toContain('strayMeetingId: removed.ok ? null : created.value.meetingId')
+  })
+
+  it('offers a delete-by-id route behind the admin gate', () => {
+    expect(route).toContain("availabilityAdminRoutes.post('/availability/zoom/meetings/:id/delete', requireAdmin")
+  })
+
+  it('no longer tells the user to go do it by hand with no explanation', () => {
+    expect(page).not.toContain('Remove &ldquo;Pinnacle connection test&rdquo; from Zoom by hand')
+    expect(page).toContain('Try removing it now')
+    expect(page).toContain('{zoomTest.cleanupDetail}')
+  })
+
+  it('points at the scope that is actually missing', () => {
+    expect(page).toContain('meeting:delete:meeting:admin')
   })
 })

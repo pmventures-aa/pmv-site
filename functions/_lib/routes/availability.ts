@@ -342,7 +342,31 @@ availabilityAdminRoutes.post('/availability/zoom/test', requireAdmin, async (c) 
     // A meeting we could create but not delete is still a working connection,
     // and saying so beats a silent stray meeting on the host's calendar.
     cleanedUp: removed.ok,
+    // Why it could not be cleaned up, and which meeting is stranded. Create
+    // and delete are separate Zoom scopes, so "created fine, cannot delete"
+    // is a real and specific configuration state - it deserves a real and
+    // specific message rather than a bare boolean. The id is not a
+    // credential; the join and start URLs are, and neither is returned.
+    cleanupDetail: removed.ok ? null : removed.detail,
+    strayMeetingId: removed.ok ? null : created.value.meetingId,
   })
+})
+
+/**
+ * Delete one Zoom meeting by id.
+ *
+ * Exists so a meeting the test could not clean up can be removed from here
+ * instead of by hand in Zoom. Admin only, and it returns Zoom's own reason on
+ * failure so a retry that will never work says so on the first attempt.
+ */
+availabilityAdminRoutes.post('/availability/zoom/meetings/:id/delete', requireAdmin, async (c) => {
+  const meetingId = c.req.param('id')
+  if (!meetingId) return c.json({ ok: false, detail: 'meeting id is required' }, 400)
+  const status = zoomConfigStatus(c.env)
+  if (!status.configured) return c.json({ ok: false, detail: 'Zoom credentials are not set' })
+
+  const removed = await deleteZoomMeeting(c.env, meetingId)
+  return c.json({ ok: removed.ok, detail: removed.ok ? null : removed.detail })
 })
 
 availabilityAdminRoutes.get('/availability/schedules/:id/preview', requireStaff, async (c) => {

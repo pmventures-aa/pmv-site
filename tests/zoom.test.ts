@@ -227,4 +227,45 @@ describe('updating and deleting', () => {
     const res = await deleteZoomMeeting(env(), '987654321')
     expect(res.ok).toBe(false)
   })
+
+  // A bare status code cannot tell a missing delete scope apart from a
+  // meeting owned by someone else, and those need opposite fixes. Create
+  // already surfaced Zoom's own words; delete and update now do too.
+  it('says WHY the delete failed, in Zoom\'s words', async () => {
+    responder = (url) => (url.includes('/oauth/token')
+      ? json(TOKEN_OK)
+      : json({ code: 4711, message: 'Invalid access token, does not contain scopes: [meeting:delete:admin]' }, 401))
+    const res = await deleteZoomMeeting(env(), '987654321')
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.detail).toContain('401')
+    expect(res.detail).toContain('meeting:delete:admin')
+  })
+
+  it('says why the update failed too', async () => {
+    responder = (url) => (url.includes('/oauth/token')
+      ? json(TOKEN_OK)
+      : json({ message: 'Meeting host does not exist' }, 400))
+    const res = await updateZoomMeeting(env(), '987654321', {
+      startsAt: INPUT.startsAt, durationMinutes: 60, timezone: 'UTC',
+    })
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.detail).toContain('Meeting host does not exist')
+  })
+
+  // The scrubbing that protects create has to protect these paths as well:
+  // a failure message is still a place a credential could surface.
+  it('never echoes a configured credential in a delete failure', async () => {
+    responder = (url) => (url.includes('/oauth/token')
+      ? json(TOKEN_OK)
+      : json({ message: 'Bad account acct-1 with secret secret-1 and client client-1' }, 400))
+    const res = await deleteZoomMeeting(env(), '987654321')
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    for (const secret of ['acct-1', 'client-1', 'secret-1']) {
+      expect(res.detail).not.toContain(secret)
+    }
+    expect(res.detail).toContain('[redacted]')
+  })
 })

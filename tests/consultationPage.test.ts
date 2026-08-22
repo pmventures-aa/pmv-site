@@ -17,7 +17,7 @@ describe('public consultation booking page', () => {
     // renders them where the visitor actually is.
     expect(page).toContain('resolvedOptions().timeZone')
     expect(page).toContain('toLocaleTimeString(undefined')
-    expect(page).toContain('Times shown in your timezone')
+    expect(page).toContain('Times in your timezone')
     // The zone is named next to the choice so the pick is unambiguous.
     expect(page).toContain('timeZoneName')
   })
@@ -39,9 +39,13 @@ describe('public consultation booking page', () => {
     expect(page).not.toMatch(/start_url|startUrl|hostUrl/)
   })
 
-  it('keeps the booking form inert until a time is chosen', () => {
-    expect(page).toContain('disabled={!selected}')
-    expect(page).toContain('disabled={busy || !selected}')
+  // The form used to render disabled at half opacity before a time was
+  // picked. It is now not rendered at all until one is, which is the same
+  // guarantee enforced more strongly: there is no field to reach, not merely
+  // a greyed one. The assertion follows the mechanism.
+  it('offers no booking form until a time is chosen', () => {
+    expect(page).toContain('? (\n            <form onSubmit={submit}')
+    expect(page).not.toContain('disabled={!selected}')
   })
 
   it('addresses an existing booking only by its token', () => {

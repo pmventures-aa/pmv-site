@@ -287,7 +287,8 @@ export async function updateZoomMeeting(env: Env, meetingId: string, input: Upda
   // 204 on success. A 404 means it is already gone, which is not a problem
   // worth surfacing to a caller that only wanted it changed.
   if (response.ok || response.status === 404) return { ok: true, value: true }
-  return { ok: false, reason: 'request_failed', detail: `Zoom update returned ${response.status}` }
+  const body = await response.text().catch(() => '')
+  return { ok: false, reason: 'request_failed', detail: `Zoom update returned ${response.status}: ${safeZoomError(body, config)}` }
 }
 
 export async function deleteZoomMeeting(env: Env, meetingId: string): Promise<ZoomResult<true>> {
@@ -308,5 +309,9 @@ export async function deleteZoomMeeting(env: Env, meetingId: string): Promise<Zo
 
   // Already deleted is the outcome the caller wanted.
   if (response.ok || response.status === 404) return { ok: true, value: true }
-  return { ok: false, reason: 'request_failed', detail: `Zoom delete returned ${response.status}` }
+  // Read the body, the way create already does. A bare status code cannot
+  // distinguish a missing delete scope from a meeting owned by another host,
+  // and those need opposite fixes.
+  const body = await response.text().catch(() => '')
+  return { ok: false, reason: 'request_failed', detail: `Zoom delete returned ${response.status}: ${safeZoomError(body, config)}` }
 }

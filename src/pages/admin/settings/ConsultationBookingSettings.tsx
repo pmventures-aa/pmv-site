@@ -288,7 +288,8 @@ export default function ConsultationBookingSettings() {
   const [blocking, setBlocking] = useState(false)
   const [zoom, setZoom] = useState<ZoomStatus | null>(null)
   const [copied, setCopied] = useState(false)
-  const [zoomTest, setZoomTest] = useState<{ ok: boolean; reason?: string; detail?: string; hostEmail?: string; cleanedUp?: boolean } | null>(null)
+  const [zoomTest, setZoomTest] = useState<{ ok: boolean; reason?: string; detail?: string; hostEmail?: string; cleanedUp?: boolean; cleanupDetail?: string | null; strayMeetingId?: string | null } | null>(null)
+  const [removingStray, setRemovingStray] = useState(false)
   const [testingZoom, setTestingZoom] = useState(false)
 
   const load = useCallback(async () => {
@@ -483,6 +484,31 @@ export default function ConsultationBookingSettings() {
     } finally {
       if (removed.length) patch({ blackouts: schedule.blackouts.filter((b) => !removed.includes(b.id)) })
       setBlocking(false)
+    }
+  }
+
+  /**
+   * Deletes a meeting the test could not clean up, without leaving HQ. On
+   * success the warning is cleared by marking the test result cleaned up; on
+   * failure Zoom's reason replaces the old one, so a retry that cannot work
+   * says why rather than looking like nothing happened.
+   */
+  async function removeStrayMeeting(meetingId: string) {
+    setRemovingStray(true)
+    try {
+      const res = await api.post<{ ok: boolean; detail?: string | null }>(
+        `/admin/availability/zoom/meetings/${encodeURIComponent(meetingId)}/delete`, {},
+      )
+      setZoomTest((prev) => prev && (res.ok
+        ? { ...prev, cleanedUp: true, cleanupDetail: null, strayMeetingId: null }
+        : { ...prev, cleanupDetail: res.detail || 'Zoom refused the delete again.' }))
+    } catch (err) {
+      setZoomTest((prev) => prev && {
+        ...prev,
+        cleanupDetail: err instanceof ApiError ? err.message : 'The delete could not be sent.',
+      })
+    } finally {
+      setRemovingStray(false)
     }
   }
 
@@ -739,7 +765,32 @@ export default function ConsultationBookingSettings() {
                     <>
                       <p className="font-bold">Zoom is working. Bookings will get a join link.</p>
                       {zoomTest.cleanedUp === false && (
-                        <p className="mt-1 text-amber-200">The test meeting could not be deleted. Remove &ldquo;Pinnacle connection test&rdquo; from Zoom by hand.</p>
+                        <div className="mt-2 rounded-md border border-amber-300/25 bg-amber-400/[.06] p-2.5 text-amber-200">
+                          <p className="font-bold">The test meeting was created but not deleted.</p>
+                          {/* Zoom's own words. Create and delete are separate
+                              scopes, so this is usually a missing delete
+                              permission rather than anything being broken. */}
+                          {zoomTest.cleanupDetail && (
+                            <p className="mt-1 break-words font-mono text-[11px] text-slate-300">{zoomTest.cleanupDetail}</p>
+                          )}
+                          <p className="mt-2 text-slate-400">
+                            Creating and deleting a meeting are separate Zoom permissions. If this says 401 or 403, add
+                            the delete scope to the Server-to-Server app (<code>meeting:delete:meeting:admin</code>, or
+                            <code> meeting:write:admin</code> on the classic scope model), then try again.
+                          </p>
+                          {zoomTest.strayMeetingId && (
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <button
+                                type="button" disabled={removingStray}
+                                onClick={() => void removeStrayMeeting(zoomTest.strayMeetingId as string)}
+                                className={`${btnOutline} min-h-8`}
+                              >
+                                {removingStray ? 'Removing...' : 'Try removing it now'}
+                              </button>
+                              <span className="text-[11px] text-slate-500">Meeting {zoomTest.strayMeetingId}</span>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </>
                   ) : (
