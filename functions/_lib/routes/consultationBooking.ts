@@ -30,6 +30,7 @@ import { PUBLIC_SITE_BASE } from '../scopeFunnel'
 import { isSlotBookable } from '../../../shared/availability'
 import { loadScheduleRow, loadSchedule, loadBusyIntervals } from './availability'
 import { createZoomMeeting, deleteZoomMeeting, isZoomConfigured } from '../zoom'
+import { reserveClientAccount, sendReservedAccountWelcome } from '../reserveClientAccount'
 import { pushConsultationToGoogle, removeConsultationFromGoogle } from '../googleCalendarPush'
 
 export const consultationBookingPublicRoutes = new Hono<AppEnv>()
@@ -144,6 +145,18 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
     'SELECT id FROM users WHERE lower(email) = lower(?) LIMIT 1',
   ).bind(email).first<{ id: string }>()
 
+  // Booking a consultation is completing a request, so it earns the same
+  // workspace a scope request does: created, never signed in, activated only
+  // by opening the link we email. Resolved before the batch so the account
+  // rows share its transaction and cannot half-commit.
+  const account = await reserveClientAccount(c.env, {
+    email,
+    fullName: name,
+    firstName: first,
+    lastName: last,
+    serviceKey: null,
+  })
+
   const bookingId = uuid()
   const publicToken = uuid()
   const eventId = uuid()
@@ -170,6 +183,7 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
 
   try {
     await c.env.DB.batch([
+      ...account.statements,
       // The calendar row staff work from. Internal until someone confirms it, so
       // an unverified email can never surface an event in a client's portal.
       // meeting_url here is what feeds the ICS invite's LOCATION field.
@@ -200,7 +214,7 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         bookingId, publicToken, row.id, eventId, inquiryId, name, email, phone || null,
-        topic || null, matched?.id ?? null, startIso, endIso, schedule.timezone, ip,
+        topic || null, account.userId ?? matched?.id ?? null, startIso, endIso, schedule.timezone, ip,
         meeting ? 'zoom' : null, meeting?.meetingId ?? null, meeting?.joinUrl ?? null, meetingFormat,
       ),
     ])
@@ -254,6 +268,7 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
   })
 
   await Promise.allSettled([
+    sendReservedAccountWelcome(c.env, account, { email, firstName: first }),
     sendEmail(c.env, {
       to: email,
       subject: confirmation.subject,
