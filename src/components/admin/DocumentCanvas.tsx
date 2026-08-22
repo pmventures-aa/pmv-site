@@ -8,7 +8,8 @@ import {
 import { LetterheadCrest } from './LetterheadCrest'
 import { DocumentExportMenu } from './DocumentExportMenu'
 import { DOC_FONTS, DOC_FONT_GROUPS, DOC_HIGHLIGHT, DOC_INK, DOC_SIZES, toEditorHtml } from '../../../shared/docHtml'
-import { DOC_PAGE_SIZES, docPageSize, isDocMargin, isDocPageSize, type DocMarginKey, type DocPageSizeKey } from '../../../shared/docLayout'
+import { DOC_MARGINS, DOC_MARGIN_KEYS, DOC_PAGE_SIZES, docMarginsScreen, docPageSize, isDocMargin, isDocPageSize, type DocMarginKey, type DocPageSizeKey } from '../../../shared/docLayout'
+import { docPaperVars } from '../../../shared/documentTheme'
 import { FIRM_NAME, FIRM_PHONE, FIRM_REGION, FIRM_SITE_HOST, FIRM_TAGLINE, SUPPORT_EMAIL } from '../../../shared/letterhead'
 import { api } from '../../lib/api'
 import './documentCanvas.css'
@@ -93,6 +94,12 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false,fullPa
   const branded=document.is_branded!==0
   const editableText=document.document_type==='text' && !readOnly
   const paper=docPageSize(pageSize)
+  // Every size and colour on the page comes through these custom properties,
+  // which are the same numbers the PDF and DOCX exporters read.
+  const paperStyle=useMemo(()=>{
+    const box=docMarginsScreen(margins)
+    return {...docPaperVars(),'--doc-page-w':`${paper.screen.w}px`,'--doc-page-h':`${paper.screen.h}px`,'--doc-mx':`${box.x}px`,'--doc-mt':`${box.top}px`,'--doc-mb':`${box.bottom}px`,'--doc-body-min':`${paper.screen.h-box.top-box.bottom-220}px`} as React.CSSProperties
+  },[paper.screen.w,paper.screen.h,margins])
   // Page size + margins persist on the document itself, so preview, browser
   // print (@page below), and PDF export all read the same geometry.
   function persistLayout(next:{page_size?:DocPageSizeKey;page_margins?:DocMarginKey}){
@@ -111,32 +118,30 @@ export function DocumentCanvas({document,text,onTextChange,readOnly=false,fullPa
   const typeLabel=useMemo(()=>document.document_type==='text'?'Editable document':isPdf?'PDF':isDocx?'DOCX':isImage?'Image':ext.toUpperCase()||'File',[document.document_type,isPdf,isDocx,isImage,ext])
   return <section className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#111820] shadow-[0_20px_60px_rgba(0,0,0,.28)]">
     <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-navy-950/90 px-3 py-2 sm:px-4">
-      <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{document.title}</p><p className="text-[11px] text-slate-500">{typeLabel} · {readOnly?'read-only reference':'formatting lives in the bar below, not on the page'}</p></div>
+      <div className="min-w-0">{!fullPage&&<p className="truncate text-sm font-semibold text-white">{document.title}</p>}<p className="text-[11px] text-slate-500">{typeLabel} · {readOnly?'read-only reference':'formatting lives in the bar below, not on the page'}</p></div>
       <div className="flex items-center gap-1.5">
         {document.document_type==='text'&&<select className="doc-ribbon-select mr-1" value={pageSize} onChange={(e)=>changePageSize(e.target.value as DocPageSizeKey)} title="Page size" style={{height:'2rem'}}>
           {DOC_PAGE_SIZES.map((s)=><option key={s.key} value={s.key}>{s.label}</option>)}
         </select>}
         {document.document_type==='text'&&<select className="doc-ribbon-select mr-1" value={margins} onChange={(e)=>changeMargins(e.target.value as DocMarginKey)} title="Page margins" style={{height:'2rem'}}>
-          <option value="normal">Normal margins</option>
-          <option value="narrow">Narrow margins</option>
-          <option value="wide">Wide margins</option>
+          {DOC_MARGIN_KEYS.map((key)=><option key={key} value={key}>{DOC_MARGINS[key].label}</option>)}
         </select>}
         <button className="doc-tool" onClick={()=>setZoom(v=>Math.max(60,v-10))} title="Zoom out"><Minus size={15}/></button><span className="w-12 text-center text-[11px] tabular-nums text-slate-400">{zoom}%</span><button className="doc-tool" onClick={()=>setZoom(v=>Math.min(180,v+10))} title="Zoom in"><Plus size={15}/></button>
         <button className="doc-tool" onClick={()=>{setZoom(100);setReloadKey(v=>v+1)}} title="Refresh document"><RotateCw size={14}/></button>
-        {fullPageHref
+        {!fullPage&&(fullPageHref
           ? <Link className="doc-tool" to={fullPageHref} title="Open full page"><Maximize2 size={14}/></Link>
-          : <a className="doc-tool" href={url} target="_blank" rel="noreferrer" title="Open full screen"><Maximize2 size={14}/></a>}
-        {document.document_type==='text'
+          : <a className="doc-tool" href={url} target="_blank" rel="noreferrer" title="Open full screen"><Maximize2 size={14}/></a>)}
+        {!fullPage&&(document.document_type==='text'
           ? <DocumentExportMenu compact documentId={document.id} title={document.title} documentType="text" align="right"/>
-          : <a className="doc-tool" href={url} download title="Download"><Download size={14}/></a>}
+          : <a className="doc-tool" href={url} download title="Download"><Download size={14}/></a>)}
       </div>
     </div>
     {editableText && <FormatRibbon onChange={onTextChange}/>}
     <div className={`relative overflow-auto bg-[#2a3037] p-4 sm:p-7 ${fullPage?'h-[calc(100vh-138px)] min-h-[540px]':'h-[calc(100vh-255px)] min-h-[600px]'}`}>
       {isPdf&&<div className="mx-auto h-full min-h-[560px] w-full overflow-hidden bg-white shadow-2xl" style={{maxWidth:`${Math.round(900*zoom/100)}px`}}><iframe key={reloadKey} title={document.title} src={`${url}#toolbar=0&navpanes=1&view=FitH`} className="h-full w-full bg-white"/></div>}
-      {document.document_type==='text'&&<><style>{`@media print{@page{size:${paper.css};margin:0}}`}</style><div className="mx-auto origin-top" style={{width:`${paper.screen.w}px`,transform:`scale(${zoom/100})`,transformOrigin:'top center',marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}><article className={`doc-paper doc-margins-${margins} doc-size-${pageSize}`}>{branded&&<PaperBrand/>}<div className="doc-body"><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</article></div></>}
+      {document.document_type==='text'&&<><style>{`@media print{@page{size:${paper.css};margin:0}}`}</style><div className="mx-auto origin-top" style={{width:`${paper.screen.w}px`,transform:`scale(${zoom/100})`,transformOrigin:'top center',marginBottom:`${Math.max(0,(zoom-100)*8)}px`}}><article className="doc-paper" style={paperStyle}>{branded&&<PaperBrand/>}<div className="doc-body"><RichDocEditor value={text} onChange={onTextChange} readOnly={readOnly}/></div>{branded&&<PaperFooter/>}</article></div></>}
       {isImage&&<div className="mx-auto flex min-h-[500px] items-start justify-center"><img src={url} alt={document.title} style={{width:`${zoom}%`,maxWidth:'none'}} className="bg-white shadow-2xl"/></div>}
-      {isDocx&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center'}}><article className="doc-paper">{branded&&<PaperBrand/>}<div className="doc-body">{loading?<PreviewMessage text="Rendering DOCX…"/>:docxError?<PreviewMessage text={docxError}/>:docx?.map((b,i)=>b.type==='table'?<table key={i} className="my-5 w-full border-collapse text-sm"><tbody>{b.rows.map((row,r)=><tr key={r}>{row.map((cell,c)=><td key={c} className="border border-slate-300 p-2 align-top">{cell}</td>)}</tr>)}</tbody></table>:b.style?.toLowerCase().includes('heading')?<h2 key={i} className="mb-3 mt-6 font-serif text-xl font-semibold">{b.text}</h2>:<p key={i} className="mb-3 whitespace-pre-wrap font-serif text-[15px] leading-7">{b.text||' '}</p>)}</div>{branded&&<PaperFooter/>}</article></div>}
+      {isDocx&&<div className="mx-auto origin-top" style={{width:'816px',transform:`scale(${zoom/100})`,transformOrigin:'top center'}}><article className="doc-paper" style={paperStyle}>{branded&&<PaperBrand/>}<div className="doc-body">{loading?<PreviewMessage text="Rendering DOCX…"/>:docxError?<PreviewMessage text={docxError}/>:docx?.map((b,i)=>b.type==='table'?<table key={i} className="my-5 w-full border-collapse text-sm"><tbody>{b.rows.map((row,r)=><tr key={r}>{row.map((cell,c)=><td key={c} className="border border-slate-300 p-2 align-top">{cell}</td>)}</tr>)}</tbody></table>:b.style?.toLowerCase().includes('heading')?<h2 key={i} className="mb-3 mt-6 font-serif text-xl font-semibold">{b.text}</h2>:<p key={i} className="mb-3 whitespace-pre-wrap font-serif text-[15px] leading-7">{b.text||' '}</p>)}</div>{branded&&<PaperFooter/>}</article></div>}
       {!isPdf&&!isImage&&!isDocx&&document.document_type!=='text'&&<div className="mx-auto grid min-h-[520px] max-w-2xl place-items-center bg-white p-10 text-center shadow-2xl"><div><FileText size={52} className="mx-auto text-slate-300"/><h3 className="mt-5 text-lg font-semibold text-slate-800">Preview unavailable for this file type</h3><p className="mt-2 text-sm leading-6 text-slate-500">The file remains stored securely in Document Hub. Open or download it to work with the original format.</p><a href={url} target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Open document</a></div></div>}
     </div>
   </section>
@@ -316,7 +321,7 @@ function FormatRibbon({ onChange }: { onChange: (v: string) => void }) {
           </div>
         )}
       </div>
-      <p className="doc-ribbon-hint">Select text first, then use this bar. Zoom, margins, and export stay in the title row so they never sit on the letterhead.</p>
+      <p className="doc-ribbon-hint">Select text first, then use this bar. Page size, margins, and zoom stay in the row above so they never sit on the letterhead.</p>
     </div>
   )
 }

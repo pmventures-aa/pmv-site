@@ -170,7 +170,9 @@ internalDocumentAdminRoutes.post('/documents-workspace/:id/export', async (c) =>
         return new Response(htmlToPlainText(doc.text_content || ''), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': disposition(`${base}.txt`) } })
       }
       if (format === 'docx') {
-        const bytes = await buildDocx({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo })
+        // Same page size and margins as the editor and the PDF, so all three
+        // views of one document agree on where the printable box is.
+        const bytes = await buildDocx({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo, pageSize: doc.page_size, margins: doc.page_margins })
         return new Response(bytes as unknown as ArrayBuffer, { headers: { 'Content-Type': EXPORT_MIME_DOCX, 'Content-Disposition': disposition(`${base}.docx`) } })
       }
       const bytes = await buildPdf({ title: doc.title, html: doc.text_content || '', branded: doc.is_branded !== 0, logoBytes: logo, pageSize: doc.page_size, margins: doc.page_margins })

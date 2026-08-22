@@ -3,6 +3,8 @@
 // (points, 1/72in). Keeping preview, print, and export on the same table is what
 // makes "what you see is what exports" hold for Letter, Legal, and A4.
 
+import { pt } from './documentTheme'
+
 export type DocPageSizeKey = 'letter' | 'legal' | 'a4'
 export type DocMarginKey = 'normal' | 'narrow' | 'wide'
 
@@ -32,14 +34,24 @@ export function docPageSize(key: string | null | undefined): DocPageSize {
   return DOC_PAGE_SIZES.find((s) => s.key === key) ?? DOC_PAGE_SIZES[0]
 }
 
-// Side / top / bottom margins in points for the PDF export, matched to the
-// on-screen margin presets so the printable box lines up with the editor.
-export const DOC_MARGIN_PT: Record<DocMarginKey, { x: number; top: number; bottom: number }> = {
-  normal: { x: 54, top: 54, bottom: 48 },
-  narrow: { x: 40, top: 44, bottom: 40 },
-  wide: { x: 76, top: 66, bottom: 60 },
+// Margin presets. Declared once in CSS px at 96dpi (what the editor shows)
+// and converted to points for the PDF, so the printable box in the export is
+// the same box the author saw. These used to be two hand-kept tables and they
+// had drifted: "normal" was 64px on screen but 54pt (72px) in the PDF.
+export const DOC_MARGINS: Record<DocMarginKey, { label: string; screen: { x: number; top: number; bottom: number } }> = {
+  normal: { label: 'Normal margins', screen: { x: 72, top: 64, bottom: 48 } },
+  narrow: { label: 'Narrow margins', screen: { x: 48, top: 52, bottom: 40 } },
+  wide: { label: 'Wide margins', screen: { x: 108, top: 78, bottom: 60 } },
 }
 
+export const DOC_MARGIN_KEYS: DocMarginKey[] = ['normal', 'narrow', 'wide']
+
+export function docMarginsScreen(key: string | null | undefined): { x: number; top: number; bottom: number } {
+  return (DOC_MARGINS[key as DocMarginKey] ?? DOC_MARGINS.normal).screen
+}
+
+// Points, for the PDF export.
 export function docMargins(key: string | null | undefined): { x: number; top: number; bottom: number } {
-  return DOC_MARGIN_PT[key as DocMarginKey] ?? DOC_MARGIN_PT.normal
+  const s = docMarginsScreen(key)
+  return { x: pt(s.x), top: pt(s.top), bottom: pt(s.bottom) }
 }
