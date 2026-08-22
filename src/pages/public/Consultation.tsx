@@ -59,9 +59,13 @@ const longLabel = (iso: string) =>
   `${new Date(iso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} at ${timeLabel(iso)} ${zoneLabel(iso)}`
 
 export default function Consultation() {
+  // /book is a short link to share; /consultation is the address the site
+  // links internally. Both render this page, and the canonical pins them to
+  // one so they do not compete as separate pages for the same content.
   usePageMeta(
     'Book a Consultation | Pinnacle Management Ventures',
     'Pick a time that works and speak with someone about what you need.',
+    { canonicalPath: '/consultation' },
   )
 
   const [data, setData] = useState<AvailabilityResponse | null>(null)

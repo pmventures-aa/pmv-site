@@ -118,6 +118,9 @@ function App() {
         <Route path="/resources" element={<Resources />} />
         <Route path="/instant-quote" element={<InstantQuote />} />
         <Route path="/consultation" element={<Consultation />} />
+        {/* Short link for sharing. Renders the page rather than redirecting,
+            so the address someone was given is the address they keep. */}
+        <Route path="/book" element={<Consultation />} />
         <Route path="/consultation/booking" element={<ConsultationBooking />} />
         <Route path="/book-a-consultation" element={<Navigate to="/consultation" replace />} />
         <Route path="/quote/:token" element={<QuoteView />} />

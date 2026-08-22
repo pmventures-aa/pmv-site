@@ -34,14 +34,23 @@ function ensureOg(property: string, content: string) {
 // `exactTitle` renders the title verbatim instead of appending "| Site Name".
 // Use it on the home page so the title leads with the brand, which is the
 // signal Google uses to show the site name beside the result.
-export function usePageMeta(title: string, description = DEFAULT_DESCRIPTION, opts: { exactTitle?: boolean } = {}) {
+// `canonicalPath` pins the canonical url to one path when a page answers on
+// several. Without it the canonical follows whatever address the visitor
+// arrived at, so a short share link and its long form would compete as two
+// separate pages for the same content.
+export function usePageMeta(
+  title: string,
+  description = DEFAULT_DESCRIPTION,
+  opts: { exactTitle?: boolean; canonicalPath?: string } = {},
+) {
   useEffect(() => {
     const prevTitle = document.title
     const meta = document.querySelector('meta[name="description"]')
     const prevDescription = meta?.getAttribute('content') ?? DEFAULT_DESCRIPTION
     const canonical = document.querySelector('link[rel="canonical"]')
     const prevCanonical = canonical?.getAttribute('href') ?? null
-    const url = `${SITE_URL}${window.location.pathname}`
+    const path = opts.canonicalPath ?? window.location.pathname
+    const url = `${SITE_URL}${path}`
     const fullTitle = opts.exactTitle ? title : `${title} | ${SITE_NAME}`
 
     document.title = fullTitle
@@ -72,5 +81,5 @@ export function usePageMeta(title: string, description = DEFAULT_DESCRIPTION, op
         else canonicalEl.remove()
       }
     }
-  }, [title, description])
+  }, [title, description, opts.exactTitle, opts.canonicalPath])
 }
