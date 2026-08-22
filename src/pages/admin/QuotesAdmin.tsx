@@ -229,7 +229,7 @@ export default function QuotesAdmin() {
   }
 
   return <div>
-    <PageIntro
+    <PageIntro section="Revenue"
       kicker="Revenue"
       title="Quotes"
       subtitle="Write a quote, send a branded link, and let the client accept or decline with notes. Accepted quotes convert to an invoice."

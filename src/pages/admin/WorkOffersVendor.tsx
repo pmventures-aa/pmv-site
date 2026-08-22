@@ -108,7 +108,7 @@ export function WorkOfferDetail() {
 
   return (
     <div className="space-y-4">
-      <PageIntro
+      <PageIntro section="Delivery"
         kicker="Work offer"
         title={offer.title || proposalKindLabel(offer.kind)}
         subtitle={canRespond ? 'Read the details, then tell us whether you can take it.' : proposalStatusLabel(status)}

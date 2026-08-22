@@ -222,7 +222,7 @@ export default function CleaningMyJobs() {
 
   return (
     <div className="space-y-6">
-      <PageIntro kicker="Cleaning" title="My Cleaning Jobs" subtitle="Accept work, follow the property steps, and complete each job from your phone." />
+      <PageIntro section="Delivery" kicker="Cleaning" title="My Cleaning Jobs" subtitle="Accept work, follow the property steps, and complete each job from your phone." />
 
       {loading ? (
         <Panel><p className="text-sm text-slate-400">Loading…</p></Panel>

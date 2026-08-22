@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { RotateCw } from 'lucide-react'
+import { sectionGlowClass, sectionTextClass } from '../../../shared/hqSectionColor'
 
 export const btnPrimary =
   'inline-flex items-center justify-center gap-2 rounded-md bg-gold px-3 py-1.5 text-sm font-semibold text-navy-950 transition hover:bg-gold-400 disabled:opacity-60'
@@ -10,7 +11,7 @@ export const panelCls = 'surface-panel rounded-lg'
 export const inputCls =
   'pmv-hq-control w-full min-h-9 rounded-md border border-white/12 bg-white/[.045] px-3 py-1.5 text-sm font-medium leading-5 text-slate-100 placeholder:font-normal placeholder:text-slate-500 transition focus:border-gold/55 focus:bg-white/[.065] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/15'
 
-export function PageIntro({ kicker, title, subtitle, action, leading }: { kicker:string; title:string; subtitle?:string; action?:ReactNode; leading?:ReactNode }) {
+export function PageIntro({ kicker, title, subtitle, action, leading, section }: { kicker:string; title:string; subtitle?:string; action?:ReactNode; leading?:ReactNode; section?:string }) {
   function refresh() {
     window.dispatchEvent(new CustomEvent('pmv:refresh', { detail: { source: 'manual' } }))
   }
@@ -19,7 +20,9 @@ export function PageIntro({ kicker, title, subtitle, action, leading }: { kicker
       <div className="flex items-start gap-3">
         {leading}
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold/85">{kicker}</p>
+          {/* Falls back to the brand accent, so a page that has not named its
+              hub looks deliberate rather than unstyled. */}
+          <p className={`text-[10px] font-bold uppercase tracking-[.16em] ${section?sectionTextClass(section):'text-gold/85'}`}>{kicker}</p>
           <h1 className="mt-1 text-xl font-bold tracking-[-.02em] text-white">{title}</h1>
           {subtitle && <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-400">{subtitle}</p>}
         </div>
@@ -35,7 +38,14 @@ export function PageIntro({ kicker, title, subtitle, action, leading }: { kicker
 }
 
 export function Panel({ className='', children }: { className?:string; children:ReactNode }) { return <div className={`${panelCls} p-4 ${className}`}>{children}</div> }
-export function EmptyState({ label }: { label:string }) { return <div className="rounded-md border border-dashed border-white/10 bg-white/[.012] px-4 py-8 text-center text-sm text-slate-500">{label}</div> }
+export function EmptyState({ label, section, hint }: { label:string; section?:string; hint?:string }) {
+  return (
+    <div className={`rounded-lg border border-dashed px-4 py-8 text-center ${section?sectionGlowClass(section):'border-white/12 bg-white/[.02]'}`}>
+      <p className="text-sm font-semibold text-slate-300">{label}</p>
+      {hint && <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-slate-500">{hint}</p>}
+    </div>
+  )
+}
 export function Skeleton({ className='' }: { className?:string }) { return <div className={`animate-pulse rounded-md bg-white/[.07] ${className}`}/> }
 export function SkeletonStatCard(){return <Panel className="p-4"><Skeleton className="h-3 w-24"/><Skeleton className="mt-3 h-6 w-16"/></Panel>}
 export function SkeletonTable({rows=4,cols=4}:{rows?:number;cols?:number}){return <div className="space-y-2">{Array.from({length:rows}).map((_,r)=><div key={r} className="flex gap-3">{Array.from({length:cols}).map((_,c)=><Skeleton key={c} className="h-3.5 flex-1"/>)}</div>)}</div>}

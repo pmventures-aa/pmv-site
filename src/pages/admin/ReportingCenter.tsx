@@ -139,7 +139,7 @@ export default function ReportingCenter() {
   }
 
   if (!caps.loading && !caps.can_view_reports) {
-    return <div><PageIntro kicker="Insights" title="Reporting Center" /><NoAccess label="the Reporting Center" /></div>
+    return <div><PageIntro section="Intelligence" kicker="Insights" title="Reporting Center" /><NoAccess label="the Reporting Center" /></div>
   }
 
   const categoryEntries = catalog.filter((c) => c.category === category && !KPI_KEYS.includes(c.key))
