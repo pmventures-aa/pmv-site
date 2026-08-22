@@ -11,7 +11,6 @@ import ServiceCatalogSettings from './settings/ServiceCatalogSettings'
 import ServiceOfferingsSettings from './settings/ServiceOfferingsSettings'
 import StaffSettings from './settings/StaffSettings'
 import NotificationSettings from './settings/NotificationSettings'
-import CalendarSyncSettings from './settings/CalendarSyncSettings'
 import ConsultationBookingSettings from './settings/ConsultationBookingSettings'
 import ManagedTemplatesSettings from './settings/ManagedTemplatesSettings'
 
@@ -22,7 +21,6 @@ const TABS = [
   { key: 'offerings', label: 'Service Offerings', short: 'Control which services are available and how they are presented.', icon: SlidersHorizontal, terms: 'services offerings enabled availability pricing scope' },
   { key: 'staff', label: 'Network Access & Permissions', short: 'Create and rename coding roles, set defaults, and control every permission for a specific user.', icon: Users, terms: 'staff users roles access permissions team providers professionals network coding role templates overrides owner' },
   { key: 'notifications', label: 'Notifications', short: 'Choose how operational events reach you across HQ, email, desktop, and sound.', icon: Bell, terms: 'notifications email desktop sound alerts events' },
-  { key: 'calendar', label: 'Calendar', short: 'Connect Google Calendar. Pinnacle stays authoritative; supported edits sync both ways.', icon: CalendarCheck2, terms: 'calendar google outlook microsoft sync ical external' },
   { key: 'booking', label: 'Consultation Booking', short: 'Publish bookable hours for the public consultation page, set call length, buffers, notice, and time off.', icon: CalendarClock, terms: 'booking consultation availability slots hours schedule appointment zoom meeting calendly scheduler public book time off blackout buffer' },
   { key: 'templates', label: 'Templates', short: 'Create, version, duplicate, and publish agreements and reusable master copy.', icon: Files, terms: 'templates agreement provider version publish document legal create duplicate archive' },
   { key: 'deletions', label: 'Permanent Deletions', short: 'Owner-only irreversible record deletion and impact review.', icon: Trash2, terms: 'delete danger purge permanent owner archive' },
@@ -159,7 +157,6 @@ export default function SettingsAdmin() {
           {tab === 'offerings' && <ServiceOfferingsSettings />}
           {tab === 'staff' && <StaffSettings />}
           {tab === 'notifications' && <NotificationSettings />}
-          {tab === 'calendar' && <CalendarSyncSettings />}
           {tab === 'booking' && <ConsultationBookingSettings />}
           {tab === 'templates' && (caps.is_owner ? <ManagedTemplatesSettings /> : <NoAccess label="Templates" />)}
           {tab === 'deletions' && (caps.is_owner ? <div className="rounded-xl border border-rose-400/20 bg-rose-400/[.025] p-1"><div className="px-4 pb-2 pt-4"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-rose-300">Danger Zone</p><p className="mt-1 text-sm text-slate-400">Permanent deletion is restricted to the owner and requires dependency review before execution.</p></div><PermanentDeletions /></div> : <NoAccess label="Permanent Deletions" />)}

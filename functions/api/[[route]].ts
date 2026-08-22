@@ -79,9 +79,10 @@ import { loadWorkspaceContext } from '../_lib/workspaceContext'
 import { logAuth0StartupWarnings } from '../_lib/routes/auth0'
 import { workAssignmentRoutes } from '../_lib/routes/workAssignments'
 import { vendorProposalRoutes } from '../_lib/routes/vendorProposals'
+import { providerAvailabilityRoutes } from '../_lib/routes/providerAvailability'
+import { providerCalendarFeedPublic, providerCalendarFeedRoutes } from '../_lib/routes/providerCalendarFeed'
 import { providerReviewAdminRoutes, providerReviewSelfRoutes } from '../_lib/routes/providerReview'
 import { portalCalendarRoutes, adminCalendarRoutes } from '../_lib/routes/calendarRoutes'
-import { externalCalendarRoutes, externalCalendarWebhookRoutes } from '../_lib/routes/externalCalendar'
 import { strPublicRoutes, strAdminRoutes, strPortalRoutes } from '../_lib/routes/strRoutes'
 import { cleaningPricingPublicRoutes, cleaningPricingAdminRoutes } from '../_lib/routes/cleaningPricing'
 import { cleaningJobsPublicRoutes, cleaningJobsAdminRoutes, cleaningJobsPortalRoutes } from '../_lib/routes/cleaningJobs'
@@ -214,13 +215,12 @@ app.route('/admin', fieldWorkRoutes)
 app.route('/admin', fieldLocationRoutes)
 app.route('/admin', workAssignmentRoutes)
 app.route('/admin', vendorProposalRoutes)
+app.route('/admin', providerAvailabilityRoutes)
+app.route('/admin', providerCalendarFeedRoutes)
+// Token-addressed and unauthenticated by design: a calendar client cannot log in.
+app.route('/', providerCalendarFeedPublic)
 app.route('/admin', providerReviewAdminRoutes)
 app.route('/admin', adminCalendarRoutes)
-// External calendar (Google, later Microsoft) OAuth + sync surface. Kept
-// under /admin so it inherits the requireUser middleware chain; webhook
-// endpoint below is public because the provider posts to it unauthenticated.
-app.route('/admin', externalCalendarRoutes)
-app.route('/', externalCalendarWebhookRoutes)
 app.route('/admin', strAdminRoutes)
 app.route('/admin', cleaningPricingAdminRoutes)
 app.route('/admin', cleaningJobsAdminRoutes)

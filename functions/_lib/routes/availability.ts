@@ -19,7 +19,6 @@ import { Hono } from 'hono'
 import { createZoomMeeting, deleteZoomMeeting, zoomConfigStatus } from '../zoom'
 import type { AppEnv, Env } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
-import { googleBusySpans } from '../googleFreeBusy'
 import { uuid } from '../crypto'
 import { actorGeo, actorIp, actorUserAgent, logAudit } from '../auditLog'
 import {
@@ -181,16 +180,10 @@ export async function loadBusyIntervals(
     endsAt: r.ends_at ?? new Date(Date.parse(r.starts_at.replace(' ', 'T') + 'Z') + row.slot_minutes * 60_000).toISOString(),
   }))
 
-  // The host's own calendar, if they have connected one. Without this a
-  // schedule only knows about work booked through Pinnacle, so anything on
-  // the host's real calendar stays bookable and double-books them.
-  //
-  // Freebusy only: spans, never titles or attendees. And it fails open, so a
-  // Google outage leaves slots bookable rather than making the booking page
-  // look fully booked.
-  if (!row.host_user_id) return pinnacle
-  const external = await googleBusySpans(env, row.host_user_id, fromIso, toIso)
-  return external.length ? [...pinnacle, ...external] : pinnacle
+  // Only work booked through Pinnacle counts as busy. We no longer read the
+  // host's own calendar, so anything they schedule elsewhere must be entered
+  // as time off to protect it - which the Time off calendar exists for.
+  return pinnacle
 }
 
 // Resolve and bound the requested date range. Defaults to the next 30 days.

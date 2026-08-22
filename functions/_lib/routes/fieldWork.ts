@@ -15,6 +15,7 @@ import { DispatchProviderConflict, loadDispatchProviderProfile, provisionDispatc
 import { toDisplayCase } from '../../../shared/displayCase'
 import { isEligibleProviderAccount } from '../../../shared/operations'
 import { estimateVendorFee, loadVendorFeeSettings, saveVendorFeeSettings } from '../vendorFeeAdjustment'
+import { cancelAssignmentCalendar, syncAssignmentToCalendar } from '../fieldAssignmentCalendar'
 
 export const fieldWorkRoutes = new Hono<AppEnv>()
 
@@ -279,6 +280,10 @@ fieldWorkRoutes.post('/field-assignments', requireStaff, async (c) => {
   })
 
   const row = await loadAssignment(c.env, id)
+  // The provider gets a real calendar invite, and the visit becomes visible on
+  // the HQ calendar. Best-effort: the assignment already exists and must not
+  // fail because a calendar row did not.
+  if (row) await syncAssignmentToCalendar(c.env, row)
   return c.json({ assignment: row })
 })
 
@@ -532,6 +537,9 @@ fieldWorkRoutes.post('/field-assignments/:id/cancel', requireStaff, async (c) =>
   if (user.role !== 'admin' && row.assigned_by_user_id !== user.id) return c.json({ error: 'forbidden' }, 403)
   if (row.status === 'completed') return c.json({ error: 'cannot cancel completed assignment' }, 409)
   await c.env.DB.prepare(`UPDATE field_assignments SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?`).bind(row.id).run()
+  // Takes the job off the provider's own calendar rather than leaving it there
+  // as work that is no longer happening.
+  await cancelAssignmentCalendar(c.env, row.id, user.id)
   await c.env.DB.prepare(
     'UPDATE field_agent_locations SET sharing_active = 0 WHERE user_id = ? AND assignment_id = ?',
   ).bind(row.vendor_user_id, row.id).run()
