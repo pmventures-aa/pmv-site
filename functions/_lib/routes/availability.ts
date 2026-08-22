@@ -16,6 +16,7 @@
 // the schedule, loads what is already booked, and hands both to the engine.
 
 import { Hono } from 'hono'
+import { zoomConfigStatus } from '../zoom'
 import type { AppEnv, Env } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
 import { googleBusySpans } from '../googleFreeBusy'
@@ -289,7 +290,10 @@ availabilityAdminRoutes.get('/availability/schedules', requireStaff, async (c) =
   const schedules = await Promise.all(
     (results ?? []).map(async (row) => adminScheduleView(row, await loadWindows(c.env, row.id), await loadBlackouts(c.env, row.id))),
   )
-  return c.json({ schedules })
+  // Zoom's state travels with the schedules because that is the only page
+  // where it matters. Without it, the sole way to discover a missing secret
+  // was to take a real booking and notice the confirmation had no join link.
+  return c.json({ schedules, zoom: zoomConfigStatus(c.env) })
 })
 
 availabilityAdminRoutes.get('/availability/schedules/:id/preview', requireStaff, async (c) => {

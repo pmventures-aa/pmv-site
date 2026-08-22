@@ -21,6 +21,14 @@ import {
 // in this component: the engine does that per day at read time, so a schedule
 // stays correct across daylight saving without anything being regenerated.
 
+interface ZoomStatus {
+  configured: boolean
+  hasAccountId: boolean
+  hasClientId: boolean
+  hasClientSecret: boolean
+  hostEmail: string
+}
+
 interface Blackout { id: string; startsAt: string; endsAt: string; reason?: string | null }
 
 const MINUTES_PER_DAY = 24 * 60
@@ -142,13 +150,15 @@ export default function ConsultationBookingSettings() {
   const [previewing, setPreviewing] = useState(false)
   const [blackoutDraft, setBlackoutDraft] = useState({ startsAt: '', endsAt: '', reason: '' })
   const [dayDraft, setDayDraft] = useState({ date: '', days: 1, reason: '' })
+  const [zoom, setZoom] = useState<ZoomStatus | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await api.get<{ schedules: Schedule[] }>('/admin/availability/schedules')
+      const res = await api.get<{ schedules: Schedule[]; zoom?: ZoomStatus }>('/admin/availability/schedules')
       setSchedule(res.schedules.find((s) => s.slug === 'consultation') ?? res.schedules[0] ?? null)
+      setZoom(res.zoom ?? null)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load the booking schedule.')
     } finally {
@@ -470,6 +480,46 @@ export default function ConsultationBookingSettings() {
           </label>
         </div>
       </Panel>
+
+      {zoom && (
+        <Panel>
+          <h3 className="text-sm font-bold text-white">Video meetings</h3>
+          {zoom.configured ? (
+            <>
+              <p className="mt-1.5 text-xs leading-5 text-slate-400">
+                Zoom is configured. Every virtual booking gets its own meeting, and the join link goes into the confirmation email and the calendar entry. Cancelling a booking deletes the meeting.
+              </p>
+              <p className="mt-3 text-xs text-slate-400">
+                Meetings are created under <span className="font-bold text-slate-200">{zoom.hostEmail}</span>.
+              </p>
+            </>
+          ) : (
+            <>
+              {/* Booking deliberately survives a missing Zoom credential, which
+                  means the only previous symptom was a confirmation email with
+                  no join link. Say it plainly instead. */}
+              <p className="mt-1.5 text-xs leading-5 text-amber-200">
+                Zoom is not configured, so virtual bookings will be taken without a join link. Nothing breaks; visitors just do not receive one.
+              </p>
+              <div className="mt-3 space-y-1.5">
+                {([
+                  ['ZOOM_ACCOUNT_ID', zoom.hasAccountId],
+                  ['ZOOM_CLIENT_ID', zoom.hasClientId],
+                  ['ZOOM_CLIENT_SECRET', zoom.hasClientSecret],
+                ] as Array<[string, boolean]>).map(([name, present]) => (
+                  <p key={name} className="flex items-center gap-2 text-xs">
+                    <span className={present ? 'text-emerald-300' : 'text-rose-300'}>{present ? 'set' : 'missing'}</span>
+                    <code className="text-slate-300">{name}</code>
+                  </p>
+                ))}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                These are Cloudflare Pages secrets on this project, from a Zoom Server-to-Server OAuth app. Values are never read back here.
+              </p>
+            </>
+          )}
+        </Panel>
+      )}
 
       <Panel>
         <h3 className="text-sm font-bold text-white">Time off</h3>
