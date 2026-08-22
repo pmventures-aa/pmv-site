@@ -1,7 +1,7 @@
 import {
   Home, Layers, FileText, MessageSquare, Mails, Calendar, Receipt, HelpCircle, Building2, Users,
   Workflow, UserPlus, Activity, ClipboardList, BarChart3, UsersRound, Settings, UserCog, ArrowLeftRight, MapPinned,
-  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, Video, Sparkles, Send, HandCoins, type LucideIcon,
+  Bot, Gauge, ShieldCheck, Globe, Wrench, MailPlus, KeyRound, ClipboardCheck, DoorOpen, Video, Sparkles, Send, HandCoins, CalendarClock, type LucideIcon,
 } from 'lucide-react'
 import { clientWorkspace, type OperatingWorld } from '../../lib/workspace'
 
@@ -124,6 +124,8 @@ export function vendorNavForWorld(world: OperatingWorld): NavItem[] {
     {key:'home',label:'Home',to:'',icon:Home},
     {key:'assignments',label:assignmentLabel,to:'field-work/mine',icon:MapPinned},
     {key:'work-offers',label:'Work offers',to:'work-offers',icon:HandCoins,section:'Work'},
+    // A provider tells us when they work. We never read their own calendar.
+    {key:'my-availability',label:'My availability',to:'my-availability',icon:CalendarClock,section:'Work'},
     {key:'messages',label:'Inbox',to:'messages',icon:MessageSquare,section:'Work'},
     {key:'security-center',label:'Security',to:'security-center',icon:ShieldCheck,section:'Account'},
   ]
