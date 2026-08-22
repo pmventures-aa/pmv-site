@@ -16,7 +16,7 @@ import { CaseStudyStrip, PublicMetricsBand } from '../components/public/Proof'
 import { StoryImage } from '../components/public/story'
 import { ServiceConstellation } from '../components/public/ServiceConstellation'
 import { Icon } from '../components/kit/Icon'
-import { CLIENT_LOGIN, GET_HELP, pathways, portalHighlights, useCases, whyPinnacle } from '../data/publicSite'
+import { CLIENT_LOGIN, GET_HELP, pathways, portalHighlights, useCases } from '../data/publicSite'
 import { getCleaningConfig } from '../lib/cleaningApi'
 import { formatUsd, type CleaningServiceType } from '../../shared/cleaningPricing'
 
@@ -52,9 +52,9 @@ export default function Home() {
     <div className="min-h-screen bg-navy-950">
       <Header />
       <main>
-        <section className="pmv-hero-story relative min-h-[calc(100vh-68px)] overflow-hidden border-b border-white/[.07]">
+        <section className="pmv-hero-story relative min-h-[78vh] overflow-hidden border-b border-white/[.07]">
           <AmbientGlow />
-          <div className="container-pmv relative z-10 grid min-h-[calc(100vh-68px)] gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
+          <div className="container-pmv relative z-10 grid min-h-[78vh] gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
             <StaggerOnMount>
               <motion.p variants={staggerItem} className="eyebrow">Nationwide professional support · South Florida field services</motion.p>
               <h1 className="pmv-h1 mt-6">
@@ -108,7 +108,7 @@ export default function Home() {
 
         <SectionTransition className="max-w-[72rem] px-4" />
 
-        <section className="container-pmv py-16 sm:py-24">
+        <section className="container-pmv py-12 sm:py-16">
           <Reveal className="grid gap-6 lg:grid-cols-[.72fr_1.28fr] lg:items-end">
             <div>
               <p className="eyebrow">What brings you to Pinnacle?</p>
@@ -148,21 +148,6 @@ export default function Home() {
           stages={PMV_WORKFLOW}
         />
 
-        <section className="container-pmv py-16 sm:py-24">
-          <Reveal className="max-w-3xl">
-            <p className="eyebrow">Why Pinnacle</p>
-            <h2 className="mt-4 font-display text-3xl font-bold leading-tight tracking-[-.035em] text-white sm:text-5xl">One Relationship. Multiple Capabilities. Less Runaround.</h2>
-          </Reveal>
-          <div className="mt-10 grid gap-x-10 md:grid-cols-2">
-            {whyPinnacle.map(([title, body]) => (
-              <Reveal key={title} className="border-t border-gold/20 py-6">
-                <h3 className="font-semibold text-white">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
-              </Reveal>
-            ))}
-          </div>
-        </section>
-
         <section className="border-y border-white/[.07] bg-navy-900/30">
           <div className="container-pmv grid gap-10 py-16 sm:py-20 lg:grid-cols-[.95fr_1.05fr] lg:items-center lg:gap-14">
             <Reveal>
@@ -198,7 +183,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="container-pmv py-16 sm:py-24">
+        <section className="container-pmv py-12 sm:py-16">
           <div className="grid gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
             <Reveal>
               <p className="eyebrow">Client portal</p>
