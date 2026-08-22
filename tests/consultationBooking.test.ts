@@ -50,6 +50,7 @@ interface Store {
   inquiries: Array<Record<string, unknown>>
   bookings: Array<Record<string, unknown>>
   calendarLinks: Array<Record<string, unknown>>
+  clientProfiles: Array<Record<string, unknown>>
   users: Array<{ id: string; email: string }>
   kv: Map<string, string>
   failBookingInsert?: boolean
@@ -77,6 +78,7 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     inquiries: [],
     bookings: [],
     calendarLinks: [],
+    clientProfiles: [],
     users: [],
     kv: new Map(),
     ...overrides,
@@ -95,8 +97,11 @@ function makeEnv(store: Store): Env {
           return (store.schedules.find((r) => r.slug === bound[0]) ?? null) as T | null
         }
         if (s.includes('from users where lower(email)')) {
+          // Booking now reserves a client workspace, and that decision reads
+          // role and password_hash to avoid crossing a staff account or
+          // re-prompting someone who already has a password.
           const hit = store.users.find((u) => u.email.toLowerCase() === String(bound[0]).toLowerCase())
-          return (hit ? { id: hit.id } : null) as T | null
+          return (hit ? { id: hit.id, role: hit.role ?? 'client', password_hash: hit.password_hash ?? null } : null) as T | null
         }
         if (s.includes('from consultation_bookings') && s.includes('public_token')) {
           const hit = store.bookings.find((b) => b.public_token === bound[0])
@@ -131,6 +136,16 @@ function makeEnv(store: Store): Env {
       },
     }
     function apply() {
+      if (s.startsWith('insert into users')) {
+        const [id, email, full_name] = bound
+        store.users.push({ id, email, full_name, role: 'client', password_hash: null })
+        return { success: true }
+      }
+      if (s.startsWith('insert into client_profiles')) {
+        const [id, user_id] = bound
+        store.clientProfiles.push({ id, user_id })
+        return { success: true }
+      }
       if (s.startsWith('insert into calendar_events')) {
         const [id, title, description, starts_at, ends_at, timezone, event_type, location_type, meeting_url, assigned_user_id] = bound
         store.events.push({ id, title, description, starts_at, ends_at, timezone, event_type, status: 'proposed', location_type, meeting_url, visibility: 'internal', client_visible: 0, assigned_user_id })
