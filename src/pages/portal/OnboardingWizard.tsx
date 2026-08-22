@@ -7,6 +7,7 @@ import { inputCls } from '../auth/AuthLayout'
 import { LoadingScreen } from '../../components/LoadingScreen'
 import { useAppPath } from '../../lib/basePath'
 import { clientWorkspace, onboardingWorldCopy, resolveWorld, worldFromServiceParam } from '../../lib/workspace'
+import { acknowledgement } from '../../../shared/guidedIntake'
 
 interface Service {
   key: string
@@ -87,6 +88,10 @@ export default function OnboardingWizard() {
   const currentQuestions = currentService ? grouped.get(currentService.key) || [] : []
   const totalJourneySteps = Math.max(3, selectedServices.length + 2)
   const progressStep = step === 'services' ? 1 : step === 'review' ? totalJourneySteps : Math.min(totalJourneySteps - 1, questionServiceIndex + 2)
+  const guidedLine = acknowledgement(
+    step === 'services' ? 'opening' : step === 'questions' ? 'details' : 'review',
+    { workLabel: step === 'questions' ? currentService?.name : selectedServices.map((s) => s.name).join(', ') },
+  )
   const intentWorld = worldFromServiceParam(intentService) || resolveWorld(Array.from(selected))
   const worldCopy = onboardingWorldCopy(intentWorld)
   const catalogByWorld = useMemo(() => {
@@ -186,6 +191,9 @@ export default function OnboardingWizard() {
               <p className="text-xs font-semibold text-white">Step {progressStep} of {totalJourneySteps}</p>
               <p className="mt-1 text-xs text-slate-500">{step === 'services' ? 'What brought you here' : step === 'questions' ? `A little about ${currentService?.name || 'your needs'}` : 'Confirm and enter your portal'}</p>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-gold transition-all" style={{ width: `${Math.round((progressStep / totalJourneySteps) * 100)}%` }} /></div>
+              {/* Same conversational beat as the public intake: repeat back
+                  what they picked before asking the next thing. */}
+              <p className="mt-3 text-xs leading-5 text-slate-400">{guidedLine}</p>
             </div>
           </aside>
 

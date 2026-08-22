@@ -12,6 +12,7 @@ import type { OperatingWorld } from '../../../shared/workspace'
 import { resolveScopeEntry, visibleQuestions, type ScopeQuestion } from '../../../shared/scopeEntries'
 import type { GeoHit } from '../../../shared/geocode'
 import { DEFAULT_SCOPE_REPLY_WINDOW, type PublicSiteConfig } from '../../../shared/siteConfig'
+import { OPENING_QUESTION, TIMING_QUESTION, acknowledgement } from '../../../shared/guidedIntake'
 
 function UseMyLocationButton({ onResolved }: { onResolved: (a: GeoHit) => void }) {
   const [state, setState] = useState<'idle' | 'locating' | 'ok' | 'error'>('idle')
@@ -295,15 +296,22 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
         : 'What should be true when the work is finished? Add any deadline, access issue, document, property condition, or other detail that matters.'
   const detailsTitle = entry && form.job_type===entry.job ? entry.title : 'A few details specific to this work'
 
-  // Named steps + a warm, encouraging helper line that acknowledges progress
-  // and previews what is next, so the form reads like a short conversation.
+  // Named steps, plus a line that repeats back what they just told us before
+  // asking the next thing. Built in shared/guidedIntake so the phrasing and
+  // the honesty rule behind it are the same on every questionnaire.
   const stepNames = locked ? ['The details','Where to reply'] : ['The work','The details','Where to reply']
   const activeStepIndex = locked ? step-1 : step
-  const helperLine = step===0
-    ? 'Pick the closest fit. The next screen only asks what that kind of work needs.'
-    : step===1
-      ? `Great${selectedLabel?`, ${selectedLabel.toLowerCase()}`:''}. A few quick details and you are almost done.`
-      : 'Thanks! Last thing: where should a real person reply?'
+  const helperLine = acknowledgement(
+    step===0 ? 'opening' : step===1 ? 'details' : 'contact',
+    {
+      workLabel: selectedLabel,
+      city: form.city,
+      state: form.state,
+      locationType: form.location_type,
+      timing: form.timing,
+      firstName: form.contact_name.trim().split(/\s+/)[0] || null,
+    },
+  )
 
   return <div className={`overflow-hidden rounded-2xl border border-white/10 bg-navy-900/75 shadow-[0_24px_80px_rgba(0,0,0,.24)] ${compact?'':'max-w-5xl'}`}>
     <div className="border-b border-white/10 px-5 py-4 sm:px-7">
@@ -344,7 +352,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
               </div>
             </div>
           )}
-          <h3 className="text-xl font-bold text-white">{copy.pickerTitle}</h3>
+          <h3 className="text-xl font-bold text-white">{world==='general'?OPENING_QUESTION:copy.pickerTitle}</h3>
           <p className="mt-1 text-sm text-slate-400">{world==='general'?'Pick the closest fit. The next screen is the questions for that work.':'These options stay inside this operating world. The next screen is the questions for that work.'}</p>
           <div className="mt-5 grid gap-2 sm:grid-cols-2">{visibleJobs.map(job=>
             <button key={job.value} type="button" onClick={()=>chooseJob(job.value)} className={`flex min-h-[88px] items-start gap-3 rounded-xl border p-4 text-left transition ${form.job_type===job.value?'border-gold/55 bg-gold/[.08]':'border-white/10 bg-white/[.02] hover:border-white/25'}`}>
@@ -400,7 +408,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
           )}</div>
 
           <div className="mt-6">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">How soon do you need it?</label>
+            <label className="block text-sm font-semibold text-white">{TIMING_QUESTION}</label>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">{timings.map(item=>
               <button key={item} type="button" onClick={()=>update('timing',item)} className={optionButtonCls(form.timing===item)}>{item}</button>)}
             </div>
