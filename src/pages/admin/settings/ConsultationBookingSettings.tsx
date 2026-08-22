@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Copy, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Plus, Trash2 } from 'lucide-react'
 import { Panel, EmptyState, Skeleton, inputCls, btnPrimary, btnOutline, Tag } from '../../../components/admin/ui'
 import { api, ApiError } from '../../../lib/api'
 import {
@@ -13,6 +13,18 @@ import {
   zonedWallTimeToUtcMs,
   type AvailabilityWindow,
 } from '../../../../shared/availability'
+import {
+  WEEKDAY_INITIALS,
+  blockingIdsForDay,
+  dayBlockState,
+  firstOfMonth,
+  groupConsecutive,
+  isPast,
+  monthGrid,
+  shiftMonth,
+  todayKeyIn,
+  type DayRange,
+} from '../../../../shared/dayBlocking'
 
 // Editor for the public consultation schedule.
 //
@@ -143,6 +155,125 @@ const NOTICE_CHOICES: Array<[number, string]> = [
 
 const label = (u: AccessUser) => u.full_name?.trim() || u.email
 
+/**
+ * Click days on a month to block them.
+ *
+ * The two existing ways in this panel both need you to know the date first:
+ * the chips assume today or this weekend, and the row wants it typed. This is
+ * the one that matches how the decision is actually made - look at the month,
+ * click the days you are gone.
+ *
+ * Consecutive picks collapse into one blackout row rather than one per day, so
+ * a week away reads as a week and comes back off in a single click.
+ */
+function BlockCalendar({
+  timezone, blackouts, onBlockRanges, onUnblockDay, busy,
+}: {
+  timezone: string
+  blackouts: Blackout[]
+  onBlockRanges: (ranges: DayRange[], reason: string) => Promise<void>
+  onUnblockDay: (ids: string[]) => Promise<void>
+  busy: boolean
+}) {
+  const today = todayKeyIn(timezone)
+  const [anchor, setAnchor] = useState(() => firstOfMonth(today))
+  const [picked, setPicked] = useState<string[]>([])
+  const [reason, setReason] = useState('')
+
+  const grid = useMemo(() => monthGrid(anchor), [anchor])
+  const ranges = useMemo(() => groupConsecutive(picked), [picked])
+  const pickedSet = useMemo(() => new Set(picked), [picked])
+
+  function toggle(dateKey: string) {
+    const state = dayBlockState(dateKey, blackouts, timezone)
+    if (state !== 'free') {
+      // Clicking a blocked day frees it, which is the obvious meaning and
+      // saves a trip to the list below.
+      void onUnblockDay(blockingIdsForDay(dateKey, blackouts, timezone))
+      return
+    }
+    setPicked((prev) => prev.includes(dateKey) ? prev.filter((k) => k !== dateKey) : [...prev, dateKey])
+  }
+
+  async function commit() {
+    if (!ranges.length) return
+    await onBlockRanges(ranges, reason.trim())
+    setPicked([])
+    setReason('')
+  }
+
+  return (
+    <div className="rounded-lg border border-white/[.08] bg-white/[.015] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" onClick={() => setAnchor((a) => shiftMonth(a, -1))} className="rounded-md p-1.5 text-slate-400 hover:text-gold" aria-label="Previous month">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <p className="text-xs font-bold text-white">{grid.label}</p>
+        <button type="button" onClick={() => setAnchor((a) => shiftMonth(a, 1))} className="rounded-md p-1.5 text-slate-400 hover:text-gold" aria-label="Next month">
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-2 grid grid-cols-7 gap-1">
+        {WEEKDAY_INITIALS.map((initial, i) => (
+          <span key={i} className="py-1 text-center text-[10px] font-bold uppercase tracking-wide text-slate-600">{initial}</span>
+        ))}
+        {grid.weeks.flat().map((dateKey, i) => {
+          if (!dateKey) return <span key={`pad-${i}`} />
+          const past = isPast(dateKey, timezone)
+          const state = dayBlockState(dateKey, blackouts, timezone)
+          const isPicked = pickedSet.has(dateKey)
+          const tone = state === 'full'
+            ? 'border-gold/50 bg-gold/20 text-gold'
+            : state === 'partial'
+              ? 'border-gold/25 bg-gold/[.07] text-slate-200'
+              : isPicked
+                ? 'border-gold/60 bg-gold/10 text-white'
+                : 'border-white/[.08] bg-white/[.02] text-slate-300 hover:border-white/25'
+          return (
+            <button
+              key={dateKey}
+              type="button"
+              disabled={past || busy}
+              onClick={() => toggle(dateKey)}
+              aria-pressed={isPicked || state !== 'free'}
+              aria-label={`${dateKey}${state === 'full' ? ', blocked' : state === 'partial' ? ', partly blocked' : ''}`}
+              className={`min-h-9 rounded-md border text-xs font-bold tabular-nums transition ${tone} ${past ? 'cursor-not-allowed opacity-25' : ''} ${dateKey === today ? 'ring-1 ring-inset ring-white/25' : ''}`}
+            >
+              {Number(dateKey.slice(8))}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-gold/50 bg-gold/20" /> Blocked</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-gold/25 bg-gold/[.07]" /> Part of the day</span>
+        <span>Click a blocked day to free it.</span>
+      </div>
+
+      {picked.length > 0 && (
+        <div className="mt-3 border-t border-white/[.08] pt-3">
+          <p className="text-xs text-slate-300">
+            {picked.length} day{picked.length === 1 ? '' : 's'} selected
+            {ranges.length < picked.length && <span className="text-slate-500"> · saved as {ranges.length} block{ranges.length === 1 ? '' : 's'}</span>}
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <input
+              className={inputCls} placeholder="Reason (optional)" value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button type="button" className={btnOutline} onClick={() => setPicked([])}>Clear</button>
+              <button type="button" className={btnPrimary} disabled={busy} onClick={() => void commit()}>Block these days</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ConsultationBookingSettings() {
   const [schedule, setSchedule] = useState<Schedule | null>(null)
   const [users, setUsers] = useState<AccessUser[]>([])
@@ -154,6 +285,7 @@ export default function ConsultationBookingSettings() {
   const [previewing, setPreviewing] = useState(false)
   const [blackoutDraft, setBlackoutDraft] = useState({ startsAt: '', endsAt: '', reason: '' })
   const [dayDraft, setDayDraft] = useState({ date: '', days: 1, reason: '' })
+  const [blocking, setBlocking] = useState(false)
   const [zoom, setZoom] = useState<ZoomStatus | null>(null)
   const [copied, setCopied] = useState(false)
   const [zoomTest, setZoomTest] = useState<{ ok: boolean; reason?: string; detail?: string; hostEmail?: string; cleanedUp?: boolean } | null>(null)
@@ -305,6 +437,52 @@ export default function ConsultationBookingSettings() {
       setDayDraft({ date: '', days: 1, reason: '' })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not block those days.')
+    }
+  }
+
+  /**
+   * Writes one blackout per contiguous run the calendar produced. Sequential
+   * rather than parallel: the rows land in date order, and a mid-way failure
+   * leaves the earlier runs saved and says so instead of a partial scatter.
+   */
+  async function blockRanges(ranges: DayRange[], reason: string) {
+    if (!schedule || !ranges.length) return
+    setError('')
+    setBlocking(true)
+    const added: Blackout[] = []
+    try {
+      for (const range of ranges) {
+        const res = await api.post<{ blackout: Blackout }>(`/admin/availability/schedules/${schedule.id}/blackouts`, {
+          startsAt: dayStartIso(range.from, schedule.timezone),
+          endsAt: dayStartIso(range.toExclusive, schedule.timezone),
+          reason,
+        })
+        added.push(res.blackout)
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not block all of those days.')
+    } finally {
+      if (added.length) patch({ blackouts: [...schedule.blackouts, ...added] })
+      setBlocking(false)
+    }
+  }
+
+  /** Frees a day by removing every blackout that touches it. */
+  async function unblockDay(ids: string[]) {
+    if (!schedule || !ids.length) return
+    setError('')
+    setBlocking(true)
+    const removed: string[] = []
+    try {
+      for (const id of ids) {
+        await api.del(`/admin/availability/blackouts/${id}`)
+        removed.push(id)
+      }
+    } catch {
+      setError('Could not free that day.')
+    } finally {
+      if (removed.length) patch({ blackouts: schedule.blackouts.filter((b) => !removed.includes(b.id)) })
+      setBlocking(false)
     }
   }
 
@@ -643,6 +821,17 @@ export default function ConsultationBookingSettings() {
             </button>
           ))}
         </div>
+
+        <div className="mt-4">
+          <BlockCalendar
+            timezone={schedule.timezone}
+            blackouts={schedule.blackouts}
+            onBlockRanges={blockRanges}
+            onUnblockDay={unblockDay}
+            busy={blocking}
+          />
+        </div>
+
         <div className="mt-4 space-y-2">
           {schedule.blackouts.length === 0 && <EmptyState label="No time off scheduled." />}
           {schedule.blackouts.map((b) => (
@@ -662,7 +851,7 @@ export default function ConsultationBookingSettings() {
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_1.2fr_auto] sm:items-end">
           <label className="text-xs font-bold text-slate-300">
-            Block from
+            Or block from
             <input
               type="date" className={`${inputCls} mt-2`} value={dayDraft.date}
               min={todayKey(schedule.timezone)}
