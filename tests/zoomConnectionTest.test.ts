@@ -110,13 +110,25 @@ describe('the advice matches which call failed', () => {
 
   it('sends a rejected token to the app type and account id', () => {
     expect(ui).toContain("zoomTest.reason === 'auth_failed'")
-    expect(ui).toContain('not a <strong>Server-to-Server OAuth</strong> app')
+    expect(ui).toContain('Server-to-Server OAuth</strong> app')
     expect(ui).toContain('ZOOM_ACCOUNT_ID')
   })
 
+  it('names a disabled app on the token branch, where it actually surfaces', () => {
+    // A deactivated Server-to-Server app rejects its own credentials at the
+    // token exchange, not at meeting create. This was filed under the create
+    // branch, which sent the reader to the scopes screen for an app that was
+    // simply switched off.
+    expect(ui).toContain('activate it on the app&rsquo;s Activation tab')
+    const authBranch = ui.slice(ui.indexOf("zoomTest.reason === 'auth_failed'"), ui.indexOf('The credentials worked'))
+    expect(authBranch).toContain('disabled')
+  })
+
   it('keeps the scope advice for the case it actually describes', () => {
-    // Naming scopes for a rejected token points at the wrong screen entirely.
     expect(ui).toContain('The credentials worked and the meeting call was refused.')
     expect(ui).toContain('missing the meeting write scope')
+    // Activation no longer appears here.
+    const createBranch = ui.slice(ui.indexOf('The credentials worked'))
+    expect(createBranch.slice(0, 500)).not.toContain('never activated')
   })
 })

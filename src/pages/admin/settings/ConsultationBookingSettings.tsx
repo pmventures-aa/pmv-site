@@ -573,15 +573,18 @@ export default function ConsultationBookingSettings() {
                           wrong screen entirely. */}
                       {zoomTest.reason === 'auth_failed' ? (
                         <p className="mt-2 text-slate-400">
-                          Zoom refused the credentials themselves, before any meeting was attempted. Usually the app is
-                          not a <strong>Server-to-Server OAuth</strong> app (a General or OAuth app cannot use this grant),
+                          Zoom refused the credentials themselves, before any meeting was attempted. If it says the app
+                          is <strong>disabled</strong>, activate it on the app&rsquo;s Activation tab in the Zoom
+                          Marketplace: a Server-to-Server app that is switched off, or that switched itself off after
+                          going unused, rejects its own credentials this way. Otherwise the app is probably not a
+                          <strong> Server-to-Server OAuth</strong> app (a General or OAuth app cannot use this grant),
                           or <code>ZOOM_ACCOUNT_ID</code> holds something other than the Account ID from the app&rsquo;s
                           Credentials tab.
                         </p>
                       ) : (
                         <p className="mt-2 text-slate-400">
                           The credentials worked and the meeting call was refused. Usually the Server-to-Server app is
-                          missing the meeting write scope, the app was never activated, or{' '}
+                          missing the meeting write scope, or{' '}
                           {zoomTest.hostEmail || 'the host address'} is not a licensed user on the account.
                         </p>
                       )}
