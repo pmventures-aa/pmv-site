@@ -95,6 +95,33 @@ function base64(input: string): string {
   return btoa(input)
 }
 
+/**
+ * Zoom's own error text, reduced to the part that is safe to show.
+ *
+ * The body was withheld entirely before, on the grounds that a failed auth
+ * exchange can echo credential material. That was too blunt: it also withheld
+ * the only string that says WHICH thing is wrong, and a bare "returned 400"
+ * sent us guessing at scopes when the real answer is in the payload. So keep
+ * the two fields Zoom puts the diagnosis in, and scrub anything that matches a
+ * configured credential before the string goes anywhere near a log or a page.
+ */
+function safeZoomError(body: string, config: ZoomConfig): string {
+  let text = body
+  try {
+    const parsed = JSON.parse(body) as { error?: unknown; reason?: unknown; message?: unknown }
+    const parts = [parsed.error, parsed.reason, parsed.message]
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    if (parts.length) text = [...new Set(parts)].join(': ')
+  } catch {
+    // Not JSON. The raw body still gets scrubbed and truncated below.
+  }
+  // Longest first, so a credential that contains another is not partly missed.
+  for (const secret of [config.clientSecret, config.accountId, config.clientId].sort((a, b) => b.length - a.length)) {
+    if (secret) text = text.split(secret).join('[redacted]')
+  }
+  return text.slice(0, 200)
+}
+
 async function withTimeout(input: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -140,9 +167,12 @@ export async function getZoomToken(env: Env): Promise<ZoomResult<string>> {
   }
 
   if (!response.ok) {
-    // Deliberately does not include the response body: a failed token exchange
-    // can echo credential material back, and this string reaches logs.
-    return { ok: false, reason: 'auth_failed', detail: `Zoom token exchange returned ${response.status}` }
+    const body = await response.text().catch(() => '')
+    return {
+      ok: false,
+      reason: 'auth_failed',
+      detail: `Zoom token exchange returned ${response.status}: ${safeZoomError(body, config)}`,
+    }
   }
 
   const payload = await response.json().catch(() => null) as { access_token?: string; expires_in?: number } | null
@@ -207,7 +237,7 @@ export async function createZoomMeeting(env: Env, input: CreateMeetingInput): Pr
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    return { ok: false, reason: 'request_failed', detail: `Zoom create returned ${response.status}: ${body.slice(0, 200)}` }
+    return { ok: false, reason: 'request_failed', detail: `Zoom create returned ${response.status}: ${safeZoomError(body, config)}` }
   }
 
   const payload = await response.json().catch(() => null) as
