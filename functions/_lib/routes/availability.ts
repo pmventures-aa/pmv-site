@@ -16,7 +16,7 @@
 // the schedule, loads what is already booked, and hands both to the engine.
 
 import { Hono } from 'hono'
-import { zoomConfigStatus } from '../zoom'
+import { createZoomMeeting, deleteZoomMeeting, zoomConfigStatus } from '../zoom'
 import type { AppEnv, Env } from '../types'
 import { requireStaff, requireAdmin } from '../mid'
 import { googleBusySpans } from '../googleFreeBusy'
@@ -294,6 +294,55 @@ availabilityAdminRoutes.get('/availability/schedules', requireStaff, async (c) =
   // where it matters. Without it, the sole way to discover a missing secret
   // was to take a real booking and notice the confirmation had no join link.
   return c.json({ schedules, zoom: zoomConfigStatus(c.env) })
+})
+
+/**
+ * Prove the Zoom credentials actually work, rather than that they exist.
+ *
+ * zoomConfigStatus only reports that three strings are set. A booking can
+ * still come through with no link because the app lacks the meeting scope, is
+ * not activated, or the host address is not a user on the account. Until now
+ * the reason went to console.error, where nobody looks, and the first symptom
+ * was a booked call with no way to join it.
+ *
+ * Creates a real meeting well in the future and deletes it again, so the check
+ * exercises the same call a booking makes without leaving anything behind.
+ */
+availabilityAdminRoutes.post('/availability/zoom/test', requireAdmin, async (c) => {
+  const status = zoomConfigStatus(c.env)
+  if (!status.configured) {
+    const missing = [
+      status.hasAccountId ? null : 'ZOOM_ACCOUNT_ID',
+      status.hasClientId ? null : 'ZOOM_CLIENT_ID',
+      status.hasClientSecret ? null : 'ZOOM_CLIENT_SECRET',
+    ].filter(Boolean)
+    return c.json({ ok: false, reason: 'not_configured', detail: `Not set: ${missing.join(', ')}` })
+  }
+
+  // Far enough out that it cannot collide with anything real, and deleted
+  // moments later regardless.
+  const startsAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  const created = await createZoomMeeting(c.env, {
+    topic: 'Pinnacle connection test',
+    startsAt,
+    durationMinutes: 15,
+    timezone: 'UTC',
+  })
+
+  if (!created.ok) {
+    // detail carries Zoom's own status and message, which is the part that
+    // says whether this is a scope, an activation, or a bad host address.
+    return c.json({ ok: false, reason: created.reason, detail: created.detail, hostEmail: status.hostEmail })
+  }
+
+  const removed = await deleteZoomMeeting(c.env, created.value.meetingId)
+  return c.json({
+    ok: true,
+    hostEmail: status.hostEmail,
+    // A meeting we could create but not delete is still a working connection,
+    // and saying so beats a silent stray meeting on the host's calendar.
+    cleanedUp: removed.ok,
+  })
 })
 
 availabilityAdminRoutes.get('/availability/schedules/:id/preview', requireStaff, async (c) => {

@@ -156,6 +156,8 @@ export default function ConsultationBookingSettings() {
   const [dayDraft, setDayDraft] = useState({ date: '', days: 1, reason: '' })
   const [zoom, setZoom] = useState<ZoomStatus | null>(null)
   const [copied, setCopied] = useState(false)
+  const [zoomTest, setZoomTest] = useState<{ ok: boolean; detail?: string; hostEmail?: string; cleanedUp?: boolean } | null>(null)
+  const [testingZoom, setTestingZoom] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -264,6 +266,19 @@ export default function ConsultationBookingSettings() {
    * standing, so blocking a day from a different timezone used to shift the
    * block by the offset between them and leave part of the real day bookable.
    */
+  async function testZoom() {
+    setTestingZoom(true)
+    setZoomTest(null)
+    try {
+      const res = await api.post<{ ok: boolean; detail?: string; hostEmail?: string; cleanedUp?: boolean }>(
+        '/admin/availability/zoom/test', {},
+      )
+      setZoomTest(res)
+    } catch (err) {
+      setZoomTest({ ok: false, detail: err instanceof ApiError ? err.message : 'The test could not run.' })
+    } finally { setTestingZoom(false) }
+  }
+
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(BOOKING_LINK)
@@ -528,6 +543,39 @@ export default function ConsultationBookingSettings() {
               <p className="mt-3 text-xs text-slate-400">
                 Meetings are created under <span className="font-bold text-slate-200">{zoom.hostEmail}</span>.
               </p>
+              {/* Credentials being SET is not the same as them working. The
+                  scope, the app's activation state and the host address can
+                  each fail while all three secrets are present. */}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button type="button" onClick={() => void testZoom()} disabled={testingZoom} className={`${btnOutline} min-h-9`}>
+                  {testingZoom ? 'Testing...' : 'Test connection'}
+                </button>
+                <span className="text-xs text-slate-500">Creates a meeting and deletes it again.</span>
+              </div>
+              {zoomTest && (
+                <div className={`mt-3 rounded-lg border p-3 text-xs leading-5 ${
+                  zoomTest.ok ? 'border-emerald-300/25 bg-emerald-400/[.05] text-emerald-200'
+                              : 'border-rose-400/30 bg-rose-400/[.06] text-rose-200'
+                }`}>
+                  {zoomTest.ok ? (
+                    <>
+                      <p className="font-bold">Zoom is working. Bookings will get a join link.</p>
+                      {zoomTest.cleanedUp === false && (
+                        <p className="mt-1 text-amber-200">The test meeting could not be deleted. Remove &ldquo;Pinnacle connection test&rdquo; from Zoom by hand.</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-bold">Zoom rejected the request. Bookings will be taken without a join link.</p>
+                      {zoomTest.detail && <p className="mt-1 break-words font-mono text-[11px] text-slate-300">{zoomTest.detail}</p>}
+                      <p className="mt-2 text-slate-400">
+                        Usually one of: the Server-to-Server app is missing the meeting write scope, the app was never
+                        activated, or {zoomTest.hostEmail || 'the host address'} is not a licensed user on the account.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <>
