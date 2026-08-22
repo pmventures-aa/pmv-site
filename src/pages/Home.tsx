@@ -52,33 +52,12 @@ export default function Home() {
     <div className="min-h-screen bg-navy-950">
       <Header />
       <main>
-        {/* The wizard used to sit eighth of nine sections, below a hero that
-            was a full viewport tall. The guided experience already existed;
-            visitors just had to scroll past everything else to reach it. It
-            now opens the page, and the hero follows. */}
-        <section className="container-pmv pb-4 pt-10 sm:pt-14">
-          <div className="grid gap-9 lg:grid-cols-[.58fr_1.42fr] lg:items-start lg:gap-14">
-            <div>
-              <p className="eyebrow">Start here</p>
-              <h1 className="pmv-h1 mt-4">What do you need handled?</h1>
-              <p className="mt-5 max-w-md text-base leading-7 text-slate-400">
-                You do not need to know the right service first. Answer a few short questions and we will work out the rest.
-              </p>
-              <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-white">
-                <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
-                Two minutes, no account, and a real person replies within two business hours.
-              </p>
-            </div>
-            <ScopeWizard source="home" compact />
-          </div>
-        </section>
-
-        <section className="pmv-hero-story relative overflow-hidden border-y border-white/[.07]">
+        <section className="pmv-hero-story relative min-h-[calc(100vh-68px)] overflow-hidden border-b border-white/[.07]">
           <AmbientGlow />
-          <div className="container-pmv relative z-10 grid gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
+          <div className="container-pmv relative z-10 grid min-h-[calc(100vh-68px)] gap-8 py-14 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:py-20">
             <StaggerOnMount>
               <motion.p variants={staggerItem} className="eyebrow">Nationwide professional support · South Florida field services</motion.p>
-              <h2 className="pmv-h1 mt-6">
+              <h1 className="pmv-h1 mt-6">
                 <KineticHeading
                   trigger="mount"
                   lines={[
@@ -86,7 +65,7 @@ export default function Home() {
                     { text: 'One Call Away.', className: 'pmv-gold-text' },
                   ]}
                 />
-              </h2>
+              </h1>
               <motion.p variants={staggerItem} className="mt-7 max-w-3xl text-lg leading-8 text-slate-300 sm:text-xl">
                 Business, property, and administrative matters handled through one trusted point of contact.
               </motion.p>
@@ -95,6 +74,10 @@ export default function Home() {
               </motion.p>
               <motion.div variants={staggerItem} className="mt-9 flex flex-wrap gap-3">
                 <ViewTransitionLink to={GET_HELP} className={btnPrimary}>{heroCtaLabel}</ViewTransitionLink>
+                {/* Some people would rather talk than fill anything in. Giving
+                    that its own action here means they do not have to work out
+                    that a request form is the way to reach a person. */}
+                <ViewTransitionLink to="/book" className={btnOutline}>Book a Call</ViewTransitionLink>
                 <ViewTransitionLink to="/services" className={btnOutline}>Explore Services</ViewTransitionLink>
               </motion.div>
               <motion.p variants={staggerItem} className="mt-4 text-sm text-slate-500">
@@ -106,6 +89,22 @@ export default function Home() {
             </motion.div>
           </div>
         </section>
+
+        {/* Directly after the hero: someone who has just read the pitch should
+            not have to scroll through six sections to act on it. Kept tight so
+            it reads as a next step rather than a second hero. */}
+        <section className="container-pmv py-10 sm:py-12">
+          <div className="grid gap-6 lg:grid-cols-[.42fr_1.58fr] lg:items-start lg:gap-10">
+            <Reveal>
+              <p className="eyebrow">Start a request</p>
+              <h2 className="mt-3 font-display text-xl font-bold tracking-[-.02em] text-white sm:text-2xl">Two minutes. No account.</h2>
+              <p className="mt-3 max-w-sm text-sm leading-6 text-slate-400">Tell us what needs to happen, where, and when.</p>
+              <p className="mt-4 flex items-center gap-2 text-xs font-semibold text-white"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />A real person replies within two business hours.</p>
+            </Reveal>
+            <ScopeWizard source="home" compact />
+          </div>
+        </section>
+
 
         <SectionTransition className="max-w-[72rem] px-4" />
 
@@ -231,23 +230,55 @@ export default function Home() {
               <div>
                 <p className="eyebrow">Monthly plans</p>
                 <h2 className="mt-4 max-w-2xl font-display text-3xl font-bold text-white sm:text-4xl">When the work repeats, put it on a plan.</h2>
+                <p className="mt-4 max-w-xl text-base leading-7 text-slate-400">Three retainers for the three kinds of work that come back every month. Each one gives you a named coordinator and a rate that beats booking the same work one job at a time.</p>
               </div>
               <ViewTransitionLink to="/care-plans" className="text-sm font-semibold text-gold hover:underline">See monthly plans <span aria-hidden="true">→</span></ViewTransitionLink>
             </Reveal>
-            <div className="mt-8 grid gap-3 lg:grid-cols-3">
+            {/* These were three cards carrying a name and a price and nothing
+                else, so nobody could tell what they were buying or which one
+                was theirs. Copy below is the families' own, not invented. */}
+            <div className="mt-8 grid gap-4 lg:grid-cols-3">
               {[
-                { name: 'Property Care', price: 'From $89/mo', to: '/care-plans?family=property' },
-                { name: 'Ops-on-Call', price: 'From $199/mo', to: '/care-plans?family=ops' },
-                { name: 'Legal & Notary Pass', price: 'From $99/mo', to: '/care-plans?family=legal' },
+                {
+                  name: 'Property Care',
+                  price: 'From $89/mo',
+                  who: 'Owners and investors',
+                  what: 'Put us on call instead of handing over a percentage of rent. Inspections, service credits, storm coverage, and a coordinator who already knows the property.',
+                  to: '/care-plans?family=property',
+                },
+                {
+                  name: 'Ops-on-Call',
+                  price: 'From $199/mo',
+                  who: 'Businesses without the headcount',
+                  what: 'A monthly retainer for administrative capacity and project support. Triage, follow-up, systems work, and coordination, used as things come up.',
+                  to: '/care-plans?family=ops',
+                },
+                {
+                  name: 'Legal & Notary Pass',
+                  price: 'From $99/mo',
+                  who: 'Solo attorneys and firms',
+                  what: 'Mobile notary, RON, courier, and courthouse coverage with a named coordinator. Included appointments land first; everything past that is 25% off.',
+                  to: '/care-plans?family=legal',
+                },
               ].map((plan) => (
-                <ViewTransitionLink key={plan.name} to={plan.to} className="rounded-lg border border-white/10 bg-white/[.02] px-5 py-4 transition hover:border-gold/40">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <h3 className="font-semibold text-white">{plan.name}</h3>
+                <ViewTransitionLink
+                  key={plan.name}
+                  to={plan.to}
+                  className="group flex flex-col rounded-xl border border-white/10 bg-white/[.02] p-5 transition hover:border-gold/40 hover:bg-white/[.035]"
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold/75">{plan.who}</p>
+                  <h3 className="mt-2 font-display text-lg font-bold text-white">{plan.name}</h3>
+                  <p className="mt-3 flex-1 text-sm leading-6 text-slate-400">{plan.what}</p>
+                  <div className="mt-5 flex items-baseline justify-between gap-3 border-t border-white/[.08] pt-4">
                     <span className="text-sm font-bold text-gold">{plan.price}</span>
+                    <span className="text-xs font-semibold text-slate-400 transition group-hover:text-white">See what is included <span aria-hidden="true">&rarr;</span></span>
                   </div>
                 </ViewTransitionLink>
               ))}
             </div>
+            <p className="mt-5 max-w-2xl text-sm leading-6 text-slate-500">
+              Every plan is month to month, and the same network handles a one-off job if a plan is not what you need.
+            </p>
           </div>
         </section>
 
