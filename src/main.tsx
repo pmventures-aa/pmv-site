@@ -23,7 +23,6 @@ const About = lazy(() => import('./pages/public/About'))
 const HowItWorks = lazy(() => import('./pages/public/HowItWorks'))
 const Coverage = lazy(() => import('./pages/public/Coverage'))
 const Resources = lazy(() => import('./pages/public/Resources'))
-const ServiceArea = lazy(() => import('./pages/public/ServiceArea'))
 const Contact = lazy(() => import('./pages/public/Contact'))
 const Professionals = lazy(() => import('./pages/public/Professionals'))
 const Terms = lazy(() => import('./pages/public/Terms'))
@@ -134,7 +133,9 @@ function App() {
         <Route path="/cleaning/areas" element={<CleaningAreasIndex />} />
         <Route path="/cleaning/:area" element={<CleaningArea />} />
         <Route path="/about" element={<About />} />
-        <Route path="/service-area" element={<ServiceArea />} />
+        {/* /service-area said the same thing as /coverage in different words.
+            Its map moved there; the address keeps working. */}
+        <Route path="/service-area" element={<Navigate to="/coverage" replace />} />
         <Route path="/professionals" element={<Professionals />} />
         <Route path="/work-with-pinnacle" element={<Navigate to="/professionals" replace />} />
         <Route path="/contact" element={<Contact />} />
