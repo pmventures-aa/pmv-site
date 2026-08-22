@@ -1,3 +1,4 @@
+import { MapPin } from 'lucide-react'
 import { Header } from '../../components/public/Header'
 import { Footer } from '../../components/public/Footer'
 import { btnOutline, btnPrimary } from '../../components/public/ui'
@@ -55,6 +56,12 @@ function CoverageColumn({ tone, kicker, title, blurb, items, footnote }: {
     </Reveal>
   )
 }
+
+// Lifted from /service-area when that page folded into this one. It said the
+// same thing in different words; the map was the only part that was not
+// already here.
+const SOUTH_FLORIDA_MAP =
+  'https://www.openstreetmap.org/export/embed.html?bbox=-80.55%2C25.45%2C-79.85%2C26.95&layer=mapnik&marker=26.1224%2C-80.1373'
 
 export default function Coverage() {
   usePageMeta(
@@ -128,6 +135,34 @@ export default function Coverage() {
               <ViewTransitionLink to="/how-it-works" className={btnOutline}>How Pinnacle Works</ViewTransitionLink>
             </Reveal>
           </div>
+        </section>
+
+        <section className="container-pmv pb-4">
+          <Reveal className="overflow-hidden rounded-md border border-white/10 bg-navy-900/80 shadow-2xl shadow-black/20">
+            <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-white">
+                  <MapPin className="h-4 w-4 text-gold" />
+                  <h2 className="font-semibold">South Florida coverage</h2>
+                </div>
+                <p className="mt-1 text-sm text-slate-400">Use the map as a general reference. We confirm service availability for each address.</p>
+              </div>
+              <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Miami-Dade, Broward, Palm Beach</span>
+            </div>
+            <div className="relative h-[360px] w-full sm:h-[440px]">
+              <iframe
+                title="Pinnacle Management Ventures South Florida service area map"
+                src={SOUTH_FLORIDA_MAP}
+                className="absolute inset-0 h-full w-full border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+            <div className="flex flex-col gap-2 border-t border-white/10 px-5 py-4 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+              <span>Primary on-site coverage is within the South Florida tri-county area.</span>
+              <a href="https://www.openstreetmap.org/#map=9/26.1224/-80.1373" target="_blank" rel="noreferrer" className="font-medium text-gold transition hover:text-gold/80">Open larger map</a>
+            </div>
+          </Reveal>
         </section>
 
         <section className="container-pmv py-14 sm:py-18">
