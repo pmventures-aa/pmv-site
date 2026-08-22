@@ -57,6 +57,39 @@ export function isZoomConfigured(env: Env): boolean {
   return zoomConfig(env) !== null
 }
 
+export interface ZoomConfigStatus {
+  configured: boolean
+  hasAccountId: boolean
+  hasClientId: boolean
+  hasClientSecret: boolean
+  hostEmail: string
+}
+
+/**
+ * Whether each Zoom credential is present, for the settings page.
+ *
+ * Booleans only. Never the values: this crosses the wire to a browser, and a
+ * client secret that reaches a browser is a leaked client secret regardless of
+ * who was looking at the page. Reporting each field separately rather than one
+ * "configured" flag is the difference between "Zoom does not work" and "you
+ * set two of the three".
+ *
+ * hostEmail is not a secret. It lives in wrangler.toml, and showing it is how
+ * you catch a meeting being created under the wrong account.
+ */
+export function zoomConfigStatus(env: Env): ZoomConfigStatus {
+  const hasAccountId = !!env.ZOOM_ACCOUNT_ID?.trim()
+  const hasClientId = !!env.ZOOM_CLIENT_ID?.trim()
+  const hasClientSecret = !!env.ZOOM_CLIENT_SECRET?.trim()
+  return {
+    configured: hasAccountId && hasClientId && hasClientSecret,
+    hasAccountId,
+    hasClientId,
+    hasClientSecret,
+    hostEmail: env.ZOOM_HOST_EMAIL?.trim() || 'me',
+  }
+}
+
 function base64(input: string): string {
   // btoa is available in Workers; this is ASCII credential material only.
   return btoa(input)
