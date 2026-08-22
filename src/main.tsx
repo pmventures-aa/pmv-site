@@ -21,6 +21,7 @@ const MobileDocumentHub = lazy(() => import('./pages/public/ServiceHubs').then((
 const ProjectGuidePage = lazy(() => import('./pages/public/ProjectGuides'))
 const About = lazy(() => import('./pages/public/About'))
 const HowItWorks = lazy(() => import('./pages/public/HowItWorks'))
+const AboutThisApp = lazy(() => import('./pages/public/AboutThisApp'))
 const Coverage = lazy(() => import('./pages/public/Coverage'))
 const Resources = lazy(() => import('./pages/public/Resources'))
 const Contact = lazy(() => import('./pages/public/Contact'))
@@ -114,6 +115,9 @@ function App() {
         <Route path="/request-assistance" element={<Navigate to="/scope-request" replace />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/coverage" element={<Coverage />} />
+        {/* Public, unauthenticated description of the application for the
+            Google OAuth review. Must never sit behind a login. */}
+        <Route path="/about-this-app" element={<AboutThisApp />} />
         <Route path="/resources" element={<Resources />} />
         <Route path="/instant-quote" element={<InstantQuote />} />
         <Route path="/consultation" element={<Consultation />} />
