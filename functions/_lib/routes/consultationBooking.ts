@@ -31,7 +31,6 @@ import { isSlotBookable } from '../../../shared/availability'
 import { loadScheduleRow, loadSchedule, loadBusyIntervals } from './availability'
 import { createZoomMeeting, deleteZoomMeeting, isZoomConfigured } from '../zoom'
 import { reserveClientAccount, sendReservedAccountWelcome } from '../reserveClientAccount'
-import { pushConsultationToGoogle, removeConsultationFromGoogle } from '../googleCalendarPush'
 
 export const consultationBookingPublicRoutes = new Hono<AppEnv>()
 export const consultationBookingAdminRoutes = new Hono<AppEnv>()
@@ -226,21 +225,6 @@ consultationBookingPublicRoutes.post('/consultation/book', async (c) => {
   }
 
   // Put it on the host's real calendar. After the write and never inside it:
-  // the booking is already true, so a Google failure downgrades to "not on
-  // your phone yet" rather than rolling anything back. pushConsultationToGoogle
-  // swallows its own errors and records why in consultation_calendar_links.
-  await pushConsultationToGoogle(c.env, row.host_user_id, {
-    bookingId,
-    contactName: name,
-    email,
-    phone: phone || null,
-    topic: topic || null,
-    startsAt: startIso,
-    endsAt: endIso,
-    timezone: schedule.timezone,
-    meetingFormat,
-    joinUrl: meeting?.joinUrl ?? null,
-  })
 
   const manageUrl = `${PUBLIC_SITE_BASE}/consultation/booking?ref=${encodeURIComponent(publicToken)}`
 
@@ -361,8 +345,6 @@ consultationBookingPublicRoutes.get('/consultation/booking/:ref', async (c) => {
 
 consultationBookingPublicRoutes.post('/consultation/booking/:ref/cancel', async (c) => {
   const ref = c.req.param('ref') ?? ''
-  // host_user_id comes along so the Google event can be deleted from the same
-  // calendar it was written to.
   const row = await c.env.DB.prepare(
     `SELECT b.id, b.calendar_event_id, b.contact_name, b.email, b.starts_at, b.timezone, b.status,
             b.meeting_provider, b.meeting_external_id, s.host_user_id
@@ -407,9 +389,6 @@ consultationBookingPublicRoutes.post('/consultation/booking/:ref/cancel', async 
     if (!removed.ok) console.error('[zoom] consultation meeting delete failed', removed.reason, removed.detail)
   }
 
-  // And off the host's Google calendar, for the same reason: a cancelled hour
-  // that still shows as busy makes the host unbookable for no purpose.
-  await removeConsultationFromGoogle(c.env, row.host_user_id, row.id)
 
   await notifyStaff(c.env, {
     staffUserIds: [],

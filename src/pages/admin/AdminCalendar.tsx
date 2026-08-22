@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-import { PageIntro, Panel, EmptyState, Tag, inputCls, btnPrimary } from '../../components/admin/ui'
+import { PageIntro, Tag, inputCls, btnPrimary } from '../../components/admin/ui'
 import { Dialog, DialogContent } from '../../components/kit/Dialog'
 import { CalendarGrid, type CalendarMode } from '../../components/calendar/CalendarGrid'
 import { CalendarEventDetailPanel, type CalendarInviteState } from '../../components/calendar/CalendarEventDetail'
@@ -129,14 +129,25 @@ export default function AdminCalendar() {
   return (
     <div className="space-y-4">
       <PageIntro
+        section="Delivery"
         kicker="Schedule"
         title="Calendar"
-        subtitle="Every appointment, deadline, visit, and signature window across your book of business, unified from the domain records that own them."
+        subtitle="Consultations, field visits, notarizations, and signature windows, from the records that own them."
         action={<CreateEventDialog clients={clients} staff={staff} onCreated={() => void load()} />}
       />
 
-      <Panel className="p-3">
-        <div className="flex flex-wrap items-end gap-3">
+      <details className="group rounded-lg border border-white/10 bg-white/[.02]" open={hasFilters}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5">
+          <span className="flex items-center gap-2 text-xs font-bold text-slate-300">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Filters
+            {hasFilters && <Tag tone="gold">On</Tag>}
+          </span>
+          <span className="text-[11px] text-slate-500 group-open:hidden">
+            {hasFilters ? 'Some events are hidden' : 'Showing everything'}
+          </span>
+        </summary>
+        <div className="flex flex-wrap items-end gap-3 border-t border-white/[.08] p-3">
           <label className="block">
             <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Type</span>
             <select className={selectCls} value={eventType} onChange={(e) => setEventType(e.target.value)}>
@@ -183,13 +194,11 @@ export default function AdminCalendar() {
             </button>
           )}
         </div>
-      </Panel>
+      </details>
 
       <div className="rounded-xl border border-white/10 bg-white/[.02] p-4">
         {loading && events.length === 0 ? (
-          <p className="py-16 text-center text-sm text-slate-500">Loading calendar…</p>
-        ) : events.length === 0 ? (
-          <EmptyState label="No events match this view. Adjust the range or filters." />
+          <CalendarSkeleton />
         ) : (
           <CalendarGrid
             events={events}
@@ -199,6 +208,11 @@ export default function AdminCalendar() {
             onDateChange={setDate}
             onSelectEvent={setSelected}
           />
+        )}
+        {!loading && events.length === 0 && (
+          <p className="mt-3 rounded-lg border border-dashed border-white/12 bg-white/[.02] px-4 py-3 text-center text-xs text-slate-400">
+            Nothing scheduled in this view.{hasFilters ? ' Filters are on, so there may be events you are not seeing.' : ''}
+          </p>
         )}
       </div>
 
@@ -365,5 +379,22 @@ function CreateEventDialog({ clients, staff, onCreated }: { clients: ClientOptio
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** A month-shaped placeholder, so the page does not jump when events land. */
+function CalendarSkeleton() {
+  return (
+    <div role="status" aria-label="Loading calendar">
+      <div className="flex items-center justify-between gap-3">
+        <div className="h-8 w-40 animate-pulse rounded-md bg-white/[.06]" />
+        <div className="h-8 w-44 animate-pulse rounded-md bg-white/[.06]" />
+      </div>
+      <div className="mt-4 grid grid-cols-7 gap-1.5">
+        {Array.from({ length: 42 }).map((_, i) => (
+          <div key={i} className="h-20 animate-pulse rounded-md bg-white/[.04]" />
+        ))}
+      </div>
+    </div>
   )
 }

@@ -36,10 +36,11 @@ describe('the select can never be left unusable', () => {
 })
 
 describe('the sections themselves are unchanged', () => {
-  it('still offers Calendar and Consultation Booking to any staff member', () => {
-    // Only deletions and templates are owner-gated; a missing Calendar tab is
-    // a layout problem, never a permission one.
-    expect(page).toContain("key: 'calendar', label: 'Calendar'")
+  it('still offers Consultation Booking to any staff member', () => {
+    // The Calendar tab was the Google Calendar sync connector and went with
+    // that integration. Consultation Booking is the surface that survived, and
+    // a missing tab there is a layout problem, never a permission one.
+    expect(page).not.toContain("key: 'calendar', label: 'Calendar'")
     expect(page).toContain("key: 'booking', label: 'Consultation Booking'")
     expect(page).toContain("TABS.filter((item) => !['deletions', 'templates'].includes(item.key) || caps.is_owner)")
   })
