@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { CheckCircle2, Clock, FileText, Loader2, Lock, LogOut, MessageSquareReply, ShieldCheck, UserRound, Wallet, Briefcase, Users } from 'lucide-react'
+import { CheckCircle2, Clock, FileText, Loader2, LogOut, MessageSquareReply, ShieldCheck, UserRound } from 'lucide-react'
 import { api } from '../../lib/api'
 import { useAuth, isApiError } from '../../lib/auth'
 import { Crest } from '../../components/ui'
@@ -93,7 +93,6 @@ export default function UnderReviewShell() {
               <ProfileCard profile={data.profile} onSaved={load} />
             )}
             <FollowUps items={data.followUps} onAnswered={load} />
-            <ComingSoon />
           </motion.div>
         ) : null}
       </main>
@@ -325,33 +324,3 @@ function FollowUpCard({ item, onAnswered }: { item: FollowUpRequest; onAnswered:
   )
 }
 
-const COMING_SOON = [
-  { icon: Briefcase, label: 'Jobs & assignments', blurb: 'Accept and manage work once approved.' },
-  { icon: FileText, label: 'Documents', blurb: 'Agreements, tax forms, and proof of work.' },
-  { icon: Wallet, label: 'Payouts', blurb: 'Track earnings and payment history.' },
-  { icon: Users, label: 'Network directory', blurb: 'Your profile in the provider network.' },
-] as const
-
-function ComingSoon() {
-  return (
-    <section>
-      <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-slate-200">Unlocks when you're approved</h2>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        {COMING_SOON.map(({ icon: Icon, label, blurb }) => (
-          <div key={label} className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[.02] p-5">
-            <div className="pointer-events-none select-none blur-[2px] [filter:blur(2px)]">
-              <span className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 bg-white/[.03] text-slate-400"><Icon size={17} /></span>
-              <p className="mt-3 text-sm font-semibold text-slate-200">{label}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">{blurb}</p>
-            </div>
-            <div className="absolute inset-0 grid place-items-center bg-[#06111f]/35">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#06111f]/70 px-3 py-1 text-[11px] font-semibold text-slate-300">
-                <Lock size={12} className="text-gold/80" /> Coming soon
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
