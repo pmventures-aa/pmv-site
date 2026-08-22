@@ -50,20 +50,19 @@ export function Header() {
         <nav className="hidden items-center gap-6 text-sm text-slate-300 lg:flex" aria-label="Primary navigation">
           <div className="group relative">
             <Link to="/services" className="inline-flex items-center gap-1.5 font-semibold transition-colors hover:text-gold">Services <Icon name="chevronDown" size={13} /></Link>
-            <div className="invisible absolute left-1/2 top-full w-[min(780px,calc(100vw-2rem))] -translate-x-1/2 pt-5 opacity-0 transition duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+            <div className="invisible absolute left-1/2 top-full w-[min(660px,calc(100vw-2rem))] -translate-x-1/2 pt-5 opacity-0 transition duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
               <div className="rounded-xl border border-white/10 bg-navy-950 p-2 shadow-[0_24px_70px_rgba(0,0,0,.38)]">
                 <div className="grid grid-cols-3">
                   {pathways.map((item) => (
-                    <div key={item.to} className="border-r border-white/[.07] p-5 last:border-r-0">
+                    <div key={item.to} className="border-r border-white/[.07] p-4 last:border-r-0">
                       <ViewTransitionLink to={item.to} className="group/item block rounded-lg hover:bg-white/[.03]">
                         <p className="text-[10px] font-bold uppercase tracking-[.14em] text-gold">{item.label}</p>
-                        <p className="mt-2 text-sm font-bold text-white group-hover/item:text-gold">{item.title}</p>
-                        <p className="mt-2 text-xs leading-5 text-slate-400">{item.body}</p>
+                        <p className="mt-1.5 text-sm font-bold text-white group-hover/item:text-gold">{item.title}</p>
                       </ViewTransitionLink>
-                      <ul className="mt-4 space-y-2 border-t border-white/[.06] pt-3">
+                      <ul className="mt-3 space-y-1.5 border-t border-white/[.06] pt-3">
                         {(pathwayLinks[item.key] ?? []).map((link) => (
                           <li key={link.to}>
-                            <ViewTransitionLink to={link.to} className="block text-xs font-medium text-slate-400 transition-colors hover:text-gold">{link.label}</ViewTransitionLink>
+                            <ViewTransitionLink to={link.to} className="block py-0.5 text-xs font-medium text-slate-300 transition-colors hover:text-gold">{link.label}</ViewTransitionLink>
                           </li>
                         ))}
                       </ul>

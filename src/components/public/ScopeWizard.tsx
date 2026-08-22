@@ -53,6 +53,7 @@ function UseMyLocationButton({ onResolved }: { onResolved: (a: GeoHit) => void }
   )
 }
 
+type StepKey = 'work' | 'place' | 'specifics' | 'timing' | 'details' | 'contact'
 type ScopeResponse = { confirmation_url:string; request_token?:string; setup_url?:string|null; account_status?:string }
 type Form = {
   job_type:string
@@ -189,7 +190,7 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
   const initialJob=visibleJobs.some((job)=>job.value===preselected)?preselected:(worldDefaultJob&&visibleJobs.some((job)=>job.value===worldDefaultJob)?worldDefaultJob:(entry?.job||''))
   const restoredDraft=readScopeDraft(draftKey)
   const [locked,setLocked]=useState(!!entry)
-  const [step,setStep]=useState<number>(()=>restoredDraft?restoredDraft.step:(initialJob?1:0));const [busy,setBusy]=useState(false);const [error,setError]=useState('')
+  const [step,setStep]=useState<number>(()=>restoredDraft?restoredDraft.step:((initialJob&&!entry)?1:0));const [busy,setBusy]=useState(false);const [error,setError]=useState('')
   const [form,setForm]=useState<Form>(()=>{
     if(restoredDraft)return restoredDraft.form
     return {
@@ -236,13 +237,17 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     playPublicSound('step')
   }
 
+  // One screen, one thing to get wrong, so the message can name it exactly.
+  function validate(key:StepKey):string|null{
+    if(key==='work'&&!form.job_type)return 'Choose the kind of work you need.'
+    if(key==='place'&&form.location_type==='onsite'&&(!form.city.trim()||!form.state.trim()))return 'Enter the city and state for the on-site work.'
+    if(key==='timing'&&!form.timing)return 'Choose the timing that is closest to what you need.'
+    return null
+  }
   function next(){
-    if(step===0&&!form.job_type)return setError('Choose the kind of work you need.')
-    if(step===1){
-      if(form.location_type==='onsite'&&(!form.city.trim()||!form.state.trim()))return setError('Enter the city and state for the on-site work.')
-      if(!form.timing)return setError('Choose the timing that is closest to what you need.')
-    }
-    setError('');setStep(value=>Math.min(2,value+1));playPublicSound('step')
+    const problem=validate(currentKey)
+    if(problem)return setError(problem)
+    setError('');setStep(value=>Math.min(stepKeys.length-1,value+1));playPublicSound('step')
   }
   async function submit(){
     if(!form.contact_name.trim())return setError('Enter your name.')
@@ -275,15 +280,26 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
   }
 
   const selectedLabel=entry && form.job_type===entry.job ? entry.pickerLabel : jobs.find(j=>j.value===form.job_type)?.label
-  const totalSteps = 3
-  const displayTotal = locked ? totalSteps - 1 : totalSteps
-  const displayStep = locked ? step : step + 1
-  const progressPct = (displayStep / displayTotal) * 100
-  const showDetailsStep = step === 1
-  const showContactStep = step === 2
-  const isLastStep = showContactStep
   const showLocationToggle = flexibleLocationJobs.has(form.job_type)
   const showAddress = form.location_type==='onsite' || propertyJobs.has(form.job_type)
+  // The form is a conversation, so each screen asks about ONE thing. Which
+  // screens exist depends on the answers: a remote job never asks for an
+  // address, and a job with no catalog questions never shows that screen.
+  // Building the list instead of hard-coding indices is what lets the flow
+  // shorten itself rather than showing empty sections.
+  const stepKeys = useMemo(() => {
+    const keys: StepKey[] = locked ? [] : ['work']
+    if (showLocationToggle || showAddress) keys.push('place')
+    if (activeQuestions.length) keys.push('specifics')
+    keys.push('timing', 'details', 'contact')
+    return keys
+  }, [locked, showLocationToggle, showAddress, activeQuestions.length])
+
+  const currentKey: StepKey = stepKeys[Math.min(step, stepKeys.length - 1)] ?? 'work'
+  const isLastStep = currentKey === 'contact'
+  const displayTotal = stepKeys.length
+  const displayStep = Math.min(step + 1, displayTotal)
+  const progressPct = (displayStep / displayTotal) * 100
   const addressLabel = propertyJobs.has(form.job_type) ? 'What is the property address?' : 'Where does this need to happen?'
   const detailsPlaceholder = entry?.id==='moving-data-between-systems'
     ? 'Anything else about the source, destination, or records that must survive the move.'
@@ -299,10 +315,14 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
   // Named steps, plus a line that repeats back what they just told us before
   // asking the next thing. Built in shared/guidedIntake so the phrasing and
   // the honesty rule behind it are the same on every questionnaire.
-  const stepNames = locked ? ['The details','Where to reply'] : ['The work','The details','Where to reply']
-  const activeStepIndex = locked ? step-1 : step
+  const STEP_NAMES: Record<StepKey,string> = {
+    work:'The work', place:'Where', specifics:'Specifics',
+    timing:'When', details:'Anything else', contact:'Where to reply',
+  }
+  const stepNames = stepKeys.map((key)=>STEP_NAMES[key])
+  const activeStepIndex = Math.min(step, stepKeys.length-1)
   const helperLine = acknowledgement(
-    step===0 ? 'opening' : step===1 ? 'details' : 'contact',
+    currentKey==='work' ? 'opening' : currentKey==='contact' ? 'contact' : 'details',
     {
       workLabel: selectedLabel,
       city: form.city,
@@ -313,8 +333,8 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     },
   )
 
-  return <div className={`overflow-hidden rounded-2xl border border-white/10 bg-navy-900/75 shadow-[0_24px_80px_rgba(0,0,0,.24)] ${compact?'':'max-w-5xl'}`}>
-    <div className="border-b border-white/10 px-5 py-4 sm:px-7">
+  return <div className={`overflow-hidden rounded-2xl border border-white/10 bg-navy-900/75 shadow-[0_24px_80px_rgba(0,0,0,.24)] ${compact?'':'max-w-3xl'}`}>
+    <div className="border-b border-white/10 px-5 py-3.5 sm:px-6">
       <div className="flex items-center justify-between gap-5">
         <div><p className="eyebrow">{selectedLabel||copy.eyebrow}</p><p className="mt-1 text-xs text-slate-500">About two minutes · no account needed · a real person replies within {replyWindow}</p></div>
         <span className="shrink-0 text-xs font-bold text-gold">Step {displayStep} of {displayTotal}</span>
@@ -335,14 +355,14 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
       </AnimatePresence>
     </div>
 
-    <div className="p-5 sm:p-7"><AnimatePresence mode="wait" initial={false}>
+    <div className="p-5 sm:p-6"><AnimatePresence mode="wait" initial={false}>
       <motion.div key={step} initial={{opacity:0,x:16}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-12}} transition={{duration:.18}}>
-        {locked && entry && step>0 && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/25 bg-gold/[.06] px-4 py-3">
+        {locked && entry && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/25 bg-gold/[.06] px-4 py-3">
           <p className="text-sm text-white"><span className="text-[10px] font-bold uppercase tracking-[.14em] text-gold">This request</span><span className="mt-0.5 block font-semibold">{entry.pickerLabel}</span></p>
           <button type="button" className="text-xs font-bold text-gold hover:underline" onClick={()=>{setLocked(false);setStep(0)}}>Choose a different need</button>
         </div>}
 
-        {step===0 && <div>
+        {currentKey==='work' && <div>
           {rememberedWorld&&rememberedWorld!=='general'&&(
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/25 bg-gold/[.06] px-4 py-3">
               <p className="text-sm text-white"><span className="text-[10px] font-bold uppercase tracking-[.14em] text-gold">Remembered</span><span className="mt-0.5 block font-semibold">Earlier you were looking at {WORLD_LABEL[rememberedWorld]??rememberedWorld} support.</span></p>
@@ -362,10 +382,8 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
           </div>
         </div>}
 
-        {showDetailsStep && <div>
-          <h3 className="text-xl font-bold text-white">{detailsTitle}</h3>
-          <p className="mt-1 text-sm text-slate-400">Same structure on every request: location, a yes or no, then photos, reports, or a quick check-in.</p>
-
+        {currentKey==='place' && <div>
+          <h3 className="text-xl font-bold text-white">{showLocationToggle ? 'Where does this need to happen?' : addressLabel}</h3>
           {showLocationToggle && <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <button type="button" onClick={()=>update('location_type','onsite')} className={optionButtonCls(form.location_type==='onsite')}><strong className="block text-white">At a location</strong><span className="mt-1 block text-xs font-normal text-slate-400">A property, office, courthouse, care facility, or other site.</span></button>
             <button type="button" onClick={()=>update('location_type','remote')} className={optionButtonCls(form.location_type==='remote')}><strong className="block text-white">Remote or nationwide</strong><span className="mt-1 block text-xs font-normal text-slate-400">RON, document prep, or coordination that does not require a site visit.</span></button>
@@ -402,21 +420,30 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
             </div>
             <p className="text-[11px] text-slate-500">Use My Current Location prefills the address you are standing at right now. You can still search or type a different service address instead.</p>
           </div>}
-
-          <div className="mt-6 space-y-5">{activeQuestions.map((q)=>
-            <QuestionField key={q.key} q={q} val={form.service_answers[q.key]} onChange={(v)=>setAnswer(q.key,v)}/>
-          )}</div>
-
-          <div className="mt-6">
-            <label className="block text-sm font-semibold text-white">{TIMING_QUESTION}</label>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">{timings.map(item=>
-              <button key={item} type="button" onClick={()=>update('timing',item)} className={optionButtonCls(form.timing===item)}>{item}</button>)}
-            </div>
-          </div>
-          <textarea className="input mt-5 min-h-24 resize-y" placeholder={detailsPlaceholder} value={form.details} onChange={e=>update('details',e.target.value)}/>
         </div>}
 
-        {showContactStep && <div>
+        {currentKey==='specifics' && <div>
+          <h3 className="text-xl font-bold text-white">{detailsTitle}</h3>
+          <div className="mt-5 space-y-5">{activeQuestions.map((q)=>
+            <QuestionField key={q.key} q={q} val={form.service_answers[q.key]} onChange={(v)=>setAnswer(q.key,v)}/>
+          )}</div>
+        </div>}
+
+        {currentKey==='timing' && <div>
+          <h3 className="text-xl font-bold text-white">{TIMING_QUESTION}</h3>
+          <p className="mt-1 text-sm text-slate-400">Whatever is closest. We will confirm the real date with you.</p>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">{timings.map(item=>
+            <button key={item} type="button" onClick={()=>{update('timing',item)}} className={optionButtonCls(form.timing===item)}>{item}</button>)}
+          </div>
+        </div>}
+
+        {currentKey==='details' && <div>
+          <h3 className="text-xl font-bold text-white">Anything else we should know?</h3>
+          <p className="mt-1 text-sm text-slate-400">Optional. Skip it and we will ask on the call.</p>
+          <textarea className="input mt-5 min-h-28 resize-y" placeholder={detailsPlaceholder} value={form.details} onChange={e=>update('details',e.target.value)}/>
+        </div>}
+
+        {currentKey==='contact' && <div>
           <h3 className="text-xl font-bold text-white">Last step - where should we reply?</h3>
           <p className="mt-1 text-sm text-slate-400">Sending this reserves a client workspace as a lead. You can set a password after, or we will email a setup link. Logging in later is what turns a lead into a prospect.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -438,8 +465,10 @@ export function ScopeWizard({source='scope-page',compact=false}:{source?:string;
     </AnimatePresence>
     {error && <p role="alert" className="mt-4 rounded-lg border border-red-400/20 bg-red-400/[.06] px-4 py-3 text-sm text-red-200">{error}</p>}
     <div className="mt-6 flex items-center justify-between gap-3">
-      {step>0 ? <button type="button" className="btn-outline" onClick={()=>{setError('');if(locked&&step===1){setLocked(false);setStep(0)}else setStep(v=>v-1)}}>Back</button> : <span/>}
-      {step===0
+      {step>0 ? <button type="button" className="btn-outline" onClick={()=>{setError('');setStep(v=>v-1)}}>Back</button>
+        : locked ? <button type="button" className="btn-outline" onClick={()=>{setError('');setLocked(false);setStep(0)}}>Back</button>
+        : <span/>}
+      {currentKey==='work'
         ? <span/>
         : !isLastStep
           ? <button type="button" className="btn-gold" onClick={next}>Continue</button>

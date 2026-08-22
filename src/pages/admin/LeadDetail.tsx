@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../../lib/api'
 import { useAppPath } from '../../lib/basePath'
 import { lifecycleLabel } from '../../../shared/lifecycle'
+import { JourneyChip, JourneyRail } from '../../components/admin/JourneyChip'
 import { Panel, Tag, inputCls, btnPrimary, btnOutline, EmptyState } from '../../components/admin/ui'
 import { toast } from '../../components/kit/toast'
 import { describeActivity, timeAgo, type ActivityEvent } from '../../lib/activity'
@@ -53,14 +54,6 @@ interface StaffMember { id: string; full_name: string | null; email: string }
 interface Bundle { record: LeadRecord; notes: NoteRow[]; emails: EmailRow[]; activity: ActivityRow[]; lists: CRMList[]; tags: { id: string; name: string }[]; conversion: { client_user_id: string } | null }
 
 type Tab = 'overview' | 'activity' | 'lists' | 'details'
-
-function lifecycleTone(stage: string): 'gold' | 'green' | 'blue' | 'slate' | 'red' {
-  if (stage === 'opportunity') return 'gold'
-  if (stage === 'prospect') return 'blue'
-  if (stage === 'lost') return 'red'
-  if (stage === 'converted') return 'green'
-  return 'slate'
-}
 
 function plainText(html: string) {
   return html.replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim()
@@ -169,7 +162,7 @@ export default function LeadDetail() {
               {location && <span>{location}</span>}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Tag tone={lifecycleTone(r.lifecycle_stage)}>{lifecycleLabel(r.lifecycle_stage)}</Tag>
+              <JourneyChip stage={r.lifecycle_stage} />
               <Tag>{r.status}</Tag>
               {r.client_user_id && !r.converted_at && <Tag tone="blue">Reserved workspace</Tag>}
               {r.email_status !== 'emailable' && <Tag tone="red">Email {r.email_status}</Tag>}
@@ -197,7 +190,7 @@ export default function LeadDetail() {
         <section>
           <div className="mb-5 flex items-end justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Relationship</p><h2 className="mt-1 text-xl font-semibold text-white">What we know</h2></div><button onClick={() => setEditing((v) => !v)} className="text-sm font-medium text-gold hover:underline">{editing ? 'Done' : 'Edit details'}</button></div>
           {editing ? <RecordEditor record={r} staff={staff} onSave={async (patch) => { await updateRecord(patch); setEditing(false) }} /> : <dl className="grid border-y border-white/10 sm:grid-cols-2">
-            <Info label="Lifecycle" value={lifecycleLabel(r.lifecycle_stage)} />
+            <div className="sm:col-span-2"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">Journey</p><div className="mt-2"><JourneyRail stage={r.lifecycle_stage} /></div></div>
             <Info label="Pipeline stage" value={r.status} />
             <Info label="Owner" value={r.owner_name || r.owner_email || 'Unassigned'} />
             <Info label="Interested in" value={r.service_name || 'Not specified'} />

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
-import { lifecycleLabel } from '../../../shared/lifecycle'
+import { JourneyChip } from './JourneyChip'
 import { crmRecordLine } from '../../../shared/crmRecord'
 import { useAppPath } from '../../lib/basePath'
 
@@ -53,7 +53,7 @@ export function GlobalSearch({ className = '' }: { className?: string }) {
       {showPanel && <div className="absolute left-0 top-10 z-30 max-h-[28rem] w-96 overflow-y-auto rounded-md border border-white/10 bg-navy-900 shadow-lg">
         {loading ? <p className="px-4 py-6 text-center text-sm text-slate-400">Searching…</p> : !hasAny ? <p className="px-4 py-6 text-center text-sm text-slate-400">No matches for "{q.trim()}".</p> : <div className="divide-y divide-white/5">
           {results.clients.length > 0 && <SearchGroup label="Clients">{results.clients.map((r) => <Link key={r.id} to={p(`clients/${r.public_ref}/overview`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.full_name || r.email}</p><p className="text-xs text-slate-500">{r.business_name || r.email}</p></Link>)}</SearchGroup>}
-          {results.inquiries.length > 0 && <SearchGroup label="Leads & Prospects">{results.inquiries.map((r) => <Link key={r.id} to={p(`leads/${r.id}/overview`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.name}</p><p className="text-xs text-slate-500">{crmRecordLine(r)} · {lifecycleLabel(r.lifecycle_stage)}</p></Link>)}</SearchGroup>}
+          {results.inquiries.length > 0 && <SearchGroup label="Leads & Prospects">{results.inquiries.map((r) => <Link key={r.id} to={p(`leads/${r.id}/overview`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.name}</p><p className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">{crmRecordLine(r)} <JourneyChip stage={r.lifecycle_stage} /></p></Link>)}</SearchGroup>}
           {results.quotes.length > 0 && <SearchGroup label="Quotes">{results.quotes.map((r) => <Link key={r.id} to={`${p('quotes')}?quote=${encodeURIComponent(r.id)}`} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.quote_number}: {r.title}</p><p className="text-xs text-slate-500">{r.recipient_name} · {r.status} · {money(r.total_cents)}</p></Link>)}</SearchGroup>}
           {results.matters.length > 0 && <SearchGroup label="Matters">{results.matters.map((r) => <Link key={r.id} to={p(`clients/${r.client_public_ref}`)} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.title}</p><p className="text-xs text-slate-500">{r.client_name || r.client_email} · {r.status.replace(/_/g, ' ')}</p></Link>)}</SearchGroup>}
           {results.invoices.length > 0 && <SearchGroup label="Invoices">{results.invoices.map((r) => <Link key={r.id} to={`${p('invoices')}?invoice=${encodeURIComponent(r.id)}`} onClick={go} className="block px-4 py-2.5 text-sm hover:bg-white/5"><p className="text-slate-200">{r.invoice_number || money(r.amount_cents)}: {r.status.replace(/_/g, ' ')}</p><p className="text-xs text-slate-500">{r.title || r.client_name || r.client_email}</p></Link>)}</SearchGroup>}
